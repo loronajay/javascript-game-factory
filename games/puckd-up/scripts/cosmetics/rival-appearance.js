@@ -10,7 +10,7 @@
 // player's own saved public loadout, fetched from the platform. Two sources,
 // one shape, and neither is reachable from the Garage.
 
-import { normalizeGarage } from "./loadout.js";
+import { normalizeLoadout } from "./loadout.js";
 
 /** A rival's design keyword to the equipment it stands for. */
 const RIVAL_KIT = {
@@ -31,17 +31,19 @@ const RIVAL_KIT = {
 const FALLBACK = RIVAL_KIT.classic;
 
 /**
- * A rival's equipment as an ordinary garage document.
+ * A rival's equipment as an ordinary LOADOUT.
  *
- * Built through `normalizeGarage`, so a rival is subject to exactly the same
- * bounds and fallbacks a player is — a typo in the table above degrades to the
+ * One design, the same shape the player's equipped slot has — a rival has no
+ * garage of saved alternatives, because nothing ever asks them to switch.
+ * Built through `normalizeLoadout`, so a rival is subject to exactly the same
+ * bounds and fallbacks a player is: a typo in the table above degrades to the
  * factory loadout rather than drawing something impossible.
  */
-export function rivalGarage(rival) {
+export function rivalLoadout(rival) {
   const kit = RIVAL_KIT[rival?.design] ?? FALLBACK;
   const primary = rival?.color || "#3f7194";
   const accent = rival?.accent || "#d8dde2";
-  return normalizeGarage({
+  return normalizeLoadout({
     mallet: {
       shapePreset: kit.shape,
       material: { preset: kit.material },

@@ -10,6 +10,11 @@
 // the account holds the truth; this screen only ever reports what the store
 // says, so SAVED means the API accepted it and SAVE FAILED means it did not.
 //
+// ONE SLOT AT A TIME. A player keeps several designs, and the one being EDITED
+// is always the one EQUIPPED — picking a slot equips it. That is why there is no
+// "apply to slot" step to get wrong and no way for the panel to be editing a
+// design that is not the one on the table behind it.
+//
 // MY HALF ONLY. There is no side selector here and no hidden one: the table tab
 // edits `tableHalf`, the renderer is handed `'player'`, and the opponent's half
 // is drawn from the rival's kit or their own public loadout. The absence is the
@@ -23,6 +28,8 @@ import { TABLE_SURFACE_BY_ID, TABLE_RAIL_BY_ID, TABLE_GOAL_BY_ID } from "../cosm
 import {
   applyShapePreset, applyMaterialPreset, applySurfacePreset, applyRailPreset, applyGoalPreset,
   matchingShapePresetId, matchingMaterialPresetId,
+  equippedLoadout, replaceLoadout, selectLoadout, addLoadout, removeLoadout, renameLoadout,
+  MAX_LOADOUTS,
 } from "../cosmetics/loadout.js";
 import {
   STATUS_SIGNED_OUT, STATUS_LOADING, STATUS_SAVED, STATUS_UNSAVED, STATUS_SAVING, STATUS_ERROR,
@@ -56,7 +63,8 @@ export function createGarageScreen({ doc, match, view, store }) {
   const abort = new AbortController(), options = { signal: abort.signal };
   const el = Object.fromEntries(
     ["garageScreen", "garageEditor", "garageTabs", "garageCamera", "garageSave", "garageStatus",
-     "garageStatusNote", "garageRevert", "garageBack", "garageCollision"]
+     "garageStatusNote", "garageRevert", "garageBack", "garageCollision",
+     "garageSlotRow", "garageSlotName", "garageSlotNew", "garageSlotCopy", "garageSlotDelete"]
       .map((id) => {
         const node = doc.getElementById(id);
         if (!node) throw new Error(`Missing garage element: ${id}`);
@@ -77,15 +85,20 @@ export function createGarageScreen({ doc, match, view, store }) {
     return node;
   };
 
+  /** The design under the cursor: the equipped slot of the working copy. */
+  const editing = () => equippedLoadout(store.garage);
+
   function commit(next) {
     store.update(next);
-    view.equipPlayer(store.garage);
+    view.equipPlayer(store.editing);
     refreshValues();
+    refreshSlots();
     refreshStatus();
   }
 
+  /** Every control edits the EQUIPPED loadout, addressed by id rather than index. */
   function setPath(path, value) {
-    commit(writePath(store.garage, path, value));
+    commit(replaceLoadout(store.garage, writePath(editing(), path, value)));
   }
 
   /**
@@ -96,15 +109,15 @@ export function createGarageScreen({ doc, match, view, store }) {
    * from, and moving a slider back reports the preset again.
    */
   function activePresetId(field) {
-    const garage = store.garage;
-    if (field.apply === "shape") return matchingShapePresetId(garage.mallet.geometry);
-    if (field.apply === "material") return matchingMaterialPresetId(garage.mallet.material);
+    const loadout = editing();
+    if (field.apply === "shape") return matchingShapePresetId(loadout.mallet.geometry);
+    if (field.apply === "material") return matchingMaterialPresetId(loadout.mallet.material);
     const [lookup, section, key] = {
-      surface: [TABLE_SURFACE_BY_ID, garage.tableHalf.surface, "surface"],
-      rails: [TABLE_RAIL_BY_ID, garage.tableHalf.rails, "rails"],
-      goal: [TABLE_GOAL_BY_ID, garage.tableHalf.goal, "goal"],
+      surface: [TABLE_SURFACE_BY_ID, loadout.tableHalf.surface, "surface"],
+      rails: [TABLE_RAIL_BY_ID, loadout.tableHalf.rails, "rails"],
+      goal: [TABLE_GOAL_BY_ID, loadout.tableHalf.goal, "goal"],
     }[field.apply] ?? [];
-    if (!lookup) return readPath(garage, field.path);
+    if (!lookup) return readPath(loadout, field.path);
     const preset = lookup.get(section.preset);
     if (!preset) return null;
     return Object.entries(preset[key]).every(([name, value]) => section[name] === value) ? preset.id : null;
@@ -129,7 +142,9 @@ export function createGarageScreen({ doc, match, view, store }) {
       if (option.blurb) button.append(make("small", null, option.blurb));
       button.addEventListener("click", () => {
         const applier = PRESET_APPLIERS[field.apply];
-        commit(applier ? applier(store.garage, option.id) : writePath(store.garage, field.path, option.id));
+        commit(applier
+          ? applier(store.garage, option.id)
+          : replaceLoadout(store.garage, writePath(editing(), field.path, option.id)));
       }, options);
       grid.append(button);
       return { id: option.id, button };
@@ -168,7 +183,7 @@ export function createGarageScreen({ doc, match, view, store }) {
     controls.push({
       node: row,
       sync() {
-        const current = readPath(store.garage, field.path);
+        const current = readPath(editing(), field.path);
         if (doc.activeElement !== input) input.value = String(current);
         value.textContent = field.bounds.step >= 1 ? String(Math.round(current)) : current.toFixed(2);
       },
@@ -199,7 +214,7 @@ export function createGarageScreen({ doc, match, view, store }) {
     controls.push({
       node: row,
       sync() {
-        const current = readPath(store.garage, field.path);
+        const current = readPath(editing(), field.path);
         if (doc.activeElement !== picker) picker.value = current;
       },
     });
@@ -213,12 +228,12 @@ export function createGarageScreen({ doc, match, view, store }) {
     button.append(make("span", null, field.label));
     const state = make("b", null, "Off");
     button.append(state);
-    button.addEventListener("click", () => setPath(field.path, !readPath(store.garage, field.path)), options);
+    button.addEventListener("click", () => setPath(field.path, !readPath(editing(), field.path)), options);
     row.append(button);
     controls.push({
       node: row,
       sync() {
-        const on = Boolean(readPath(store.garage, field.path));
+        const on = Boolean(readPath(editing(), field.path));
         state.textContent = on ? "On" : "Off";
         button.classList.toggle("selected", on);
         button.setAttribute("aria-pressed", String(on));
@@ -235,7 +250,7 @@ export function createGarageScreen({ doc, match, view, store }) {
     const clear = make("button", "garageChip garageDecalClear");
     clear.type = "button";
     clear.append(make("b", null, "None"));
-    clear.addEventListener("click", () => commit(writePath(store.garage, `${field.path}.type`, "none")), options);
+    clear.addEventListener("click", () => commit(replaceLoadout(store.garage, writePath(editing(), `${field.path}.type`, "none"))), options);
     row.append(clear);
 
     const tiles = [];
@@ -253,8 +268,8 @@ export function createGarageScreen({ doc, match, view, store }) {
         image.loading = "lazy";
         button.append(image);
         button.addEventListener("click", () => {
-          const next = writePath(store.garage, `${field.path}.type`, "builtin");
-          commit(writePath(next, `${field.path}.id`, decal.id));
+          const next = writePath(editing(), `${field.path}.type`, "builtin");
+          commit(replaceLoadout(store.garage, writePath(next, `${field.path}.id`, decal.id)));
         }, options);
         grid.append(button);
         tiles.push({ id: decal.id, button });
@@ -265,7 +280,7 @@ export function createGarageScreen({ doc, match, view, store }) {
     controls.push({
       node: row,
       sync() {
-        const decal = readPath(store.garage, field.path);
+        const decal = readPath(editing(), field.path);
         clear.classList.toggle("selected", decal.type === "none");
         for (const tile of tiles) {
           const selected = decal.type === "builtin" && decal.id === tile.id;
@@ -305,6 +320,95 @@ export function createGarageScreen({ doc, match, view, store }) {
   panes.mallet.append(buildGroups(MALLET_GROUPS));
   panes.table.append(buildGroups(TABLE_GROUPS));
   el.garageEditor.append(panes.mallet, panes.table);
+
+  // ---------------------------------------------------------------------------
+  // SLOTS
+  // ---------------------------------------------------------------------------
+  //
+  // The bar is rebuilt when the LIST changes and only refreshed when it has
+  // not, so renaming a design while typing does not tear the input out from
+  // under the cursor.
+
+  let slotChips = [];
+  let slotSignature = "";
+  /** Which slot the name field is currently showing, so a switch always rewrites it. */
+  let namedSlot = "";
+
+  /** Two dabs of a design's own paint, so a slot is recognisable before it is read. */
+  function slotChip(loadout) {
+    const button = make("button", "garageSlot");
+    button.type = "button";
+    const paint = make("span", "garageSlotPaint");
+    paint.style.setProperty("--primary", loadout.mallet.colors.primary);
+    paint.style.setProperty("--accent", loadout.tableHalf.surface.baseColor);
+    button.append(paint, make("b", null, loadout.name));
+    button.addEventListener("click", () => {
+      if (store.garage.equippedId === loadout.id) return;
+      commit(selectLoadout(store.garage, loadout.id));
+    }, options);
+    return button;
+  }
+
+  function refreshSlots() {
+    const garage = store.garage;
+    const signature = garage.loadouts.map((loadout) => loadout.id).join(",");
+    if (signature !== slotSignature) {
+      slotSignature = signature;
+      el.garageSlotRow.replaceChildren();
+      slotChips = garage.loadouts.map((loadout) => {
+        const button = slotChip(loadout);
+        el.garageSlotRow.append(button);
+        return { id: loadout.id, button };
+      });
+    }
+
+    for (const chip of slotChips) {
+      const loadout = garage.loadouts.find((entry) => entry.id === chip.id);
+      if (!loadout) continue;
+      const selected = loadout.id === garage.equippedId;
+      chip.button.classList.toggle("selected", selected);
+      chip.button.setAttribute("aria-pressed", String(selected));
+      chip.button.querySelector("b").textContent = loadout.name;
+      const paint = chip.button.querySelector(".garageSlotPaint");
+      paint.style.setProperty("--primary", loadout.mallet.colors.primary);
+      paint.style.setProperty("--accent", loadout.tableHalf.surface.baseColor);
+    }
+
+    // Typing a name must not fight the field it is being typed into — but
+    // moving to a DIFFERENT slot always rewrites it, focused or not, or the
+    // field sits there showing a name that belongs to another design.
+    if (namedSlot !== garage.equippedId || doc.activeElement !== el.garageSlotName) {
+      el.garageSlotName.value = editing().name;
+      namedSlot = garage.equippedId;
+    }
+    el.garageSlotNew.disabled = garage.loadouts.length >= MAX_LOADOUTS;
+    el.garageSlotCopy.disabled = garage.loadouts.length >= MAX_LOADOUTS;
+    // The last design cannot go: a player with no loadout has no mallet.
+    el.garageSlotDelete.disabled = garage.loadouts.length <= 1;
+  }
+
+  el.garageSlotName.addEventListener("input", () => {
+    commit(renameLoadout(store.garage, store.garage.equippedId, el.garageSlotName.value));
+  }, options);
+  // A name that normalizes to something else (blank, over-long, padded) settles
+  // into the field on blur rather than rewriting it mid-keystroke.
+  el.garageSlotName.addEventListener("blur", () => {
+    el.garageSlotName.value = editing().name;
+  }, options);
+
+  /** A new slot arrives named, equipped and ready to be renamed. */
+  function addSlot(from) {
+    commit(addLoadout(store.garage, from ? { from } : {}));
+    el.garageSlotName.focus();
+    el.garageSlotName.select();
+  }
+
+  el.garageSlotNew.addEventListener("click", () => addSlot(null), options);
+  el.garageSlotCopy.addEventListener("click", () => addSlot(store.garage.equippedId), options);
+
+  el.garageSlotDelete.addEventListener("click", () => {
+    commit(removeLoadout(store.garage, store.garage.equippedId));
+  }, options);
 
   // ---------------------------------------------------------------------------
   // CHROME
@@ -361,15 +465,17 @@ export function createGarageScreen({ doc, match, view, store }) {
     }
     refreshStatus();
     await store.save();
-    view.equipPlayer(store.garage);
+    view.equipPlayer(store.editing);
     refreshValues();
+    refreshSlots();
     refreshStatus();
   }, options);
 
   el.garageRevert.addEventListener("click", () => {
     store.revert();
-    view.equipPlayer(store.garage);
+    view.equipPlayer(store.editing);
     refreshValues();
+    refreshSlots();
     refreshStatus();
   }, options);
 
@@ -377,11 +483,11 @@ export function createGarageScreen({ doc, match, view, store }) {
     // Leaving does not save. The equipped half goes back to the account's copy
     // so the menu never shows a design the player has not kept.
     store.revert();
-    view.equipPlayer(store.garage);
+    view.equipPlayer(store.editing);
     view.setViewportBand(1);
     view.setCameraMode("match");
     view.showCollisionOverlay(false);
-    match.menu();
+    match.exitGarage();
   }, options);
 
   // Orbit and zoom, but only in an inspect mode and only from the canvas behind
@@ -444,7 +550,10 @@ export function createGarageScreen({ doc, match, view, store }) {
     }
   }
 
-  const unsubscribe = store.subscribe(refreshStatus);
+  const unsubscribe = store.subscribe(() => {
+    refreshSlots();
+    refreshStatus();
+  });
 
   /**
    * Entering the Garage. The account's garage was already fetched at cabinet
@@ -452,15 +561,17 @@ export function createGarageScreen({ doc, match, view, store }) {
    * only in here — so this just brings the panel up to date with it.
    */
   function open() {
-    view.equipPlayer(store.garage);
+    view.equipPlayer(store.editing);
     view.setViewportBand(isDrawerLayout() ? DRAWER_BAND : 1);
     selectCamera(isDrawerLayout() ? "table" : "match");
     refreshValues();
+    refreshSlots();
     refreshStatus();
   }
 
   refreshChrome();
   refreshValues();
+  refreshSlots();
   refreshStatus();
 
   return {

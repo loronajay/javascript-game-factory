@@ -9,7 +9,9 @@ import {
 } from '../../../platform-api/src/services/puckd-up-loadout-catalog.mjs';
 import { createPlatformApiClient } from '../../../js/platform/api/platform-api.mjs';
 import { createGarageStore } from '../scripts/garage/garage-store.js';
-import { applyShapePreset, applySurfacePreset, defaultGarage } from '../scripts/cosmetics/loadout.js';
+import {
+    applyShapePreset, applySurfacePreset, defaultGarage, equippedLoadout, replaceLoadout, addLoadout,
+} from '../scripts/cosmetics/loadout.js';
 
 // The whole save path, over real HTTP.
 //
@@ -89,14 +91,17 @@ test('PUT then GET: a design survives the round trip intact', async () => {
     await store.load();
 
     store.update(applySurfacePreset(applyShapePreset(store.garage, 'mallet.shape.champion'), 'table.surface.championship'));
-    store.update(garage => ({
-        ...garage,
-        mallet: {
-            ...garage.mallet,
-            colors: { ...garage.mallet.colors, primary: '#2f8fd0' },
-            decal: { ...garage.mallet.decal, type: 'builtin', id: 'decal.champion-crown', scale: 1.2 },
-        },
-    }));
+    store.update(garage => {
+        const loadout = equippedLoadout(garage);
+        return replaceLoadout(garage, {
+            ...loadout,
+            mallet: {
+                ...loadout.mallet,
+                colors: { ...loadout.mallet.colors, primary: '#2f8fd0' },
+                decal: { ...loadout.mallet.decal, type: 'builtin', id: 'decal.champion-crown', scale: 1.2 },
+            },
+        });
+    });
     assert.equal(store.status, 'unsaved');
     assert.equal(rows.size, 0, 'nothing reaches the server before Save & Equip');
 
@@ -108,10 +113,39 @@ test('PUT then GET: a design survives the round trip intact', async () => {
     const reopened = storeFor();
     const loaded = await reopened.load();
     assert.deepEqual(loaded, store.garage);
-    assert.equal(loaded.mallet.shapePreset, 'mallet.shape.champion');
-    assert.equal(loaded.mallet.colors.primary, '#2f8fd0');
-    assert.equal(loaded.mallet.decal.id, 'decal.champion-crown');
-    assert.equal(loaded.tableHalf.surface.preset, 'table.surface.championship');
+    const design = equippedLoadout(loaded);
+    assert.equal(design.mallet.shapePreset, 'mallet.shape.champion');
+    assert.equal(design.mallet.colors.primary, '#2f8fd0');
+    assert.equal(design.mallet.decal.id, 'decal.champion-crown');
+    assert.equal(design.tableHalf.surface.preset, 'table.surface.championship');
+});
+
+test('several designs survive the round trip, and equipping one is a save', async () => {
+    const store = storeFor();
+    await store.load();
+
+    // A second design, built from the first, then the first equipped again.
+    store.update(garage => applyShapePreset(addLoadout(garage, { from: garage.equippedId, name: 'Night Shift' }), 'mallet.shape.razor'));
+    assert.deepEqual(await store.save(), { ok: true });
+
+    const reopened = storeFor();
+    await reopened.load();
+    assert.deepEqual(reopened.loadouts.map(loadout => loadout.name), ['Loadout 1', 'Night Shift']);
+    assert.equal(reopened.equipped.mallet.shapePreset, 'mallet.shape.razor');
+
+    assert.deepEqual(await reopened.equip('loadout-1'), { ok: true });
+
+    // The account, read fresh, is on the first design again — and still has both.
+    const again = storeFor();
+    await again.load();
+    assert.equal(again.equipped.id, 'loadout-1');
+    assert.equal(again.equipped.mallet.shapePreset, 'mallet.shape.champion');
+    assert.equal(again.loadouts.length, 2);
+
+    // An opponent is shown the equipped one, with no trace of the other.
+    const public_ = await client().fetchGamePublicLoadout('puckd-up', PLAYER);
+    assert.equal(public_.mallet.shapePreset, 'mallet.shape.champion');
+    assert.ok(!JSON.stringify(public_).includes('Night Shift'));
 });
 
 test('an opponent can fetch the public loadout, and gets only the appearance', async () => {
@@ -152,11 +186,14 @@ test("the server's normalized document becomes the client's state", async () => 
     await store.load();
     // Below the marking floor: the client clamps it, and the server clamps it
     // again, and what the editor ends up showing is the server's answer.
-    store.update(garage => ({ ...garage, tableHalf: { ...garage.tableHalf, markings: { color: '#ffffff', opacity: 0 } } }));
+    store.update(garage => replaceLoadout(garage, {
+        ...equippedLoadout(garage),
+        tableHalf: { ...equippedLoadout(garage).tableHalf, markings: { color: '#ffffff', opacity: 0 } },
+    }));
     await store.save();
-    assert.equal(store.garage.tableHalf.markings.opacity, 0.25);
-    assert.deepEqual(store.garage, store.equipped);
-    assert.equal(rows.get(`${PLAYER}:puckd-up`).tableHalf.markings.opacity, 0.25);
+    assert.equal(store.editing.tableHalf.markings.opacity, 0.25);
+    assert.deepEqual(store.editing, store.equipped);
+    assert.equal(equippedLoadout(rows.get(`${PLAYER}:puckd-up`)).tableHalf.markings.opacity, 0.25);
 });
 
 test('a save against a dead server fails loudly and keeps the design', async () => {
@@ -172,5 +209,5 @@ test('a save against a dead server fails loudly and keeps the design', async () 
     const result = await offline.save();
     assert.equal(result.ok, false);
     assert.equal(offline.status, 'error');
-    assert.equal(offline.garage.mallet.shapePreset, 'mallet.shape.razor');
+    assert.equal(offline.editing.mallet.shapePreset, 'mallet.shape.razor');
 });

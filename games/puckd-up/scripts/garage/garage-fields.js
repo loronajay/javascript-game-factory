@@ -5,7 +5,9 @@
 // under node — `tests/garage-fields.test.js` asserts every `path` addresses a
 // real field of the garage document and every bound it cites exists.
 //
-// `path` is a dotted address into the garage document. That is the only
+// `path` is a dotted address into ONE LOADOUT — `mallet.*` or `tableHalf.*` —
+// not into the garage document that holds the list of them. That is what keeps
+// these controls identical whichever slot is equipped, and it is the only
 // coupling between a control and what it edits; nothing here knows how a value
 // is drawn.
 
@@ -181,15 +183,15 @@ export const TABLE_GROUPS = Object.freeze([
   },
 ]);
 
-/** Read a dotted path out of a garage document. */
-export function readPath(garage, path) {
-  return path.split(".").reduce((node, key) => (node == null ? undefined : node[key]), garage);
+/** Read a dotted path out of a loadout. */
+export function readPath(loadout, path) {
+  return path.split(".").reduce((node, key) => (node == null ? undefined : node[key]), loadout);
 }
 
-/** A copy of `garage` with one dotted path replaced. The document stays immutable. */
-export function writePath(garage, path, value) {
+/** A copy of `loadout` with one dotted path replaced. The source stays untouched. */
+export function writePath(loadout, path, value) {
   const keys = path.split(".");
-  const next = structuredClone(garage);
+  const next = structuredClone(loadout);
   let node = next;
   for (const key of keys.slice(0, -1)) node = node[key];
   node[keys.at(-1)] = value;

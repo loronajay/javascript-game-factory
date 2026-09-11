@@ -92,3 +92,33 @@ test('Circuit matches preserve campaign mode and can return to the tour after a 
     match.circuit();
     assert.equal(match.state.screen, 'circuit');
 });
+
+// The Garage is reachable from the main menu and from match setup, and Back
+// returns to whichever opened it — a player who stepped in from setup to build
+// a second design has not finished choosing a rival and a venue.
+test('the Garage opens from the menu and Back goes to the menu', () => {
+    const match = createMatch();
+    match.garage();
+    assert.equal(match.state.screen, 'garage');
+    match.exitGarage();
+    assert.equal(match.state.screen, 'menu');
+});
+
+test('the Garage opens from setup and Back goes back to setup', () => {
+    const match = createMatch();
+    match.setup();
+    match.garage();
+    assert.equal(match.state.screen, 'garage');
+    match.exitGarage();
+    assert.equal(match.state.screen, 'setup');
+});
+
+test('the Garage is not reachable mid-match, and exiting it from elsewhere does nothing', () => {
+    const match = createMatch();
+    match.setup();
+    match.start();
+    match.garage();
+    assert.equal(match.state.screen, 'playing');
+    match.exitGarage();
+    assert.equal(match.state.screen, 'playing');
+});

@@ -107,19 +107,13 @@
           <div class="screenKicker"><span>Solo Clash</span><span>Match setup</span></div>
           <div class="panelHeading"><div><h2>Dial it in</h2><p>Set your side, opponent, and venue.</p></div><span class="matchBadge">1P // CPU</span></div>
           <div class="setupGrid">
-            <div class="colorBox">
-              <div class="sectionLabel">01 // Your color</div>
-              <div class="swatches" id="swatches">
-                <button class="swatch" type="button" data-color="#a14848" style="--swatch:#a14848" aria-label="Crimson"></button>
-                <button class="swatch" type="button" data-color="#d05a32" style="--swatch:#d05a32" aria-label="Orange"></button>
-                <button class="swatch" type="button" data-color="#d0a52e" style="--swatch:#d0a52e" aria-label="Gold"></button>
-                <button class="swatch" type="button" data-color="#3e9b61" style="--swatch:#3e9b61" aria-label="Green"></button>
-                <button class="swatch" type="button" data-color="#3d82b2" style="--swatch:#3d82b2" aria-label="Blue"></button>
-                <button class="swatch" type="button" data-color="#7652b8" style="--swatch:#7652b8" aria-label="Purple"></button>
-                <button class="swatch" type="button" data-color="#c24b86" style="--swatch:#c24b86" aria-label="Pink"></button>
-                <button class="swatch" type="button" data-color="#d8dde2" style="--swatch:#d8dde2" aria-label="Silver"></button>
+            <div class="loadoutBox">
+              <div class="sectionLabel">01 // Your loadout</div>
+              <div class="loadoutList" id="setupLoadouts" role="group" aria-label="Saved loadouts"></div>
+              <div class="loadoutFoot">
+                <p class="loadoutNote" id="setupLoadoutNote" role="status" aria-live="polite"></p>
+                <button class="ghost" type="button" id="setupGarage">Open Garage</button>
               </div>
-              <div class="pickerRow"><div class="previewChip" id="colorPreview" aria-hidden="true"></div><label class="customColor">Custom<input type="color" id="playerColor" value="#a14848" aria-label="Custom player color"></label></div>
             </div>
             <div class="settingStack">
               <label class="settingCard" for="setupRival"><span class="sectionLabel">02 // Rival</span><select id="setupRival" aria-label="Choose rival"></select></label>
@@ -175,6 +169,17 @@
           <div class="screenKicker"><span>Garage</span><span id="garageStatus" data-tone="ok">Saved to your account</span></div>
           <h2>Your equipment</h2>
           <p class="garageSubhead">You own your mallet and your half of the table. The far half belongs to whoever is standing there.</p>
+          <!-- Saved designs. Picking one EQUIPS it, so the slot being edited and
+               the slot on the table are the same slot and cannot disagree. -->
+          <div class="garageSlots">
+            <div class="garageSlotRow" id="garageSlotRow" role="group" aria-label="Saved loadouts"></div>
+            <div class="garageSlotBar">
+              <label class="garageSlotName" for="garageSlotName">Name<input id="garageSlotName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Loadout 1"></label>
+              <button class="garageGhost" type="button" id="garageSlotNew">New</button>
+              <button class="garageGhost" type="button" id="garageSlotCopy">Duplicate</button>
+              <button class="garageGhost" type="button" id="garageSlotDelete">Delete</button>
+            </div>
+          </div>
           <div class="garageTabs" id="garageTabs" role="group" aria-label="Editor section"></div>
         </div>
         <div class="garageEditor" id="garageEditor"></div>

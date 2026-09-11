@@ -24,7 +24,9 @@
 // was persisted — including any clamp the server applied that the client did
 // not. That is the difference between an editor and a wish.
 
-import { defaultGarage, normalizeGarage, serializeGarage, garagesEqual } from "../cosmetics/loadout.js";
+import {
+  defaultGarage, normalizeGarage, serializeGarage, garagesEqual, equippedLoadout, selectLoadout,
+} from "../cosmetics/loadout.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { readFactoryAccountSession } from "../../../../js/platform/api/factory-account-gate.mjs";
 
@@ -78,6 +80,40 @@ export function createGarageStore({ session = null, api = null, readSession = re
     setStatus(garagesEqual(working, persisted) ? STATUS_SAVED : STATUS_UNSAVED);
   }
 
+  /**
+   * Save & Equip.
+   *
+   * Resolves `{ ok }`. A failure keeps the working copy exactly as it is —
+   * losing a player's design because a request timed out would be a worse
+   * outcome than the failed save itself.
+   */
+  async function saveGarage() {
+    if (!available) {
+      setStatus(STATUS_SIGNED_OUT);
+      return { ok: false, reason: "signed-out" };
+    }
+    if (inFlight) return { ok: false, reason: "busy" };
+    inFlight = true;
+    setStatus(STATUS_SAVING);
+    const sending = serializeGarage(working);
+    let payload = null;
+    try {
+      payload = await client.saveGameGarage(GAME_SLUG, sending);
+    } catch {
+      payload = null;
+    }
+    inFlight = false;
+    if (!payload?.ok) {
+      setStatus(STATUS_ERROR, "Save failed. Your design is still here — try again.");
+      return { ok: false, reason: "request-failed" };
+    }
+    // The server's document is now the truth, clamps and all.
+    persisted = normalizeGarage(payload.garage ?? sending);
+    working = normalizeGarage(persisted);
+    setStatus(STATUS_SAVED);
+    return { ok: true };
+  }
+
   return {
     /** Whether a garage can be SAVED at all: somebody signed in, and a server to keep it on. */
     get available() {
@@ -93,9 +129,23 @@ export function createGarageStore({ session = null, api = null, readSession = re
     get garage() {
       return working;
     },
-    /** What the server has. Used by the match, so gameplay shows what was equipped. */
+    /** Every saved design, for the slot bar and the setup picker. */
+    get loadouts() {
+      return working.loadouts;
+    },
+    /**
+     * The design the editor is on — which is the equipped one, always. There is
+     * no separate "editing" slot to fall out of step with what is on the table.
+     */
+    get editing() {
+      return equippedLoadout(working);
+    },
+    /**
+     * What the server has ON. Used by the match and the stage preview, so
+     * gameplay shows the equipped design and not the working copy.
+     */
     get equipped() {
-      return persisted;
+      return equippedLoadout(persisted);
     },
     get dirty() {
       return !garagesEqual(working, persisted);
@@ -149,38 +199,24 @@ export function createGarageStore({ session = null, api = null, readSession = re
       return working;
     },
 
+    save: saveGarage,
+
     /**
-     * Save & Equip.
+     * Equip a saved design and write that choice to the account.
      *
-     * Resolves `{ ok }`. A failure keeps the working copy exactly as it is —
-     * losing a player's design because a request timed out would be a worse
-     * outcome than the failed save itself.
+     * This is what the match-setup picker calls, and it saves rather than
+     * holding the change locally: an opponent's client reads the EQUIPPED slot
+     * off the public route, so a choice that never left the tab would put a
+     * different mallet on their screen than on this one.
      */
-    async save() {
+    async equip(id) {
+      working = selectLoadout(working, id);
       if (!available) {
         setStatus(STATUS_SIGNED_OUT);
         return { ok: false, reason: "signed-out" };
       }
-      if (inFlight) return { ok: false, reason: "busy" };
-      inFlight = true;
-      setStatus(STATUS_SAVING);
-      const sending = serializeGarage(working);
-      let payload = null;
-      try {
-        payload = await client.saveGameGarage(GAME_SLUG, sending);
-      } catch {
-        payload = null;
-      }
-      inFlight = false;
-      if (!payload?.ok) {
-        setStatus(STATUS_ERROR, "Save failed. Your design is still here — try again.");
-        return { ok: false, reason: "request-failed" };
-      }
-      // The server's document is now the truth, clamps and all.
-      persisted = normalizeGarage(payload.garage ?? sending);
-      working = normalizeGarage(persisted);
-      setStatus(STATUS_SAVED);
-      return { ok: true };
+      settle();
+      return saveGarage();
     },
 
     /** Throw away unsaved edits and go back to what the account holds. */

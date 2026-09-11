@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { paintSurface, SURFACE_PAINTER_IDS, SURFACE_TEXTURE_SIZE } from '../scripts/render/table-surface.js';
 import { TABLE_PATTERNS, TABLE_SURFACE_PRESETS } from '../scripts/cosmetics/catalog.js';
-import { defaultGarage } from '../scripts/cosmetics/loadout.js';
+import { defaultLoadout } from '../scripts/cosmetics/loadout.js';
 
 /**
  * A recording 2D context. The painters only ever call canvas methods, so this
@@ -59,13 +59,13 @@ test('painting is deterministic: the same surface draws the same pixels twice', 
 
 test('the base colour is always laid down, so a half is never transparent', () => {
     const ctx = recordingContext();
-    paintSurface(ctx, width, height, { ...defaultGarage().tableHalf.surface });
+    paintSurface(ctx, width, height, { ...defaultLoadout().tableHalf.surface });
     assert.ok(ctx.calls.some(call => call[0] === 'set' && call[1] === 'fillStyle' && call[2] === '#1b2229'));
     assert.ok(ctx.calls.some(call => call[0] === 'fillRect' && call[3] === width && call[4] === height));
 });
 
 test('a pattern at zero strength is skipped rather than drawn invisibly', () => {
-    const surface = { ...defaultGarage().tableHalf.surface, patternOpacity: 0 };
+    const surface = { ...defaultLoadout().tableHalf.surface, patternOpacity: 0 };
     const quiet = recordingContext(), loud = recordingContext();
     paintSurface(quiet, width, height, surface);
     paintSurface(loud, width, height, { ...surface, patternOpacity: 0.4 });
@@ -74,7 +74,7 @@ test('a pattern at zero strength is skipped rather than drawn invisibly', () => 
 
 test('an unknown pattern id paints the base and stops, rather than throwing', () => {
     const ctx = recordingContext();
-    paintSurface(ctx, width, height, { ...defaultGarage().tableHalf.surface, patternId: 'table.pattern.graffiti' });
+    paintSurface(ctx, width, height, { ...defaultLoadout().tableHalf.surface, patternId: 'table.pattern.graffiti' });
     assert.ok(ctx.calls.length > 0);
 });
 
@@ -83,7 +83,7 @@ test('nothing solid is painted across the middle of a half', () => {
     // allowed in the `field` zone must either CLIP itself to the perimeter and
     // rear, or draw with strokes only — either way there is no filled shape
     // sitting under live play for the puck to disappear into.
-    const surface = defaultGarage().tableHalf.surface;
+    const surface = defaultLoadout().tableHalf.surface;
     // The base wash is painted first and always the same; paint it alone once so
     // the pattern's own calls can be isolated from it.
     const base = recordingContext();
@@ -100,7 +100,7 @@ test('nothing solid is painted across the middle of a half', () => {
 });
 
 test('pattern scale actually changes the drawing', () => {
-    const surface = { ...defaultGarage().tableHalf.surface, patternId: 'table.pattern.vector-grid', patternOpacity: 0.5 };
+    const surface = { ...defaultLoadout().tableHalf.surface, patternId: 'table.pattern.vector-grid', patternOpacity: 0.5 };
     const small = recordingContext(), large = recordingContext();
     paintSurface(small, width, height, { ...surface, patternScale: 0.5 });
     paintSurface(large, width, height, { ...surface, patternScale: 2.4 });

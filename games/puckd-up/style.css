@@ -87,8 +87,15 @@ canvas{display:block;width:100%;height:100%;outline:none;touch-action:none}
 
 /* Match setup */
 .settingsStage{padding-block:24px}.settingsPanel{max-width:680px;padding:24px 28px}.panelHeading{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:16px}.panelHeading h2{font-size:42px}.panelHeading p{margin:7px 0 0;color:#8fa2b7;font-size:11px}.matchBadge{flex:0 0 auto;padding:7px 9px;border:1px solid rgba(78,209,255,.35);color:#72defe;font:italic 900 10px var(--display);letter-spacing:.1em}
-.setupGrid{display:grid;grid-template-columns:1.3fr .9fr;gap:9px}.sectionLabel{display:block;margin-bottom:8px;font-size:8px;font-weight:900;letter-spacing:.14em;color:#7390aa;text-transform:uppercase}.colorBox,.settingCard{border:1px solid rgba(125,170,218,.15);background:rgba(8,17,31,.78);padding:12px}.swatches{display:grid;grid-template-columns:repeat(8,1fr);gap:7px}.swatch{aspect-ratio:1;min-height:0;width:100%;padding:0;border:2px solid rgba(255,255,255,.15);background:var(--swatch);box-shadow:inset 0 0 13px rgba(0,0,0,.28)}.swatch:hover:not(:disabled){transform:translateY(-2px)}.swatch.selected{outline:2px solid #fff;outline-offset:2px;border-color:#fff;box-shadow:0 0 15px var(--swatch)}
-.pickerRow{display:flex;align-items:center;gap:9px;margin-top:12px}.previewChip{height:9px;flex:1;background:var(--player-accent);box-shadow:0 0 12px var(--player-accent)}.customColor{display:flex;align-items:center;gap:7px;color:#8195aa;font-size:8px;text-transform:uppercase;letter-spacing:.1em}.customColor input{width:38px;height:27px;padding:2px}
+.setupGrid{display:grid;grid-template-columns:1.3fr .9fr;gap:9px}.sectionLabel{display:block;margin-bottom:8px;font-size:8px;font-weight:900;letter-spacing:.14em;color:#7390aa;text-transform:uppercase}.loadoutBox,.settingCard{border:1px solid rgba(125,170,218,.15);background:rgba(8,17,31,.78);padding:12px}
+.loadoutList{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+.loadoutCard{min-height:0;display:flex;align-items:center;gap:8px;padding:9px 10px;text-align:left;text-transform:none}
+.loadoutCard b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.loadoutCard.selected{border-color:#46cfff;background:linear-gradient(110deg,rgba(8,116,213,.42),rgba(8,169,210,.3))}
+.loadoutPaint{flex:none;width:16px;height:16px;border:1px solid rgba(255,255,255,.2);background:linear-gradient(135deg,var(--primary) 0 55%,var(--accent) 55% 100%)}
+.loadoutFoot{display:flex;align-items:center;gap:9px;margin-top:11px}
+.loadoutNote{flex:1;margin:0;color:var(--muted);font-size:9px;line-height:1.4}
+#setupGarage{min-height:32px;padding:0 12px;font-size:9px}
 .settingStack{display:grid;gap:9px}.settingCard{display:block}.settingCard select{width:100%;height:39px;padding:0 9px;border-color:rgba(87,205,255,.28);font-size:11px}.matchRule{display:grid;grid-template-columns:1fr 1fr;gap:10px}.matchRule b{font:italic 900 12px var(--display);text-transform:uppercase}.matchRule .sectionLabel{margin-bottom:3px}
 .arenaSection{margin-top:14px}.arenaGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.arenaCard{min-height:94px;position:relative;overflow:hidden;text-align:left;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;isolation:isolate;background:#09111d}.arenaCard::before{content:"";position:absolute;inset:0;z-index:-3;background:var(--arena-bg);opacity:.8}.arenaThumbnail{position:absolute;inset:0;z-index:-2;background-position:center;background-size:cover;transition:transform .25s,filter .25s}.arenaCard::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(4,8,14,.02),rgba(4,8,14,.94))}.arenaCard:hover:not(:disabled) .arenaThumbnail{transform:scale(1.08);filter:saturate(1.2)}.arenaCard.selected{border-color:#a6efff;box-shadow:inset 0 -3px 0 #4bd8ff,0 0 18px rgba(0,167,255,.23)}.arenaNumber{position:absolute;top:8px;right:8px;font:italic 900 9px var(--display);color:rgba(255,255,255,.78);text-shadow:0 1px 5px #000}.arenaCard b{font:italic 900 11px var(--display);letter-spacing:.02em;text-shadow:0 2px 7px #000}.arenaCard small{margin-top:2px;color:#bed0e2;font-size:7px;letter-spacing:.02em;text-transform:none;text-shadow:0 1px 5px #000}.arenaCard[data-arena=hyper_arcade]{--arena-bg:radial-gradient(circle at 75% 25%,#ec36ff 0 7%,transparent 32%),linear-gradient(135deg,#301355,#101b45 45%,#063e50)}.arenaCard[data-arena=competition_circuit]{--arena-bg:linear-gradient(135deg,#17212b,#366487 48%,#0c1117)}.arenaCard[data-arena=park_jam]{--arena-bg:linear-gradient(160deg,#6aa8d2 0 38%,#557d49 39% 62%,#60594c 63%)}.arenaCard[data-arena=skyline_rooftop]{--arena-bg:radial-gradient(circle at 70% 20%,#5165a0 0 5%,transparent 28%),linear-gradient(150deg,#090c18,#172041 60%,#251736)}
 .arenaCard[data-arena=garage_club]{--arena-bg:linear-gradient(160deg,#17191b,#4e4538 55%,#20282a)}.arenaCard[data-arena=boardwalk_bash]{--arena-bg:linear-gradient(160deg,#724d83,#e28d68 48%,#286f83)}.arenaCard[data-arena=freight_yard]{--arena-bg:linear-gradient(150deg,#08121a,#35444a 55%,#a3672f)}.arenaCard[data-arena=zero_g_arena]{--arena-bg:radial-gradient(circle at 25% 30%,#3973a6,transparent 22%),linear-gradient(150deg,#01040b,#102744 60%,#96702a)}
@@ -136,6 +143,16 @@ canvas{display:block;width:100%;height:100%;outline:none;touch-action:none}
 #garageStatus[data-tone="warn"]{color:#ffce4d}
 #garageStatus[data-tone="bad"]{color:var(--red)}
 #garageStatus[data-tone="muted"]{color:var(--muted)}
+.garageSlots{margin-bottom:11px}
+.garageSlotRow{display:flex;flex-wrap:wrap;gap:5px}
+.garageSlot{min-height:30px;display:flex;align-items:center;gap:6px;padding:0 9px;text-transform:none;letter-spacing:.04em}
+.garageSlot b{font-size:10px;letter-spacing:.06em;text-transform:uppercase;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.garageSlot.selected{border-color:#46cfff;background:linear-gradient(110deg,rgba(8,116,213,.42),rgba(8,169,210,.3))}
+.garageSlotPaint{flex:none;width:12px;height:12px;border:1px solid rgba(255,255,255,.2);background:linear-gradient(135deg,var(--primary) 0 55%,var(--accent) 55% 100%)}
+.garageSlotBar{display:flex;align-items:center;gap:5px;margin-top:6px}
+.garageSlotName{flex:1;display:flex;align-items:center;gap:6px;color:#7390aa;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+.garageSlotName input{flex:1;min-width:0;height:30px;padding:0 8px;font-size:10px;letter-spacing:.04em}
+.garageSlotBar .garageGhost{min-height:30px;padding:0 9px;font-size:9px}
 .garageTabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .garageTab{min-height:38px}
 .garageTab.selected{border-color:#46cfff;background:linear-gradient(110deg,rgba(8,116,213,.5),rgba(8,169,210,.4));color:#fff}

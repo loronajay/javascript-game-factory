@@ -7,7 +7,7 @@ import { visualRailSegments } from '../scripts/render/table.js';
 import { tableRails } from '../scripts/physics/table-layout.js';
 import { W, L, GOAL, RAIL, CONTACT_R, PUCK_R } from '../scripts/config.js';
 import { PHYSICS_MALLET_RADIUS } from '../scripts/cosmetics/catalog.js';
-import { defaultGarage, normalizeGarage } from '../scripts/cosmetics/loadout.js';
+import { defaultLoadout, normalizeLoadout } from '../scripts/cosmetics/loadout.js';
 import { MALLET_GROUPS, TABLE_GROUPS, allFields, readPath, writePath } from '../scripts/garage/garage-fields.js';
 
 // Two rules this cabinet must not be able to break:
@@ -44,8 +44,8 @@ test('every editable geometry value is inside the mallet, whatever it is set to'
     // whole point of the overlay — but it may not run away with the table.
     const extremes = allFields()
         .filter(field => field.kind === 'slider' && field.path.startsWith('mallet.geometry.'))
-        .reduce((garage, field) => writePath(garage, field.path, field.bounds.max), defaultGarage());
-    const geometry = normalizeGarage(extremes).mallet.geometry;
+        .reduce((loadout, field) => writePath(loadout, field.path, field.bounds.max), defaultLoadout());
+    const geometry = normalizeLoadout(extremes).mallet.geometry;
     for (const value of Object.values(geometry)) {
         if (typeof value === 'number') assert.ok(value <= 0.9, `geometry value ${value} is larger than a mallet`);
     }
@@ -99,8 +99,11 @@ test('the editor groups are the ones the Garage advertises', () => {
     assert.deepEqual(TABLE_GROUPS.map(group => group.name), ['Surface', 'Pattern', 'Markings', 'Rails', 'Goal', 'Trim']);
 });
 
-test('every control addresses a real field of the garage document', () => {
-    const garage = defaultGarage();
+// Editor paths address ONE LOADOUT — `mallet.*` and `tableHalf.*` — never the
+// document that holds the list of them. That is what keeps the controls the same
+// whichever slot is equipped.
+test('every control addresses a real field of a loadout', () => {
+    const garage = defaultLoadout();
     for (const field of allFields()) {
         assert.notEqual(readPath(garage, field.path), undefined, `dead editor path: ${field.path}`);
         if (field.kind === 'slider') {
@@ -113,7 +116,7 @@ test('every control addresses a real field of the garage document', () => {
 });
 
 test('writePath leaves the source document untouched', () => {
-    const before = defaultGarage();
+    const before = defaultLoadout();
     const after = writePath(before, 'mallet.colors.primary', '#123456');
     assert.equal(before.mallet.colors.primary, '#a14848');
     assert.equal(after.mallet.colors.primary, '#123456');

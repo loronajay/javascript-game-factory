@@ -1,4 +1,11 @@
-// The garage document: what a player has equipped.
+// The garage document: every loadout a player has built, and which one is on.
+//
+// A LOADOUT is one complete design — a mallet and a table half — with an id and
+// a player-given name. The GARAGE is the list of them plus `equippedId`, and a
+// player always has at least one: deleting the last one is not a state this
+// document can be in. Everything downstream (the view, the stage preview, the
+// public route an opponent reads) is handed ONE LOADOUT, never the list, which
+// is why adding the list cost those files nothing.
 //
 // Pure. No THREE, no DOM, no storage, no network, no clock — so the whole
 // document contract is testable under node, and so the same normalizer runs in
@@ -36,7 +43,19 @@ import {
 } from "./catalog.js";
 import { DECAL_BY_ID } from "./decal-catalog.js";
 
-export const LOADOUT_VERSION = 1;
+export const LOADOUT_VERSION = 2;
+
+/**
+ * How many designs one account may keep.
+ *
+ * A cap rather than no cap because this is a row in someone else's database and
+ * the whole document is read on every match; eight is more slots than the
+ * setup picker can show at once without becoming a menu of its own.
+ */
+export const MAX_LOADOUTS = 8;
+
+/** Longest player-given name. The picker shows it on one line. */
+export const LOADOUT_NAME_LIMIT = 24;
 
 const DEFAULT_SHAPE_ID = "mallet.shape.classic";
 const DEFAULT_MATERIAL_ID = "mallet.material.anodized";
@@ -242,31 +261,206 @@ function normalizeTableHalf(raw) {
 }
 
 // ---------------------------------------------------------------------------
-// DOCUMENT
+// LOADOUT
 // ---------------------------------------------------------------------------
 
+/** An id this document minted. Short, opaque, and safe to put in markup. */
+const LOADOUT_ID = /^[A-Za-z0-9_-]{1,32}$/;
+/** Everything below a space, plus DEL. A name is one line of text or it is not a name. */
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
+
+/** The slot a player who has never opened the Garage is already looking at. */
+const defaultLoadoutName = (index) => `Loadout ${index + 1}`;
+const defaultLoadoutId = (index) => `loadout-${index + 1}`;
+
 /**
- * The factory loadout: what a player who has never opened the Garage is
- * already looking at. The server returns the same document for a player with
- * no row, and `tests/server-agreement.test.js` asserts they are byte-identical.
+ * A player-given name, made safe and made finite.
+ *
+ * Control characters out, runs of whitespace collapsed, trimmed, capped — and
+ * an empty result becomes the slot's positional name rather than a blank chip.
+ * The SERVER does all of this again; the two must agree character for
+ * character, which is what `tests/server-agreement.test.js` checks.
  */
-export function defaultGarage() {
-  return normalizeGarage(null);
+function normalizeLoadoutName(value, index) {
+  const text = (typeof value === "string" ? value : "")
+    .replace(CONTROL_CHARS, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, LOADOUT_NAME_LIMIT)
+    .trim();
+  return text || defaultLoadoutName(index);
 }
 
-/** Coerce anything at all into a valid garage document. Never throws. */
-export function normalizeGarage(value) {
+/**
+ * One design.
+ *
+ * `index` is the slot's position, used only to name an unnamed loadout and to
+ * mint an id for one that arrived without a usable one — so the same junk
+ * normalizes to the same document on the client and on the server.
+ */
+export function normalizeLoadout(value, index = 0) {
   const input = object(value);
+  const id = typeof input.id === "string" && LOADOUT_ID.test(input.id.trim())
+    ? input.id.trim()
+    : defaultLoadoutId(index);
   return {
-    version: LOADOUT_VERSION,
+    id,
+    name: normalizeLoadoutName(input.name, index),
     mallet: normalizeMallet(input.mallet),
     tableHalf: normalizeTableHalf(input.tableHalf),
   };
 }
 
+/** The factory design: slot one, untouched. */
+export function defaultLoadout() {
+  return normalizeLoadout(null);
+}
+
+// ---------------------------------------------------------------------------
+// DOCUMENT
+// ---------------------------------------------------------------------------
+
+/**
+ * The factory garage: one loadout, equipped, exactly what the cabinet draws
+ * before it has ever talked to the API. The server returns the same document
+ * for a player with no row.
+ */
+export function defaultGarage() {
+  return normalizeGarage(null);
+}
+
+/**
+ * Coerce anything at all into a garage document. Never throws.
+ *
+ * MIGRATION, NOT WIPE. A version-1 document was a bare mallet-and-table-half
+ * with no list and no id, so a document with no usable `loadouts` array is read
+ * AS one loadout — meaning every garage saved before this existed comes back as
+ * slot one with its design intact, and `{}` and `null` land on the factory
+ * loadout by that same path.
+ */
+export function normalizeGarage(value) {
+  const input = object(value);
+  const raw = Array.isArray(input.loadouts) && input.loadouts.length ? input.loadouts : [input];
+
+  const loadouts = [];
+  const taken = new Set();
+  for (const entry of raw.slice(0, MAX_LOADOUTS)) {
+    const index = loadouts.length;
+    const loadout = normalizeLoadout(entry, index);
+    // Two slots with one id is a document the editor cannot address. The later
+    // one is renumbered rather than dropped: it is somebody's design.
+    if (taken.has(loadout.id)) {
+      let n = index + 1;
+      while (taken.has(defaultLoadoutId(n))) n += 1;
+      loadout.id = defaultLoadoutId(n);
+    }
+    taken.add(loadout.id);
+    loadouts.push(loadout);
+  }
+
+  const requested = typeof input.equippedId === "string" ? input.equippedId.trim() : "";
+  const equippedId = taken.has(requested) ? requested : loadouts[0].id;
+  return { version: LOADOUT_VERSION, equippedId, loadouts };
+}
+
 /** The wire form. Normalized, so an edited document cannot leave malformed. */
 export function serializeGarage(garage) {
   return normalizeGarage(garage);
+}
+
+/** Structural equality, used by the editor to decide UNSAVED vs SAVED. */
+export function garagesEqual(left, right) {
+  return JSON.stringify(normalizeGarage(left)) === JSON.stringify(normalizeGarage(right));
+}
+
+// ---------------------------------------------------------------------------
+// SLOTS
+// ---------------------------------------------------------------------------
+
+/**
+ * The loadout that is ON.
+ *
+ * This is the ONLY thing handed to the renderer, the stage preview and the
+ * public route, and it is always a real loadout — `normalizeGarage` guarantees
+ * at least one slot and an `equippedId` that names one of them.
+ */
+export function equippedLoadout(garage) {
+  const normalized = normalizeGarage(garage);
+  return normalized.loadouts.find((loadout) => loadout.id === normalized.equippedId) ?? normalized.loadouts[0];
+}
+
+/** Put an edited loadout back where it came from. Identity is the id, not the index. */
+export function replaceLoadout(garage, loadout) {
+  const next = normalizeGarage(garage);
+  const index = next.loadouts.findIndex((entry) => entry.id === loadout?.id);
+  if (index < 0) return next;
+  next.loadouts[index] = normalizeLoadout({ ...loadout, id: next.loadouts[index].id }, index);
+  return next;
+}
+
+/** Apply a change to whichever loadout is equipped. */
+function mapEquipped(garage, change) {
+  const next = normalizeGarage(garage);
+  return replaceLoadout(next, change(equippedLoadout(next)));
+}
+
+/** Equip a saved design. An unknown id leaves the garage exactly as it was. */
+export function selectLoadout(garage, id) {
+  const next = normalizeGarage(garage);
+  if (!next.loadouts.some((loadout) => loadout.id === id)) return next;
+  next.equippedId = id;
+  return next;
+}
+
+export function renameLoadout(garage, id, name) {
+  const next = normalizeGarage(garage);
+  const index = next.loadouts.findIndex((loadout) => loadout.id === id);
+  if (index < 0) return next;
+  next.loadouts[index] = { ...next.loadouts[index], name: normalizeLoadoutName(name, index) };
+  return next;
+}
+
+/**
+ * Add a slot and equip it.
+ *
+ * `from` copies an existing design — the way most second loadouts get made is
+ * "this one, but blue" — and omitting it starts from the factory loadout. At
+ * `MAX_LOADOUTS` the garage comes back untouched; the caller disables the
+ * button, and this makes the rule true rather than merely displayed.
+ */
+export function addLoadout(garage, { from = null, name = "" } = {}) {
+  const next = normalizeGarage(garage);
+  if (next.loadouts.length >= MAX_LOADOUTS) return next;
+  const source = from ? next.loadouts.find((loadout) => loadout.id === from) : null;
+  const taken = new Set(next.loadouts.map((loadout) => loadout.id));
+  let n = next.loadouts.length;
+  while (taken.has(defaultLoadoutId(n))) n += 1;
+  const index = next.loadouts.length;
+  const created = normalizeLoadout({
+    ...(source ?? defaultLoadout()),
+    id: defaultLoadoutId(n),
+    name: name || (source ? `${source.name} copy` : defaultLoadoutName(index)),
+  }, index);
+  next.loadouts.push(created);
+  next.equippedId = created.id;
+  return next;
+}
+
+/**
+ * Delete a slot.
+ *
+ * The last one cannot go: a player with no loadout has no mallet, and the
+ * document has nowhere to point. Deleting what was equipped equips its
+ * neighbour rather than leaving the garage pointing at nothing.
+ */
+export function removeLoadout(garage, id) {
+  const next = normalizeGarage(garage);
+  if (next.loadouts.length <= 1) return next;
+  const index = next.loadouts.findIndex((loadout) => loadout.id === id);
+  if (index < 0) return next;
+  next.loadouts.splice(index, 1);
+  if (next.equippedId === id) next.equippedId = next.loadouts[Math.min(index, next.loadouts.length - 1)].id;
+  return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,49 +500,51 @@ export function matchingMaterialPresetId(material) {
   return null;
 }
 
+// Presets seed the EQUIPPED loadout. The editor only ever edits the design that
+// is on, so there is no "which slot did that apply to" to get wrong.
+
 /** Seed the geometry from a preset, leaving everything else on the mallet alone. */
 export function applyShapePreset(garage, presetId) {
   const preset = MALLET_SHAPE_BY_ID.get(presetId);
   if (!preset) return normalizeGarage(garage);
-  const next = normalizeGarage(garage);
-  next.mallet.shapePreset = preset.id;
-  next.mallet.geometry = normalizeGeometry(preset.geometry, preset.geometry);
-  return next;
+  return mapEquipped(garage, (loadout) => ({
+    ...loadout,
+    mallet: { ...loadout.mallet, shapePreset: preset.id, geometry: normalizeGeometry(preset.geometry, preset.geometry) },
+  }));
 }
 
 export function applyMaterialPreset(garage, presetId) {
   const preset = MALLET_MATERIAL_BY_ID.get(presetId);
   if (!preset) return normalizeGarage(garage);
-  const next = normalizeGarage(garage);
-  next.mallet.material = normalizeMaterial({ preset: preset.id, ...preset.material }, preset.material);
-  return next;
+  return mapEquipped(garage, (loadout) => ({
+    ...loadout,
+    mallet: { ...loadout.mallet, material: normalizeMaterial({ preset: preset.id, ...preset.material }, preset.material) },
+  }));
 }
 
 export function applySurfacePreset(garage, presetId) {
   const preset = TABLE_SURFACE_BY_ID.get(presetId);
   if (!preset) return normalizeGarage(garage);
-  const next = normalizeGarage(garage);
-  next.tableHalf.surface = normalizeSurface({ preset: preset.id, ...preset.surface });
-  return next;
+  return mapEquipped(garage, (loadout) => ({
+    ...loadout,
+    tableHalf: { ...loadout.tableHalf, surface: normalizeSurface({ preset: preset.id, ...preset.surface }) },
+  }));
 }
 
 export function applyRailPreset(garage, presetId) {
   const preset = TABLE_RAIL_BY_ID.get(presetId);
   if (!preset) return normalizeGarage(garage);
-  const next = normalizeGarage(garage);
-  next.tableHalf.rails = normalizeRails({ preset: preset.id, ...preset.rails });
-  return next;
+  return mapEquipped(garage, (loadout) => ({
+    ...loadout,
+    tableHalf: { ...loadout.tableHalf, rails: normalizeRails({ preset: preset.id, ...preset.rails }) },
+  }));
 }
 
 export function applyGoalPreset(garage, presetId) {
   const preset = TABLE_GOAL_BY_ID.get(presetId);
   if (!preset) return normalizeGarage(garage);
-  const next = normalizeGarage(garage);
-  next.tableHalf.goal = normalizeGoal({ preset: preset.id, ...preset.goal });
-  return next;
-}
-
-/** Structural equality, used by the editor to decide UNSAVED vs SAVED. */
-export function garagesEqual(left, right) {
-  return JSON.stringify(normalizeGarage(left)) === JSON.stringify(normalizeGarage(right));
+  return mapEquipped(garage, (loadout) => ({
+    ...loadout,
+    tableHalf: { ...loadout.tableHalf, goal: normalizeGoal({ preset: preset.id, ...preset.goal }) },
+  }));
 }

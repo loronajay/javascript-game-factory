@@ -2,8 +2,8 @@ import { ARENA_IDS } from '../config.js';
 import { createTable } from './table.js';
 import { createVenues } from './venues/index.js';
 import { getRival } from '../physics/rivals.js';
-import { rivalGarage } from '../cosmetics/rival-appearance.js';
-import { defaultGarage } from '../cosmetics/loadout.js';
+import { rivalLoadout } from '../cosmetics/rival-appearance.js';
+import { defaultLoadout } from '../cosmetics/loadout.js';
 
 
 function disposeStage(stage) {
@@ -60,11 +60,11 @@ function createPreviewStage(THREE, canvas, { preserveDrawingBuffer = false } = {
     // The preview dresses both halves through the same appearance calls the
     // match uses, so the venue card shows the equipment that will actually be
     // on the table rather than a stand-in.
-    function configure(arenaId, playerColor, rivalId = 'rookie', garage = defaultGarage()) {
-        const rival = getRival(rivalId), opponent = rivalGarage(rival);
+    function configure(arenaId, playerColor, rivalId = 'rookie', loadout = defaultLoadout()) {
+        const rival = getRival(rivalId), opponent = rivalLoadout(rival);
         venues.applyArenaTheme(arenaId);
-        table.applyHalfAppearance('player', garage.tableHalf);
-        table.applyMalletAppearance('player', garage.mallet);
+        table.applyHalfAppearance('player', loadout.tableHalf);
+        table.applyMalletAppearance('player', loadout.mallet);
         table.applyHalfAppearance('cpu', opponent.tableHalf);
         table.applyMalletAppearance('cpu', opponent.mallet);
         table.applyColors(playerColor, rival.color);
@@ -117,8 +117,8 @@ export function createVenuePreview({ THREE, canvas, container, thumbnailTargets 
         stage.camera.aspect = width / height;
         stage.camera.updateProjectionMatrix();
     }
-    function configure(config, garage) {
-        stage.configure(config.arenaId, config.playerColor, config.rivalId, garage);
+    function configure(config, loadout) {
+        stage.configure(config.arenaId, config.playerColor, config.rivalId, loadout);
         configured = true;
         if (!thumbnailsReady) {
             thumbnailsReady = true;

@@ -63,11 +63,13 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
         // visits the editor this session. Signed out, this resolves to the
         // factory loadout and never claims to have saved anything.
         const garage = createGarageStore();
-        const ui = own(createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient: client, getGarage: () => garage.equipped }));
+        const ui = own(createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient: client, garage }));
         const garageScreen = own(createGarageScreen({ doc, match, view, store: garage }));
-        void garage.load().then(equipped => {
-            view.equipPlayer(equipped);
-            ui.render();
+        void garage.load().then(() => {
+            // The account's EQUIPPED design, on the table and in the setup
+            // picker, before the player has opened the Garage this session.
+            view.equipPlayer(garage.equipped);
+            ui.refreshGarage();
         }).catch(() => { /* The cabinet plays on the factory loadout. */ });
         const online = own(createOnlineController({ doc, match, account, client }));
         const clock = createFixedStep(dt => {

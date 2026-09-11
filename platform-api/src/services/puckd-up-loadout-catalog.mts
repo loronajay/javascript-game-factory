@@ -31,7 +31,12 @@
 
 export const PUCK_D_UP_GAME_SLUG = "puckd-up";
 
-const LOADOUT_VERSION = 1;
+const LOADOUT_VERSION = 2;
+
+/** How many designs one account may keep. Mirrors the cabinet's own cap. */
+const MAX_LOADOUTS = 8;
+/** Longest player-given loadout name. */
+const LOADOUT_NAME_LIMIT = 24;
 
 type Bounds = { min: number; max: number };
 const range = (min: number, max: number): Bounds => ({ min, max });
@@ -347,8 +352,49 @@ function normalizeTableHalf(raw: any): any {
   };
 }
 
+// ---------------------------------------------------------------------------
+// LOADOUTS AND THE DOCUMENT
+// ---------------------------------------------------------------------------
+//
+// A player keeps SEVERAL designs and equips one. The cap and the name rules are
+// enforced here because this is a row in this database: an unbounded list of
+// unbounded names is how one account's cosmetics become everyone's problem.
+// The cabinet does the same work in `scripts/cosmetics/loadout.js` so it never
+// draws a document it would not have written, and
+// `games/puckd-up/tests/server-agreement.test.js` asserts the two agree
+// character for character.
+
+const LOADOUT_ID = /^[A-Za-z0-9_-]{1,32}$/;
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
+
+const defaultLoadoutName = (index: number): string => `Loadout ${index + 1}`;
+const defaultLoadoutId = (index: number): string => `loadout-${index + 1}`;
+
+function normalizeLoadoutName(value: any, index: number): string {
+  const text = (typeof value === "string" ? value : "")
+    .replace(CONTROL_CHARS, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, LOADOUT_NAME_LIMIT)
+    .trim();
+  return text || defaultLoadoutName(index);
+}
+
+function normalizeLoadout(value: any, index: number): any {
+  const input = asObject(value);
+  const id = typeof input.id === "string" && LOADOUT_ID.test(input.id.trim())
+    ? input.id.trim()
+    : defaultLoadoutId(index);
+  return {
+    id,
+    name: normalizeLoadoutName(input.name, index),
+    mallet: normalizeMallet(input.mallet),
+    tableHalf: normalizeTableHalf(input.tableHalf),
+  };
+}
+
 /**
- * The factory loadout.
+ * The factory garage.
  *
  * A player who has never opened the Garage has no row, and that is not an
  * error: they get this, which is exactly what their own cabinet is drawing
@@ -358,27 +404,51 @@ export function defaultPuckdUpGarage(): any {
   return normalizePuckdUpGarage(null);
 }
 
-/** Coerce any stored or submitted document into a garage. Never throws. */
+/**
+ * Coerce any stored or submitted document into a garage. Never throws.
+ *
+ * MIGRATION, NOT WIPE. Version 1 was a bare mallet-and-table-half with no list,
+ * so a document with no usable `loadouts` array is read AS one loadout — every
+ * row written before this shipped comes back as slot one with its design
+ * intact, and an absent row lands on the factory loadout by the same path.
+ */
 export function normalizePuckdUpGarage(value: any): any {
   const input = asObject(value);
-  return {
-    version: LOADOUT_VERSION,
-    mallet: normalizeMallet(input.mallet),
-    tableHalf: normalizeTableHalf(input.tableHalf),
-  };
+  const raw = Array.isArray(input.loadouts) && input.loadouts.length ? input.loadouts : [input];
+
+  const loadouts: any[] = [];
+  const taken = new Set<string>();
+  for (const entry of raw.slice(0, MAX_LOADOUTS)) {
+    const index = loadouts.length;
+    const loadout = normalizeLoadout(entry, index);
+    // Two slots with one id is a document the editor cannot address. The later
+    // one is renumbered rather than dropped: it is somebody's design.
+    if (taken.has(loadout.id)) {
+      let n = index + 1;
+      while (taken.has(defaultLoadoutId(n))) n += 1;
+      loadout.id = defaultLoadoutId(n);
+    }
+    taken.add(loadout.id);
+    loadouts.push(loadout);
+  }
+
+  const requested = typeof input.equippedId === "string" ? input.equippedId.trim() : "";
+  const equippedId = taken.has(requested) ? requested : loadouts[0].id;
+  return { version: LOADOUT_VERSION, equippedId, loadouts };
 }
 
 /**
  * What one player's equipment looks like, for an opponent to draw.
  *
- * Puck'd Up stores ONE active loadout rather than a warehouse of presets, so
- * there is no private remainder to strip — but this still resolves explicitly
- * rather than returning the row, so the day a preset list is added the public
- * shape does not silently grow to include it.
+ * THE EQUIPPED SLOT ONLY. A player's other designs are theirs; an opponent is
+ * owed the mallet and the half actually on the table, and nothing else. This is
+ * the line that keeps the public shape from growing with the private list.
  */
 export function puckdUpLoadoutFromGarage(garage: any): any {
   const normalized = normalizePuckdUpGarage(garage);
-  return { mallet: normalized.mallet, tableHalf: normalized.tableHalf };
+  const equipped = normalized.loadouts.find((loadout: any) => loadout.id === normalized.equippedId)
+    ?? normalized.loadouts[0];
+  return { mallet: equipped.mallet, tableHalf: equipped.tableHalf };
 }
 
 export const PUCK_D_UP_LOADOUT_CATALOG = Object.freeze({

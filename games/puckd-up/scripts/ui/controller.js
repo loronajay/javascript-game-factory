@@ -2,13 +2,17 @@ import { normalizeSettings, saveSettings } from '../settings.js';
 import { RIVALS, getRival } from '../physics/rivals.js';
 import { CIRCUIT_STOPS, createCircuitProgress, loadCircuitProgress, recordCircuitResult, saveCircuitProgress, stopStatus } from '../core/circuit.js';
 // Owns DOM lookup, presentation and user actions. Reads match state; never moves bodies.
-export function createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient, getGarage = () => undefined }) {
+// `garage` is the account's equipment store. The setup screen picks WHICH saved
+// loadout is equipped, which is a write to the account rather than a match
+// setting — an opponent's client draws the equipped one, so a choice that never
+// left this tab would put a different mallet on their screen than on this one.
+export function createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient, garage = null }) {
     const abort = new AbortController(), options = { signal: abort.signal };
     const ids = ['app', 'game', 'gamewrap', 'pScore', 'cScore', 'scoreboard', 'speed', 'shot', 'powerFill',
         'gameState', 'message', 'pause', 'restart', 'fullscreen', 'menuFullscreen', 'difficultyLabel',
         'serveLabel', 'menuScreen', 'setupScreen', 'pauseScreen', 'resultScreen', 'matchHud', 'matchControls',
         'cpuModeBtn', 'circuitModeBtn', 'garageModeBtn', 'garageScreen', 'circuitScreen', 'circuitGrid', 'circuitBack', 'circuitProgress', 'circuitTitle',
-        'setupBack', 'startMatch', 'setupRival', 'playerColor', 'colorPreview',
+        'setupBack', 'startMatch', 'setupRival', 'setupLoadouts', 'setupLoadoutNote', 'setupGarage',
         'resumeMatch', 'pauseRestart', 'pauseMenu', 'rematch', 'resultMenu', 'resultTitle', 'resultP', 'resultC', 'arenaGrid', 'soundToggle', 'opponentName', 'resultNote',
         'stagePreviewNumber', 'stagePreviewName', 'stagePreviewDescription', 'rivalPortrait', 'rivalTitle', 'rivalName', 'rivalIntro', 'rivalRecord',
         'rivalPortraitMobile', 'rivalTitleMobile', 'rivalNameMobile', 'rivalIntroMobile', 'rivalRecordMobile'];
@@ -18,7 +22,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
             throw new Error(`Missing cabinet element: ${id}`);
         return [id, node];
     }));
-    const swatches = [...doc.querySelectorAll('.swatch')], arenas = [...el.arenaGrid.querySelectorAll('.arenaCard')];
+    const arenas = [...el.arenaGrid.querySelectorAll('.arenaCard')];
     let previousScreen = null, circuitProgress = loadCircuitProgress(storage);
     const on = (node, event, fn) => node.addEventListener(event, fn, options);
     function write(node, text) {
@@ -54,14 +58,83 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
             button.querySelector('.circuitStopState').textContent = status === 'locked' ? 'LOCKED' : `${record.wins}W–${record.losses}L`;
         });
     }
+    // ---------------------------------------------------------------------
+    // LOADOUT PICKER
+    // ---------------------------------------------------------------------
+    //
+    // The saved designs, in the space the dead colour picker used to hold. It
+    // EQUIPS rather than configures the match: the choice is written to the
+    // account, so the mallet an opponent's client draws is the one on screen
+    // here. Signed out there is exactly one design and the note says why.
+
+    let loadoutCards = [], loadoutSignature = '', equipping = false;
+
+    function loadoutCard(loadout) {
+        const button = doc.createElement('button');
+        button.type = 'button';
+        button.className = 'loadoutCard';
+        button.innerHTML = '<span class="loadoutPaint" aria-hidden="true"></span><b></b>';
+        button.addEventListener('click', async () => {
+            if (equipping || !garage || garage.garage.equippedId === loadout.id) return;
+            equipping = true;
+            try {
+                await garage.equip(loadout.id);
+            } finally {
+                equipping = false;
+            }
+            // The equipped design is the one the table and the preview show.
+            view.equipPlayer(garage.equipped);
+            applyConfig();
+        }, options);
+        return button;
+    }
+
+    function renderLoadouts() {
+        const loadouts = garage?.loadouts ?? [];
+        const signature = loadouts.map(loadout => loadout.id).join(',');
+        if (signature !== loadoutSignature) {
+            loadoutSignature = signature;
+            el.setupLoadouts.replaceChildren();
+            loadoutCards = loadouts.map(loadout => {
+                const button = loadoutCard(loadout);
+                el.setupLoadouts.append(button);
+                return { id: loadout.id, button };
+            });
+        }
+        for (const card of loadoutCards) {
+            const loadout = loadouts.find(entry => entry.id === card.id);
+            if (!loadout) continue;
+            const selected = loadout.id === garage?.garage.equippedId;
+            card.button.classList.toggle('selected', selected);
+            card.button.setAttribute('aria-pressed', String(selected));
+            card.button.querySelector('b').textContent = loadout.name;
+            const paint = card.button.querySelector('.loadoutPaint');
+            paint.style.setProperty('--primary', loadout.mallet.colors.primary);
+            paint.style.setProperty('--accent', loadout.tableHalf.surface.baseColor);
+        }
+        write(el.setupLoadoutNote, !garage?.available
+            ? 'Sign in to your Player Factory account to keep more than one design.'
+            : loadouts.length > 1 ? 'Equipped for every match, here and online.' : 'Build a second design in the Garage.');
+    }
+
+    /**
+     * The cabinet's player accent is the EQUIPPED MALLET's primary colour.
+     *
+     * It used to be its own setting with its own picker, and the Garage made
+     * that picker dead: an equipped half owns its goal and trim, so the swatch
+     * changed nothing a player could see. The colour still drives the goal
+     * burst, the warm key light and the online ready colour, so rather than
+     * delete the concept it now follows the equipment.
+     */
+    function equippedColor() {
+        return garage?.equipped?.mallet?.colors?.primary || match.config.playerColor;
+    }
     function applyConfig(patch = {}) {
-        Object.assign(match.config, normalizeSettings({ ...match.config, ...patch }));
+        Object.assign(match.config, normalizeSettings({ ...match.config, ...patch, playerColor: patch.playerColor ?? equippedColor() }));
         const { playerColor, arenaId, rivalId, muted } = match.config;
         const rival = getRival(rivalId), record = rivalRecord(rival.id);
         view.configure(match.config);
         doc.documentElement.style.setProperty('--player-accent', playerColor);
-        el.playerColor.value = playerColor;
-        el.colorPreview.style.background = playerColor;
         el.setupRival.value = rival.id;
         el.rivalPortrait.src = rival.portrait;
         el.rivalPortrait.alt = `${rival.name}, ${rival.title}`;
@@ -78,11 +151,6 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         write(el.rivalIntroMobile, rival.intro);
         write(el.rivalRecordMobile, `Record ${record.wins}–${record.losses}`);
         doc.documentElement.style.setProperty('--rival-accent', rival.color);
-        for (const swatch of swatches) {
-            const selected = swatch.dataset.color.toLowerCase() === playerColor;
-            swatch.classList.toggle('selected', selected);
-            swatch.setAttribute('aria-pressed', String(selected));
-        }
         for (const card of arenas) {
             const selected = card.dataset.arena === arenaId;
             card.classList.toggle('selected', selected);
@@ -93,7 +161,8 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         write(el.stagePreviewNumber, `A${venueIndex} // Selected venue`);
         write(el.stagePreviewName, selectedVenue?.querySelector('b')?.textContent || 'Hyper Arcade');
         write(el.stagePreviewDescription, selectedVenue?.querySelector('small')?.textContent || 'Neon light tunnel');
-        stagePreview.configure(match.config, getGarage());
+        stagePreview.configure(match.config, garage?.equipped);
+        renderLoadouts();
         write(el.soundToggle, muted ? 'Sound: Off' : 'Sound: On');
         el.soundToggle.setAttribute('aria-pressed', String(muted));
         el.soundToggle.setAttribute('aria-label', muted ? 'Unmute audio' : 'Mute audio');
@@ -104,7 +173,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         controls.requestLock();
     }
     function start() {
-        applyConfig({ rivalId: el.setupRival.value, playerColor: el.playerColor.value });
+        applyConfig({ rivalId: el.setupRival.value });
         saveSettings(storage, match.config);
         match.start();
         focusMatch();
@@ -152,10 +221,8 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
     });
     on(el.pauseMenu, 'click', () => match.menu());
     on(el.resultMenu, 'click', () => match.state.mode === 'campaign' ? match.circuit() : match.menu());
-    on(el.playerColor, 'input', () => applyConfig({ playerColor: el.playerColor.value }));
     on(el.setupRival, 'change', () => applyConfig({ rivalId: el.setupRival.value }));
-    for (const swatch of swatches)
-        on(swatch, 'click', () => applyConfig({ playerColor: swatch.dataset.color }));
+    on(el.setupGarage, 'click', () => match.garage());
     for (const arena of arenas)
         on(arena, 'click', () => applyConfig({ arenaId: arena.dataset.arena }));
     circuitButtons.forEach((button, index) => on(button, 'click', () => {
@@ -225,6 +292,9 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         }
     }
     function handle(event) {
+        // Coming back from the Garage, the equipped design may be a different
+        // one — the picker, the accent and the stage preview all follow it.
+        if (event.type === 'screen' && event.screen === 'setup') applyConfig();
         if (event.type === 'match-end' && event.mode !== 'online') {
             if (event.mode === 'campaign') circuitProgress = recordCircuitResult(circuitProgress, { rivalId: event.rivalId, won: event.winner === 'player' });
             else {
@@ -241,5 +311,10 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
     applyConfig();
     updateCircuit();
     render();
-    return { render, handle, dispose: () => abort.abort() };
+    /** The account's garage finished loading; re-read what is equipped. */
+    function refreshGarage() {
+        applyConfig();
+        render();
+    }
+    return { render, handle, refreshGarage, dispose: () => abort.abort() };
 }

@@ -3,18 +3,19 @@ import { createTable } from './table.js';
 import { createVenues } from './venues/index.js';
 import { createGoalBurst } from './goal-burst.js';
 import { getRival } from '../physics/rivals.js';
-import { rivalGarage } from '../cosmetics/rival-appearance.js';
-import { defaultGarage } from '../cosmetics/loadout.js';
+import { rivalLoadout } from '../cosmetics/rival-appearance.js';
+import { defaultLoadout } from '../cosmetics/loadout.js';
 
 export function visiblePlayerColors(config, state) {
     return state.mode === 'online' && Array.isArray(state.playerColors) ? state.playerColors : [config.playerColor, getRival(config.rivalId).color];
 }
 // Rendering reads bodies. Animation ages advance in tick(), never in render().
 //
-// EQUIPMENT COMES FROM OUTSIDE. The view owns no cosmetic state of its own: the
-// near half is whatever the garage store last equipped, and the far half is
-// either an online opponent's public loadout or the current rival's kit. Both
-// arrive as ordinary garage documents and are drawn by the same code.
+// EQUIPMENT COMES FROM OUTSIDE, AND IT IS ONE LOADOUT. The view owns no
+// cosmetic state of its own and never sees the player's list of saved designs:
+// the near half is whichever loadout the garage store has EQUIPPED, and the far
+// half is either an online opponent's public loadout or the current rival's
+// kit. Three sources, one shape, drawn by the same code.
 export function createView(THREE, canvas, container) {
     const stage = createScene(THREE, canvas, container);
     try {
@@ -22,10 +23,10 @@ export function createView(THREE, canvas, container) {
         const venues = createVenues(THREE, stage, table);
         const goalBurst = createGoalBurst(THREE, stage.scene);
         let elapsed = 0, arena = null, config = null, colors = [];
-        let playerGarage = defaultGarage();
+        let playerLoadout = defaultLoadout();
         // Set only when a real opponent's loadout has been fetched. Null means
         // "the rival on the other side of the table", which is the CPU case.
-        let opponentGarage = null;
+        let opponentLoadout = null;
 
         function applyColors(next) {
             if (colors[0] === next[0] && colors[1] === next[1]) return;
@@ -35,13 +36,13 @@ export function createView(THREE, canvas, container) {
             stage.cool.color.set(colors[1]);
         }
         function dressPlayer() {
-            table.applyHalfAppearance('player', playerGarage.tableHalf);
-            table.applyMalletAppearance('player', playerGarage.mallet);
+            table.applyHalfAppearance('player', playerLoadout.tableHalf);
+            table.applyMalletAppearance('player', playerLoadout.mallet);
         }
         function dressOpponent() {
-            const garage = opponentGarage ?? rivalGarage(getRival(config?.rivalId));
-            table.applyHalfAppearance('cpu', garage.tableHalf);
-            table.applyMalletAppearance('cpu', garage.mallet);
+            const loadout = opponentLoadout ?? rivalLoadout(getRival(config?.rivalId));
+            table.applyHalfAppearance('cpu', loadout.tableHalf);
+            table.applyMalletAppearance('cpu', loadout.mallet);
         }
         return {
             camera: stage.camera, resize: stage.resize,
@@ -52,14 +53,14 @@ export function createView(THREE, canvas, container) {
                 table.dispose();
                 stage.dispose();
             },
-            /** The signed-in player's saved equipment. Near half only. */
-            equipPlayer(garage) {
-                playerGarage = garage;
+            /** The player's EQUIPPED loadout, never their garage. Near half only. */
+            equipPlayer(loadout) {
+                playerLoadout = loadout;
                 dressPlayer();
             },
             /** An online opponent's public loadout, or null to fall back to the rival. */
-            equipOpponent(garage) {
-                opponentGarage = garage;
+            equipOpponent(loadout) {
+                opponentLoadout = loadout;
                 dressOpponent();
             },
             showCollisionOverlay(visible) {

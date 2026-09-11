@@ -52,7 +52,7 @@ test('setup presents real 3D venue previews in the cards and dedicated right rai
     assert.equal((html.match(/class="arenaThumbnail"/g) || []).length, 8);
     assert.match(css, /\.stagePreviewCanvas/);
     assert.match(css, /\.arenaThumbnail/);
-    assert.match(controller, /stagePreview\.configure\(match\.config, getGarage\(\)\)/);
+    assert.match(controller, /stagePreview\.configure\(match\.config, garage\?\.equipped\)/);
     assert.match(cabinet, /createVenuePreview/);
     assert.match(cabinet, /stagePreview\.render/);
 });
