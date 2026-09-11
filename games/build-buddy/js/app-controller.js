@@ -1,3 +1,4 @@
+import { PauseMenu } from './pause-menu.js';
 import { Game } from './game.js';
 import { VIEW } from './constants.js';
 import {
@@ -108,6 +109,7 @@ export class AppController {
       }
     });
 
+    this.pauseMenu = new PauseMenu(this);
     this.canvas.width = VIEW.width;
     this.canvas.height = VIEW.height;
     this.renderShell();
@@ -131,17 +133,22 @@ export class AppController {
   setState(nextState) {
     const previousStageId = this.state.session?.currentStageId ?? null;
     const previousScreen = this.state.screen;
+    this.pauseMenu?.close();
     this.state = nextState;
 
     const nextStageId = this.state.session?.currentStageId ?? null;
     if (this.state.screen === APP_SCREENS.GAMEPLAY && (previousScreen !== APP_SCREENS.GAMEPLAY || previousStageId !== nextStageId)) {
       this.createGame();
     }
-    if (this.state.screen !== APP_SCREENS.GAMEPLAY) this.game = null;
+    if (this.state.screen !== APP_SCREENS.GAMEPLAY) {
+      this.game?.input.dispose();
+      this.game = null;
+    }
     this.renderShell();
   }
 
   createGame() {
+    this.game?.input.dispose();
     const localControlRole = this.state.onlineGameplay ? localOnlineRole(this.state) : 'debug';
     this.game = new Game(this.canvas, {
       initialStageId: this.state.session.currentStageId,
@@ -153,6 +160,7 @@ export class AppController {
   }
 
   updateGameplayTick() {
+    if (this.pauseMenu?.opened && !this.state.onlineGameplay) return;
     if (!this.state.onlineGameplay) {
       this.game?.update(FIXED_DT);
       return;
@@ -385,6 +393,7 @@ export class AppController {
   }
 
   renderShell() {
+    this.pauseMenu?.sync();
     this.shellRoot.replaceChildren();
     this.shellRoot.hidden = this.state.screen === APP_SCREENS.GAMEPLAY;
     this.canvas.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;

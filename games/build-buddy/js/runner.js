@@ -217,12 +217,14 @@ export class Runner {
   }
 
   tryEnterClimb(input) {
-    if (this.grounded || input.downHeld()) return;
+    if (input.downHeld() || (this.grounded && !input.upHeld())) return;
     const rr = this.rect();
     for (const wall of this.stage.climbables) {
       const expanded = { x: wall.x - 3, y: wall.y, w: wall.w + 6, h: wall.h };
       if (rectsOverlap(rr, expanded) && this.vy > -500) {
         this.climbing = true;
+        this.grounded = false;
+        this.onGroundId = null;
         this.climbWall = wall;
         this.vx = 0;
         this.vy = 0;

@@ -3,13 +3,15 @@ import { VIEW_MODES } from './view-modes.js';
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
+    this.enabled = true;
+    this.listeners = [];
     this.keys = new Set();
     this.mouse = { x: 0, y: 0, down: false, rightDown: false, justClicked: false, justRightClicked: false };
     this.taps = new Set();
     this.selectedTool = 'platform';
     this.viewModeRequest = null;
 
-    window.addEventListener('keydown', (e) => {
+    this.listen(window, 'keydown', (e) => {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
       this.keys.add(e.code);
       if (e.code === 'Digit1') this.selectedTool = 'platform';
@@ -22,11 +24,11 @@ export class Input {
       if (e.code === 'Digit8') this.viewModeRequest = VIEW_MODES.HYBRID;
     });
 
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    this.listen(window, 'keyup', (e) => this.keys.delete(e.code));
 
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    canvas.addEventListener('pointermove', (e) => this.updatePointer(e));
-    canvas.addEventListener('pointerdown', (e) => {
+    this.listen(canvas, 'contextmenu', (e) => e.preventDefault());
+    this.listen(canvas, 'pointermove', (e) => this.updatePointer(e));
+    this.listen(canvas, 'pointerdown', (e) => {
       this.updatePointer(e);
       if (e.button === 2) {
         this.mouse.rightDown = true;
@@ -37,13 +39,36 @@ export class Input {
       }
       canvas.setPointerCapture?.(e.pointerId);
     });
-    canvas.addEventListener('pointerup', (e) => {
+    this.listen(canvas, 'pointerup', (e) => {
       this.updatePointer(e);
       if (e.button === 2) this.mouse.rightDown = false;
       else this.mouse.down = false;
     });
 
     this.bindMobileButtons();
+  }
+
+  listen(target, type, handler) {
+    const listener = (event) => { if (this.enabled) handler(event); };
+    target.addEventListener(type, listener);
+    this.listeners.push(() => target.removeEventListener?.(type, listener));
+  }
+
+  setEnabled(enabled) {
+    this.enabled = enabled;
+    this.keys.clear();
+    this.taps.clear();
+    this.mouse.down = false;
+    this.mouse.rightDown = false;
+    this.viewModeRequest = null;
+    this.endFrame();
+    for (const button of document.querySelectorAll('[data-hold]')) button.classList.remove('is-held');
+  }
+
+  dispose() {
+    this.setEnabled(false);
+    for (const remove of this.listeners) remove();
+    this.listeners = [];
   }
 
   updatePointer(e) {
@@ -57,28 +82,28 @@ export class Input {
       const key = btn.dataset.hold;
       const on = (e) => { e.preventDefault(); this.keys.add(`mobile:${key}`); btn.classList.add('is-held'); };
       const off = (e) => { e.preventDefault(); this.keys.delete(`mobile:${key}`); btn.classList.remove('is-held'); };
-      btn.addEventListener('pointerdown', on);
-      btn.addEventListener('pointerup', off);
-      btn.addEventListener('pointercancel', off);
-      btn.addEventListener('pointerleave', off);
+      this.listen(btn, 'pointerdown', on);
+      this.listen(btn, 'pointerup', off);
+      this.listen(btn, 'pointercancel', off);
+      this.listen(btn, 'pointerleave', off);
     }
 
     for (const btn of document.querySelectorAll('[data-tap]')) {
-      btn.addEventListener('pointerdown', (e) => {
+      this.listen(btn, 'pointerdown', (e) => {
         e.preventDefault();
         this.taps.add(btn.dataset.tap);
       });
     }
 
     for (const btn of document.querySelectorAll('[data-tool]')) {
-      btn.addEventListener('pointerdown', (e) => {
+      this.listen(btn, 'pointerdown', (e) => {
         e.preventDefault();
         this.selectedTool = btn.dataset.tool;
       });
     }
 
     for (const btn of document.querySelectorAll('[data-view-mode]')) {
-      btn.addEventListener('pointerdown', (e) => {
+      this.listen(btn, 'pointerdown', (e) => {
         e.preventDefault();
         this.viewModeRequest = btn.dataset.viewMode;
       });
