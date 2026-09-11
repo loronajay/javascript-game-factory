@@ -1,36 +1,17 @@
-import { createTeamworkStage } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, gantry } from './pack-01-stage-helpers.js';
 
+// A spring lift enters the well; a long wall gives breathing room before the roof launch.
 export const pack01Stage04 = createTeamworkStage({
-  "stageNumber": 4,
-  "name": "Springwell",
-  "archetype": "spring_tower",
-  "rulePreset": "springFocus",
-  "timerMs": 180000,
-  "points": [
-    [
-      80,
-      2280,
-      "High spring then air jump"
-    ],
-    [
-      800,
-      1800,
-      "Brake before the landing"
-    ],
-    [
-      80,
-      1320,
-      "Launch back to the right"
-    ],
-    [
-      800,
-      840,
-      "Last launch goes left"
-    ],
-    [
-      80,
-      360,
-      "Clock out together"
-    ]
-  ]
+  stageNumber: 4,
+  name: 'Springwell',
+  archetype: 'spring_tower',
+  rulePreset: 'springFocus',
+  timerMs: 180000,
+  route: [
+    deck('start', 80, 2000, 480),
+    deck('well', 800, 1520, 480),
+    climb('well_wall', 1200, 800, 720),
+    deck('roof', 1680, 960, 480),
+    deck('exit', 2400, 480, 480),
+  ],
 });

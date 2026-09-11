@@ -10,27 +10,6 @@ export class TerrainRenderer {
     for (const p of this.stage.oneWays) toolRenderer.drawOneWay(ctx, p, false);
     for (const w of this.stage.climbables) this.drawClimbable(ctx, w);
     for (const h of this.stage.hazards) this.drawHazard(ctx, h);
-    for (const sign of this.stage.routeSigns ?? []) this.drawRouteSign(ctx, sign);
-  }
-
-  drawRouteSign(ctx, sign) {
-    ctx.save();
-    ctx.fillStyle = '#142a35';
-    ctx.strokeStyle = '#456371';
-    ctx.lineWidth = 1;
-    roundRect(ctx, sign.x, sign.y, 350, 54, 6, true, true);
-    ctx.fillStyle = '#f3bc59';
-    ctx.font = '800 18px system-ui';
-    ctx.fillText(String(sign.number).padStart(2, '0'), sign.x + 12, sign.y + 24);
-    ctx.fillStyle = '#f3eddb';
-    ctx.font = '600 12px system-ui';
-    ctx.fillText(sign.text, sign.x + 49, sign.y + 23);
-    ctx.fillStyle = '#83c9bd';
-    ctx.font = '10px system-ui';
-    ctx.fillText(sign.direction === 'EXIT' ? 'SHIFT COMPLETE' : `BUILD ${sign.direction}  ${sign.direction === 'LEFT' ? '←' : '→'}`, sign.x + 49, sign.y + 41);
-    ctx.fillStyle = '#456371';
-    ctx.fillRect(sign.x + 18, sign.y + 54, 3, 34);
-    ctx.restore();
   }
 
   drawZones(ctx) {

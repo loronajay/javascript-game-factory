@@ -1,50 +1,35 @@
 import { compileStageBlueprint } from '../../stage-authoring.js';
 
-export const BASE_Y = 1300;
-
-// Each point is a work station, in traversal order (never sorted by X).
-// 480px lifts exceed held + double jump; 1200px spans exceed unassisted range.
-// No recovery ledges: a misplaced catch must not become a permanent solo route.
-export function createTeamworkStage({ points, ...options }) {
-  const floorY = Math.max(...points.map(p => p[1]));
-  const width = Math.max(1600, ...points.map(p => p[0] + 640));
-  const last = points.at(-1);
+// Geometry is authored per course. Array order is traversal order, used only by
+// the physics checks; no solution path or instructions are exposed in the HUD.
+export function createTeamworkStage({ route, ...options }) {
+  const floors = route.filter(beat => beat.kind === 'solid' || beat.kind === 'oneWay');
+  const first = floors[0], last = floors.at(-1);
+  const floorY = Math.max(...route.map(beat => beat.y + (beat.h ?? 0)));
+  const width = Math.max(...route.map(beat => beat.x + (beat.w ?? 190))) + 240;
   const stage = compileStageBlueprint({
-    ...options,
-    width,
-    height: floorY + 440,
-    deathY: floorY + 340,
-    start: { x: points[0][0] + 100, y: points[0][1] - 60 },
-    goal: { x: last[0] + 300, y: last[1] - 160, w: 100, h: 160 },
+    ...options, width, height: floorY + 440, deathY: floorY + 340,
+    start: { x: first.x + 100, y: first.y - 60 },
+    goal: { x: last.x + last.w - 160, y: last.y - 160, w: 100, h: 160 },
     route: [
-      ...points.map(([x, y], i) => deck(i === 0 ? 'start_deck' : i === points.length - 1 ? 'goal_deck' : `station_${i}`, x, y, 480, 64)),
-      pit('yard_floor', 0, width, floorY + 280),
+      ...route.map((beat, i) => ({ ...beat, id: `${i}_${beat.id}` })),
+      pit('yard_floor', 0, width, floorY + 240),
     ],
   });
-  stage.routeSigns = points.map(([x, y, text], i) => ({
-    x: x + 48, y: y - 88, text,
-    number: i + 1,
-    direction: i === points.length - 1 ? 'EXIT' : points[i + 1][0] > x ? 'RIGHT' : 'LEFT',
-  }));
-  // Keep both edges available when the first launch points left.
   Object.assign(stage.noBuildZones[0], { x: stage.start.x - 20, y: stage.start.y - 20, w: 80, h: 100 });
   return stage;
 }
 
-export function deck(id, x, y, w, h = 70) {
+export function deck(id, x, y, w, h = 64) {
   return { id, kind: 'solid', x, y, w, h };
 }
 
-export function lowRecovery(id, x, y = BASE_Y + 230) {
-  return { id, kind: 'oneWay', x, y, w: 140, h: 18 };
+export function gantry(id, x, y, w) {
+  return { id, kind: 'oneWay', x, y, w, h: 18 };
 }
 
-export function pit(id, x, w, y = 1710) {
+export function pit(id, x, w, y) {
   return { id, kind: 'hazard', x, y, w, h: 80 };
-}
-
-export function block(id, x, y, w, h) {
-  return { id, kind: 'blocked', x, y, w, h };
 }
 
 export function climb(id, x, y, h) {

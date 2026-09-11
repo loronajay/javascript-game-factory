@@ -1,41 +1,18 @@
-import { createTeamworkStage } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, gantry } from './pack-01-stage-helpers.js';
 
+// A high start drops onto the crossing; the far mast returns the route above its entry height.
 export const pack01Stage09 = createTeamworkStage({
-  "stageNumber": 9,
-  "name": "Skybridge",
-  "archetype": "split_level_basin",
-  "rulePreset": "standard",
-  "timerMs": 240000,
-  "points": [
-    [
-      1760,
-      2280,
-      "Start by climbing left"
-    ],
-    [
-      1040,
-      1800,
-      "Keep left to the bridgehead"
-    ],
-    [
-      320,
-      1320,
-      "Build the high crossing right"
-    ],
-    [
-      2000,
-      1320,
-      "Turn left and gain height"
-    ],
-    [
-      1280,
-      840,
-      "Take the west exit"
-    ],
-    [
-      560,
-      360,
-      "Clock out together"
-    ]
-  ]
+  stageNumber: 9,
+  name: 'Skybridge',
+  archetype: 'split_level_basin',
+  rulePreset: 'standard',
+  timerMs: 240000,
+  route: [
+    deck('start', 80, 720, 560),
+    gantry('drop_rack', 1040, 1040, 400),
+    deck('bridgehead', 1760, 1280, 480),
+    deck('east_bank', 3440, 1280, 480),
+    climb('sky_mast', 3840, 480, 800),
+    deck('exit', 4400, 640, 560),
+  ],
 });

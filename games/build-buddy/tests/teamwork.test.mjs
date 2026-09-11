@@ -33,15 +33,14 @@ for (const id of getStageSequence()) {
     for (let changed = true; changed;) {
       changed = false;
       for (const a of reachable) for (const b of floors) {
-        if (!reachable.has(b) && couldReach(a, b)) { reachable.add(b); changed = true; }
+        if (!reachable.has(b) && (couldReach(a, b) || stage.climbables.some(w => w.topStand.id === b.id && couldReach(a, { x: w.x, y: w.y + w.h, w: w.w, h: 1 })))) { reachable.add(b); changed = true; }
       }
     }
     // Include jumping into the trigger without landing on its supporting deck.
     const trigger = { ...stage.goal, y: stage.goal.y + stage.goal.h + RUNNER.height };
     assert.ok(![...reachable].some(s => couldReach(s, trigger)), 'Runner can reach goal without Builder');
-    assert.ok(stage.routeSigns?.length >= 4, 'Course needs readable route beats');
-    const directions = stage.routeSigns.slice(1).map((s, i) => Math.sign(s.x - stage.routeSigns[i].x));
-    assert.ok(directions.includes(-1) && directions.includes(1), 'Course needs a direction reversal');
+    assert.ok(!stage.routeSigns?.length, 'No solution signs');
+    assert.ok(stage.climbables.length > 0, 'Climbing must be part of each course');
   });
 }
 
@@ -93,13 +92,33 @@ function flyTo(stage, registry, from, to, spring = false) {
 for (const id of getStageSequence()) {
   test(`${id}: every route leg has a legal, physics-tested Builder solution`, () => {
     const stage = getStageById(id);
-    const decks = stage.solids.filter(s => s.x >= 0);
+    const decks = [...stage.solids.filter(s => s.x >= 0), ...stage.oneWays, ...stage.climbables.map(w => w.topStand)]
+      .sort((a, b) => Number(a.id.split('_')[2]) - Number(b.id.split('_')[2]));
     for (let i = 0; i < decks.length - 1; i++) {
       const from = decks[i], to = decks[i + 1];
       const registry = new ToolRegistry(stage);
       const waitingRunner = new Runner(stage);
       waitingRunner.x = from.x + from.w / 2;
       waitingRunner.y = from.y - waitingRunner.h;
+      const wall = stage.climbables.find(w => w.topStand.id === to.id);
+      if (wall) {
+        const runner = new Runner(stage);
+        runner.x = wall.x - runner.w - 12;
+        runner.y = from.y - runner.h;
+        runner.grounded = true;
+        assert.ok(runner.x >= from.x && runner.x + runner.w <= from.x + from.w, 'Wall approach is supported');
+        let attached = false;
+        for (let tick = 0; tick < 600; tick++) {
+          runner.update(1 / 60, { axisX: () => attached ? 0 : 1,
+            consumeJumpPressed: () => tick === 0, jumpHeld: () => false,
+            consumeReposition: () => false, upHeld: () => true, downHeld: () => false }, registry);
+          attached ||= runner.climbing;
+          if (runner.grounded && runner.onGroundId === to.id) break;
+        }
+        assert.ok(attached && runner.onGroundId === to.id, `Wall ${wall.id} must be mountable and climbable`);
+        continue;
+      }
+      if (flyTo(stage, registry, from, to)) continue;
       const dir = Math.sign(to.x - from.x);
       if (!registry.toolEnabled('platform')) {
         const sx = dir > 0 ? from.x + from.w - 80 : from.x + 40;

@@ -4,9 +4,9 @@ Build Buddy is a playable co-op platformer prototype built around two asymmetric
 
 ## Current status
 
-- Night Shift rebuild: all ten courses now use mandatory construction gaps, switchbacks, vertical ascents, and long bridge crossings. Stations give building hints and the HUD maps the route. Limited-tool courses encourage recycling; Spring Exchange requires spring launches.
+- Pack 01 uses individually authored yards, scaffold masts, descending gantries, basins, and roof transfers. Climbable walls are part of every course, with construction gaps that preserve the Builder role. Solution signs and the HUD route overlay have been removed. Limited-tool courses encourage recycling; Spring Exchange requires spring launches.
 - Generated sky, city, crane layers and spring sprites replace the old procedural backdrop and spring drawings. See [art files and generation prompts](assets/art/README.md).
-- `tests/teamwork.test.mjs` checks for terrain-only shortcuts using conservative jump reach, and simulates legal Builder solutions for every route leg with the real Runner physics. These checks complement human two-player playtesting; they do not measure pacing or difficulty.
+- `tests/teamwork.test.mjs` checks for terrain-only shortcuts using conservative jump reach including wall access, and simulates wall mounting, climbing, terrain jumps, and legal Builder solutions for every route leg with the real Runner physics. These checks complement human two-player playtesting; they do not measure pacing or difficulty.
 
 - Pack 01 is a complete 10-stage pack registered through `js/stages/stage-registry.js`.
 - Local play exposes Runner, Builder, and Hybrid debug views so one tester can exercise both roles.
