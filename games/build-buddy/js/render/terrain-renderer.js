@@ -10,6 +10,27 @@ export class TerrainRenderer {
     for (const p of this.stage.oneWays) toolRenderer.drawOneWay(ctx, p, false);
     for (const w of this.stage.climbables) this.drawClimbable(ctx, w);
     for (const h of this.stage.hazards) this.drawHazard(ctx, h);
+    for (const sign of this.stage.routeSigns ?? []) this.drawRouteSign(ctx, sign);
+  }
+
+  drawRouteSign(ctx, sign) {
+    ctx.save();
+    ctx.fillStyle = '#142a35';
+    ctx.strokeStyle = '#456371';
+    ctx.lineWidth = 1;
+    roundRect(ctx, sign.x, sign.y, 350, 54, 6, true, true);
+    ctx.fillStyle = '#f3bc59';
+    ctx.font = '800 18px system-ui';
+    ctx.fillText(String(sign.number).padStart(2, '0'), sign.x + 12, sign.y + 24);
+    ctx.fillStyle = '#f3eddb';
+    ctx.font = '600 12px system-ui';
+    ctx.fillText(sign.text, sign.x + 49, sign.y + 23);
+    ctx.fillStyle = '#83c9bd';
+    ctx.font = '10px system-ui';
+    ctx.fillText(sign.direction === 'EXIT' ? 'SHIFT COMPLETE' : `BUILD ${sign.direction}  ${sign.direction === 'LEFT' ? '←' : '→'}`, sign.x + 49, sign.y + 41);
+    ctx.fillStyle = '#456371';
+    ctx.fillRect(sign.x + 18, sign.y + 54, 3, 34);
+    ctx.restore();
   }
 
   drawZones(ctx) {
@@ -34,15 +55,15 @@ export class TerrainRenderer {
 
   drawSolid(ctx, s) {
     const grd = ctx.createLinearGradient(0, s.y, 0, s.y + s.h);
-    grd.addColorStop(0, '#5f6c88');
-    grd.addColorStop(0.15, '#4f5b75');
-    grd.addColorStop(1, '#252e43');
+    grd.addColorStop(0, '#41606c');
+    grd.addColorStop(0.15, '#2d4652');
+    grd.addColorStop(1, '#152934');
     ctx.fillStyle = grd;
     ctx.strokeStyle = '#90a2c4';
     ctx.lineWidth = 2;
     roundRect(ctx, s.x, s.y, s.w, s.h, 10, true, true);
 
-    ctx.fillStyle = '#8798bb';
+    ctx.fillStyle = '#efbf65';
     roundRect(ctx, s.x + 4, s.y + 4, Math.max(0, s.w - 8), 10, 6, true, false);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fillRect(s.x + 10, s.y + 8, Math.max(0, s.w - 20), 3);

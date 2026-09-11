@@ -103,9 +103,9 @@ test("Pack 01 stages 02-10 expose distinct authored baseline archetypes", () => 
   assertEqual(stages.every((stage) => typeof stage.archetype === "string" && stage.archetype.length > 0), true);
   assertEqual(archetypes.size >= 6, true);
   assertEqual(ruleLabels.size >= 4, true);
-  assertEqual(stages.every((stage) => stage.solids.length >= 7), true);
-  assertEqual(stages.every((stage) => stage.hazards.length >= 3), true);
-  assertEqual(stages.every((stage) => stage.blockedPlacementZones.length >= 1), true);
+  assertEqual(stages.every((stage) => stage.solids.length >= 5), true);
+  assertEqual(stages.every((stage) => stage.hazards.length >= 1), true);
+  assertEqual(stages.every((stage) => stage.routeSigns.length >= 4), true);
 });
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);

@@ -448,8 +448,9 @@ export class AppController {
   renderMainMenu() {
     this.shellRoot.append(
       el('div', { className: 'shell-panel shell-panel-main' }, [
-        el('p', { className: 'shell-kicker', text: 'Build Buddy' }),
-        el('h1', { text: 'Co-op Construction Run' }),
+        el('p', { className: 'shell-kicker', text: 'Night shift / A co-op construction game' }),
+        el('h1', { text: 'Build Buddy' }),
+        el('p', { className: 'shell-description', text: 'You make the jump. Your buddy makes it possible. Build, bounce, and find your way up together.' }),
         el('div', { className: 'shell-actions' }, [
           el('button', { text: 'Play', onclick: () => this.setState(goToModeSelect(this.state)) }),
           el('button', { text: 'Debug Lab', onclick: () => this.setState(startDebugLab(this.state)) }),

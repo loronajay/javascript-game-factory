@@ -12,6 +12,7 @@ export class Renderer {
   constructor(canvas, stage, registry, runner, builder, camera, { viewMode = 'hybrid' } = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.ctx.imageSmoothingEnabled = false;
     this.stage = stage;
     this.registry = registry;
     this.runner = runner;

@@ -313,6 +313,50 @@ test("the local driver's finish ends the race without waiting for the CPU", () =
   assertDeepEqual(race.finishOrder, ["local"]);
 });
 
+test("an online-shaped race waits for every driver: the server, not the local finish, ends it", () => {
+  // Online the local car finishing is not the end of anything — the server keeps
+  // ticking until both drivers are home, and a client that declared itself
+  // finished would stop predicting the opponent's last lap.
+  let race = createCircuitRace({
+    ...definition(),
+    rules: { ...definition().rules, finishRule: "all" },
+  }, track);
+  assertEqual(race.rules.finishRule, "all");
+  assertEqual(createCircuitRace(definition(), track).rules.finishRule, "local");
+  race = {
+    ...race,
+    status: STATUS_RACING,
+    participants: race.participants.map((participant, index) => ({
+      ...participant,
+      nextCheckpoint: index === 0 ? 0 : 1,
+      vehicle: {
+        ...participant.vehicle,
+        x: index === 0 ? 0 : 50,
+        y: index === 0 ? 0 : 50,
+        velocityX: 0,
+        velocityY: 0,
+      },
+    })),
+  };
+
+  race = stepCircuitRace(race, 0, { track, containsVehicle: driveable });
+
+  assertEqual(race.status, STATUS_RACING);
+  assertEqual(race.participants[0].place, 1);
+  assertEqual(race.participants[1].finishedAt, null);
+  assertDeepEqual(race.finishOrder, ["local"]);
+
+  race = {
+    ...race,
+    participants: race.participants.map((participant, index) => (index === 1
+      ? { ...participant, nextCheckpoint: 0, vehicle: { ...participant.vehicle, x: 0, y: 0 } }
+      : participant)),
+  };
+  race = stepCircuitRace(race, 0, { track, containsVehicle: driveable });
+  assertEqual(race.status, STATUS_FINISHED);
+  assertDeepEqual(race.finishOrder, ["local", "cpu"]);
+});
+
 test("overlapping cars draw from upper road position to lower road position", () => {
   const participants = [
     { playerId: "local", control: "local", vehicle: { x: 200, y: 180 } },

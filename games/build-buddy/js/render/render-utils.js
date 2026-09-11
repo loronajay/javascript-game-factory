@@ -17,9 +17,9 @@ export function panel(ctx, x, y, w, h) {
   ctx.shadowBlur = 24;
   ctx.shadowOffsetY = 10;
   const grd = ctx.createLinearGradient(0, y, 0, y + h);
-  grd.addColorStop(0, 'rgba(255, 249, 229, 0.88)');
-  grd.addColorStop(0.52, 'rgba(255, 219, 142, 0.78)');
-  grd.addColorStop(1, 'rgba(255, 142, 90, 0.72)');
+  grd.addColorStop(0, '#f3eddb');
+  grd.addColorStop(0.52, '#eee7d3');
+  grd.addColorStop(1, '#e6dfca');
   ctx.fillStyle = grd;
   roundRect(ctx, x, y, w, h, 6, true, false);
   ctx.shadowColor = 'transparent';

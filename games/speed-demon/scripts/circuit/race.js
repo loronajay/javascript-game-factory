@@ -47,11 +47,16 @@ export function createCircuitRace(definition, track) {
   const countdownSeconds = Math.max(0, Math.min(10, Number(definition.rules?.countdownSeconds ?? 3)));
   const timeoutSeconds = Math.max(10, Math.min(1800, Number(definition.rules?.timeoutSeconds ?? 300)));
   const cpuDifficultyId = circuitDifficultyById(definition.rules?.cpuDifficultyId).id;
+  // "local": the race is over the moment the local driver crosses the line,
+  // whatever the CPU is still doing. "all": it runs until every driver is home
+  // — the online shape, where the server holds the flag and both clients keep
+  // predicting the other car's last lap.
+  const finishRule = definition.rules?.finishRule === "all" ? "all" : "local";
   return {
     runtime: "circuit",
     modeId: definition.modeId ?? "circuit",
     trackId: track.id,
-    rules: { laps, countdownSeconds, timeoutSeconds, cpuDifficultyId },
+    rules: { laps, countdownSeconds, timeoutSeconds, cpuDifficultyId, finishRule },
     source: {
       kind: definition.source?.kind ?? "freeplay",
       id: definition.source?.id ?? null,
@@ -218,7 +223,9 @@ export function stepCircuitRace(state, dt, environment = {}) {
     return advanced.participant;
   });
   const timedOut = elapsed >= state.rules.timeoutSeconds;
-  const local = participants.find((participant) => participant.control === "local") ?? null;
+  const local = state.rules.finishRule === "all"
+    ? null
+    : participants.find((participant) => participant.control === "local") ?? null;
   const complete = timedOut || (local
     ? local.finishedAt !== null
     : participants.every((participant) => participant.finishedAt !== null));

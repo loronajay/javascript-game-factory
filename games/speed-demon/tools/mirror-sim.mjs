@@ -21,6 +21,7 @@
 // Usage, from the cabinet folder:  node tools/mirror-sim.mjs
 // Add --check to verify without writing, which is what a CI gate would want.
 
+import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,10 +52,37 @@ const MIRRORED = [
   "modes.js",
 ];
 
-const header = (name) =>
+/**
+ * The circuit runtime's pure layer, mirrored whole into `shared/circuit/`. It
+ * used to be a hand-written server re-implementation, and that copy drifted:
+ * it lacked the wall-contact separation nudge, so every scrape of a barrier put
+ * the server's car 0.75 units from the client's prediction and the two never
+ * agreed again for the rest of the race; its roster list was also eight cars
+ * behind the cabinet's. A mirror cannot drift by hand. The road mask is decoded
+ * server-side (there is no canvas there) and handed to the mirrored
+ * `createRoadMask`, so even the footprint probe is one function.
+ */
+const MIRRORED_CIRCUIT = [
+  "math.js",
+  "config.js",
+  "vehicle.js",
+  "collision.js",
+  "vehicle-collision.js",
+  "cpu-driver.js",
+  "difficulty.js",
+  "race.js",
+  "road-mask.js",
+  "docklands-track-data.js",
+  "downtown-canal-track-data.js",
+  "tracks.js",
+  "model-definitions.js",
+  "assets.js",
+];
+
+const header = (name, folder = "sim") =>
   `// MIRRORED FILE — do not edit here.\n` +
   `//\n` +
-  `// Copied verbatim from javascript-games/games/speed-demon/scripts/sim/${name}\n` +
+  `// Copied verbatim from javascript-games/games/speed-demon/scripts/${folder}/${name}\n` +
   `// by that cabinet's tools/mirror-sim.mjs. Edit the original and re-run it.\n` +
   `// The golden-run fixture in both repos fails if these two copies disagree.\n\n`;
 
@@ -64,22 +92,47 @@ const rewrite = (source) => source.replace(/from "\.\/([a-z-]+)\.js"/g, 'from ".
 const check = process.argv.includes("--check");
 let stale = 0;
 
-await mkdir(server, { recursive: true });
-for (const name of MIRRORED) {
-  const source = await readFile(resolve(cabinet, "scripts/sim", name), "utf8");
-  const target = resolve(server, name.replace(/\.js$/, ".mjs"));
-  const contents = header(name) + rewrite(source);
+const sets = [
+  { folder: "sim", names: MIRRORED, targetDir: server },
+  { folder: "circuit", names: MIRRORED_CIRCUIT, targetDir: resolve(server, "circuit") },
+];
+// Every mirrored file's hash, keyed by its path under shared/. The server's
+// `mirror.test.mjs` checks its copies against this, which is what catches a
+// copy edited by hand — the hide-and-seek pattern.
+const manifest = { generatedBy: "javascript-games/games/speed-demon/tools/mirror-sim.mjs", files: {} };
+const hash = (text) => createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
+for (const { folder, names, targetDir } of sets) {
+  await mkdir(targetDir, { recursive: true });
+  for (const name of names) {
+    const source = await readFile(resolve(cabinet, "scripts", folder, name), "utf8");
+    const mirrored = name.replace(/\.js$/, ".mjs");
+    const target = resolve(targetDir, mirrored);
+    const contents = header(name, folder) + rewrite(source);
+    manifest.files[folder === "sim" ? mirrored : `${folder}/${mirrored}`] = hash(contents);
 
-  if (check) {
-    const existing = await readFile(target, "utf8").catch(() => null);
-    if (existing !== contents) {
-      console.error(`STALE  ${name}`);
-      stale += 1;
+    if (check) {
+      const existing = await readFile(target, "utf8").catch(() => null);
+      if (existing !== contents) {
+        console.error(`STALE  ${folder}/${name}`);
+        stale += 1;
+      }
+      continue;
     }
-    continue;
+    await writeFile(target, contents, "utf8");
+    console.log(`mirrored  ${folder}/${name}`);
   }
-  await writeFile(target, contents, "utf8");
-  console.log(`mirrored  ${name}`);
+}
+const manifestTarget = resolve(server, "sim-mirror-manifest.json");
+const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
+if (check) {
+  const existing = await readFile(manifestTarget, "utf8").catch(() => null);
+  if (existing !== manifestText) {
+    console.error("STALE  sim-mirror-manifest.json");
+    stale += 1;
+  }
+} else {
+  await writeFile(manifestTarget, manifestText, "utf8");
+  console.log("manifest  sim-mirror-manifest.json");
 }
 
 // ---------------------------------------------------------------------------

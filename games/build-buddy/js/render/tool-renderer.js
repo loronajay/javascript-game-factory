@@ -1,5 +1,6 @@
 import { TOOL_DEFS } from '../constants.js';
 import { darken, lighten, roundRect } from './render-utils.js';
+import { artImage, SPRING_CROPS } from './art-assets.js';
 
 export class ToolRenderer {
   constructor(registry) {
@@ -42,6 +43,12 @@ export class ToolRenderer {
   }
 
   drawSpring(ctx, t, def) {
+    const sprite = artImage('springs');
+    const crop = SPRING_CROPS[t.toolType];
+    if (sprite && crop) {
+      ctx.drawImage(sprite, crop.x, crop.y, crop.w, crop.h, t.x, t.y, t.w, t.h);
+      return;
+    }
     ctx.fillStyle = 'rgba(9, 14, 24, 0.24)';
     ctx.beginPath();
     ctx.ellipse(t.x + t.w / 2, t.y + t.h + 6, t.w * 0.34, 7, 0, 0, Math.PI * 2);

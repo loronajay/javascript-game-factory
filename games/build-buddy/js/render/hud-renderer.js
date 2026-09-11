@@ -17,6 +17,7 @@ export class HudRenderer {
   draw(ctx, game, { viewMode = VIEW_MODES.HYBRID } = {}) {
     const cfg = viewModeConfig(viewMode);
     this.drawTopBar(ctx, game, viewMode);
+    this.drawRouteMap(ctx);
     if (cfg.showToolStrip) this.drawToolStrip(ctx);
     this.drawMessage(ctx);
     if (game.cleared) this.drawClearCard(ctx);
@@ -40,7 +41,7 @@ export class HudRenderer {
 
     ctx.font = '13px system-ui';
     ctx.fillStyle = '#2f395c';
-    ctx.fillText(`Stage ${this.stage.id}`, x + 16, y + 84);
+    ctx.fillText(`${String(this.stage.stageNumber).padStart(2, '0')} / ${this.stage.name}`, x + 16, y + 84);
     ctx.fillText(`Deaths ${this.runner.deaths}   Repositions ${this.runner.repositions}`, x + 16, y + 106);
 
     if (!compact) {
@@ -50,6 +51,36 @@ export class HudRenderer {
       ctx.fillText(`Tools ${this.registry.countTotalNonCheckpoint()}/${rules.totalActiveToolCap}`, x + 16, y + 144);
       ctx.fillText(rules.ruleLabel, x + 126, y + 144);
     }
+  }
+
+  drawRouteMap(ctx) {
+    const signs = this.stage.routeSigns;
+    if (!signs?.length) return;
+    const x = 18, y = VIEW.height - 196, w = 140, h = 112;
+    ctx.fillStyle = 'rgba(9,28,38,.88)';
+    roundRect(ctx, x, y, w, h, 8, true, false);
+    ctx.fillStyle = '#a8c4cb';
+    ctx.font = '700 10px system-ui';
+    ctx.fillText('CREW ROUTE', x + 12, y + 18);
+    const project = (wx, wy) => [x + 12 + wx / this.stage.width * 116, y + 28 + wy / this.stage.height * 72];
+    ctx.strokeStyle = '#628994';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    signs.forEach((sign, i) => {
+      const [px, py] = project(sign.x + 190, sign.y + 88);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+    signs.forEach((sign, i) => {
+      const [px, py] = project(sign.x + 190, sign.y + 88);
+      ctx.fillStyle = i === signs.length - 1 ? '#61d8ba' : '#f4bf58';
+      ctx.fillRect(px - 5, py - 1, 10, 3);
+    });
+    const [rx, ry] = project(this.runner.x, this.runner.y);
+    ctx.fillStyle = '#fff4d9';
+    ctx.beginPath();
+    ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   drawToolStrip(ctx) {
@@ -142,7 +173,7 @@ export class HudRenderer {
     ctx.fillText('STAGE CLEAR', VIEW.width / 2, VIEW.height / 2 - 28);
     ctx.fillStyle = '#182036';
     ctx.font = '16px system-ui';
-    ctx.fillText('Enter/R restart prototype   N next stage', VIEW.width / 2, VIEW.height / 2 + 17);
+    ctx.fillText('Good work. Your crew made it.', VIEW.width / 2, VIEW.height / 2 + 17);
     ctx.textAlign = 'left';
   }
 }
