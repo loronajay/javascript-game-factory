@@ -979,6 +979,11 @@ export function boot(canvas, options = {}) {
     },
     onCircuitSnapshot: (message) => {
       if (!onlineCircuit || !circuitPrediction) return;
+      // A snapshot from the previous round can still be in flight when the
+      // next one is built, and reconciling against it would drop the new
+      // race's cars onto the old race's road.
+      const live = session.liveRound;
+      if (!live || message.round !== live.round || message.attempt !== live.attempt) return;
       circuitPrediction = reconcileCircuitSnapshot(circuitPrediction, circuitAdapter, message);
       circuitRace = circuitPrediction.state;
     },
@@ -1098,7 +1103,17 @@ export function boot(canvas, options = {}) {
       runtime: "circuit",
       modeId: "circuit",
       trackId: circuitTrack.id,
-      rules: { laps: message.config?.laps ?? 3, countdownSeconds: 0, timeoutSeconds: 300 },
+      // These must match the server's round definition field for field: the
+      // sim is mirrored, and a prediction built on different rules is wrong
+      // before the first input. The tree is simulated (tick 0 is startAt on
+      // both sides) and the race is over when the *server* says so, not when
+      // this car is home.
+      rules: {
+        laps: message.config?.laps ?? 3,
+        countdownSeconds: message.countdownSeconds ?? 3,
+        timeoutSeconds: 300,
+        finishRule: "all",
+      },
       participants: players.map((player) => ({
         playerId: player.playerId,
         control: player.playerId === session.youPlayerId ? "local" : "remote",

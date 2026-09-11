@@ -25,17 +25,34 @@ export function markCircuitInputsSent(prediction, events) {
   return events.length === 0 ? prediction : { ...prediction, sentThrough: events.at(-1).t };
 }
 
+/**
+ * The server's state laid over the client's. Everything the sim advances comes
+ * from the wire — including the countdown, which is simulated server-side so
+ * that tick 0 means the same instant everywhere — while what a round never
+ * changes (who drives which car, its model, its livery) stays as the client
+ * built it. A wire participant that tried to carry `control` would be a
+ * remote car claiming to be the local one.
+ */
 function mergeWireSnapshot(current, snapshot) {
   const wireParticipants = new Map((snapshot.participants ?? []).map((entry) => [entry.playerId, entry]));
   return {
     ...current,
     tick: snapshot.tick,
     elapsed: snapshot.elapsed,
+    countdown: snapshot.countdown ?? current.countdown,
     status: snapshot.status,
     finishOrder: [...(snapshot.finishOrder ?? [])],
     participants: current.participants.map((participant) => {
       const wire = wireParticipants.get(participant.playerId);
-      return wire ? { ...participant, ...wire, vehicle: { ...wire.vehicle }, input: { ...wire.input } } : participant;
+      if (!wire) return participant;
+      const { control, modelId, livery, displayName, driver, ...advanced } = wire;
+      return {
+        ...participant,
+        ...advanced,
+        vehicle: { ...wire.vehicle },
+        input: { ...wire.input },
+        lapTimes: Array.isArray(wire.lapTimes) ? [...wire.lapTimes] : participant.lapTimes,
+      };
     }),
   };
 }

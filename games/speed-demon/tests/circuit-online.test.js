@@ -46,6 +46,35 @@ test("an authoritative snapshot drops acknowledged inputs and replays the unackn
   assertDeepEqual(client.state.participants.map((entry) => entry.vehicle), server.participants.map((entry) => entry.vehicle));
 });
 
+test("a snapshot carries the simulated tree and the lap ledger, not only the cars", () => {
+  // The countdown is simulated on the server (tick 0 is at startAt on both
+  // sides), so a client that joined the tick late must adopt the server's
+  // countdown or its own 3-2-1 lands on the wrong tick. Lap times ride along so
+  // the HUD reads the authoritative ledger rather than a predicted one.
+  const adapter = createCircuitAdapter({ track });
+  const counted = { ...definition, rules: { ...definition.rules, countdownSeconds: 3 } };
+  let client = createCircuitPrediction(adapter.create(counted), "p1");
+  let server = adapter.create(counted);
+  for (let tick = 0; tick < 200; tick += 1) server = adapter.step(server, 1 / 120);
+  client = reconcileCircuitSnapshot(client, adapter, {
+    ...structuredClone(server),
+    participants: server.participants.map((entry) => ({ ...entry, lapTimes: [1.5], bestLapTime: 1.5 })),
+  });
+  assertEqual(client.state.tick, 200);
+  assertEqual(client.state.status, "countdown");
+  assertEqual(client.state.countdown, server.countdown);
+  assertDeepEqual(client.state.participants[0].lapTimes, [1.5]);
+  assertEqual(client.state.participants[0].control, "local", "wire fields never overwrite who drives the car");
+});
+
+test("an online race does not end when the local car is home", () => {
+  // The server holds the flag. A client whose reducer declared the race over
+  // on its own finish would stop stepping the opponent's last lap.
+  const adapter = createCircuitAdapter({ track });
+  const online = { ...definition, rules: { ...definition.rules, finishRule: "all" } };
+  assertEqual(adapter.create(online).rules.finishRule, "all");
+});
+
 test("an old snapshot never rewinds a newer acknowledgement", () => {
   const adapter = createCircuitAdapter({ track });
   let prediction = createCircuitPrediction(adapter.create(definition), "p1");
