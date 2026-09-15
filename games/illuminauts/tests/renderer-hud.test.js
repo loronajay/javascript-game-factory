@@ -86,3 +86,22 @@ function run() {
 }
 
 run();
+
+function testHudShowsTagBudget() {
+  const ctx = createFakeContext();
+  const state = createState();
+  state.markers = { placed: [{ id: 1 }, { id: 2 }, { id: 3 }] };
+  drawHud(ctx, state, 1000, 900, 600);
+  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === 'TAGS'));
+  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === '3/8'));
+}
+
+function testHudTagBudgetTolerantOfMissingLedger() {
+  const ctx = createFakeContext();
+  drawHud(ctx, createState(), 1000, 900, 600);
+  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === '0/8'));
+}
+
+testHudShowsTagBudget();
+testHudTagBudgetTolerantOfMissingLedger();
+console.log('Illuminauts HUD tag budget tests passed.');

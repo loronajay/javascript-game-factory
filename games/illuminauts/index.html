@@ -14,7 +14,7 @@
     <span class="traversal-label">Suit telemetry active</span>
     <button id="quitRun" type="button">Abort run [Esc]</button>
   </div>
-  <div class="look-hint">CLICK TO LINK VISOR // WASD MOVE // MOUSE OR ARROWS LOOK // SHIFT SPRINT<br>TOUCH // D-PAD MOVE // DRAG VISOR TO LOOK</div>
+  <div class="look-hint">CLICK TO LINK VISOR // WASD MOVE // MOUSE OR ARROWS LOOK // SHIFT SPRINT // E ARROW TAG // Q CROSS TAG<br>TOUCH // D-PAD MOVE // DRAG VISOR TO LOOK</div>
   <div id="bootError" role="alert" hidden></div>
   <script type="module">
     import { CONTROL_KEY_SPECS as KEY, mountMobileController } from '../../js/mobile-controller.mjs';
@@ -31,6 +31,8 @@
       dpad: { up: KEY.KeyW, down: KEY.KeyS, left: KEY.KeyA, right: KEY.KeyD },
       buttons: [
         { id: 'sprint', label: 'RUN', key: KEY.ShiftLeft },
+        { id: 'tag-arrow', label: 'TAG ↑', key: { key: 'e', code: 'KeyE' } },
+        { id: 'tag-cross', label: 'TAG ✕', key: { key: 'q', code: 'KeyQ' } },
       ],
     };
 

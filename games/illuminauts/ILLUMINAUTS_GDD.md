@@ -109,6 +109,19 @@ Power Cell rules:
 
 Power Cells are the sci-fi equivalent of torches. The word "torch" should not be used in final UI unless as internal development shorthand.
 
+## 9b. Route Tags
+
+Route Tags are the player's own graffiti: a capped set of floor decals stamped on tiles the player has stood on, so a dark junction can be recognised on the way back. They support the Route Memory pillar without weakening Limited Vision — a tag is only visible where the suit light already reaches.
+
+Route Tag rules:
+
+- `E` places an arrow tag on the current tile, pointing the way the player is facing (snapped to the four maze facings). `Q` places a cross tag (dead end / do not return).
+- A run has 8 tags. Placing a ninth recycles the oldest.
+- Placing on a tile that already holds one of your tags replaces it; tags never stack.
+- Tags persist through damage and respawn.
+- Online, tags are relayed: the rival sees your tags in your suit colour, and you see theirs. A tag can be honest route memory or deliberate misdirection — the maze is shared and so is the graffiti.
+- Tags do not reveal the map, count as pickups, or affect any shared world state.
+
 ## 10. Access Chips
 
 Access Chips are generic key items used to disable Laser Doors.

@@ -151,6 +151,31 @@ test("3D queues declare separate physics and private joins adopt the host style"
   assert.equal(socket.sent[2].settings, undefined);
 });
 
+test("a joined room's bowling style survives lobby normalization so a guest can preload 3D", () => {
+  const client = createClient();
+  client.connect();
+  const socket = MockWebSocket.instances[0];
+  socket.open();
+  socket.receive({ event: "connected", clientId: "socket-2", sessionToken: "resume-2" });
+  client.joinPrivateRoom("YAM42", { bowlingStyle: "arcade" });
+  const room = {
+    event: "lobby_joined",
+    clientId: "socket-2",
+    roomCode: "YAM42",
+    ownerId: "socket-1",
+    members: ["socket-1", "socket-2"],
+    players: [{ id: "socket-1", name: "Host" }, { id: "socket-2", name: "Guest" }],
+    playerCount: 2,
+    status: "open",
+  };
+  socket.receive({ ...room, settings: { matchType: "quick", protocolVersion: YAM_BOWLING_PROTOCOL_VERSION, bowlingStyle: "3d" } });
+  assert.equal(client.getSnapshot().lobby.settings.bowlingStyle, "3d");
+  socket.receive({ ...room, event: "lobby_updated", settings: { matchType: "quick", protocolVersion: YAM_BOWLING_PROTOCOL_VERSION } });
+  assert.equal(client.getSnapshot().lobby.settings.bowlingStyle, "arcade");
+  socket.receive({ ...room, event: "lobby_updated", settings: { matchType: "quick", bowlingStyle: "hologram" } });
+  assert.equal(client.getSnapshot().lobby.settings.bowlingStyle, "arcade");
+});
+
 test("lobby join publishes the selected bowler and owner can start a full lobby", () => {
   const client = createClient();
   client.connect();

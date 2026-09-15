@@ -17,7 +17,7 @@ function finish(simulation) {
   return engine.knockedCount(simulation);
 }
 
-test('3D is opt-in local exhibition only, regardless of stale setup preferences', () => {
+test('local 3D follows the setup pick for exhibition only; online 3D follows the frozen match, never the pick', () => {
   const session = { setup: { bowlingStyle: '3d' } };
   assert.equal(localBowlingStyle(session), '3d');
   for (const key of ['campaignMatch', 'tournamentMatch', 'tutorialMatch']) {
@@ -26,6 +26,8 @@ test('3D is opt-in local exhibition only, regardless of stale setup preferences'
   assert.equal(matchUses3d({ match: { bowlingStyle: '3d', playType: 'cpu' } }), true);
   assert.equal(matchUses3d({ match: { bowlingStyle: '3d', playType: 'hotseat' } }), true);
   assert.equal(matchUses3d({ onlineMatch: true, match: { bowlingStyle: '3d', playType: 'cpu' } }), false);
+  assert.equal(matchUses3d({ onlineMatch: true, match: { bowlingStyle: '3d', playType: 'online' } }), true);
+  assert.equal(matchUses3d({ onlineMatch: true, setup: { bowlingStyle: '3d' }, match: { bowlingStyle: 'arcade', playType: 'online' } }), false);
   assert.equal(matchUses3d({ match: { bowlingStyle: '3d', playType: 'campaign' } }), false);
   assert.equal(localBowlingStyle({ setup: { bowlingStyle: 'unknown' } }), 'arcade');
 });

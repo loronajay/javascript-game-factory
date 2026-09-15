@@ -2,6 +2,7 @@ import * as THREE from '../vendor/three.module.js';
 import { buildMapLayout, gridToWorld, WORLD_3D } from './map-3d.js';
 import { BASE_LIGHT_RADIUS, POWER_LIGHT_RADIUS } from './config.js';
 import { createHazardScene } from './scene-hazards.js';
+import { MARKER_LIMIT } from './markers.js';
 
 // Per-map GPU ownership: created once on map change, disposed together on exit/restart.
 export function createMapScene(map, options, hazards) {
@@ -56,6 +57,52 @@ export function createMapScene(map, options, hazards) {
   const beaconLight = new THREE.PointLight(0x65ffd1, 8, 14, 1.5);
   beaconLight.position.set(center.x, 1.8, center.z); root.add(beaconLight);
 
+  // Route-memory tags: a fixed pool of floor decals, one geometry per glyph, shared between every slot.
+  // Shapes are pure geometry (no textures) so the pool builds headlessly and disposes with the map.
+  const arrowShape = new THREE.Shape();
+  arrowShape.moveTo(0, 0.42); arrowShape.lineTo(0.34, 0.02); arrowShape.lineTo(0.13, 0.02); arrowShape.lineTo(0.13, -0.42);
+  arrowShape.lineTo(-0.13, -0.42); arrowShape.lineTo(-0.13, 0.02); arrowShape.lineTo(-0.34, 0.02); arrowShape.closePath();
+  const crossShape = new THREE.Shape();
+  const a = 0.36, w = 0.11;
+  crossShape.moveTo(-a, -a + w); crossShape.lineTo(-a + w, -a); crossShape.lineTo(0, -w); crossShape.lineTo(a - w, -a);
+  crossShape.lineTo(a, -a + w); crossShape.lineTo(w, 0); crossShape.lineTo(a, a - w); crossShape.lineTo(a - w, a);
+  crossShape.lineTo(0, w); crossShape.lineTo(-a + w, a); crossShape.lineTo(-a, a - w); crossShape.lineTo(-w, 0); crossShape.closePath();
+  const markerGeos = { arrow: new THREE.ShapeGeometry(arrowShape), cross: new THREE.ShapeGeometry(crossShape) };
+  // Your tags are yellow/pink; the rival's are their suit orange, dimmer, so a lie they left reads as theirs.
+  const markerMats = { arrow: glow(0xfff06a), cross: glow(0xff6a8a) };
+  const rivalMats = { arrow: glow(0xff9c53), cross: glow(0xc46a3a) };
+  const markerHalo = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55 });
+  const haloGeo = new THREE.CircleGeometry(0.58, 18);
+  for (const r of [...Object.values(markerGeos), ...Object.values(markerMats), ...Object.values(rivalMats), markerHalo, haloGeo]) extraResources.add(r);
+  function markerPoolOf(name, mats) {
+    const pool = new THREE.Group(); pool.name = name; pool.userData.mats = mats; root.add(pool);
+    for (let i = 0; i < MARKER_LIMIT; i++) {
+      const slot = new THREE.Group(); slot.visible = false; slot.userData.kind = null;
+      const halo = new THREE.Mesh(haloGeo, markerHalo); halo.rotation.x = -Math.PI / 2; halo.position.y = 0.012;
+      const glyph = new THREE.Mesh(markerGeos.arrow, mats.arrow); glyph.rotation.x = -Math.PI / 2; glyph.position.y = 0.018;
+      glyph.name = 'glyph';
+      slot.add(halo, glyph); pool.add(slot);
+    }
+    return pool;
+  }
+  const markerPool = markerPoolOf('markers', markerMats);
+  const rivalMarkerPool = markerPoolOf('rival-markers', rivalMats);
+  const markerYaw = { up: 0, right: -Math.PI / 2, down: Math.PI, left: Math.PI / 2 };
+  function syncMarkerPool(pool, ledger) {
+    pool.children.forEach((slot, i) => {
+      const m = ledger[i];
+      slot.visible = Boolean(m);
+      if (!m) return;
+      const glyph = slot.getObjectByName('glyph');
+      if (slot.userData.kind !== m.kind) {
+        glyph.geometry = markerGeos[m.kind]; glyph.material = pool.userData.mats[m.kind]; slot.userData.kind = m.kind;
+      }
+      const pos = gridToWorld(map, m.x + 0.5, m.y + 0.5);
+      slot.position.set(pos.x, 0, pos.z);
+      slot.rotation.y = markerYaw[m.dir] ?? 0;
+    });
+  }
+
   const remote = new THREE.Group();
   const suitMat = material(0xff9c53);
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.55, 4, 8), suitMat);
@@ -74,6 +121,8 @@ export function createMapScene(map, options, hazards) {
         p.mesh.position.y = 0.76 + Math.sin(now * 0.002 + p.source.x + p.source.y) * 0.07;
       }
       for (const d of doors) d.mesh.visible = !d.source.open;
+      syncMarkerPool(markerPool, state.markers?.placed ?? []);
+      syncMarkerPool(rivalMarkerPool, state.markers?.remote ?? []);
       goalMat.color.setHex(state.solo?.beaconLocked ? 0x174639 : 0x4dffc4);
       beaconLight.intensity = state.solo?.beaconLocked ? 1 : 8;
       beacon.rotation.y = now * 0.0007;

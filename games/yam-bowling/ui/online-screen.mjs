@@ -47,8 +47,8 @@ export function createOnlineScreen({
     onlineSetup.skinId = assets.storedSkinId(onlineSetup.characterSlug);
     setSelected($("online-style-options"), "data-online-style", onlineSetup.bowlingStyle || "arcade");
     $("online-style-note").textContent = onlineSetup.bowlingStyle === "3d"
-      ? "Full 3D pin physics, scored by the server. Both bowlers share the same rack. Requires WebGL 2."
-      : "The original 2D lane. Private-room guests use the host's bowling style.";
+      ? "Full 3D pin physics, scored by the server. Quick match only pairs you with other 3D bowlers; private-room guests take the host's style. Requires WebGL 2."
+      : "The original 2D lane. Quick match only pairs you with other 2D bowlers; private-room guests take the host's style.";
     setSelected($("online-mode-options"), "data-online-mode", onlineSetup.modeId);
     setSelected($("online-stakes-options"), "data-online-stakes", onlineSetup.ranked ? "ranked" : "casual");
     $("online-stakes-note").textContent = onlineSetup.ranked

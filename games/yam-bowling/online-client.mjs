@@ -137,6 +137,10 @@ function normalizeLobby(data = {}) {
       matchType: normalizeModeId(data.settings?.matchType),
       ranked: data.settings?.ranked === true,
       protocolVersion: Number(data.settings?.protocolVersion) || 1,
+      // The room's physics, not this device's pick: a code join takes the
+      // style the host opened with, and the session preloads the 3D engine off
+      // this field before the match snapshot arrives.
+      bowlingStyle: data.settings?.bowlingStyle === "3d" ? "3d" : "arcade",
     },
     startAt: Number.isFinite(Number(data.startAt)) ? Number(data.startAt) : null,
   };

@@ -6,6 +6,7 @@ function fmtRunTime(ms) {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 import { drawSpriteContain } from './assets.js';
+import { MARKER_LIMIT } from './markers.js';
 
 function drawHudIcon(ctx, name, x, y, size, catalog) {
   return drawSpriteContain(ctx, name, x, y, size, size, catalog);
@@ -60,6 +61,17 @@ export function drawHud(ctx, state, now, width, height, spriteCatalog = undefine
   ctx.font = `bold ${fontSize}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'left';
   ctx.fillText(`x ${player.chips}`, chipGroupX + Math.floor(chipIconSize * 0.72), barH * 0.64);
+
+  // Route-memory tag budget sits between the suit hearts and the access group.
+  const tagCount = state.markers?.placed?.length ?? 0;
+  const tagX = Math.floor(width * 0.27);
+  ctx.fillStyle = '#6f9699';
+  ctx.font = `700 ${labelSize}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'left';
+  ctx.fillText('TAGS', tagX, labelSize * 0.78);
+  ctx.fillStyle = tagCount >= MARKER_LIMIT ? '#ffd166' : '#fff06a';
+  ctx.font = `bold ${fontSize}px ui-monospace, Consolas, monospace`;
+  ctx.fillText(`${tagCount}/${MARKER_LIMIT}`, tagX, barH * 0.64);
 
   if (state.online?.enabled && state.remote?.displayName) {
     ctx.fillStyle = '#ffd45f';

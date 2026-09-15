@@ -15,8 +15,8 @@ export function createSetupScreen({ session, roster, animation, assets, loadout,
       button.setAttribute("aria-pressed", String(button.dataset.bowlingStyle === setup.bowlingStyle));
     }
     $("bowling-style-status").textContent = setup.bowlingStyle === "3d"
-      ? "A physical 3D alley. Your bowlers, outfits and match rules. Local exhibition only."
-      : "The original Yam lane. Pick a match length and make it yours.";
+      ? "A physical 3D alley for this local match. Online picks its own style on the Match desk."
+      : "The original Yam lane for this local match. Online picks its own style on the Match desk.";
     setSelected($("play-type-options"), "data-play-type", setup.playType);
     setSelected($("cpu-options"), "data-cpu-level", setup.cpuLevelId);
     $("cpu-options").hidden = setup.playType !== "cpu";

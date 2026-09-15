@@ -4,6 +4,7 @@ import { createWorldMap } from './map.js';
 import { MAPS } from './maps.js';
 import { getSpawnYaw } from './map-3d.js';
 import { createHazards } from './hazard-layout.js';
+import { createMarkerState } from './markers.js';
 
 // role: 'A' spawns at the S tile, 'B' spawns at the T tile.
 // mapEntry overrides MAPS lookup when provided (used by playtest mode).
@@ -86,6 +87,8 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
     },
 
     hazards,
+    // Route-memory tags stamped by the local player. Private, capped, and kept through death.
+    markers: createMarkerState(),
     audio: createAudioState(),
     // input is replaced with the stable DOM-bound object by game.js
     input: { held: new Set(), justPressed: new Set() },

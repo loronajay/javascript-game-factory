@@ -3,6 +3,7 @@ import { MAPS } from './scripts/maps.js';
 import { bindInput, clearFrameInput, consumeAnyKey } from './scripts/input.js';
 import { updatePlayer } from './scripts/player.js';
 import { updateAliens } from './scripts/hazards.js';
+import { updateMarkerInput, applyRemoteMarker } from './scripts/markers.js';
 import { bindFirstPersonControls } from './scripts/input-3d.js';
 import { createPositionPacket, applyRemotePosition } from './scripts/online-pose.js';
 import {
@@ -207,6 +208,8 @@ function handleRemoteEvent(value) {
         enqueueSoundEvent(state, 'door-unlock', { doorId: door.id, remote: true });
       }
     }
+  } else if (type === 'marker_placed') {
+    applyRemoteMarker(state, value);
   } else if (type === 'player_died') {
     const remoteSpawn = onlineLocalRole === 'A' ? state.map.start2 : state.map.start;
     state.remote.tx = remoteSpawn.x;
@@ -458,6 +461,7 @@ function gameTick(now) {
 
   updateAliens(state.hazards, now - (state.gameStartAt || 0));
   updatePlayer(state, now, TICK_MS);
+  updateMarkerInput(state);
 
   if (state.online?.enabled && onlineClient) {
     for (const event of state.online.outbox) {
