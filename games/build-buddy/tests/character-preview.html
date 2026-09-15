@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Build Buddy — animation review</title>
+<style>body{margin:0;padding:30px;background:#10232e;color:#f5eedc;font:16px system-ui}h1{margin:0 0 8px}p{color:#9fb7c1}nav{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}button{padding:12px 20px;background:#244553;color:inherit;border:1px solid #608591;border-radius:8px;cursor:pointer}button[aria-pressed=true]{background:#ddb560;color:#152833}canvas{display:block;max-width:100%;height:auto;border:1px solid #365260;border-radius:12px;background:#17303b}a{color:#8ce1d1}</style>
+<h1>Meet the runners</h1><p>Actual game animation playback, enlarged for review. Small figures show gameplay size.</p><nav id="controls"></nav><canvas id="preview" width="1120" height="420"></canvas><p><a href="../">Back to Build Buddy</a></p>
+<script type="module">
+import { RunnerRenderer } from '../js/render/runner-renderer.js';
+import { CHARACTERS } from '../js/characters.js';
+const canvas = document.querySelector('canvas'), ctx = canvas.getContext('2d');
+let pose='run', paused=false, previous=0, accumulator=0, facing=1;
+const runners=CHARACTERS.map(c=>({characterId:c.id,x:0,y:0,w:34,h:58,vx:320,vy:0,grounded:true,climbing:false,dead:false,facing:1}));
+const renderers=runners.map(r=>new RunnerRenderer(r));
+for(const name of ['idle','run','jump','fall','climb']) {
+ const button=document.createElement('button'); button.textContent=name; button.setAttribute('aria-pressed',String(name===pose));
+ button.onclick=()=>{pose=name;for(const other of document.querySelectorAll('[aria-pressed]'))other.setAttribute('aria-pressed',String(other===button));};document.querySelector('nav').append(button);
+}
+for(const [label,action] of [['Pause / play',()=>paused=!paused],['Face left / right',()=>facing*=-1]]){const button=document.createElement('button');button.textContent=label;button.onclick=action;document.querySelector('nav').append(button);}
+function frame(now){accumulator+=Math.min((now-previous)/1000,.1);previous=now;while(accumulator>=1/60){if(!paused)runners.forEach((r,i)=>{r.vx=pose==='run'?320:0;r.vy=pose==='jump'?-300:pose==='fall'?300:pose==='climb'?-180:0;r.grounded=pose==='idle'||pose==='run';r.climbing=pose==='climb';r.facing=facing;renderers[i].animation.update(r,1/60);});accumulator-=1/60;}
+ ctx.clearRect(0,0,1120,420);ctx.imageSmoothingEnabled=false;
+ renderers.forEach((renderer,i)=>{ctx.save();ctx.translate(90+i*280,30);ctx.scale(3.6,3.6);renderer.draw(ctx);ctx.restore();ctx.save();ctx.translate(125+i*280,290);renderer.draw(ctx);ctx.restore();ctx.fillStyle='#f5eedc';ctx.font='bold 20px system-ui';ctx.textAlign='center';ctx.fillText(CHARACTERS[i].name,140+i*280,385);});requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+</script></html>

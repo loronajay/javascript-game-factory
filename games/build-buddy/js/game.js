@@ -49,11 +49,16 @@ export class Game {
     this.input = new Input(canvas);
     this.remoteRunnerInput = null;
     this.remoteBuilderCursor = null;
+    this.audioEvents = [];
     this.loadStage(this.stageSequence[this.stageIndex]);
   }
 
   currentStageId() {
     return this.stageSequence[this.stageIndex];
+  }
+
+  updateAnimation(dt) {
+    this.renderer.runnerRenderer.animation.update(this.runner, dt);
   }
 
   loadStage(stageId) {
@@ -99,7 +104,7 @@ export class Game {
       timeLimitMs: this.stage.timerMs,
       timeClearedMs: Math.round(this.elapsedMs),
       runnerDeaths: this.runner.deaths,
-      toolUseCount: this.registry.tools.filter((tool) => tool.active).length,
+      toolUseCount: this.registry.toolUseCount,
       ...extra,
     };
   }
@@ -113,6 +118,9 @@ export class Game {
         vx: this.runner.vx,
         vy: this.runner.vy,
         dead: this.runner.dead,
+        grounded: this.runner.grounded,
+        climbing: this.runner.climbing,
+        facing: this.runner.facing,
       },
       tools: this.registry.tools.map((tool) => ({
         id: tool.id,
@@ -133,6 +141,9 @@ export class Game {
       this.runner.vx = Number(snapshot.runner.vx) || 0;
       this.runner.vy = Number(snapshot.runner.vy) || 0;
       this.runner.dead = snapshot.runner.dead === true;
+      if (typeof snapshot.runner.grounded === 'boolean') this.runner.grounded = snapshot.runner.grounded;
+      if (typeof snapshot.runner.climbing === 'boolean') this.runner.climbing = snapshot.runner.climbing;
+      if (snapshot.runner.facing === -1 || snapshot.runner.facing === 1) this.runner.facing = snapshot.runner.facing;
     }
     if (snapshot.timerMs !== undefined && Number.isFinite(Number(snapshot.timerMs))) {
       this.timeRemainingMs = Math.max(0, Number(snapshot.timerMs));
@@ -166,10 +177,15 @@ export class Game {
   }
 
   applyBuilderCommand(command = {}) {
+    let result;
     if (command.action === 'delete') {
-      return this.registry.deleteAt(command.gridX, command.gridY);
+      result = this.registry.deleteAt(command.gridX, command.gridY);
+    } else {
+      result = this.registry.add(command.toolType, command.gridX, command.gridY, this.runner);
     }
-    return this.registry.add(command.toolType, command.gridX, command.gridY, this.runner);
+    const succeeded = result.valid === true || result.deleted === true;
+    this.audioEvents.push({ type: succeeded ? 'toolAction' : 'error' });
+    return result;
   }
 
   applyRunnerInputCommand(input = {}) {
@@ -188,6 +204,7 @@ export class Game {
     this.stageEnded = true;
     this.cleared = outcome === 'clear';
     const result = { outcome, ...this.stageStats(extra) };
+    this.audioEvents.push({ type: outcome === 'clear' ? 'goal' : 'error' });
     if (outcome === 'clear') this.onStageClear?.(result);
     else this.onStageFailure?.(result);
   }
@@ -224,5 +241,13 @@ export class Game {
 
   render() {
     this.renderer.render(this);
+  }
+
+  consumeAudioEvents() {
+    return [
+      ...this.audioEvents.splice(0),
+      ...this.runner.consumeAudioEvents(),
+      ...this.builder.consumeAudioEvents(),
+    ];
   }
 }

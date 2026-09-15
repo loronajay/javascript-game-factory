@@ -1,3 +1,6 @@
+import { normalizeCharacterId } from './character-roster.js';
+import { normalizeCharacterCosmetics } from './character-cosmetics.js';
+
 export const SESSION_MODES = Object.freeze({
   LOCAL_RUN: 'local_run',
   ONLINE_RUN: 'online_run',
@@ -18,6 +21,8 @@ function normalizePlayers(players = DEFAULT_PLAYERS) {
   const normalized = Array.isArray(players) ? players.slice(0, 2) : [];
   while (normalized.length < 2) normalized.push(DEFAULT_PLAYERS[normalized.length]);
   return normalized.map((player, index) => ({
+    characterId: normalizeCharacterId(player?.characterId),
+    cosmetics: normalizeCharacterCosmetics(player?.cosmetics),
     id: typeof player?.id === 'string' && player.id ? player.id : DEFAULT_PLAYERS[index].id,
     displayName: typeof player?.displayName === 'string' && player.displayName
       ? player.displayName

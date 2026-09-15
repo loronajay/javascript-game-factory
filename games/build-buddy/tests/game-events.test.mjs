@@ -1,5 +1,6 @@
 import { Game } from "../js/game.js";
 import { VIEW_MODES } from "../js/view-modes.js";
+import { makeTool } from "../js/tools.js";
 
 let passed = 0;
 let failed = 0;
@@ -63,6 +64,27 @@ test("game reports stage clear once when the runner reaches the goal", () => {
   assertEqual(events.length, 1);
   assertEqual(events[0].stageId, game.currentStageId());
   assertEqual(events[0].outcome, "clear");
+  assertEqual(game.consumeAudioEvents().some((event) => event.type === "goal"), true);
+});
+
+test("game exposes jump and spring audio events with the real bounce power", () => {
+  const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.RUNNER });
+  game.runner.grounded = true;
+  game.input.taps.add("jump");
+  game.update(1 / 60);
+  assertEqual(game.consumeAudioEvents().some((event) => event.type === "jump"), true);
+
+  const spring = game.registry.tools.find((tool) => tool.kind === "spring")
+    ?? makeTool("springBlue", 500, 500);
+  if (!game.registry.tools.includes(spring)) game.registry.tools.push(spring);
+  game.runner.prevX = spring.x;
+  game.runner.prevY = spring.y - game.runner.h - 2;
+  game.runner.x = spring.x;
+  game.runner.y = spring.y - game.runner.h + 2;
+  game.runner.vy = 100;
+  game.runner.resolveCollisions(1 / 60, game.input, game.registry);
+  const event = game.consumeAudioEvents().find((item) => item.type === "spring");
+  assertEqual(event?.bounceVy, spring.bounceVy);
 });
 
 test("game reports timer expiry as a stage failure instead of killing the runner", () => {
@@ -113,6 +135,44 @@ test("game applies remote builder commands to the host registry", () => {
 
   assertEqual(result.valid, true);
   assertEqual(game.registry.tools.filter((tool) => tool.active).length, before + 1);
+  assertEqual(game.consumeAudioEvents().some((event) => event.type === "toolAction"), true);
+});
+
+test("game result counts successful placements even when a placed tool is later deleted", () => {
+  const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.BUILDER });
+  game.runner.x = 1000;
+  game.runner.y = 1000;
+
+  assertEqual(game.stageStats().toolUseCount, 0);
+  const placed = game.applyBuilderCommand({
+    action: "place",
+    toolType: "platform",
+    gridX: 520,
+    gridY: 960,
+  });
+  assertEqual(placed.valid, true);
+  const deleted = game.applyBuilderCommand({
+    action: "delete",
+    gridX: placed.tool.x + 1,
+    gridY: placed.tool.y + 1,
+  });
+
+  assertEqual(deleted.deleted, true);
+  assertEqual(game.stageStats().toolUseCount, 1);
+  const toolActionEvents = game.consumeAudioEvents().filter((event) => event.type === "toolAction");
+  assertEqual(toolActionEvents.length, 2);
+});
+
+test("invalid builder actions emit the error sound event", () => {
+  const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.BUILDER });
+  const result = game.applyBuilderCommand({
+    action: "place",
+    toolType: "platform",
+    gridX: -1000,
+    gridY: -1000,
+  });
+  assertEqual(result.valid, false);
+  assertEqual(game.consumeAudioEvents().some((event) => event.type === "error"), true);
 });
 
 test("game can drive runner movement from remote runner input", () => {

@@ -161,7 +161,7 @@ function compileRouteBeat(stageNumber, beat) {
   };
 
   if (beat.kind === 'oneWay') return { kind: 'oneWays', value };
-  if (beat.kind === 'hazard') return { kind: 'hazards', value };
+  if (beat.kind === 'hazard') return { kind: 'hazards', value: beat.facing ? { ...value, facing: beat.facing } : value };
   if (beat.kind === 'noBuild') return { kind: 'noBuildZones', value };
   if (beat.kind === 'blocked') return { kind: 'blockedPlacementZones', value };
   return { kind: 'solids', value };

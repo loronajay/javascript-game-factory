@@ -1,6 +1,11 @@
-import { createTeamworkStage, deck, climb, gantry } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, slab, lock, tool } from './pack-01-stage-helpers.js';
 
-// A spring lift enters the well; a long wall gives breathing room before the roof launch.
+// A vertical well. Lock zones fill the shaft except one narrow column, too
+// thin for a platform but exactly wide enough for a spring, so the way up is a
+// spring elevator: a blue on the floor, then floating blues the Runner comes
+// down onto and rebounds off, placed rung by rung as the Runner climbs. The
+// well opens onto a gallery, a spring-and-platform side launch, a wall, and a
+// drop bridge to the exit.
 export const pack01Stage04 = createTeamworkStage({
   stageNumber: 4,
   name: 'Springwell',
@@ -8,10 +13,24 @@ export const pack01Stage04 = createTeamworkStage({
   rulePreset: 'springFocus',
   timerMs: 180000,
   route: [
-    deck('start', 80, 2000, 480),
-    deck('well', 800, 1520, 480),
-    climb('well_wall', 1200, 800, 720),
-    deck('roof', 1680, 960, 480),
-    deck('exit', 2400, 480, 480),
+    deck('start', 80, 2400, 1120),
+    deck('well_top', 1000, 1148, 400, 64, [
+      tool('springBlue', 880, 2360),
+      tool('springBlue', 880, 1960),
+      tool('springBlue', 880, 1560),
+    ]),
+    deck('gallery', 2300, 1148, 400, 64, [tool('platform', 1800, 1120)]),
+    deck('launch', 3600, 840, 400, 64, [tool('springBlue', 2640, 1120), tool('platform', 3160, 840)]),
+    climb('well_mast', 4000, 280, 560),
+    deck('roof', 4052, 256, 348),
+    deck('exit', 5500, 556, 500, 64, [tool('platform', 4880, 400)]),
+  ],
+  extras: [
+    slab('well_west', 600, 1100, 40, 1200),
+    slab('well_east', 1200, 1212, 40, 1188),
+    lock('well_lock_west', 640, 1200, 240, 1160),
+    lock('well_lock_east', 960, 1212, 240, 1148),
+    spikes('gallery_spikes', 2500, 1148, 80),
+    spikes('roof_spikes', 4240, 256, 80),
   ],
 });

@@ -182,6 +182,7 @@ export function createRunnerStateMessage(runner = {}) {
       vx: Number(runner.vx) || 0,
       vy: Number(runner.vy) || 0,
       dead: runner.dead === true,
+      ...runnerPoseFlags(runner),
     },
   };
 }
@@ -190,6 +191,14 @@ export function shouldSendServerRunnerState(state, localRole, tick) {
   return state?.authorityPlayerId === 'server'
     && localRole === 'runner'
     && normalizeTick(tick) % 3 === 0;
+}
+
+function runnerPoseFlags(runner) {
+  return {
+    ...(typeof runner.grounded === 'boolean' ? { grounded: runner.grounded } : {}),
+    ...(typeof runner.climbing === 'boolean' ? { climbing: runner.climbing } : {}),
+    ...(runner.facing === -1 || runner.facing === 1 ? { facing: runner.facing } : {}),
+  };
 }
 
 export function acceptServerRunnerStateMessage(state, localRole, lastAppliedTick, message = {}) {
@@ -258,6 +267,7 @@ export function createStateSyncMessage(snapshot = {}) {
       vx: Number(snapshot.runner.vx) || 0,
       vy: Number(snapshot.runner.vy) || 0,
       dead: snapshot.runner.dead === true,
+      ...runnerPoseFlags(snapshot.runner),
     }
     : null;
   const tools = Array.isArray(snapshot.tools)

@@ -5,6 +5,8 @@ import {
   createStateSyncMessage,
 } from './online-gameplay.js';
 
+import { normalizeCharacterCosmetics, normalizeCharacterId } from './characters.js';
+
 export const BUILD_BUDDY_GAME_ID = 'build-buddy';
 export const BUILD_BUDDY_PROTOCOL_VERSION = 1;
 
@@ -45,6 +47,8 @@ export function sanitizeOnlineIdentity(identity) {
   return {
     playerId: boundedText(identity?.playerId, '', 64),
     displayName: boundedText(identity?.displayName, 'Player', 24),
+    ...(identity?.characterId !== undefined ? { characterId: normalizeCharacterId(identity.characterId) } : {}),
+    ...(identity?.cosmetics !== undefined ? { cosmetics: normalizeCharacterCosmetics(identity.cosmetics) } : {}),
   };
 }
 
@@ -278,6 +282,7 @@ export function createOnlineClient(input = {}) {
     }
     if (data.event === 'lobby_joined' || data.event === 'lobby_updated') {
       applyLobbyEvent(data);
+      sendProfile();
       return;
     }
     if (data.event === 'lobby_player_joined' || data.event === 'lobby_player_left') {
@@ -382,6 +387,7 @@ export function createOnlineClient(input = {}) {
   }
 
   function sendProfile() {
+    if (snapshot.clientId) emit({ profiles: { ...snapshot.profiles, [snapshot.clientId]: { ...identity } } });
     lobbyMessage('profile', identity);
   }
 

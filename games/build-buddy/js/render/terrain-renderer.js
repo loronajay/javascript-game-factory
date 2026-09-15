@@ -101,6 +101,29 @@ export class TerrainRenderer {
   }
 
   drawHazard(ctx, h) {
+    // The strip is drawn pointing up; other facings are the same strip turned
+    // in place, so a ceiling strip's base hugs the ceiling and a wall strip's
+    // base hugs the wall while the points reach into the room.
+    if (h.facing === 'down') {
+      ctx.save();
+      ctx.translate(0, h.y * 2 + h.h);
+      ctx.scale(1, -1);
+      this.drawSpikeStrip(ctx, h);
+      ctx.restore();
+      return;
+    }
+    if (h.facing === 'left' || h.facing === 'right') {
+      ctx.save();
+      ctx.translate(h.x + h.w / 2, h.y + h.h / 2);
+      ctx.rotate(h.facing === 'left' ? -Math.PI / 2 : Math.PI / 2);
+      this.drawSpikeStrip(ctx, { x: -h.h / 2, y: -h.w / 2, w: h.h, h: h.w });
+      ctx.restore();
+      return;
+    }
+    this.drawSpikeStrip(ctx, h);
+  }
+
+  drawSpikeStrip(ctx, h) {
     const baseH = Math.max(10, Math.round(h.h * 0.38));
     const spikeHeight = Math.max(12, h.h - baseH);
 

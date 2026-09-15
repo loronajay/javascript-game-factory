@@ -187,7 +187,8 @@ test("lobby messages exchange profile and ready state without a custom auth laye
 
   const sent = MockWebSocket.instances[0].sent;
   assertEqual(sent[0].messageType, "profile");
-  assertEqual(sent[1].messageType, "ready");
+  assertEqual(sent[1].messageType, "profile"); // Explicit resend after the automatic join announcement.
+  assertEqual(sent[2].messageType, "ready");
   assertEqual(typeof sent[0].value, "string");
   assertEqual(updates.at(-1).profiles.p2.displayName, "Player Two");
   assertEqual(updates.at(-1).readyByPlayerId.p2, true);

@@ -1,4 +1,10 @@
 export const ART = Object.freeze({
+  animals: 'assets/art/animal-runners.png',
+  foxRunner: 'assets/art/runners/fox.png',
+  rabbitRunner: 'assets/art/runners/rabbit.png',
+  raccoonRunner: 'assets/art/runners/raccoon.png',
+  bearRunner: 'assets/art/runners/bear.png',
+  menuCrew: 'assets/art/menu-custom-crew.png',
   sky: 'assets/art/sky.png', city: 'assets/art/city.png',
   cranes: 'assets/art/cranes.png', springs: 'assets/art/springs.png',
 });

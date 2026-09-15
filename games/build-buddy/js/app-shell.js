@@ -25,10 +25,12 @@ import {
   recordAuthoritativeStageResult,
 } from './online-gameplay.js';
 import { VIEW_MODES } from './view-modes.js';
+import { loadCharacters, loadCharacterCosmetics, saveCharacters, normalizeCharacterCosmetic, normalizeCharacterCosmetics, normalizeCharacterId } from './characters.js';
 
 export const APP_SCREENS = Object.freeze({
   MAIN_MENU: 'main_menu',
   MODE_SELECT: 'mode_select',
+  LOCAL_SETUP: 'local_setup',
   ONLINE_MENU: 'online_menu',
   ONLINE_LOBBY: 'online_lobby',
   PRACTICE_SELECT: 'practice_select',
@@ -86,6 +88,7 @@ function createOnlineState(intent, identity, extra = {}) {
     ownerId: extra.ownerId || '',
     isOwner: false,
     players: [],
+    profiles: {},
     readyByPlayerId: {},
     authorityMode: 'client_host',
     serverMatchState: null,
@@ -119,6 +122,9 @@ function playerFromMember(memberId, profiles, fallbackIndex) {
   return {
     id: profile.playerId || memberId || `online_player_${fallbackIndex + 1}`,
     displayName: profile.displayName || `Player ${fallbackIndex + 1}`,
+    characterId: normalizeCharacterId(profile.characterId),
+    cosmetics: normalizeCharacterCosmetics(profile.cosmetics),
+    networkId: memberId,
   };
 }
 
@@ -126,6 +132,8 @@ function playersFromServerMatch(matchState, fallbackPlayers) {
   const serverPlayers = Array.isArray(matchState?.players) ? matchState.players.slice(0, 2) : [];
   if (serverPlayers.length >= 2) {
     return serverPlayers.map((player, index) => ({
+      characterId: normalizeCharacterId(fallbackPlayers?.find(p => p.networkId === (player.clientId || player.id))?.characterId),
+      cosmetics: normalizeCharacterCosmetics(fallbackPlayers?.find(p => p.networkId === (player.clientId || player.id))?.cosmetics),
       id: typeof player?.clientId === 'string' && player.clientId
         ? player.clientId
         : (typeof player?.id === 'string' && player.id ? player.id : `online_player_${index + 1}`),
@@ -154,12 +162,18 @@ export function createAppShellState({
   players = DEFAULT_PLAYERS,
 } = {}) {
   const normalizedStages = normalizeStages(stageList);
+  const savedCharacters = loadCharacters(storage);
+  const savedCosmetics = loadCharacterCosmetics(storage);
   return {
     screen: APP_SCREENS.MAIN_MENU,
     storage,
     packId,
     stageList: normalizedStages,
-    players: clone(players),
+    players: clone(players).map((player, index) => ({
+      ...player,
+      characterId: normalizeCharacterId(player.characterId ?? savedCharacters[index]),
+      cosmetics: normalizeCharacterCosmetics(player.cosmetics ?? savedCosmetics[index]),
+    })),
     progression: loadProgression(storage),
     session: null,
     stageResult: null,
@@ -172,6 +186,25 @@ export function createAppShellState({
 
 export function goToModeSelect(state) {
   return { ...state, screen: APP_SCREENS.MODE_SELECT, stageResult: null, runSummary: null };
+}
+
+export function selectCharacter(state, playerIndex, characterId) {
+  if (!Number.isInteger(playerIndex) || !state.players[playerIndex]) return state;
+  const players = state.players.map((player, index) => index === playerIndex
+    ? { ...player, characterId: normalizeCharacterId(characterId) } : player);
+  saveCharacters(state.storage, players);
+  return { ...state, players };
+}
+
+export function selectCharacterCosmetic(state, playerIndex, key, value) {
+  if (!Number.isInteger(playerIndex) || !state.players[playerIndex]) return state;
+  const normalized = normalizeCharacterCosmetic(key, value);
+  if (normalized === null) return state;
+  const players = state.players.map((player, index) => index === playerIndex
+    ? { ...player, cosmetics: { ...normalizeCharacterCosmetics(player.cosmetics), [key]: normalized } }
+    : player);
+  saveCharacters(state.storage, players);
+  return { ...state, players };
 }
 
 export function goToOnlineMenu(state) {
@@ -235,6 +268,7 @@ export function applyOnlineClientSnapshot(state, snapshot = {}) {
       ownerId,
       isOwner: !!ownerId && ownerId === (snapshot.clientId || state.online.identity.playerId),
       players,
+      profiles: { ...profiles },
       readyByPlayerId: { ...(snapshot.readyByPlayerId ?? state.online.readyByPlayerId) },
       authorityMode: snapshot.onlineGameplay?.lastMatchState?.value?.network?.authorityMode || state.online.authorityMode,
       serverMatchState: snapshot.onlineGameplay?.lastMatchState?.value ?? state.online.serverMatchState,

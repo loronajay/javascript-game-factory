@@ -1,12 +1,19 @@
 import { roundRect } from './render-utils.js';
+import { artImage } from './art-assets.js';
+import { characterById } from '../characters.js';
+import { RunnerAnimation } from './runner-animation.js';
+import { RUNNER_FRAMES } from './runner-frames.js';
+import { customizedRunnerSheet } from './runner-colors.js';
 
 export class RunnerRenderer {
   constructor(runner) {
     this.runner = runner;
+    this.animation = new RunnerAnimation();
   }
 
   draw(ctx, { showSafetyZone = false } = {}) {
     const r = this.runner;
+    ctx.save();
     if (showSafetyZone) {
       const safety = r.safetyNoBuildRect();
       ctx.fillStyle = 'rgba(255,255,255,0.04)';
@@ -15,34 +22,30 @@ export class RunnerRenderer {
       roundRect(ctx, safety.x, safety.y, safety.w, safety.h, 20, true, true);
       ctx.setLineDash([]);
     }
-
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.36)';
-    ctx.shadowBlur = 15;
-    ctx.shadowOffsetY = 5;
-
-    const body = r.dead ? '#566070' : r.climbing ? '#82e6ce' : '#4aa99d';
-    const suit = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-    suit.addColorStop(0, body);
-    suit.addColorStop(1, r.dead ? '#343b4a' : '#225668');
-    ctx.fillStyle = suit;
-    roundRect(ctx, r.x, r.y, r.w, r.h, 12, true, false);
-
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.fillStyle = '#edc79e';
-    roundRect(ctx, r.x + 5, r.y + 10, r.w - 10, 16, 5, true, false);
-    ctx.fillStyle = r.dead ? '#75808a' : '#f4bf58';
-    roundRect(ctx, r.x, r.y, r.w, 13, 6, true, false);
-    ctx.fillRect(r.x, r.y + 10, r.w, 4);
-    ctx.fillStyle = '#16313f';
-    ctx.fillRect(r.x + (r.facing > 0 ? 23 : 7), r.y + 17, 4, 4);
-    ctx.fillStyle = '#f7df9a';
-    ctx.fillRect(r.x + 6, r.y + 31, r.w - 12, 4);
-    ctx.fillStyle = '#122f3d';
-    ctx.fillRect(r.x + 2, r.y + r.h - 8, 12, 8);
-    ctx.fillRect(r.x + r.w - 14, r.y + r.h - 8, 12, 8);
-
+    const character = characterById(r.characterId);
+    const atlas = RUNNER_FRAMES[character.id];
+    const sourceSheet = atlas ? artImage(`${character.id}Runner`) : null;
+    const sheet = sourceSheet ? customizedRunnerSheet(sourceSheet, character.id, r.cosmetics, atlas) : null;
+    const facing = r.facing < 0 ? -1 : 1;
+    ctx.translate(r.x + r.w / 2, r.y + r.h);
+    ctx.scale(facing, 1);
+    ctx.globalAlpha = r.dead ? .55 : 1;
+    if (sheet) {
+      // Use measured bounds, one scale per animal, and a shared foot baseline.
+      // Climbing paws align with the wall rather than drifting between frames.
+      const frame = atlas.frames[this.animation.frame];
+      const scale = r.h / atlas.bodyHeight;
+      const left = r.climbing ? r.w / 2 - frame.w * scale : -frame.anchor * scale;
+      ctx.drawImage(sheet, frame.x, frame.y, frame.w, frame.h,
+        left, -frame.h * scale, frame.w * scale, frame.h * scale);
+    } else {
+      const image = artImage('animals');
+      if (image) {
+        const { x, y, w, h } = character.crop;
+        const width = r.h * w / h;
+        ctx.drawImage(image, x, y, w, h, -width * character.anchor, -r.h, width, r.h);
+      }
+    }
     ctx.restore();
   }
 }

@@ -6,6 +6,7 @@ Generated with the built-in OpenAI image generation tool on 2026-09-11. Original
 - `city.png`: transparent distant scenery, 0.18 camera speed.
 - `cranes.png`: transparent near scenery, 0.42 camera speed.
 - `springs.png`: yellow, green and blue sprite atlas. Runtime crops remove transparent padding and map each device to its existing 54 × 28 hitbox. Collision and bounce strength remain defined by the tool constants.
+- `menu-custom-crew.png`: transparent main-menu vignette of the full four-character roster assembling a scaffold in player-customized colors.
 
 Layers move vertically as well as horizontally. Alternating mirrored tiles avoid hard wrap seams. Code-rendered fallbacks remain available while images load.
 
@@ -27,3 +28,6 @@ Use case: game-asset. Create a wide 1536x1024 TRANSPARENT PNG parallax foregroun
 
 Use case: game-asset. A production sprite atlas for Build Buddy, a 2D side-scrolling construction game. Transparent PNG, wide 1536x1024 canvas. EXACTLY THREE isolated spring launch pads in a single horizontal row, evenly spaced: yellow cap on left, green cap in middle, blue cap on right. All three have IDENTICAL geometry and size. Each is a low wide mechanical device aspect ratio exactly 54:28: a perfectly horizontal broad flat colored rectangular top cap, one stout silver compression coil underneath, dark navy bolted base. Orthographic FRONT/SIDE elevation for a platformer, NO perspective, NO visible top plane, no sloping launch surface. Crisp illustrated industrial game art, simple bold shapes readable at 54x28 pixels, subtle highlights and strong outlines. Cap is widest part, flat top flush with top of each sprite bounding box; base flush with bottom. Objects separated by large transparent gaps. Genuine transparent alpha, no floor shadow, glow, backdrop, text, labels, numbers, border or watermark. No extra items. All three objects sit at same vertical position.
 
+### menu-custom-crew
+
+Use case: stylized-concept. Integrated main-menu character key art for the open right side of a 16:9 game menu. Match the established cute chibi animal proportions, bold dark ink outlines, expressive faces, and polished 2D game-illustration finish. Feature exactly four recognizable Build Buddy characters actively building one compact scaffold together: the fox and bear brace opposite ends of the beam, the rabbit fastens it with a wrench, and the raccoon passes over a large bolt. Give every character a visibly customized non-default palette: plum fox with cobalt and mint accessories; lavender rabbit with emerald and coral accessories; seafoam raccoon with navy, coral, and violet accents; cobalt bear with gold, magenta, and turquoise accents. Full bodies and faces visible in one compact composition. Warm amber rim light and subtle cool teal shadow light. Genuine transparent alpha; no painted checkerboard, text, logo, border, UI, rectangular backdrop, extra characters, or watermark.

@@ -17,6 +17,15 @@ export class Runner {
     this.jumpHeldLast = false;
     this.message = '';
     this.messageTime = 0;
+    this.audioEvents = [];
+  }
+
+  emitAudio(type, details = {}) {
+    this.audioEvents.push({ type, ...details });
+  }
+
+  consumeAudioEvents() {
+    return this.audioEvents.splice(0);
   }
 
   spawnAt(x, y) {
@@ -128,10 +137,12 @@ export class Runner {
         this.grounded = false;
         this.onGroundId = null;
         this.jumpHoldTimer = PHYS.maxJumpHold;
+        this.emitAudio('jump');
       } else if (this.hasDoubleJump) {
         this.vy = PHYS.doubleJumpVy;
         this.hasDoubleJump = false;
         this.jumpHoldTimer = 0;
+        this.emitAudio('jump');
       }
     }
 
@@ -176,6 +187,7 @@ export class Runner {
       this.climbWall = null;
       this.grounded = false;
       this.hasDoubleJump = true;
+      this.emitAudio('jump');
       this.facing = wallSide;
       this.x += wallSide * 10;
       return;
@@ -281,6 +293,7 @@ export class Runner {
         this.onGroundId = null;
         this.message = spring.toolType.replace('spring', '') + ' bounce';
         this.messageTime = 0.6;
+        this.emitAudio('spring', { bounceVy: spring.bounceVy, toolType: spring.toolType });
       }
     }
   }
@@ -356,6 +369,7 @@ export class Runner {
     };
     this.message = messages[reason] ?? 'runner down';
     this.messageTime = reason === 'timer' ? 1.8 : 1;
+    this.emitAudio('error');
   }
 
   respawn(registry) {

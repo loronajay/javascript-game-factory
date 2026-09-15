@@ -36,6 +36,7 @@ export class ToolRegistry {
     this.stage = stage;
     this.rules = resolveBuilderRules(stage);
     this.tools = stage.preplacedTools.map(t => makeTool(t.toolType, t.x, t.y));
+    this.toolUseCount = 0;
   }
 
   toolEnabled(toolType) {
@@ -89,6 +90,7 @@ export class ToolRegistry {
     if (!validation.valid) return validation;
     const tool = makeTool(toolType, validation.x ?? placement.x, validation.y ?? placement.y);
     this.tools.push(tool);
+    this.toolUseCount += 1;
     return { valid: true, tool };
   }
 
@@ -229,6 +231,11 @@ export class BuilderController {
     this.hover = { x: 0, y: 0, valid: false, reason: '' };
     this.message = '';
     this.messageTime = 0;
+    this.audioEvents = [];
+  }
+
+  consumeAudioEvents() {
+    return this.audioEvents.splice(0);
   }
 
   updateHover(input, camera, runner) {
@@ -259,10 +266,12 @@ export class BuilderController {
     if (input.consumePlace()) {
       const res = this.registry.add(this.selectedTool, this.hover.x, this.hover.y, runner);
       this.toast(res.valid ? `${TOOL_DEFS[this.selectedTool].label} placed` : res.reason);
+      this.audioEvents.push({ type: res.valid ? 'toolAction' : 'error' });
     }
     if (input.consumeDelete()) {
       const res = this.registry.deleteAt(world.x, world.y);
       this.toast(res.deleted ? 'Tool deleted' : res.reason);
+      this.audioEvents.push({ type: res.deleted ? 'toolAction' : 'error' });
     }
 
     this.messageTime = Math.max(0, this.messageTime - dt);

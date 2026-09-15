@@ -7,6 +7,7 @@ export class GoalRenderer {
 
   draw(ctx) {
     const g = this.stage.goal;
+    ctx.save();
     const glow = ctx.createLinearGradient(0, g.y, 0, g.y + g.h);
     glow.addColorStop(0, 'rgba(91, 255, 183, 0.28)');
     glow.addColorStop(1, 'rgba(35, 160, 108, 0.16)');
@@ -21,10 +22,13 @@ export class GoalRenderer {
 
     ctx.fillStyle = '#dcfff0';
     ctx.font = '800 28px system-ui';
-    ctx.fillText('GOAL', g.x + 28, g.y + 100);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GOAL', g.x + g.w / 2, g.y + g.h / 2);
 
     ctx.strokeStyle = 'rgba(127,255,186,0.22)';
     ctx.lineWidth = 2;
     for (let i = 1; i <= 3; i++) roundRect(ctx, g.x - i * 8, g.y - i * 8, g.w + i * 16, g.h + i * 16, 22, false, true);
+    ctx.restore();
   }
 }
