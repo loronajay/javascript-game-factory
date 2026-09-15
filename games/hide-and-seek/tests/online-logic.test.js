@@ -254,3 +254,34 @@ test('a catch is narrated by name, to everyone except the player it happened to'
   assert.equal(online.describeCatchEvent(state, { type: 'hider-tagged', playerId: 'me' }), null, 'your own catch is the spectator handoff\'s to announce');
   assert.equal(online.describeCatchEvent(state, { type: 'drawer-empty', playerId: 'you' }), null);
 });
+
+test('the host can ask for CPU guests, and the lobby shows the chairs they will take', () => {
+  let state = online.applyNetEvent(online.createNetState(), {
+    event: 'lobby_joined', clientId: 'me', ownerId: 'me', members: ['me', 'you'], settings: { mapId: 'grand-hotel', cpuCount: 0 },
+  });
+  assert.equal(state.cpuCount, 0);
+  assert.deepEqual(online.cpuSeatsOf(state), []);
+  // The request is a lobby setting, not a game message: the server sanitizes it and every lobby
+  // payload carries it back, so every client sees the same chairs.
+  assert.deepEqual(online.cpuCountRequest(3), { type: 'update_lobby_settings', settings: { cpuCount: 3 } });
+  assert.deepEqual(online.cpuCountRequest(99).settings, { cpuCount: online.MAX_CPU_GUESTS });
+  assert.deepEqual(online.cpuCountRequest(-4).settings, { cpuCount: 0 });
+  state = online.applyNetEvent(state, { event: 'lobby_updated', members: ['me', 'you'], settings: { mapId: 'grand-hotel', cpuCount: 3 } });
+  assert.equal(state.cpuCount, 3);
+  assert.deepEqual(online.cpuSeatsOf(state), ['cpu-1', 'cpu-2', 'cpu-3']);
+  assert.equal(online.nameOf(state, 'cpu-2'), 'CPU Guest 2', 'a bot chair has a name before any snapshot names it');
+  assert.equal(online.isCpuSeat('cpu-2'), true);
+  assert.equal(online.isCpuSeat('me'), false);
+  // People always come first: as guests arrive, the bots give up their chairs.
+  state = online.applyNetEvent(state, { event: 'lobby_updated', members: ['me', 'you', 'a', 'b', 'c', 'd', 'e'], settings: { mapId: 'grand-hotel', cpuCount: 3 } });
+  assert.deepEqual(online.cpuSeatsOf(state), ['cpu-1']);
+  state = online.applyNetEvent(state, { event: 'lobby_updated', members: ['me', 'you', 'a', 'b', 'c', 'd', 'e', 'f'], settings: { mapId: 'grand-hotel', cpuCount: 3 } });
+  assert.deepEqual(online.cpuSeatsOf(state), []);
+  // A payload that says nothing about bots leaves the count alone rather than zeroing it.
+  state = online.applyNetEvent(state, { event: 'lobby_player_left', members: ['me', 'you'] });
+  assert.equal(state.cpuCount, 3);
+  // Only the host may change it, and only while the lobby is open.
+  assert.equal(online.canEditCpuCount(state), true);
+  assert.equal(online.canEditCpuCount({ ...state, ownerId: 'you' }), false);
+  assert.equal(online.canEditCpuCount({ ...state, status: online.NET_STATES.STARTING }), false);
+});

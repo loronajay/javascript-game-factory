@@ -36,6 +36,9 @@ export function createOnline({
   const playerCountEl = document.getElementById('onlinePlayerCount');
   const startBtn = document.getElementById('onlineStart');
   const copyBtn = document.getElementById('onlineCopy');
+  const cpuAddBtn = document.getElementById('onlineCpuAdd');
+  const cpuRemoveBtn = document.getElementById('onlineCpuRemove');
+  const cpuCountEl = document.getElementById('onlineCpuCount');
   const clockEl = document.getElementById('roundClock');
   const countEl = document.getElementById('roundCount');
   const bannerEl = document.getElementById('roundBanner');
@@ -91,9 +94,12 @@ export function createOnline({
   }
 
   function renderLobby() {
+    // The chairs as the round will seat them: the people, then the bots the host asked for in
+    // whatever chairs are still empty. Both come off the server's lobby payload.
+    const cpuSeats = logic.cpuSeatsOf(net);
     if (statusEl) { statusEl.textContent = label(); statusEl.dataset.state = net.status; }
     if (roomEl) roomEl.textContent = net.roomCode || '— — — — —';
-    if (playerCountEl) playerCountEl.textContent = `${net.members.length} / ${logic.LOBBY_LIMITS.maxPlayers}`;
+    if (playerCountEl) playerCountEl.textContent = `${net.members.length + cpuSeats.length} / ${logic.LOBBY_LIMITS.maxPlayers}`;
     if (copyBtn) copyBtn.disabled = !net.roomCode;
     if (rosterEl) {
       rosterEl.replaceChildren();
@@ -103,9 +109,9 @@ export function createOnline({
         empty.textContent = 'Waiting for the first guest…';
         rosterEl.appendChild(empty);
       }
-      net.members.forEach((id, index) => {
+      [...net.members, ...cpuSeats].forEach((id, index) => {
         const guest = document.createElement('div');
-        guest.className = 'rosterGuest';
+        guest.className = logic.isCpuSeat(id) ? 'rosterGuest rosterGuest--cpu' : 'rosterGuest';
         const seat = document.createElement('span');
         seat.className = 'guestSeat';
         seat.textContent = String(index + 1).padStart(2, '0');
@@ -117,11 +123,15 @@ export function createOnline({
         name.textContent = id === net.clientId ? `${who} (YOU)` : who;
         const badge = document.createElement('span');
         badge.className = 'guestBadge';
-        badge.textContent = id === net.ownerId ? 'HOST' : 'READY';
+        badge.textContent = logic.isCpuSeat(id) ? 'CPU' : id === net.ownerId ? 'HOST' : 'READY';
         guest.append(seat, name, badge);
         rosterEl.appendChild(guest);
       });
     }
+    const editable = logic.canEditCpuCount(net);
+    if (cpuCountEl) cpuCountEl.textContent = String(net.cpuCount);
+    if (cpuAddBtn) cpuAddBtn.disabled = !editable || net.cpuCount >= logic.MAX_CPU_GUESTS;
+    if (cpuRemoveBtn) cpuRemoveBtn.disabled = !editable || net.cpuCount <= 0;
     if (startBtn) {
       const owner = !!net.clientId && net.clientId === net.ownerId;
       startBtn.disabled = !owner || net.members.length < 2 || net.status !== logic.NET_STATES.LOBBY;
@@ -436,6 +446,12 @@ export function createOnline({
   }
 
   if (startBtn) startBtn.addEventListener('click', () => { menuClick(); send({ type: 'start_lobby' }); });
+  // The host asks; the server answers with the lobby as it now stands, and `renderLobby` draws that.
+  // Nothing here changes the count locally, so a refused or lost request cannot show chairs the round
+  // will not seat.
+  const requestCpuCount = (count) => { if (!logic.canEditCpuCount(net)) return; menuClick(); send(logic.cpuCountRequest(count)); };
+  if (cpuAddBtn) cpuAddBtn.addEventListener('click', () => requestCpuCount(net.cpuCount + 1));
+  if (cpuRemoveBtn) cpuRemoveBtn.addEventListener('click', () => requestCpuCount(net.cpuCount - 1));
   if (copyBtn) copyBtn.addEventListener('click', () => {
     if (!net.roomCode) return;
     menuClick();

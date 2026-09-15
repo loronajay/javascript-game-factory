@@ -119,11 +119,19 @@
           <div class="roomCardLabel">ROOM CODE</div>
           <div id="onlineRoom" class="onlineRoom">&mdash; &mdash; &mdash; &mdash; &mdash;</div>
           <button id="onlineCopy" class="copyBtn" type="button" disabled>COPY CODE</button>
-          <p>Share this code with your party. Matchmaking fills open seats automatically.</p>
+          <p>Share this code with your party. Matchmaking fills open seats automatically; the host can seat CPU guests in whatever is left.</p>
         </section>
         <section class="rosterCard">
           <div class="rosterHeading"><span>GUEST LIST</span><b id="onlinePlayerCount">0 / 8</b></div>
           <div id="onlinePlayers" class="onlinePlayers" aria-live="polite"><div class="emptyRoster">Waiting for the first guest&hellip;</div></div>
+          <div class="cpuControls">
+            <span class="cpuControlsCopy"><strong>CPU GUESTS</strong><small>Fill the empty chairs with bots. They only ever hide &mdash; the seeker is always a real guest.</small></span>
+            <span class="cpuStepper">
+              <button id="onlineCpuRemove" class="stepBtn" type="button" disabled aria-label="Fewer CPU guests">&minus;</button>
+              <b id="onlineCpuCount">0</b>
+              <button id="onlineCpuAdd" class="stepBtn" type="button" disabled aria-label="More CPU guests">+</button>
+            </span>
+          </div>
         </section>
       </div>
       <div class="lobbyRules"><span><b id="lobbyMapName">THE GRAND HOTEL</b></span><span><b>2&ndash;8</b> PLAYERS</span><span><b>RANDOM</b> SEEKER</span><span><b>45 SEC</b> TO HIDE</span><span><b id="lobbyDemonCount">2</b> DEMONS</span></div>
@@ -297,7 +305,7 @@
   <script src="layout.js?v=7.1"></script>
   <script src="collision-logic.js?v=7.1"></script>
   <script src="movement-logic.js?v=7.1"></script>
-  <script src="online-logic.js?v=7.2"></script>
+  <script src="online-logic.js?v=7.6"></script>
   <script src="hotel-plan.js?v=7.1"></script>
   <script src="mall-plan.js?v=7.3"></script>
   <script src="hospital-plan.js?v=7.4"></script>

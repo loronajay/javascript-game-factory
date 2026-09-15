@@ -50,6 +50,41 @@
   const LOBBY_LIMITS = Object.freeze({ minPlayers: 2, maxPlayers: 8 });
   const RESUME_MARGIN_MS = 1_500;
 
+  // How many CPU guests a host may ask for. The server clamps it again to the chairs actually left
+  // empty when the round starts: people always come first, and a bot only ever takes a seat nobody
+  // has claimed. The seeker is always a person — a bot only ever hides.
+  const MAX_CPU_GUESTS = 6;
+
+  function isCpuSeat(id) {
+    return /^cpu-\d+$/.test(String(id || ''));
+  }
+
+  // The request a host sends. It is a lobby setting rather than a game message on purpose: the server
+  // sanitizes it, keeps it host-only so a searcher who never asked for bots still joins, and hands it
+  // back on every lobby payload — which is how every client sees the same chairs.
+  function cpuCountRequest(count) {
+    const cpuCount = Math.max(0, Math.min(MAX_CPU_GUESTS, Math.floor(Number(count) || 0)));
+    return { type: 'update_lobby_settings', settings: { cpuCount } };
+  }
+
+  // The bot chairs the lobby will fill when it starts, given who is already sitting down. The same
+  // arithmetic the server does, so the roster a host looks at is the roster the round will seat.
+  function cpuSeatsOf(state) {
+    const free = Math.max(0, LOBBY_LIMITS.maxPlayers - (state?.members || []).length);
+    const count = Math.min(Math.max(0, Number(state?.cpuCount) || 0), free);
+    return Array.from({ length: count }, (_, index) => `cpu-${index + 1}`);
+  }
+
+  function canEditCpuCount(state) {
+    return !!state?.clientId && state.clientId === state?.ownerId && state.status === NET_STATES.LOBBY;
+  }
+
+  function cpuCountFrom(payload, current) {
+    const value = payload?.settings?.cpuCount;
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return current;
+    return Math.max(0, Math.min(MAX_CPU_GUESTS, Math.floor(Number(value))));
+  }
+
   // Which building an online round is played in, carried as a lobby setting.
   //
   // A client builds its map at boot, so it cannot join a round happening somewhere else — it has no
@@ -95,6 +130,8 @@
       seekerId: null,
       snapshot: null,
       error: null,
+      // How many CPU guests the host has asked for. The server's word, off the lobby payload.
+      cpuCount: 0,
       // Who has dropped and is still inside their grace window. Their body is standing in the hotel
       // and is still catchable, so this is a caption rather than a roster change.
       absent: [],
@@ -150,6 +187,7 @@
   // there is exactly one fallback rather than one per surface.
   function nameOf(state, id) {
     if (!id) return 'Guest';
+    if (isCpuSeat(id)) return `CPU Guest ${id.slice(4)}`;
     const known = state?.names?.[id];
     if (typeof known === 'string' && known.trim()) return known.trim();
     const fromSnapshot = state?.snapshot?.players?.find((entry) => entry.id === id);
@@ -224,12 +262,13 @@
           ownerId: event.ownerId || null,
           members: memberIdsFrom(event),
           names: namesFrom(current, event),
+          cpuCount: cpuCountFrom(event, current.cpuCount),
           error: null,
         };
       case 'lobby_updated':
       case 'lobby_player_joined':
       case 'lobby_player_left':
-        return { ...current, members: memberIdsFrom(event) || current.members, names: namesFrom(current, event), ownerId: event.ownerId || current.ownerId };
+        return { ...current, members: memberIdsFrom(event) || current.members, names: namesFrom(current, event), ownerId: event.ownerId || current.ownerId, cpuCount: cpuCountFrom(event, current.cpuCount) };
       case 'lobby_started': {
         const started = parseValue(event.matchState);
         return {
@@ -355,8 +394,9 @@
   }
 
   return {
-    INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
+    INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, MAX_CPU_GUESTS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
     lobbySettingsFor, snapshotMapMismatch, hasPlayableSnapshot,
+    canEditCpuCount, cpuCountRequest, cpuSeatsOf, isCpuSeat,
     applyNetEvent, createNetState, describeCatchEvent, describeInput, interpolatePose, isSeeker,
     nameOf, othersOf, reconcilePosition, rememberSession, resumeRequestFor, roleOf, selfOf, shouldSendInput,
   };

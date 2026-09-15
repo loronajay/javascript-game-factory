@@ -159,3 +159,49 @@ test('a catch is called out by name to every client except the one it happened t
   assert.ok(!env.notices.slice(before).some((line) => line.includes('HAS BEEN FOUND')));
   assert.ok(env.notices.at(-1).includes('SPECTATING'));
 });
+
+test('the host fills empty chairs with CPU guests from the lobby, and everyone sees them seated', async () => {
+  const host = await client('seeker');
+  const guest = await client('me');
+  const controls = (env) => ({ add: env.elements.get('onlineCpuAdd'), remove: env.elements.get('onlineCpuRemove'), count: env.elements.get('onlineCpuCount') });
+  // The lobby opened with no bots: nothing to remove yet, and only the host may add.
+  assert.equal(controls(host).add.disabled, false);
+  assert.equal(controls(host).remove.disabled, true);
+  assert.equal(controls(guest).add.disabled, true, "a guest cannot seat bots in somebody else's lobby");
+  controls(host).add.fire('click');
+  const request = host.socket.sent.find((message) => message.type === 'update_lobby_settings');
+  assert.deepEqual(request, { type: 'update_lobby_settings', settings: { cpuCount: 1 } });
+  // The server answers with the lobby as it now stands, and both clients draw the same chairs.
+  for (const env of [host, guest]) {
+    env.socket.receive({ event: 'lobby_updated', ownerId: 'seeker', members: ['seeker', 'me', 'other'], settings: { mapId: 'grand-hotel', cpuCount: 2 },
+      players: ['seeker', 'me', 'other'].map((seat) => ({ id: seat, name: NAMES[seat] })) });
+    const rows = env.elements.get('onlinePlayers').children;
+    const you = env === host ? 'seeker' : 'me';
+    const expected = ['seeker', 'me', 'other'].map((id) => (id === you ? `${NAMES[id].toUpperCase()} (YOU)` : NAMES[id].toUpperCase()));
+    assert.deepEqual(rows.map((row) => row.children[1].textContent), [...expected, 'CPU GUEST 1', 'CPU GUEST 2']);
+    assert.deepEqual(rows.slice(3).map((row) => row.children[2].textContent), ['CPU', 'CPU']);
+    assert.equal(env.elements.get('onlinePlayerCount').textContent, '5 / 8');
+    assert.equal(controls(env).count.textContent, '2');
+  }
+  assert.equal(controls(host).remove.disabled, false);
+  controls(host).remove.fire('click');
+  assert.deepEqual(host.socket.sent.at(-1), { type: 'update_lobby_settings', settings: { cpuCount: 1 } });
+  // Once the round is starting the chairs are set.
+  start(host);
+  assert.equal(controls(host).add.disabled, true);
+  assert.equal(controls(host).remove.disabled, true);
+});
+
+test('a CPU guest in a round is drawn, named and narrated like any other guest', async () => {
+  const env = await client();
+  const view = snapshot();
+  view.players.push({ id: 'cpu-1', name: 'CPU Guest 1', cpu: true, role: 'hider', alive: true, x: 30, y: 0, z: 0, yaw: 0, floor: 1, flashlight: { on: true, charge: 1 } });
+  view.round.hidersTotal = 3; view.round.hidersRemaining = 3;
+  start(env, view);
+  deliver(env, view);
+  assert.equal(env.elements.get('roundCount').textContent, '3/3');
+  const found = { ...view, tick: 2, events: [{ type: 'hider-tagged', playerId: 'cpu-1', seekerId: 'seeker' }] };
+  found.players = found.players.map((player) => (player.id === 'cpu-1' ? { ...player, alive: false } : player));
+  deliver(env, found);
+  assert.ok(env.notices.includes('CPU GUEST 1 HAS BEEN FOUND.'), env.notices.join(' | '));
+});

@@ -118,6 +118,14 @@ Game Factory account, and the name over your body in the corridor comes from you
 The lobby holds two to eight guests; the host presses `START ROUND`, and the server picks who is it
 without announcing it until the doors close. Any player can be either role.
 
+**CPU guests.** If only a few people are online, the host can fill the empty chairs with bots from
+the `CPU GUESTS` stepper under the guest list. They show in the roster as `CPU GUEST N`, and everyone
+in the lobby sees the same chairs. Three things to know: people always come first, so a bot gives up
+its chair to anyone who joins before the round starts; the seeker is always a real guest, a bot only
+ever hides; and a bot plays by exactly the rules you do — it walks the same corridors, opens doors by
+the handle, spends a real battery, sprints on a real stamina meter, and is found and caught the same
+way. It still takes two real people to start a round.
+
 **The server owns the round.** Where you are, what you can see, how much battery you have left, which
 drawer still had the key in it and who was caught are all decided there. Your client only sends which
 keys you are holding and which way you are facing — a client that gets to say "I wasn't caught" is
@@ -143,7 +151,10 @@ Playing on `localhost` talks to a network server on `localhost:3000`; anywhere e
 
 - Nobody has played an online round with real people yet.
 - A two-player round is fragile: there is exactly one hider, so a demon reaching them ends it. Three
-  or more guests is where the game is meant to live.
+  or more guests is where the game is meant to live — which is what CPU guests are for.
+- CPU guests have not been watched by a person in a live round. They are proven headlessly on every
+  map (they reach a room, open a shut door, bolt from the seeker and get caught by demons), which is
+  not the same as knowing whether they are convincing to hunt.
 - Only The Grand Hotel has been playtested by a human at all. The other three are proven correct by
   tests, which is not the same as proven fun.
 

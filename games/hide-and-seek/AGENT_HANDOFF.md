@@ -376,6 +376,34 @@ the shape catch resolution and the demons' threat checks want.
   Human and network poses already use camera yaw. Hiders must publish facing too.
 - Do not grow a second navigation system for any of them.
 
+### CPU guests online (`cpu-logic.js`)
+
+- **A bot speaks only in inputs.** `driveHiders` returns `{ brains, inputs }` and the server hands
+  the inputs to the same `engine.tick` a client's arrive at. A bot has no other channel into the
+  state — no `forceDoorOpen`, no position write, no charge — and `tests/cpu-logic.test.js` asserts
+  its input has exactly the fields `sim.readInput` keeps. If a bot needs to do something a human
+  cannot press for, the answer is a rule in the sim for everybody, not a side door for the bot.
+- **The seeker is never a bot online.** `chooseSeeker` is fed the human ids only. Do not "fix" the
+  absence of a CPU seeker in the lobby.
+- **People come first.** `cpuSeatIds(requested, humans, maxPlayers)` fills only the chairs left
+  empty at start; the client draws the same arithmetic (`online-logic.cpuSeatsOf`) so the roster a
+  host looks at is the roster the round seats. `cpu-N` ids are reserved — `applyHideAndSeekInput`
+  refuses them, so a socket cannot drive a bot.
+- **`cpuCount` is a lobby setting, host-only.** It lives in the server's `sanitizeLobbySettings`
+  and `HOST_ONLY_SETTINGS`, because matchmaking compares settings and a searcher who never asked
+  for bots must still join a host who did. The client never changes the count locally; it sends
+  `update_lobby_settings` and draws whatever the lobby payload says.
+- **A press is one tick, then a wait.** `pressed` drops `interact` the next tick (the authority
+  reads a rising edge; a held E strobes the leaf) and `doorWait` keeps the bot off the swinging
+  door. A bot only presses a door that is *closed and unlocked* — pressing an open one shuts it.
+- **A stalled bot replans before it gives up.** `body.moving` is the tick's own answer to whether
+  the last push went anywhere; `giveUpSeconds` of pushing replans the same target up to
+  `maxRouteAttempts`, then strikes the room off that bot's `unreachable` list. Fleeing re-picks a
+  room at most every `fleeReplanSeconds`, because the brain asks for one every tick a threat is in
+  range and answering each is a route plan per tick per bot.
+- **Bots use the round's seeded random** (`seededRandom(seed + ':cpu')` on the server), so a match
+  with bots in it still replays; the server test pins it.
+
 ## Spectating
 
 A caught hider stays in the match as a camera, never as a body. Target eligibility and cycling are

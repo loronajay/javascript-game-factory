@@ -40,6 +40,12 @@ export const MIRRORED_FILES = Object.freeze([
   'fixtures-logic.js',
   'demon-logic.js',
   'sim-logic.js',
+  // The CPU guests an online lobby can seat. `hider-logic.js` is the brain the solo stand-ins use;
+  // `cpu-logic.js` is the hands that turn it into inputs. Neither is needed by the browser online —
+  // the server presses the keys — but both have to be the cabinet's own copy, for the same reason
+  // the demons are.
+  'hider-logic.js',
+  'cpu-logic.js',
 ]);
 
 export const MANIFEST_NAME = 'sim-mirror-manifest.json';
