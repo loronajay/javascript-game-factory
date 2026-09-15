@@ -12,6 +12,8 @@ const files = {
   board: readFileSync(join(root, 'css', 'board.css'), 'utf8'),
   battle: readFileSync(join(root, 'css', 'battle.css'), 'utf8'),
   buttons: readFileSync(join(root, 'css', 'buttons.css'), 'utf8'),
+  panels: readFileSync(join(root, 'css', 'panels.css'), 'utf8'),
+  placement: readFileSync(join(root, 'css', 'placement.css'), 'utf8'),
   responsive: readFileSync(join(root, 'css', 'responsive.css'), 'utf8'),
 };
 
@@ -233,6 +235,124 @@ test('hidden result-screen buttons are removed from layout', () => {
     files.buttons,
     /\.btn\.hidden\s*\{[\s\S]*display:\s*none;/,
     'Expected hidden buttons to be removed from the result-screen action row.',
+  );
+});
+
+test('battle presentation has a distinct porcelain war-room identity', () => {
+  assertNotMatches(
+    files.index,
+    /battle-kicker|battle-versus|FLUSH OR BE FLUSHED|Operation: Final Flush/i,
+    'Expected the battle screen to avoid decorative slogans competing with the boards.',
+  );
+  assertMatches(
+    files.shell,
+    /url\(['"]?\.\.\/images\/bathroom-war-room\.png['"]?\)/,
+    'Expected the shell to use the custom bathroom war-room artwork.',
+  );
+  assertMatches(
+    files.board,
+    /\.board-bowl-seat\s*\{[\s\S]*aspect-ratio:\s*1\s*\/\s*1;[\s\S]*border-radius:\s*24px;/,
+    'Expected the playable toilet bowl to remain square so the full 10x10 grid stays contained.',
+  );
+  assertMatches(
+    files.board,
+    /\.board-bowl-water\s*\{[\s\S]*border-radius:\s*16px;[\s\S]*overflow:\s*visible;/,
+    'Expected the water surface to preserve the square playable bounds and visible coordinates.',
+  );
+  assertNotMatches(
+    files.board,
+    /border-radius:\s*4[5-9]%\s+4[5-9]%/,
+    'The playable board must not be forced into an oval toilet silhouette.',
+  );
+  assertNotMatches(
+    files.board,
+    /\.board-bowl--target\.bowl--your-turn \.board-bowl-water::after/,
+    'The active-turn treatment must not cover target cells with a reticle.',
+  );
+  assertMatches(
+    files.battle,
+    /\.battle-stage::before\s*\{[\s\S]*radial-gradient[\s\S]*filter:\s*blur/,
+    'Expected the battle stage to carry atmospheric floor light behind the bowls.',
+  );
+});
+
+test('menu throne uses a generated hero toilet asset', () => {
+  assertMatches(
+    files.index,
+    /<img[^>]+class="menu-throne-art"[^>]+src="\.\/images\/menu-hero-toilet\.png"/,
+    'Expected the menu to render the generated hero toilet instead of CSS toilet pieces.',
+  );
+  assertNotMatches(
+    files.index,
+    /menu-throne-(?:tank|seat|water)/,
+    'Expected the old CSS toilet construction to be removed from menu markup.',
+  );
+});
+
+test('major game phases use deliberately different environments', () => {
+  const phaseBackgrounds = [
+    ['screen-menu', 'menu-throne-room.png'],
+    ['screen-matchmaking', 'matchmaking-corridor.png'],
+    ['screen-placement', 'fleet-prep-bay.png'],
+    ['screen-battle', 'bathroom-war-room.png'],
+    ['screen-ended', 'results-arena.png'],
+  ];
+
+  for (const [screen, asset] of phaseBackgrounds) {
+    assertMatches(
+      files.shell,
+      new RegExp(`:has\\(#${screen}:not\\(\\.hidden\\)\\)[\\s\\S]*url\\(['\"]?\\.\\.\\/images\\/${asset.replace('.', '\\.')}`),
+      `Expected ${screen} to own its ${asset} environment.`,
+    );
+  }
+});
+
+test('interface panels use the porcelain command-console theme', () => {
+  assertMatches(
+    files.panels,
+    /\.porcelain-panel,[\s\S]*background:\s*linear-gradient\([^;]*rgba\(3,\s*25,\s*42/,
+    'Expected general panels to use dark enamel command-console surfaces.',
+  );
+  assertMatches(
+    files.panels,
+    /\.screen-heading\s*\{[\s\S]*font-family:\s*var\(--font-stencil\);[\s\S]*color:\s*#eefbff;/,
+    'Expected screen headings to use the bright stencil command style.',
+  );
+  assertMatches(
+    files.buttons,
+    /\.btn-primary\s*\{[\s\S]*#ffb23f/,
+    'Expected primary actions to have a distinct amber launch-control treatment.',
+  );
+  assertMatches(
+    files.placement,
+    /\.roster-ship\s*\{[\s\S]*rgba\(4,\s*27,\s*44/,
+    'Expected fleet roster cards to match the dark command-console UI.',
+  );
+});
+
+test('board tank headers do not stack placards or fake controls', () => {
+  assertMatches(
+    files.board,
+    /\.board-label--tank\s*\{[\s\S]*background:\s*transparent;[\s\S]*border:\s*0;[\s\S]*box-shadow:\s*none;/,
+    'Expected a plain tank label instead of a placard nested inside another panel.',
+  );
+  assertNotMatches(
+    files.board,
+    /\.board-bowl-tank::after/,
+    'Expected the fake flush-handle control to be removed from the board header.',
+  );
+});
+
+test('falling shot travels visibly from above the board', () => {
+  assertMatches(
+    files.board,
+    /\.board-cell\.cell-target-pending,[\s\S]*\.board-cell\.cell-incoming-pending\s*\{[\s\S]*overflow:\s*visible;[\s\S]*z-index:\s*10;/,
+    'Expected pending-shot cells to let the falling projectile travel outside cell bounds.',
+  );
+  assertMatches(
+    files.board,
+    /@keyframes\s+shot-drop\s*\{[\s\S]*translateY\(clamp\(-620px,\s*-46vh,\s*-260px\)\)/,
+    'Expected the shot to begin high above the board instead of just above its target cell.',
   );
 });
 

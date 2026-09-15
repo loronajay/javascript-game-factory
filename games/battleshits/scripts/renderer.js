@@ -238,7 +238,9 @@ export function renderTargetBoard(gs) {
         el.classList.add('cell-target-miss');
       } else if (cell.result === 'hit') {
         el.classList.add('cell-target-hit');
-        el.appendChild(makeSprite(SPRITES.missile, false, 'shot-marker'));
+        const overlay = document.createElement('div');
+        overlay.className = 'hit-overlay';
+        el.appendChild(overlay);
       } else if (cell.result === 'sunk') {
         el.classList.add('cell-target-sunk');
         el.appendChild(makeSprite(SPRITES.missile, false, 'shot-marker'));

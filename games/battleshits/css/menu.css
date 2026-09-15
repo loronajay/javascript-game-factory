@@ -13,9 +13,9 @@
   width: 100%;
   max-width: 860px;
   padding: 14px 24px;
-  border: 4px solid rgba(0, 0, 0, 0.78);
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 14px 30px rgba(7, 31, 52, 0.18);
+  border: 3px solid rgba(127, 222, 255, 0.66);
+  background: linear-gradient(180deg, rgba(3, 26, 43, 0.82), rgba(1, 12, 23, 0.92));
+  box-shadow: inset 0 0 24px rgba(31, 177, 234, 0.12), 0 14px 34px rgba(0, 5, 12, 0.62);
   overflow: hidden;
 }
 
@@ -25,70 +25,48 @@
   font-size: clamp(2.8rem, 7vw, 5.6rem);
   line-height: 0.9;
   letter-spacing: 0.03em;
-  color: #080808;
+  color: #f1fbff;
   text-transform: uppercase;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.18);
+  text-shadow: 0 3px 0 #00111e, 0 0 22px rgba(91, 218, 255, 0.42);
 }
 
 .menu-throne {
   position: relative;
-  width: min(220px, 26vw, 30vh);
-  aspect-ratio: 0.82;
-  margin-top: -2px;
+  width: min(290px, 31vw, 35vh);
+  aspect-ratio: 1145 / 1374;
+  margin-top: -8px;
   flex: 0 1 auto; /* can shrink if needed, but title is pinned first */
+  filter: drop-shadow(0 24px 22px rgba(0, 5, 12, 0.58));
 }
 
-.menu-throne-tank,
-.menu-throne-seat,
-.menu-throne-water {
+.menu-throne::after {
+  content: '';
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.menu-throne-tank {
-  top: 0;
-  width: 86%;
-  height: 29%;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #ffffff 0%, #efefef 62%, #d8d8d8 100%);
-  box-shadow:
-    inset 0 0 0 4px rgba(255, 255, 255, 0.95),
-    inset 0 -8px 14px rgba(150, 160, 172, 0.42),
-    0 18px 26px rgba(44, 73, 99, 0.22);
-}
-
-.menu-throne-seat {
-  top: 20%;
-  width: 72%;
-  height: 58%;
-  border-radius: 45% 45% 42% 42% / 30% 30% 58% 58%;
-  background: linear-gradient(180deg, #ffffff 0%, #f6f6f6 50%, #d7d9dc 100%);
-  box-shadow:
-    inset 0 0 0 8px rgba(255, 255, 255, 0.92),
-    inset 0 -15px 18px rgba(117, 132, 149, 0.32),
-    0 26px 32px rgba(34, 69, 99, 0.2);
-}
-
-.menu-throne-water {
-  top: 33%;
-  width: 42%;
-  height: 38%;
+  inset: 28% 13% 10%;
+  z-index: -1;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 45% 28%, rgba(255, 255, 255, 0.56), transparent 18%),
-    radial-gradient(circle at 52% 58%, rgba(7, 74, 124, 0.4), transparent 34%),
-    radial-gradient(circle at 50% 50%, #47b8ef 0%, #2398d7 46%, #0d5d98 82%, #083453 100%);
-  box-shadow:
-    inset 0 0 20px rgba(255, 255, 255, 0.35),
-    inset 0 -18px 28px rgba(9, 46, 78, 0.36);
+  background: rgba(31, 192, 255, 0.26);
+  filter: blur(26px);
+  animation: throne-aura 2.8s ease-in-out infinite;
+}
+
+.menu-throne-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@keyframes throne-aura {
+  50% { opacity: 0.62; transform: scale(1.08); }
 }
 
 .game-tagline {
   font-size: 13px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(6, 33, 56, 0.72);
+  color: rgba(221, 244, 255, 0.82);
+  text-shadow: 0 2px 7px rgba(0, 7, 14, 0.9);
   text-align: center;
 }
 

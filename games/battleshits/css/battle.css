@@ -2,6 +2,25 @@
   --bowl-size: clamp(280px, min(34vw, 54vh), 480px);
 }
 
+.battle-stage {
+  isolation: isolate;
+  padding: clamp(10px, 1.4vh, 18px);
+  border: 1px solid rgba(139, 216, 255, 0.14);
+  border-radius: 32px;
+  background: linear-gradient(180deg, rgba(1, 14, 27, 0.34), rgba(1, 10, 19, 0.68));
+  box-shadow: 0 30px 80px rgba(0, 5, 12, 0.64), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.battle-stage::before {
+  content: '';
+  position: absolute;
+  inset: 28% 5% 1%;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 80%, rgba(37, 179, 255, 0.3), transparent 65%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
 .battle-header {
   display: flex;
   justify-content: center;
@@ -15,6 +34,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.screen-battle .status-placard {
+  border-color: rgba(144, 224, 255, 0.55);
+  background: linear-gradient(180deg, rgba(8, 37, 58, 0.94), rgba(2, 16, 29, 0.98));
+  box-shadow: inset 0 0 18px rgba(35, 174, 235, 0.12), 0 12px 25px rgba(0, 4, 9, 0.44);
+}
+
+.screen-battle .turn-indicator,
+.screen-battle .opponent-display {
+  color: #eafaff;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .turn-indicator,
@@ -34,6 +67,8 @@
 }
 
 .battle-center-col {
+  position: relative;
+  flex-direction: column;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -96,12 +131,12 @@
   animation-duration: 3.6s;
 }
 
-/* Fleet bowl shake on incoming hit */
-.board-bowl--fleet.bowl--taking-hit {
+/* Both boards react at confirmed impact. */
+.board-bowl.bowl--taking-hit {
   animation: bowl-hit-shake 0.45s ease-out;
 }
 
-.board-bowl--fleet.bowl--taking-sunk {
+.board-bowl.bowl--taking-sunk {
   animation: bowl-sunk-shake 0.65s ease-out;
 }
 
@@ -127,7 +162,7 @@
 }
 
 /* Red flash overlay when a ship sinks */
-.board-bowl--fleet.bowl--taking-sunk::after {
+.board-bowl.bowl--taking-sunk::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -142,6 +177,26 @@
   0%   { opacity: 1; }
   60%  { opacity: 0.5; }
   100% { opacity: 0; }
+}
+
+.board-bowl--target.bowl--taking-sunk::after {
+  background: radial-gradient(ellipse, rgba(255, 220, 115, 0.42), rgba(255, 98, 20, 0.18));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-bowl.bowl--taking-hit,
+  .board-bowl.bowl--taking-sunk {
+    animation: none;
+  }
+
+  .board-bowl.bowl--taking-sunk::after {
+    display: none;
+  }
+
+  .hit-overlay::before,
+  .hit-overlay::after {
+    animation: none;
+  }
 }
 
 /* Ship status row pulse when just sunk */
@@ -165,7 +220,8 @@
   font: 700 clamp(0.72rem, 1.35vh, 0.84rem) var(--font-ui);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(8, 34, 54, 0.74);
+  color: rgba(207, 239, 255, 0.72);
+  text-shadow: 0 2px 5px rgba(0, 8, 16, 0.8);
 }
 
 .battle-playfield {
@@ -203,7 +259,7 @@
 
 /* Lock tank height so bowl position never moves when label text changes */
 .screen-battle .board-bowl-tank {
-  height: 72px;
+  height: 58px;
   overflow: hidden;
   justify-content: center;
 }
@@ -245,8 +301,9 @@
   width: min(100%, 430px);
   padding: 10px 14px;
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 12px 24px rgba(9, 39, 62, 0.16);
+  border: 1px solid rgba(110, 211, 255, 0.35);
+  background: linear-gradient(180deg, rgba(5, 29, 47, 0.94), rgba(2, 16, 29, 0.97));
+  box-shadow: inset 0 0 20px rgba(49, 178, 230, 0.08), 0 12px 24px rgba(0, 5, 11, 0.4);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -278,10 +335,10 @@
 }
 
 .ship-status--afloat {
-  color: rgba(71, 44, 23, 0.92);
+  color: rgba(240, 248, 234, 0.92);
 }
 
 .ship-status--sunk {
-  color: rgba(54, 56, 63, 0.64);
+  color: rgba(130, 159, 174, 0.56);
   text-decoration: line-through;
 }

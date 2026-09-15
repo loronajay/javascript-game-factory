@@ -47,8 +47,8 @@ export function clearBattleTimers() {
   clearEmoteTimers();
 }
 
-function triggerFleetBowlShake(sunk) {
-  const bowl = document.querySelector('#screen-battle .board-bowl--fleet');
+function triggerBowlShake(side, sunk) {
+  const bowl = document.querySelector(`#screen-battle .board-bowl--${side}`);
   if (!bowl) return;
   const cls = sunk ? 'bowl--taking-sunk' : 'bowl--taking-hit';
   bowl.classList.remove('bowl--taking-hit', 'bowl--taking-sunk');
@@ -105,6 +105,7 @@ function applyShotResult(gs, { clearAll, onMatchEnded }, { col, row, hit, sunk, 
 
   renderTargetBoard(gs);
   renderOpponentFleetStatus(gs);
+  if (hit) triggerBowlShake('target', sunk);
 
   if (fleetDestroyed) {
     transitionToMatchEnded(gs, 'win', { clearAll });
@@ -148,7 +149,7 @@ export function handleIncomingShot(gs, net, col, row, { clearAll, onMatchEnded }
     renderFleetBoard(gs);
     renderFleetStatus(gs);
 
-    if (hit) triggerFleetBowlShake(sunk);
+    if (hit) triggerBowlShake('fleet', sunk);
 
     if (fleetDestroyed) {
       transitionToMatchEnded(gs, 'loss', { clearAll });

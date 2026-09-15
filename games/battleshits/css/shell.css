@@ -16,22 +16,63 @@
 }
 
 .bathroom-wall {
+  transition: filter 420ms ease, opacity 420ms ease;
   background:
+    linear-gradient(180deg, rgba(2, 13, 24, 0.08), rgba(1, 9, 18, 0.62)),
+    url('../images/bathroom-war-room.png') center center / cover no-repeat,
     linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(60, 121, 181, 0.14)),
     linear-gradient(180deg, var(--tile-blue-light) 0%, var(--tile-blue) 48%, var(--tile-blue-dark) 100%);
-  background-size: 82px 82px, 82px 82px, 100% 100%, 100% 100%;
-  opacity: 0.95;
+  background-size: 100% 100%, cover, 82px 82px, 82px 82px, 100% 100%, 100% 100%;
+  background-position: center, center, center, center, center, center;
+  opacity: 1;
+}
+
+/* Each phase is a different room in the same porcelain war complex. */
+.game-shell:has(#screen-menu:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(180deg, rgba(1, 10, 20, 0.05), rgba(0, 7, 14, 0.42)), url('../images/menu-throne-room.png') center / cover no-repeat;
+}
+
+.game-shell:has(#screen-difficulty:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(135deg, rgba(37, 13, 68, 0.38), rgba(1, 12, 24, 0.5)), url('../images/matchmaking-corridor.png') 48% center / cover no-repeat;
+}
+
+.game-shell:has(#screen-matchmaking:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(180deg, rgba(0, 93, 130, 0.2), rgba(0, 8, 18, 0.55)), url('../images/matchmaking-corridor.png') center / cover no-repeat;
+}
+
+.game-shell:has(#screen-room-create:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(135deg, rgba(131, 67, 0, 0.26), rgba(0, 12, 24, 0.55)), url('../images/matchmaking-corridor.png') 42% center / cover no-repeat;
+}
+
+.game-shell:has(#screen-room-join:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(225deg, rgba(0, 101, 80, 0.24), rgba(0, 12, 24, 0.55)), url('../images/matchmaking-corridor.png') 58% center / cover no-repeat;
+}
+
+.game-shell:has(#screen-placement:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(180deg, rgba(0, 18, 29, 0.08), rgba(0, 9, 17, 0.48)), url('../images/fleet-prep-bay.png') center / cover no-repeat;
+}
+
+.game-shell:has(#screen-waiting:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(180deg, rgba(21, 11, 56, 0.28), rgba(0, 7, 16, 0.6)), url('../images/fleet-prep-bay.png') 54% center / cover no-repeat;
+  filter: saturate(0.72) brightness(0.72);
+}
+
+.game-shell:has(#screen-battle:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(180deg, rgba(2, 13, 24, 0.08), rgba(1, 9, 18, 0.62)), url('../images/bathroom-war-room.png') center / cover no-repeat;
+}
+
+.game-shell:has(#screen-ended:not(.hidden)) .bathroom-wall {
+  background: linear-gradient(180deg, rgba(6, 12, 31, 0.08), rgba(1, 7, 18, 0.36)), url('../images/results-arena.png') center / cover no-repeat;
 }
 
 .bathroom-sheen {
   background:
-    radial-gradient(circle at 20% 22%, rgba(255, 255, 255, 0.4), transparent 20%),
-    radial-gradient(circle at 80% 14%, rgba(255, 255, 255, 0.25), transparent 18%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 22%, rgba(0, 0, 0, 0.12) 100%);
-  mix-blend-mode: screen;
-  opacity: 0.65;
+    radial-gradient(ellipse at 28% 42%, rgba(26, 174, 255, 0.16), transparent 27%),
+    radial-gradient(ellipse at 72% 42%, rgba(26, 174, 255, 0.16), transparent 27%),
+    linear-gradient(180deg, rgba(1, 9, 18, 0.08), transparent 42%, rgba(0, 4, 9, 0.34) 100%);
+  opacity: 1;
 }
 
 .back-link {
@@ -39,7 +80,7 @@
   top: 18px;
   left: 20px;
   z-index: 10;
-  color: rgba(9, 25, 39, 0.75);
+  color: rgba(226, 247, 255, 0.78);
   text-decoration: none;
   text-transform: uppercase;
   letter-spacing: 0.2em;

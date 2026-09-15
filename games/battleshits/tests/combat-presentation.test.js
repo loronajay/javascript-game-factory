@@ -49,7 +49,7 @@ globalThis.clearTimeout = (timer) => {
   if (timer) timer.cleared = true;
 };
 
-const { clearBattleTimers, handleIncomingShot } = await import('../scripts/battle.js');
+const { clearBattleTimers, handleIncomingShot, handleShotResult } = await import('../scripts/battle.js');
 
 function makeLiveFleet() {
   const board = createFleetBoard();
@@ -73,6 +73,26 @@ function makeBattleState() {
 }
 
 console.log('\ncombat presentation');
+
+for (const outcome of ['hit', 'sunk', 'miss']) {
+  test(`outgoing ${outcome} resolves damage and advances turn only at impact`, () => {
+    clearBattleTimers();
+    queuedTimers.length = 0;
+    const gs = makeBattleState();
+    gs.turn = 'awaiting_result';
+    gs.pendingShot = { col: 0, row: 0, startedAt: Date.now() };
+    handleShotResult(gs, {
+      col: 0, row: 0, hit: outcome !== 'miss', sunk: outcome === 'sunk',
+      shipId: outcome === 'miss' ? null : 'destroyer', fleetDestroyed: false,
+    }, { clearAll() {} });
+    assertEqual(gs.myTarget[0], null);
+    assertEqual(gs.turn, 'awaiting_result');
+    queuedTimers[0].fn();
+    assertEqual(gs.myTarget[0].result, outcome);
+    assertEqual(gs.pendingShot, null);
+    assertEqual(gs.turn, 'theirs');
+  });
+}
 
 test('incoming opponent shots wait for the impact animation before resolving', () => {
   clearBattleTimers();

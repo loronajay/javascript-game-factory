@@ -1,7 +1,8 @@
 .btn {
   min-width: min(100%, 520px);
   padding: 12px 26px;
-  border: 3px solid #0e0e0f;
+  border: 2px solid rgba(106, 211, 249, 0.58);
+  border-radius: 7px;
   cursor: pointer;
   touch-action: manipulation;
   text-transform: uppercase;
@@ -10,10 +11,11 @@
   font-family: var(--font-stencil);
   font-size: clamp(0.95rem, 1.8vw, 1.2rem);
   color: white;
-  background: linear-gradient(180deg, var(--sign-top), var(--sign-bottom));
+  background: linear-gradient(180deg, #123b55, #031522 72%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 10px 22px rgba(7, 25, 41, 0.26);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -8px 16px rgba(0, 3, 8, 0.26),
+    0 10px 22px rgba(0, 5, 12, 0.46);
   transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
 }
 
@@ -44,6 +46,14 @@
   color: white;
 }
 
+.btn-primary {
+  color: #1a1004;
+  border-color: #ffb23f;
+  background: linear-gradient(180deg, #ffd879, #d67b1e 64%, #8c3f0d);
+  text-shadow: 0 1px rgba(255, 255, 255, 0.34);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.52), 0 0 22px rgba(255, 158, 44, 0.26);
+}
+
 .btn-small {
   min-width: 0;
   padding: 10px 16px;
@@ -65,8 +75,8 @@
 
 .btn-ghost {
   background: transparent;
-  border-color: rgba(0, 0, 0, 0.2);
-  color: rgba(0, 0, 0, 0.55);
+  border-color: rgba(145, 219, 245, 0.28);
+  color: rgba(210, 239, 249, 0.68);
   box-shadow: none;
   font-size: 0.82rem;
 }
