@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <title>Build Buddy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -23,6 +26,16 @@
 
   <main id="app">
     <section id="shell" aria-label="Build Buddy menu"></section>
+    <div id="shellBackdrop" aria-hidden="true">
+      <div class="backdrop-layer backdrop-sky"></div>
+      <div class="backdrop-layer backdrop-city"></div>
+      <div class="backdrop-layer backdrop-cranes"></div>
+      <div class="backdrop-worklight"></div>
+      <div class="backdrop-grid"></div>
+      <div class="backdrop-vignette"></div>
+    </div>
+    <!-- Same corner tag every cabinet carries; hides with the shell so it never sits on the HUD. -->
+    <a href="../../grid.html" class="back-link">&larr; Back to Arcade</a>
 
     <canvas id="game" width="1280" height="720" aria-label="Build Buddy game canvas"></canvas>
 

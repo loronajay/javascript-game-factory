@@ -457,12 +457,21 @@ export class AppController {
   renderMainMenu() {
     this.shellRoot.append(
       el('div', { className: 'shell-panel shell-panel-main' }, [
-        el('p', { className: 'shell-kicker', text: 'Night shift / A co-op construction game' }),
-        el('h1', { text: 'Build Buddy' }),
-        el('p', { className: 'shell-description', text: 'You make the jump. Your buddy makes it possible. Build, bounce, and find your way up together.' }),
-        el('div', { className: 'shell-actions' }, [
-          el('button', { text: 'Play', onclick: () => this.setState(goToModeSelect(this.state)) }),
-          el('button', { text: 'Debug Lab', onclick: () => this.setState(startDebugLab(this.state)) }),
+        el('div', { className: 'sign-plate' }, [
+          el('p', { className: 'shell-kicker', text: 'Night shift  //  Site 07  //  Co-op construction' }),
+          el('h1', {}, [
+            el('span', { className: 'title-line', text: 'Build' }),
+            el('span', { className: 'title-line title-line-accent', text: 'Buddy' }),
+          ]),
+          el('p', { className: 'shell-description', text: 'You make the jump. Your buddy makes it possible. Build, bounce, and find your way up together.' }),
+          el('div', { className: 'role-strip' }, [
+            el('span', { className: 'role-chip role-runner' }, [el('i'), el('b', { text: 'Runner' }), el('em', { text: 'jumps, climbs, wall-kicks' })]),
+            el('span', { className: 'role-chip role-builder' }, [el('i'), el('b', { text: 'Builder' }), el('em', { text: 'drops platforms & springs' })]),
+          ]),
+          el('div', { className: 'shell-actions' }, [
+            el('button', { text: 'Clock In', onclick: () => this.setState(goToModeSelect(this.state)) }),
+            el('button', { text: 'Debug Lab', onclick: () => this.setState(startDebugLab(this.state)) }),
+          ]),
         ]),
       ]),
     );
