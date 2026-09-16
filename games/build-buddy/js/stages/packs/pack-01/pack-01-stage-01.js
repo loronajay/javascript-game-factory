@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, tool } from '../../course-helpers.js';
 
 // The first shift teaches every tool in order: the Runner clears a small gap
 // alone, then meets a cliff too tall to jump (a platform step), a bridge over
@@ -8,7 +8,7 @@ export const pack01Stage01 = createTeamworkStage({
   stageNumber: 1,
   name: 'First Shift',
   archetype: 'wall_and_bridge_intro',
-  rulePreset: 'standard',
+  kit: { platform: 3, springGreen: 1 },
   timerMs: 180000,
   route: [
     deck('start', 80, 1600, 560),

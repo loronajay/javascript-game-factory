@@ -12,6 +12,7 @@ import { pack01Stage10 } from './pack-01-stage-10.js';
 export const pack01Manifest = {
   id: 'pack_01',
   name: 'Pack 01',
+  biome: 'construction-zone',
   stageCount: 10,
   stages: [
     pack01Stage01,

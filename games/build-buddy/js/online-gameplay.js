@@ -43,6 +43,7 @@ function normalizeOutcome(value) {
 }
 
 function normalizeAction(value) {
+  if (value === 'recall') return 'recall';
   return value === 'delete' ? 'delete' : 'place';
 }
 

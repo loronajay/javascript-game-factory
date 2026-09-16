@@ -5,9 +5,22 @@ export const ART = Object.freeze({
   raccoonRunner: 'assets/art/runners/raccoon.png',
   bearRunner: 'assets/art/runners/bear.png',
   menuCrew: 'assets/art/menu-custom-crew.png',
-  sky: 'assets/art/sky.png', city: 'assets/art/city.png',
-  cranes: 'assets/art/cranes.png', springs: 'assets/art/springs.png',
+  springs: 'assets/art/springs.png',
 });
+
+export const DEFAULT_BIOME = 'construction-zone';
+
+export const BIOME_ART = Object.freeze(Object.fromEntries([
+  'construction-zone',
+  'harbor',
+  'glacier',
+  'jungle',
+  'mount-chaos',
+].map((biome) => [biome, Object.freeze({
+  sky: `assets/art/${biome}/sky.png`,
+  city: `assets/art/${biome}/city.png`,
+  cranes: `assets/art/${biome}/cranes.png`,
+})])));
 
 // Measured opaque bounds, excluding the atlas padding and soft exterior glow.
 // drawImage maps these directly onto each tool's physics rectangle, including its cap.
@@ -18,14 +31,17 @@ export const SPRING_CROPS = Object.freeze({
 });
 
 const cache = new Map();
-export function artImage(key) {
+export function artImage(key, biome = DEFAULT_BIOME) {
   if (typeof Image === 'undefined') return null;
-  if (!cache.has(key)) {
+  const path = BIOME_ART[biome]?.[key] ?? ART[key];
+  if (!path) return null;
+  const cacheKey = `${biome}:${key}`;
+  if (!cache.has(cacheKey)) {
     const image = new Image();
-    image.src = new URL(`../../${ART[key]}`, import.meta.url).href;
-    cache.set(key, image);
+    image.src = new URL(`../../${path}`, import.meta.url).href;
+    cache.set(cacheKey, image);
   }
-  const image = cache.get(key);
+  const image = cache.get(cacheKey);
   return image.complete && image.naturalWidth > 0 ? image : null;
 }
 

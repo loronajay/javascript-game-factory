@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ART, SPRING_CROPS, parallaxOffset } from '../js/render/art-assets.js';
+import { ART, BIOME_ART, SPRING_CROPS, parallaxOffset } from '../js/render/art-assets.js';
 import { TOOL_DEFS } from '../js/constants.js';
 import { CHARACTERS, CHARACTER_ART } from '../js/characters.js';
 import { RUNNER_FRAMES } from '../js/render/runner-frames.js';
 
 test('all shipped art references resolve to PNGs and sprite crops stay in bounds', () => {
-  for (const path of Object.values(ART)) {
+  const shippedArt = [...Object.values(ART), ...Object.values(BIOME_ART).flatMap(Object.values)];
+  for (const path of shippedArt) {
     const png = readFileSync(new URL(`../${path}`, import.meta.url));
     assert.equal(png.toString('ascii', 1, 4), 'PNG');
     const runnerId = path.match(/runners\/(\w+)\.png$/)?.[1];
@@ -36,6 +37,24 @@ test('all shipped art references resolve to PNGs and sprite crops stay in bounds
     assert.ok(crop.x >= 0 && crop.x + crop.w <= 2172);
     assert.ok(crop.y >= 0 && crop.y + crop.h <= 724);
   }
+});
+
+test('parallax art is grouped by biome so stage packs can select their own background', () => {
+  assert.deepEqual(BIOME_ART['construction-zone'], {
+    sky: 'assets/art/construction-zone/sky.png',
+    city: 'assets/art/construction-zone/city.png',
+    cranes: 'assets/art/construction-zone/cranes.png',
+  });
+  assert.deepEqual(BIOME_ART.harbor, {
+    sky: 'assets/art/harbor/sky.png',
+    city: 'assets/art/harbor/city.png',
+    cranes: 'assets/art/harbor/cranes.png',
+  });
+
+  const css = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
+  assert.match(css, /assets\/art\/construction-zone\/sky\.png/);
+  assert.match(css, /assets\/art\/construction-zone\/city\.png/);
+  assert.match(css, /assets\/art\/construction-zone\/cranes\.png/);
 });
 
 test('parallax responds to both camera axes and wraps continuously', () => {

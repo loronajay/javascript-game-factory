@@ -14,12 +14,13 @@ import {
   startOnlineRunFromLobby,
   startOnlineSearch,
   startPrivateLobby,
-  startDebugLab,
   startLocalRun,
   startPractice,
   submitStageClear,
   submitStageFailure,
   continueFromStageResult,
+  selectPack,
+  getPackOptions,
 } from "../js/app-shell.js";
 import { DEFAULT_PACK_ID, getStageSequence, listStages } from "../js/stages/stage-registry.js";
 import { createMemoryStorage, isStageUnlocked, loadProgression } from "../js/progression.js";
@@ -63,7 +64,7 @@ test("local run starts a canon session at the first stage", () => {
   assertEqual(state.screen, APP_SCREENS.GAMEPLAY);
   assertEqual(state.session.mode, SESSION_MODES.LOCAL_RUN);
   assertEqual(state.session.currentStageId, "pack_01_stage_01");
-  assertEqual(state.viewMode, "runner");
+  assertEqual(state.viewMode, "shared");
   assertEqual(state.session.progressionWritesEnabled, true);
 });
 
@@ -130,18 +131,6 @@ test("locked practice stages cannot be started", () => {
 
   assertEqual(state.screen, APP_SCREENS.PRACTICE_SELECT);
   assertEqual(state.session, null);
-});
-
-test("debug lab starts a non-canon hybrid session even for locked stages", () => {
-  const state = startDebugLab(
-    createAppShellState({ storage: createMemoryStorage(), stageList }),
-    "pack_01_stage_02",
-  );
-
-  assertEqual(state.screen, APP_SCREENS.GAMEPLAY);
-  assertEqual(state.session.mode, SESSION_MODES.DEBUG);
-  assertEqual(state.session.isCanonRun, false);
-  assertEqual(state.viewMode, "hybrid");
 });
 
 test("canon clear records a stage result and unlocks that stage for practice", () => {
@@ -450,3 +439,15 @@ test("online run complete and disconnect states return player-facing screens", (
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+
+test("selecting a pack drives local runs and practice options", () => {
+  const state = selectPack(createAppShellState({ storage: createMemoryStorage() }), "pack_02");
+  assertEqual(state.packId, "pack_02");
+  assertEqual(JSON.stringify(getPackOptions(state).map((pack) => [pack.id, pack.selected])), JSON.stringify([["pack_01", false], ["pack_02", true]]));
+  assertEqual(startLocalRun(state).session.currentStageId, "pack_02_stage_01");
+  const practice = getPracticeStageOptions(state);
+  assertEqual(practice.length, 10);
+  assertEqual(practice[0].unlocked, true);
+  assertEqual(practice[1].unlocked, false);
+  assertEqual(selectPack(state, "pack_99").packId, "pack_02");
+});

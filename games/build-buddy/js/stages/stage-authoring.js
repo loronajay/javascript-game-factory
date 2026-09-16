@@ -1,3 +1,5 @@
+import { spikeBallCenter, spikeBallLane } from '../hazards.js';
+
 const DEFAULT_PACK_ID = 'pack_01';
 const DEFAULT_STAGE_HEIGHT = 2000;
 const DEFAULT_BASE_Y = 1300;
@@ -6,7 +8,7 @@ export const BUILDER_RULE_PRESETS = Object.freeze({
   standard: Object.freeze({
     ruleId: 'standard',
     ruleLabel: 'Standard build rules',
-    totalActiveToolCap: 20,
+    totalActiveToolCap: 24,
     enabledTools: Object.freeze({
       platform: true,
       springYellow: true,
@@ -15,10 +17,10 @@ export const BUILDER_RULE_PRESETS = Object.freeze({
       checkpoint: true,
     }),
     activeCaps: Object.freeze({
-      platform: 5,
-      springYellow: 5,
-      springGreen: 5,
-      springBlue: 5,
+      platform: 24,
+      springYellow: 24,
+      springGreen: 24,
+      springBlue: 24,
       checkpoint: 1,
     }),
   }),
@@ -94,7 +96,48 @@ function prefixedId(stageNumber, id) {
   return `stage_${idSuffix(stageNumber)}_${id}`;
 }
 
-function compileBuilderRules(rulePreset = 'standard', overrides = {}) {
+export const KIT_TOOL_TYPES = Object.freeze(['platform', 'springYellow', 'springGreen', 'springBlue']);
+
+const KIT_TOOL_LABELS = Object.freeze({
+  platform: 'platform',
+  springYellow: 'yellow spring',
+  springGreen: 'green spring',
+  springBlue: 'blue spring',
+});
+
+// A course's kit is the exact toolbox the Builder brings: `{ platform: 2,
+// springBlue: 1 }`. A type left out is locked for the course, the cap of each
+// type is its count, and the shared cap is the sum, so nothing in the kit is
+// ever a free choice over something else. The checkpoint is always one. The
+// tests hold a kit tight against the course's own `via` solutions.
+export function compileKitRules(kit) {
+  const activeCaps = { checkpoint: 1 };
+  const enabledTools = { checkpoint: true };
+  const parts = [];
+  for (const type of KIT_TOOL_TYPES) {
+    const count = Number.isInteger(kit[type]) && kit[type] > 0 ? kit[type] : 0;
+    activeCaps[type] = count;
+    enabledTools[type] = count > 0;
+    if (count > 0) parts.push(`${count} ${KIT_TOOL_LABELS[type]}${count === 1 ? '' : 's'}`);
+  }
+  return {
+    ruleId: 'kit',
+    ruleLabel: `Kit: ${parts.join(', ')}`,
+    totalActiveToolCap: KIT_TOOL_TYPES.reduce((sum, type) => sum + activeCaps[type], 0),
+    enabledTools,
+    activeCaps,
+    checkpoint: {
+      enabled: true,
+      requiredFloorSupport: true,
+      canMoveAfterPlaced: false,
+      canDeleteAfterPlaced: false,
+      canReplaceAfterPlaced: false,
+    },
+  };
+}
+
+function compileBuilderRules(rulePreset = 'standard', overrides = {}, kit = null) {
+  if (kit) return compileKitRules(kit);
   const standard = BUILDER_RULE_PRESETS.standard;
   const preset = BUILDER_RULE_PRESETS[rulePreset] ?? standard;
   const merged = {
@@ -152,6 +195,20 @@ function compileRouteBeat(stageNumber, beat) {
     };
   }
 
+  if (beat.kind === 'spikeBall') {
+    const ball = {
+      id,
+      kind: 'spikeBall',
+      from: { x: beat.from.x, y: beat.from.y },
+      to: { x: beat.to.x, y: beat.to.y },
+      r: beat.r ?? 28,
+      period: beat.period ?? 3,
+      phase: beat.phase ?? 0,
+    };
+    const start = spikeBallCenter(ball, 0);
+    return { kind: 'movingHazards', value: { ...ball, cx: start.x, cy: start.y, lane: spikeBallLane(ball) } };
+  }
+
   const value = {
     id,
     x: beat.x ?? 0,
@@ -182,6 +239,7 @@ export function compileStageBlueprint(blueprint) {
     oneWays: [],
     climbables: [],
     hazards: [],
+    movingHazards: [],
     noBuildZones: [],
     blockedPlacementZones: [],
   };
@@ -209,12 +267,13 @@ export function compileStageBlueprint(blueprint) {
     fallbackCheckpoint: blueprint.fallbackCheckpoint ?? start,
     deathY: blueprint.deathY ?? 1840,
     timerMs: blueprint.timerMs ?? Math.max(120000, 240000 - (stageNumber - 1) * 7000),
-    builderRules: compileBuilderRules(blueprint.rulePreset, blueprint.builderRules),
+    builderRules: compileBuilderRules(blueprint.rulePreset, blueprint.builderRules, blueprint.kit),
     goal,
     solids: compiled.solids,
     oneWays: compiled.oneWays,
     climbables: compiled.climbables,
     hazards: compiled.hazards,
+    movingHazards: compiled.movingHazards,
     noBuildZones: compiled.noBuildZones,
     blockedPlacementZones: compiled.blockedPlacementZones,
     preplacedTools: clone(blueprint.preplacedTools ?? []),

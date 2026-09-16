@@ -6,10 +6,10 @@ import { GoalRenderer } from './render/goal-renderer.js';
 import { GhostRenderer } from './render/ghost-renderer.js';
 import { RunnerRenderer } from './render/runner-renderer.js';
 import { HudRenderer } from './render/hud-renderer.js';
-import { normalizeViewMode, viewModeConfig } from './view-modes.js';
+import { normalizeViewMode, viewModeConfig, VIEW_MODES } from './view-modes.js';
 
 export class Renderer {
-  constructor(canvas, stage, registry, runner, builder, camera, { viewMode = 'hybrid' } = {}) {
+  constructor(canvas, stage, registry, runner, builder, camera, { viewMode = VIEW_MODES.SHARED } = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.ctx.imageSmoothingEnabled = false;
@@ -27,10 +27,6 @@ export class Renderer {
     this.ghost = new GhostRenderer(builder);
     this.runnerRenderer = new RunnerRenderer(runner);
     this.hud = new HudRenderer(stage, registry, runner, builder);
-  }
-
-  setViewMode(viewMode) {
-    this.viewMode = normalizeViewMode(viewMode);
   }
 
   render(game) {

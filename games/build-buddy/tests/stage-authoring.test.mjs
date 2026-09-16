@@ -75,6 +75,46 @@ test("rule presets make stage restrictions easy to author", () => {
   assertEqual(stage.builderRules.enabledTools.checkpoint, true);
 });
 
+test("standard stages use one generous overall tool limit instead of harsh per-type caps", () => {
+  const stage = compileStageBlueprint({
+    packId: "test_pack",
+    stageNumber: 1,
+    name: "Tool freedom",
+    route: [],
+    rulePreset: "standard",
+  });
+
+  assertEqual(stage.builderRules.totalActiveToolCap, 24);
+  assertEqual(stage.builderRules.activeCaps.platform, 24);
+  assertEqual(stage.builderRules.activeCaps.springYellow, 24);
+  assertEqual(stage.builderRules.activeCaps.springGreen, 24);
+  assertEqual(stage.builderRules.activeCaps.springBlue, 24);
+});
+
+test("a kit is the exact toolbox: counts are caps, absent types are locked, total is the sum", () => {
+  const stage = compileStageBlueprint({
+    packId: "test_pack",
+    stageNumber: 1,
+    name: "Kit course",
+    route: [],
+    rulePreset: "standard",
+    kit: { platform: 2, springBlue: 1 },
+  });
+
+  assertEqual(stage.builderRules.ruleId, "kit");
+  assertEqual(stage.builderRules.ruleLabel, "Kit: 2 platforms, 1 blue spring");
+  assertEqual(stage.builderRules.totalActiveToolCap, 3);
+  assertEqual(stage.builderRules.activeCaps.platform, 2);
+  assertEqual(stage.builderRules.activeCaps.springBlue, 1);
+  assertEqual(stage.builderRules.activeCaps.springYellow, 0);
+  assertEqual(stage.builderRules.activeCaps.springGreen, 0);
+  assertEqual(stage.builderRules.activeCaps.checkpoint, 1);
+  assertEqual(stage.builderRules.enabledTools.platform, true);
+  assertEqual(stage.builderRules.enabledTools.springYellow, false);
+  assertEqual(stage.builderRules.enabledTools.springGreen, false);
+  assertEqual(stage.builderRules.enabledTools.checkpoint, true);
+});
+
 test("createPackStageCatalog compiles and orders multiple blueprints", () => {
   const catalog = createPackStageCatalog({
     packId: "pack_02",

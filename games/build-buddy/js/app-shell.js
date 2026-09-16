@@ -1,4 +1,4 @@
-import { DEFAULT_PACK_ID, getStageSequence, listStages } from './stages/stage-registry.js';
+import { DEFAULT_PACK_ID, getStageSequence, listPacks, listStages } from './stages/stage-registry.js';
 import {
   getUnlockedStageIds,
   isStageUnlocked,
@@ -9,7 +9,6 @@ import {
 import {
   advanceSession,
   buildRunSummary,
-  createDebugSession,
   createLocalRunSession,
   createPracticeSession,
   getCurrentRoles,
@@ -48,7 +47,11 @@ function clone(value) {
   return structuredClone(value);
 }
 
-function normalizeStages(stageList = listStages(DEFAULT_PACK_ID)) {
+function allRegisteredStages() {
+  return listPacks().flatMap((pack) => listStages(pack.id));
+}
+
+function normalizeStages(stageList = allRegisteredStages()) {
   return stageList
     .filter((stage) => stage && typeof stage.id === 'string' && stage.id)
     .map((stage, index) => ({
@@ -158,7 +161,7 @@ function playersFromServerMatch(matchState, fallbackPlayers) {
 export function createAppShellState({
   storage = globalThis.localStorage,
   packId = DEFAULT_PACK_ID,
-  stageList = listStages(packId),
+  stageList = allRegisteredStages(),
   players = DEFAULT_PLAYERS,
 } = {}) {
   const normalizedStages = normalizeStages(stageList);
@@ -186,6 +189,21 @@ export function createAppShellState({
 
 export function goToModeSelect(state) {
   return { ...state, screen: APP_SCREENS.MODE_SELECT, stageResult: null, runSummary: null };
+}
+
+// Every pack the shell knows about, in registry order, for the pack picker.
+export function getPackOptions(state) {
+  return listPacks().map((pack) => ({
+    ...pack,
+    selected: pack.id === state.packId,
+    unlockedStages: getUnlockedStageIds(state.progression, pack.id).length,
+  }));
+}
+
+// The chosen pack drives every run type: local, online matchmaking and practice.
+export function selectPack(state, packId) {
+  if (!listPacks().some((pack) => pack.id === packId)) return state;
+  return { ...state, packId };
 }
 
 export function selectCharacter(state, playerIndex, characterId) {
@@ -395,7 +413,7 @@ export function startLocalRun(state) {
     }),
     stageResult: null,
     runSummary: null,
-    viewMode: VIEW_MODES.RUNNER,
+    viewMode: VIEW_MODES.SHARED,
   };
 }
 
@@ -411,24 +429,7 @@ export function startPractice(state, stageId) {
     session: createPracticeSession({ packId: stage.packId, stageId: stage.id, players: state.players }),
     stageResult: null,
     runSummary: null,
-    viewMode: VIEW_MODES.RUNNER,
-  };
-}
-
-export function startDebugLab(state, stageId = state.stageList[0]?.id) {
-  const stage = stageById(state, stageId) ?? state.stageList[0];
-  return {
-    ...state,
-    screen: APP_SCREENS.GAMEPLAY,
-    session: createDebugSession({
-      packId: stage?.packId ?? state.packId,
-      stageId: stage?.id,
-      stageSequence: stage ? [stage.id] : sequenceForPack(state.stageList, state.packId),
-      players: state.players,
-    }),
-    stageResult: null,
-    runSummary: null,
-    viewMode: VIEW_MODES.HYBRID,
+    viewMode: VIEW_MODES.SHARED,
   };
 }
 

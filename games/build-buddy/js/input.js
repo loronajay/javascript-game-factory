@@ -1,4 +1,3 @@
-import { VIEW_MODES } from './view-modes.js';
 
 export class Input {
   constructor(canvas) {
@@ -9,7 +8,6 @@ export class Input {
     this.mouse = { x: 0, y: 0, down: false, rightDown: false, justClicked: false, justRightClicked: false };
     this.taps = new Set();
     this.selectedTool = 'platform';
-    this.viewModeRequest = null;
 
     this.listen(window, 'keydown', (e) => {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -19,9 +17,6 @@ export class Input {
       if (e.code === 'Digit3') this.selectedTool = 'springGreen';
       if (e.code === 'Digit4') this.selectedTool = 'springBlue';
       if (e.code === 'Digit5') this.selectedTool = 'checkpoint';
-      if (e.code === 'Digit6') this.viewModeRequest = VIEW_MODES.RUNNER;
-      if (e.code === 'Digit7') this.viewModeRequest = VIEW_MODES.BUILDER;
-      if (e.code === 'Digit8') this.viewModeRequest = VIEW_MODES.HYBRID;
     });
 
     this.listen(window, 'keyup', (e) => this.keys.delete(e.code));
@@ -60,7 +55,6 @@ export class Input {
     this.taps.clear();
     this.mouse.down = false;
     this.mouse.rightDown = false;
-    this.viewModeRequest = null;
     this.endFrame();
     for (const button of document.querySelectorAll('[data-hold]')) button.classList.remove('is-held');
   }
@@ -102,12 +96,6 @@ export class Input {
       });
     }
 
-    for (const btn of document.querySelectorAll('[data-view-mode]')) {
-      this.listen(btn, 'pointerdown', (e) => {
-        e.preventDefault();
-        this.viewModeRequest = btn.dataset.viewMode;
-      });
-    }
   }
 
   axisX() {
@@ -135,11 +123,6 @@ export class Input {
     return false;
   }
 
-  consumeViewModeRequest() {
-    const mode = this.viewModeRequest;
-    this.viewModeRequest = null;
-    return mode;
-  }
 
   consumeReposition() {
     if (this.keys.has('KeyR') && !this.prevR) return true;
@@ -160,6 +143,12 @@ export class Input {
     return false;
   }
 
+  consumeRecall() {
+    if (this.keys.has('KeyC') && !this.prevRecall) return true;
+    if (this.taps.has('recall')) return true;
+    return false;
+  }
+
   cameraNudgeX() {
     return (this.keys.has('KeyE') ? 1 : 0) - (this.keys.has('KeyQ') ? 1 : 0);
   }
@@ -169,6 +158,7 @@ export class Input {
     this.prevW = this.keys.has('KeyW');
     this.prevR = this.keys.has('KeyR');
     this.prevDelete = this.keys.has('Delete');
+    this.prevRecall = this.keys.has('KeyC');
     this.mouse.justClicked = false;
     this.mouse.justRightClicked = false;
     this.taps.clear();

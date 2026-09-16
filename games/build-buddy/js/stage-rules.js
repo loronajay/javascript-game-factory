@@ -1,6 +1,6 @@
 export const DEFAULT_BUILDER_RULES = Object.freeze({
   ruleLabel: 'Standard build rules',
-  totalActiveToolCap: 20,
+  totalActiveToolCap: 24,
   enabledTools: Object.freeze({
     platform: true,
     springYellow: true,
@@ -9,10 +9,10 @@ export const DEFAULT_BUILDER_RULES = Object.freeze({
     checkpoint: true,
   }),
   activeCaps: Object.freeze({
-    platform: 5,
-    springYellow: 5,
-    springGreen: 5,
-    springBlue: 5,
+    platform: 24,
+    springYellow: 24,
+    springGreen: 24,
+    springBlue: 24,
     checkpoint: 1,
   }),
   checkpoint: Object.freeze({

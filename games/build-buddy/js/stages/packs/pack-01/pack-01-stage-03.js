@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, girder, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, girder, tool } from '../../course-helpers.js';
 
 // Two scaffold masts that stop short of the floor. The west mast hangs 420px
 // up, so the Runner is launched into it off a blue spring and catches it
@@ -9,7 +9,7 @@ export const pack01Stage03 = createTeamworkStage({
   stageNumber: 3,
   name: 'Scaffold Shuffle',
   archetype: 'limited_platform_climb',
-  rulePreset: 'limitedPlatforms',
+  kit: { platform: 2, springBlue: 1 },
   timerMs: 210000,
   route: [
     deck('start', 80, 2000, 480),

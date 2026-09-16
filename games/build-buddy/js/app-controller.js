@@ -26,12 +26,13 @@ import {
   resetToMainMenu,
   startOnlineSearch,
   startPrivateLobby,
-  startDebugLab,
   startLocalRun,
   startOnlineRunFromLobby,
   startPractice,
   submitStageClear,
   submitStageFailure,
+  selectPack,
+  getPackOptions,
 } from './app-shell.js';
 import { createOnlineClient } from './online-client.js';
 import {
@@ -47,6 +48,10 @@ import {
 } from './online-gameplay.js';
 
 const FIXED_DT = 1 / 60;
+
+function formatBiome(biome) {
+  return String(biome || '').split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
 
 function formatStageTitle(stageId) {
   return stageId
@@ -110,7 +115,6 @@ export class AppController {
     canvas,
     shellRoot,
     hudRoot,
-    viewModeControls,
     mobileControls,
     storage = globalThis.localStorage,
     onlineClient = createOnlineClient(),
@@ -120,7 +124,6 @@ export class AppController {
     this.canvas = canvas;
     this.shellRoot = shellRoot;
     this.hudRoot = hudRoot;
-    this.viewModeControls = viewModeControls;
     this.mobileControls = mobileControls;
     this.state = createAppShellState({ storage });
     this.onlineClient = onlineClient;
@@ -219,7 +222,7 @@ export class AppController {
 
   createGame() {
     this.game?.input.dispose();
-    const localControlRole = this.state.onlineGameplay ? localOnlineRole(this.state) : 'debug';
+    const localControlRole = this.state.onlineGameplay ? localOnlineRole(this.state) : 'local';
     this.game = new Game(this.canvas, {
       initialStageId: this.state.session.currentStageId,
       viewMode: this.state.viewMode,
@@ -342,6 +345,12 @@ export class AppController {
         gridY,
       });
     }
+    if (input.consumeRecall?.()) {
+      return createBuilderCommandMessage({
+        tick: this.onlineTick,
+        action: 'recall',
+      });
+    }
     return null;
   }
 
@@ -416,7 +425,7 @@ export class AppController {
       if (this.state.onlineGameplay?.isHost) this.game?.applyBuilderCommand(message.value);
     });
     this.applyOnce('state_sync', gameplay.lastStateSync, (message) => {
-      if (!this.state.onlineGameplay?.isHost) this.game?.applyStateSnapshot(message);
+      if (!this.state.onlineGameplay?.isHost) this.game?.applyStateSnapshot(message.value ?? message);
     });
     this.applyOnce('stage_result', gameplay.lastStageResult, (message) => {
       this.setState(applyOnlineStageResult(this.state, message));
@@ -479,7 +488,6 @@ export class AppController {
     this.shellRoot.hidden = this.state.screen === APP_SCREENS.GAMEPLAY;
     this.canvas.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
     this.hudRoot.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
-    this.viewModeControls.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY || !!this.state.onlineGameplay;
     this.mobileControls.hidden = this.state.screen !== APP_SCREENS.GAMEPLAY;
 
     if (this.state.screen === APP_SCREENS.MAIN_MENU) this.renderMainMenu();
@@ -554,7 +562,6 @@ export class AppController {
           ]),
           el('div', { className: 'shell-actions' }, [
             el('button', { text: 'Clock In', onclick: () => this.setState(goToModeSelect(this.state)) }),
-            el('button', { text: 'Debug Lab', onclick: () => this.setState(startDebugLab(this.state)) }),
           ]),
         ]),
         el('figure', { className: 'menu-crew-art' }, [
@@ -573,11 +580,15 @@ export class AppController {
       el('div', { className: 'shell-panel' }, [
         el('p', { className: 'shell-kicker', text: 'Mode Select' }),
         el('h2', { text: 'Choose a run type' }),
+        el('div', { className: 'pack-picker' }, getPackOptions(this.state).map((pack) => el('button', {
+          className: pack.selected ? 'pack-button is-selected' : 'pack-button',
+          text: `${pack.name} · ${formatBiome(pack.biome)}`,
+          onclick: () => this.setState(selectPack(this.state, pack.id)),
+        }))),
         el('div', { className: 'mode-grid' }, [
           el('button', { text: 'Local Co-op Run', onclick: () => this.setState({ ...this.state, screen: APP_SCREENS.LOCAL_SETUP }) }),
           el('button', { text: 'Online Co-op', onclick: () => this.setState(goToOnlineMenu(this.state)) }),
           el('button', { text: 'Practice', onclick: () => this.setState(goToPracticeSelect(this.state)) }),
-          el('button', { text: 'Debug Lab', onclick: () => this.setState(startDebugLab(this.state)) }),
         ]),
         el('button', { className: 'secondary-action', text: 'Back', onclick: () => this.setState(resetToMainMenu(this.state)) }),
       ]),

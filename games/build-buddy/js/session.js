@@ -5,7 +5,6 @@ export const SESSION_MODES = Object.freeze({
   LOCAL_RUN: 'local_run',
   ONLINE_RUN: 'online_run',
   PRACTICE: 'practice',
-  DEBUG: 'debug',
 });
 
 const DEFAULT_PLAYERS = Object.freeze([
@@ -91,18 +90,6 @@ export function createPracticeSession({ packId, stageId, players } = {}) {
     mode: SESSION_MODES.PRACTICE,
     packId,
     stageId,
-    players,
-    isCanonRun: false,
-    progressionWritesEnabled: false,
-  });
-}
-
-export function createDebugSession({ packId, stageId, stageSequence, players } = {}) {
-  return createSession({
-    mode: SESSION_MODES.DEBUG,
-    packId,
-    stageId,
-    stageSequence,
     players,
     isCanonRun: false,
     progressionWritesEnabled: false,

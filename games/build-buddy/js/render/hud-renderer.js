@@ -14,7 +14,7 @@ export class HudRenderer {
     this.builder = builder;
   }
 
-  draw(ctx, game, { viewMode = VIEW_MODES.HYBRID } = {}) {
+  draw(ctx, game, { viewMode = VIEW_MODES.SHARED } = {}) {
     const cfg = viewModeConfig(viewMode);
     this.drawTopBar(ctx, game, viewMode);
     if (cfg.showToolStrip) this.drawToolStrip(ctx);
@@ -32,7 +32,8 @@ export class HudRenderer {
 
     ctx.fillStyle = '#182036';
     ctx.font = '800 13px system-ui';
-    ctx.fillText(`BUILD BUDDY // ${viewMode.toUpperCase()}`, x + 16, y + 24);
+    const seat = viewMode === VIEW_MODES.SHARED ? 'LOCAL CO-OP' : viewMode.toUpperCase();
+    ctx.fillText(`BUILD BUDDY // ${seat}`, x + 16, y + 24);
 
     ctx.fillStyle = '#11182c';
     ctx.font = '900 28px system-ui';
@@ -79,7 +80,7 @@ export class HudRenderer {
       ctx.fillText(this.toolLabel(key, i + 1, enabled), bx + 31, y + 23);
       ctx.fillStyle = '#4f5b7c';
       ctx.font = '10px system-ui';
-      ctx.fillText(enabled ? `cap ${cap}` : 'locked', bx + 31, y + 35);
+      ctx.fillText(enabled ? `${this.registry.countType(key)}/${cap}` : 'locked', bx + 31, y + 35);
       ctx.restore();
     });
   }

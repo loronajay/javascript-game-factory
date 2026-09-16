@@ -125,6 +125,23 @@ test("builder command serialization normalizes placement and deletion commands",
   assertEqual(del.value.commandId.length > 0, true);
 });
 
+test("builder command serialization supports recalling all reusable tools", () => {
+  const recall = createBuilderCommandMessage({
+    tick: 7,
+    commandId: "recall-1",
+    action: "recall",
+  });
+
+  assertDeepEqual(recall.value, {
+    tick: 7,
+    commandId: "recall-1",
+    action: "recall",
+    toolType: null,
+    gridX: 0,
+    gridY: 0,
+  });
+});
+
 test("stage completion requests include the current stage identity for server validation", () => {
   const state = createOnlineGameplayState({
     packId: "pack_01",

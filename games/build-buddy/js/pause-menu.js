@@ -52,7 +52,6 @@ export class PauseMenu {
     this.overlay.hidden = false;
     this.app.canvas.inert = true;
     this.app.mobileControls.inert = true;
-    this.app.viewModeControls.inert = true;
     this.sync();
     this.resume.focus();
   }
@@ -66,7 +65,6 @@ export class PauseMenu {
     this.app.lastTime = null;
     this.app.canvas.inert = false;
     this.app.mobileControls.inert = false;
-    this.app.viewModeControls.inert = false;
     this.sync();
     this.button.focus();
   }

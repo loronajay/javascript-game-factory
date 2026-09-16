@@ -36,7 +36,7 @@ test('pause resumes the same game and Main Menu leaves an online match', () => {
   let left = 0;
   const app = {
     state: { screen: APP_SCREENS.GAMEPLAY },
-    canvas: { parentElement: element() }, mobileControls: {}, viewModeControls: {},
+    canvas: { parentElement: element() }, mobileControls: {},
     game: { input: { setEnabled: value => enabled.push(value) } },
     onlineClient: { leaveLobby: () => left++ },
     setState(state) { this.pauseMenu.close(); this.state = state; },

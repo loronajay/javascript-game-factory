@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, gantry, spikes, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, gantry, spikes, tool } from '../../course-helpers.js';
 
 // The last shift left the yard a mess: junk platforms and springs under the
 // start eat the platform cap, so the Builder must clear them while the Runner
@@ -10,7 +10,7 @@ export const pack01Stage05 = createTeamworkStage({
   stageNumber: 5,
   name: 'Overtime Crossing',
   archetype: 'hazard_basin',
-  rulePreset: 'standard',
+  kit: { platform: 2, springBlue: 1 },
   timerMs: 240000,
   preplacedTools: [
     tool('platform', 240, 1160), tool('platform', 480, 1240),

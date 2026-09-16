@@ -6,6 +6,9 @@ const DEFAULT_PROGRESS = Object.freeze({
     pack_01: Object.freeze({
       unlockedStageIds: Object.freeze(['pack_01_stage_01']),
     }),
+    pack_02: Object.freeze({
+      unlockedStageIds: Object.freeze(['pack_02_stage_01']),
+    }),
   }),
 });
 

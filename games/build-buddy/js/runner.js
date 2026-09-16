@@ -1,6 +1,7 @@
 import { PHYS, RUNNER } from './constants.js';
 import { approach, rectsOverlap, clamp } from './utils.js';
 import { SafeStateSystem } from './systems/safe-state-system.js';
+import { spikeBallHits } from './hazards.js';
 
 export class Runner {
   constructor(stage) {
@@ -115,6 +116,9 @@ export class Runner {
     const hazardBody = this.hazardHurtRect();
     for (const hazard of this.stage.hazards) {
       if (rectsOverlap(hazardBody, this.hazardKillRect(hazard))) this.kill('hazard');
+    }
+    for (const ball of this.stage.movingHazards ?? []) {
+      if (spikeBallHits(ball, hazardBody)) this.kill('hazard');
     }
   }
 

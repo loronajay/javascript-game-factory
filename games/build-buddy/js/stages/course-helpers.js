@@ -1,4 +1,4 @@
-import { compileStageBlueprint } from '../../stage-authoring.js';
+import { compileStageBlueprint } from './stage-authoring.js';
 
 // Geometry is authored per course. `route` is the ordered list of standing
 // surfaces the Runner crosses (decks, gantries, wall tops); `extras` is the
@@ -12,7 +12,7 @@ export const courseNotes = new Map();
 export function createTeamworkStage({ route, extras = [], preplacedTools = [], ...options }) {
   const first = route.find(beat => beat.id === 'start');
   const last = route.find(beat => beat.id === 'exit');
-  const all = [...route, ...extras];
+  const all = [...route, ...extras].map(beat => beat.kind === 'spikeBall' ? ballBounds(beat) : beat);
   const floorY = Math.max(...all.map(beat => beat.y + (beat.h ?? 0)));
   const width = Math.max(...all.map(beat => beat.x + (beat.w ?? 190))) + 240;
   const stage = compileStageBlueprint({
@@ -94,6 +94,20 @@ export function slab(id, x, y, w, h) {
 // A zone where nothing may be placed. Used to close off the obvious build.
 export function lock(id, x, y, w, h) {
   return { id, kind: 'blocked', x, y, w, h };
+}
+
+// A floating spike ball riding a cable from (x1, y1) to (x2, y2) and back, one
+// round trip every `period` seconds, easing at each end. `phase` (0..1) offsets
+// where along the trip it starts, so two balls can be set out of step. The
+// lane it sweeps blocks placement, so a Builder builds around it, never over it.
+export function spikeBall(id, x1, y1, x2, y2, { r = 28, period = 3, phase = 0 } = {}) {
+  return { id, kind: 'spikeBall', from: { x: x1, y: y1 }, to: { x: x2, y: y2 }, r, period, phase };
+}
+
+function ballBounds(ball) {
+  const x = Math.min(ball.from.x, ball.to.x) - ball.r;
+  const y = Math.min(ball.from.y, ball.to.y) - ball.r;
+  return { x, y, w: Math.max(ball.from.x, ball.to.x) + ball.r - x, h: Math.max(ball.from.y, ball.to.y) + ball.r - y };
 }
 
 export function tool(toolType, x, y) {

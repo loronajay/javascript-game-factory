@@ -7,11 +7,13 @@ import { rectsOverlap } from './utils.js';
 import { getStageById, getStageSequence } from './stages/stage-registry.js';
 import { normalizeViewMode, VIEW_MODES } from './view-modes.js';
 import { TOOL_DEFS } from './constants.js';
+import { updateMovingHazards } from './hazards.js';
 
 const CONTROL_ROLES = Object.freeze({
   RUNNER: 'runner',
   BUILDER: 'builder',
-  DEBUG: 'debug',
+  // Local co-op: one machine's keyboard drives the Runner and its mouse the Builder.
+  LOCAL: 'local',
   INERT: 'inert',
 });
 
@@ -27,20 +29,20 @@ const INERT_INPUT = Object.freeze({
 
 function normalizeControlRole(value) {
   if (value === CONTROL_ROLES.RUNNER || value === CONTROL_ROLES.BUILDER) return value;
-  if (value === CONTROL_ROLES.DEBUG) return value;
+  if (value === CONTROL_ROLES.LOCAL) return value;
   return CONTROL_ROLES.INERT;
 }
 
 export class Game {
   constructor(canvas, {
     initialStageId = null,
-    viewMode = VIEW_MODES.HYBRID,
-    localControlRole = CONTROL_ROLES.DEBUG,
+    viewMode = VIEW_MODES.SHARED,
+    localControlRole = CONTROL_ROLES.LOCAL,
     onStageClear = null,
     onStageFailure = null,
   } = {}) {
     this.canvas = canvas;
-    this.stageSequence = getStageSequence();
+    this.stageSequence = getStageSequence(initialStageId ? getStageById(initialStageId).packId : undefined);
     this.stageIndex = Math.max(0, this.stageSequence.indexOf(initialStageId ?? this.stageSequence[0]));
     this.viewMode = normalizeViewMode(viewMode);
     this.localControlRole = normalizeControlRole(localControlRole);
@@ -77,16 +79,21 @@ export class Game {
     this.cleared = false;
     this.stageEnded = false;
     this.remoteBuilderCursor = null;
+    this.syncMovingHazards();
+  }
+
+  // Moving hazards run off the stage timer rather than the local tick count, so
+  // a client that only receives snapshots still draws the ball where the host has it.
+  hazardTime() {
+    return Math.max(0, this.stage.timerMs - this.timeRemainingMs) / 1000;
+  }
+
+  syncMovingHazards() {
+    updateMovingHazards(this.stage, this.hazardTime());
   }
 
   setRemoteBuilderCursor(cursor = null) {
     this.remoteBuilderCursor = cursor ? { ...cursor } : null;
-  }
-
-  setViewMode(viewMode) {
-    if (this.localControlRole !== CONTROL_ROLES.DEBUG) return;
-    this.viewMode = normalizeViewMode(viewMode);
-    this.renderer?.setViewMode(this.viewMode);
   }
 
   setLocalControlRole(localControlRole) {
@@ -147,8 +154,13 @@ export class Game {
     }
     if (snapshot.timerMs !== undefined && Number.isFinite(Number(snapshot.timerMs))) {
       this.timeRemainingMs = Math.max(0, Number(snapshot.timerMs));
+      this.syncMovingHazards();
     }
     if (Array.isArray(snapshot.tools)) {
+      const remoteToolIds = new Set(snapshot.tools.map((tool) => tool.id));
+      for (const localTool of this.registry.tools) {
+        if (!remoteToolIds.has(localTool.id)) localTool.active = false;
+      }
       for (const remoteTool of snapshot.tools) {
         const localTool = this.registry.tools.find((tool) => tool.id === remoteTool.id);
         if (localTool) {
@@ -178,24 +190,41 @@ export class Game {
 
   applyBuilderCommand(command = {}) {
     let result;
-    if (command.action === 'delete') {
+    if (command.action === 'recall') {
+      result = this.registry.recallAll();
+    } else if (command.action === 'delete') {
       result = this.registry.deleteAt(command.gridX, command.gridY);
     } else {
       result = this.registry.add(command.toolType, command.gridX, command.gridY, this.runner);
     }
-    const succeeded = result.valid === true || result.deleted === true;
+    const succeeded = result.valid === true || result.deleted === true || result.recalled === true;
     this.audioEvents.push({ type: succeeded ? 'toolAction' : 'error' });
     return result;
   }
 
   applyRunnerInputCommand(input = {}) {
+    const previous = this.remoteRunnerInputState ?? { jump: false, reposition: false };
+    let jumpPressed = input.jump === true && !previous.jump;
+    let repositionPressed = input.reposition === true && !previous.reposition;
+    this.remoteRunnerInputState = {
+      jump: input.jump === true,
+      reposition: input.reposition === true,
+    };
     this.remoteRunnerInput = {
       axisX: () => (input.right ? 1 : 0) - (input.left ? 1 : 0),
       upHeld: () => input.up === true,
       downHeld: () => input.down === true,
       jumpHeld: () => input.jump === true,
-      consumeJumpPressed: () => input.jump === true,
-      consumeReposition: () => input.reposition === true,
+      consumeJumpPressed: () => {
+        const pressed = jumpPressed;
+        jumpPressed = false;
+        return pressed;
+      },
+      consumeReposition: () => {
+        const pressed = repositionPressed;
+        repositionPressed = false;
+        return pressed;
+      },
     };
   }
 
@@ -210,9 +239,6 @@ export class Game {
   }
 
   update(dt, { skipEndFrame = false } = {}) {
-    const requestedViewMode = this.input.consumeViewModeRequest();
-    if (requestedViewMode) this.setViewMode(requestedViewMode);
-
     if (this.stageEnded || this.cleared) {
       if (this.input.keys.has('Enter') || this.input.consumeReposition()) this.resetRuntime();
       if (this.input.keys.has('KeyN')) this.advanceStage();
@@ -225,6 +251,7 @@ export class Game {
     const runnerInput = this.remoteRunnerInput
       ?? (this.localControlRole === CONTROL_ROLES.BUILDER || this.localControlRole === CONTROL_ROLES.INERT ? INERT_INPUT : this.input);
     const builderInput = this.localControlRole === CONTROL_ROLES.RUNNER || this.localControlRole === CONTROL_ROLES.INERT ? null : this.input;
+    this.syncMovingHazards();
     this.runner.update(dt, runnerInput, this.registry);
     this.registry.markInUse(this.runner);
     this.camera.update(dt, this.runner, builderInput ?? INERT_INPUT);

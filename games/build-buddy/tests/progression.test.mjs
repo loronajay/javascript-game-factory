@@ -59,7 +59,7 @@ test("canon clears unlock the next stage when provided", () => {
   assertEqual(isStageUnlocked(progression, "pack_01", "pack_01_stage_02"), true);
 });
 
-test("practice and debug clears do not unlock stages", () => {
+test("non-canon clears do not unlock stages", () => {
   let progression = loadProgression(createMemoryStorage());
   progression = recordCanonStageClear(progression, {
     packId: "pack_01",

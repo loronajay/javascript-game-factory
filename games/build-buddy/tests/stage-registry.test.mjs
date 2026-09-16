@@ -58,6 +58,7 @@ test("pack metadata reports declared and registered stage counts together", () =
   assertEqual(pack.id, DEFAULT_PACK_ID);
   assertEqual(pack.stageCount, 10);
   assertEqual(pack.registeredStages, 10);
+  assertEqual(pack.biome, "construction-zone");
 });
 
 test("Pack 01 keeps each authored stage in its own stage module", () => {
@@ -87,6 +88,7 @@ test("authored stages are full runtime stage records and are cloned on read", ()
   const freshStage = getStageById("pack_01_stage_07");
 
   assertEqual(freshStage.stageNumber, 7);
+  assertEqual(freshStage.biome, "construction-zone");
   assertEqual(freshStage.start.x > 0, true);
   assertEqual(freshStage.goal.w > 0, true);
   assertEqual(Array.isArray(freshStage.solids), true);

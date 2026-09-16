@@ -76,6 +76,9 @@ export class SafeStateSystem {
       if (rectsOverlap(hurt, padded)) return false;
     }
 
+    // A spot a spike ball sweeps through is never somewhere to reposition to.
+    for (const ball of this.stage.movingHazards ?? []) if (rectsOverlap(hurt, ball.lane)) return false;
+
     for (const zone of this.stage.blockedPlacementZones) if (rectsOverlap(body, zone)) return false;
 
     const headroom = { x: body.x + 3, y: body.y - 4, w: body.w - 6, h: 4 };

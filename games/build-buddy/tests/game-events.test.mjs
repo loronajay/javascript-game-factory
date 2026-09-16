@@ -121,6 +121,26 @@ test("game exposes host state snapshots and applies remote snapshots", () => {
   assertEqual(guest.timeRemainingMs, 12345);
 });
 
+test("remote snapshots exactly reconcile placed tools instead of leaving ghost platforms", () => {
+  const host = new Game(createCanvasStub(), { viewMode: VIEW_MODES.RUNNER });
+  const guest = new Game(createCanvasStub(), { viewMode: VIEW_MODES.RUNNER });
+  host.runner.x = guest.runner.x = 1000;
+  host.runner.y = guest.runner.y = 1000;
+
+  const placed = host.applyBuilderCommand({
+    action: "place",
+    toolType: "platform",
+    gridX: 520,
+    gridY: 960,
+  });
+  guest.applyStateSnapshot(host.createStateSnapshot(1));
+  assertEqual(guest.registry.tools.some((tool) => tool.id === placed.tool.id && tool.active), true);
+
+  host.applyBuilderCommand({ action: "recall" });
+  guest.applyStateSnapshot(host.createStateSnapshot(2));
+  assertEqual(guest.registry.tools.some((tool) => tool.id === placed.tool.id && tool.active), false);
+});
+
 test("game applies remote builder commands to the host registry", () => {
   const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.RUNNER });
   game.runner.x = 1000;
@@ -163,6 +183,22 @@ test("game result counts successful placements even when a placed tool is later 
   assertEqual(toolActionEvents.length, 2);
 });
 
+test("game can recall every reusable tool with one builder command", () => {
+  const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.BUILDER });
+  game.runner.x = 1000;
+  game.runner.y = 1000;
+  const first = game.applyBuilderCommand({ action: "place", toolType: "platform", gridX: 520, gridY: 960 });
+  const second = game.applyBuilderCommand({ action: "place", toolType: "springGreen", gridX: 720, gridY: 960 });
+
+  assertEqual(first.valid, true);
+  assertEqual(second.valid, true);
+  const recalled = game.applyBuilderCommand({ action: "recall" });
+
+  assertEqual(recalled.recalled, true);
+  assertEqual(recalled.count >= 2, true);
+  assertEqual(game.registry.countTotalNonCheckpoint(), 0);
+});
+
 test("invalid builder actions emit the error sound event", () => {
   const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.BUILDER });
   const result = game.applyBuilderCommand({
@@ -184,6 +220,18 @@ test("game can drive runner movement from remote runner input", () => {
   assertEqual(game.runner.x > startX, true);
 });
 
+test("held remote jump input creates one press instead of retriggering every network tick", () => {
+  const game = new Game(createCanvasStub(), { viewMode: VIEW_MODES.RUNNER });
+
+  game.applyRunnerInputCommand({ jump: true });
+  assertEqual(game.remoteRunnerInput.consumeJumpPressed(), true);
+  game.applyRunnerInputCommand({ jump: true });
+  assertEqual(game.remoteRunnerInput.consumeJumpPressed(), false);
+  game.applyRunnerInputCommand({ jump: false });
+  game.applyRunnerInputCommand({ jump: true });
+  assertEqual(game.remoteRunnerInput.consumeJumpPressed(), true);
+});
+
 test("online Builder control does not locally drive Runner movement", () => {
   const game = new Game(createCanvasStub(), {
     viewMode: VIEW_MODES.BUILDER,
@@ -196,13 +244,12 @@ test("online Builder control does not locally drive Runner movement", () => {
   assertEqual(game.runner.x, startX);
 });
 
-test("online Runner control ignores manual view switching and Builder placement", () => {
+test("online Runner control ignores Builder placement", () => {
   const game = new Game(createCanvasStub(), {
     viewMode: VIEW_MODES.RUNNER,
     localControlRole: "runner",
   });
   const before = game.registry.tools.filter((tool) => tool.active).length;
-  game.input.viewModeRequest = VIEW_MODES.HYBRID;
   game.input.mouse.justClicked = true;
   game.update(1 / 60);
 
@@ -210,7 +257,7 @@ test("online Runner control ignores manual view switching and Builder placement"
   assertEqual(game.registry.tools.filter((tool) => tool.active).length, before);
 });
 
-test("unknown online control role is inert instead of debug", () => {
+test("unknown online control role is inert instead of local", () => {
   const game = new Game(createCanvasStub(), {
     viewMode: VIEW_MODES.RUNNER,
     localControlRole: "",
@@ -219,7 +266,6 @@ test("unknown online control role is inert instead of debug", () => {
   const before = game.registry.tools.filter((tool) => tool.active).length;
   game.input.keys.add("ArrowRight");
   game.input.mouse.justClicked = true;
-  game.input.viewModeRequest = VIEW_MODES.HYBRID;
   game.update(1 / 60);
 
   assertEqual(game.runner.x, startX);

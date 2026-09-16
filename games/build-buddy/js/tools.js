@@ -103,6 +103,24 @@ export class ToolRegistry {
     return { deleted: true, tool };
   }
 
+  recallAll() {
+    const recalledTools = this.tools.filter((tool) => (
+      tool.active && tool.kind !== 'checkpoint' && !tool.inUse
+    ));
+    for (const tool of recalledTools) tool.active = false;
+    const inUseCount = this.tools.filter((tool) => (
+      tool.active && tool.kind !== 'checkpoint' && tool.inUse
+    )).length;
+    return {
+      recalled: recalledTools.length > 0,
+      count: recalledTools.length,
+      inUseCount,
+      reason: recalledTools.length > 0
+        ? null
+        : (inUseCount > 0 ? 'Runner is using the remaining tool' : 'No reusable tools to return'),
+    };
+  }
+
   markInUse(runner) {
     for (const tool of this.tools) tool.inUse = false;
     const rr = runner.rect();
@@ -162,6 +180,9 @@ export class ToolRegistry {
     }
     for (const hazard of this.stage.hazards) {
       if (rectsOverlap(rect, hazard)) return { valid: false, reason: 'Overlaps hazard' };
+    }
+    for (const ball of this.stage.movingHazards ?? []) {
+      if (rectsOverlap(rect, ball.lane)) return { valid: false, reason: 'Overlaps spike ball lane' };
     }
     for (const zone of this.stage.noBuildZones) {
       if (rectsOverlap(rect, zone)) return { valid: false, reason: 'Inside no-build zone' };
@@ -272,6 +293,12 @@ export class BuilderController {
       const res = this.registry.deleteAt(world.x, world.y);
       this.toast(res.deleted ? 'Tool deleted' : res.reason);
       this.audioEvents.push({ type: res.deleted ? 'toolAction' : 'error' });
+    }
+    if (input.consumeRecall()) {
+      const res = this.registry.recallAll();
+      const suffix = res.inUseCount > 0 ? ` (${res.inUseCount} still in use)` : '';
+      this.toast(res.recalled ? `${res.count} tool${res.count === 1 ? '' : 's'} returned${suffix}` : res.reason);
+      this.audioEvents.push({ type: res.recalled ? 'toolAction' : 'error' });
     }
 
     this.messageTime = Math.max(0, this.messageTime - dt);

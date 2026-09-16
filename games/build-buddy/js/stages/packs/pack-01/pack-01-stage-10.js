@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, girder, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, girder, tool } from '../../course-helpers.js';
 
 // The finale chains every earlier problem with two platforms. Three yard gaps
 // need three platforms (recycle), a hanging wall is caught off a blue spring,
@@ -9,7 +9,7 @@ export const pack01Stage10 = createTeamworkStage({
   stageNumber: 10,
   name: 'Topping Out',
   archetype: 'finale',
-  rulePreset: 'limitedPlatforms',
+  kit: { platform: 2, springBlue: 1 },
   timerMs: 270000,
   route: [
     deck('start', 80, 2560, 560),

@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, tool } from '../../course-helpers.js';
 
 // A double-back. The ground run heads right over two gaps that need three
 // platforms between them against a cap of two, then a wall up to the relay
@@ -10,7 +10,7 @@ export const pack01Stage07 = createTeamworkStage({
   stageNumber: 7,
   name: 'Relay Station',
   archetype: 'checkpoint_gauntlet',
-  rulePreset: 'limitedPlatforms',
+  kit: { platform: 2 },
   timerMs: 240000,
   route: [
     deck('start', 80, 1800, 480),

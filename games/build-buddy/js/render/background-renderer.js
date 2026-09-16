@@ -13,7 +13,7 @@ export class BackgroundRenderer {
     ctx.translate(this.camera.x, this.camera.y);
     ctx.fillStyle = '#102b39';
     ctx.fillRect(0, 0, VIEW.width, VIEW.height);
-    const sky = artImage('sky');
+    const sky = artImage('sky', this.stage.biome);
     if (sky) ctx.drawImage(sky, 0, 0, VIEW.width, VIEW.height);
     this.drawLayer(ctx, 'city', .18, 1600, 820, 1);
     this.drawLayer(ctx, 'cranes', .42, 1800, 1000, .68);
@@ -24,7 +24,7 @@ export class BackgroundRenderer {
   }
 
   drawLayer(ctx, key, speed, width, height, alpha) {
-    const image = artImage(key);
+    const image = artImage(key, this.stage.biome);
     if (!image) return;
     const offset = parallaxOffset(this.camera, speed, width);
     const y = VIEW.height - height + offset.y + this.stage.height * speed * .3;

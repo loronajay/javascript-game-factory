@@ -6,10 +6,95 @@ export class TerrainRenderer {
   }
 
   draw(ctx, toolRenderer) {
+    for (const b of this.stage.movingHazards ?? []) this.drawSpikeBallLane(ctx, b);
     for (const s of this.stage.solids) this.drawSolid(ctx, s);
     for (const p of this.stage.oneWays) toolRenderer.drawOneWay(ctx, p, false);
     for (const w of this.stage.climbables) this.drawClimbable(ctx, w);
     for (const h of this.stage.hazards) this.drawHazard(ctx, h);
+    for (const b of this.stage.movingHazards ?? []) this.drawSpikeBall(ctx, b);
+  }
+
+  // The lane is drawn as the cable the ball rides, anchored at both ends, so a
+  // Builder can see where nothing may be placed and a Runner can see the sweep.
+  drawSpikeBallLane(ctx, b) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(214, 226, 246, 0.28)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 12]);
+    ctx.beginPath();
+    ctx.moveTo(b.from.x, b.from.y);
+    ctx.lineTo(b.to.x, b.to.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (const end of [b.from, b.to]) {
+      ctx.fillStyle = '#2a3448';
+      ctx.strokeStyle = '#a9b8d8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 214, 96, 0.75)';
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawSpikeBall(ctx, b) {
+    const { cx, cy, r } = b;
+    ctx.save();
+    ctx.translate(cx, cy);
+    // The ball rolls along its cable: one full turn per lane length.
+    const travelled = Math.hypot(cx - b.from.x, cy - b.from.y);
+    ctx.rotate(travelled / r);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.beginPath();
+    ctx.arc(4, 6, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    const spikeLen = Math.max(10, r * 0.55);
+    const spikeCount = 12;
+    for (let i = 0; i < spikeCount; i++) {
+      const a = (i / spikeCount) * Math.PI * 2;
+      const base = r - 3;
+      const spike = ctx.createLinearGradient(Math.cos(a) * base, Math.sin(a) * base, Math.cos(a) * (base + spikeLen), Math.sin(a) * (base + spikeLen));
+      spike.addColorStop(0, '#d74a4a');
+      spike.addColorStop(0.55, '#ffb866');
+      spike.addColorStop(1, '#fff0af');
+      ctx.fillStyle = spike;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a - 0.22) * base, Math.sin(a - 0.22) * base);
+      ctx.lineTo(Math.cos(a) * (base + spikeLen), Math.sin(a) * (base + spikeLen));
+      ctx.lineTo(Math.cos(a + 0.22) * base, Math.sin(a + 0.22) * base);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    const body = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
+    body.addColorStop(0, '#6d7a93');
+    body.addColorStop(0.5, '#3a4458');
+    body.addColorStop(1, '#161c2a');
+    ctx.fillStyle = body;
+    ctx.strokeStyle = '#a9b8d8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(12, 18, 31, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + Math.PI / 4;
+      drawBolt(ctx, Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6, 2.5);
+    }
+    ctx.restore();
   }
 
   drawZones(ctx) {

@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, spikeWall, slab, lock, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, spikeWall, slab, lock, tool } from '../../course-helpers.js';
 
 // The only course that goes down. Three shafts with spiked floors; each has a
 // side tunnel whose mouth sits under a ledge spiked on top and on its face, so
@@ -6,7 +6,7 @@ import { createTeamworkStage, deck, climb, spikes, spikeWall, slab, lock, tool }
 // Runner, so every shaft is two catches placed in turn: one to stop the fall
 // while the mouth is still out of sight, one level with the mouth. Six catches against five platforms means pulling
 // the first shaft's catches to lay the last. Blue is gone, and the way out is
-// a green elevator in a slot too narrow for a platform.
+// a three-rung green elevator in a slot too narrow for a platform.
 function shaft(i, y, s, tunnelW, tunnelH) {
   return [
     slab(`ledge_${i}`, s + 260, y + 340, 100, 60),
@@ -27,7 +27,7 @@ export const pack01Stage06 = createTeamworkStage({
   stageNumber: 6,
   name: 'Greenline',
   archetype: 'no_blue_descent',
-  rulePreset: 'noBlueSpring',
+  kit: { platform: 2, springGreen: 3 },
   timerMs: 210000,
   route: [
     deck('start', 80, 600, 560, 800),
@@ -36,7 +36,7 @@ export const pack01Stage06 = createTeamworkStage({
     deck('third_tunnel', 3120, 2100, 770, 400, catches(1600, 2760)),
     climb('service_mast', 3890, 1540, 560),
     deck('roof', 3942, 1516, 428),
-    deck('exit', 4370, 816, 560, 64, [tool('springGreen', 4270, 1460), tool('springGreen', 4270, 1140)]),
+    deck('exit', 4370, 816, 560, 64, [tool('springGreen', 4270, 1460), tool('springGreen', 4270, 1200), tool('springGreen', 4270, 940)]),
   ],
   extras: [
     ...shaft(1, 600, 640, 700),

@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, slab, lock, tool } from './pack-01-stage-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, slab, lock, tool } from '../../course-helpers.js';
 
 // A long bridge run that needs six platforms against a cap of five, so the
 // Builder must pull a platform from behind the Runner to lay the next one. A
@@ -8,7 +8,7 @@ export const pack01Stage02 = createTeamworkStage({
   stageNumber: 2,
   name: 'Across the Yard',
   archetype: 'bridge_chain',
-  rulePreset: 'standard',
+  kit: { platform: 3, springBlue: 1 },
   timerMs: 210000,
   route: [
     deck('start', 80, 1400, 560),

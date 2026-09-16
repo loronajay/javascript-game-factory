@@ -2,7 +2,6 @@ import {
   SESSION_MODES,
   advanceSession,
   buildRunSummary,
-  createDebugSession,
   createLocalRunSession,
   createPracticeSession,
   getCurrentRoles,
@@ -110,16 +109,12 @@ test("timeout is recorded as timer instead of a runner death label", () => {
   assertEqual(session.stageResults[0].failReason, "timer");
 });
 
-test("practice and debug sessions are non-canon and do not unlock stages", () => {
+test("practice sessions are non-canon and do not unlock stages", () => {
   const practice = createPracticeSession({ packId: "pack_01", stageId: "pack_01_stage_02", players });
-  const debug = createDebugSession({ packId: "pack_01", stageId: "pack_01_stage_03", players });
 
   assertEqual(practice.mode, SESSION_MODES.PRACTICE);
-  assertEqual(debug.mode, SESSION_MODES.DEBUG);
   assertEqual(practice.isCanonRun, false);
-  assertEqual(debug.isCanonRun, false);
   assertEqual(shouldUnlockStage(recordStageClear(practice), "pack_01_stage_02"), false);
-  assertEqual(shouldUnlockStage(recordStageClear(debug), "pack_01_stage_03"), false);
 });
 
 test("run completes after final stage result", () => {
