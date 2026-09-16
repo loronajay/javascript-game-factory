@@ -39,6 +39,9 @@ import {
   PHASE_TURN_CARD,
 } from "../match/match.js";
 
+/** What a decided table says when the other seat walks instead of racking again. */
+export const OPPONENT_LEFT_MESSAGE = "Your opponent left the table · no rematch.";
+
 export const MODE_ONLINE = "online";
 
 /** How long the turn card holds the screen. The same beat the local match uses. */
@@ -68,6 +71,13 @@ export function createOnlineMatch({
   let state = null;
   /** The state a shot produced, held back until its animation reaches the same place. */
   let pending = null;
+  /**
+   * The opponent has left the room after the match was decided. The server has
+   * no "decline": a rematch starts when both seats ask, and walking out is the
+   * only way to say no. Without this the strip read "waiting for your opponent"
+   * over a table the other player had already left.
+   */
+  let opponentGone = false;
   let started = false;
   let card = null;
   let cardTimer = null;
@@ -301,6 +311,16 @@ export function createOnlineMatch({
       // produced it is still being drawn, and `settle` applies it at the moment
       // the drawing catches up. Only states arriving at rest are applied now.
       if (snapshot.matchState && !world.moving && !pending) apply(snapshot.matchState);
+      const gone = Boolean(snapshot.opponentLeftClientId);
+      if (gone !== opponentGone) {
+        opponentGone = gone;
+        // Mid-rack the server settles the departure as a forfeit and the
+        // resulting state speaks for itself; only a decided table needs telling.
+        if (gone && state?.phase === "complete") {
+          say(OPPONENT_LEFT_MESSAGE);
+          emit("opponent-left", { message: OPPONENT_LEFT_MESSAGE });
+        }
+      }
       emit("change", { type: "connection" });
     }),
   );
@@ -374,9 +394,17 @@ export function createOnlineMatch({
 
     /** The "run it back" path. There is no restarting a rack somebody else is in. */
     rack() {
+      if (opponentGone) {
+        // Nobody to offer it to; the offer is not sent and the screen says why.
+        say(OPPONENT_LEFT_MESSAGE);
+        emit("opponent-left", { message: OPPONENT_LEFT_MESSAGE });
+        emit("change", { type: "rematch" });
+        return false;
+      }
       client.requestRematch();
       say("Rematch offered · waiting for your opponent.");
       emit("change", { type: "rematch" });
+      return true;
     },
 
     setAngle,

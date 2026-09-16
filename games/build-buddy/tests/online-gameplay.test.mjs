@@ -2,7 +2,7 @@ import {
   createBuilderCommandMessage,
   createOnlineGameplayState,
   createRunnerInputMessage,
-  acceptServerRunnerStateMessage,
+  acceptServerWorldSyncMessage,
   createStageCompleteRequestMessage,
   createStageStartMessage,
   createStateSyncMessage,
@@ -12,7 +12,7 @@ import {
   receiveStageResultMessage,
   receiveStateSyncMessage,
   recordAuthoritativeStageResult,
-  shouldSendServerRunnerState,
+  shouldSendServerWorldSync,
 } from "../js/online-gameplay.js";
 
 let passed = 0;
@@ -163,26 +163,28 @@ test("stage completion requests include the current stage identity for server va
   assertEqual(message.value.elapsedMs, 1234);
 });
 
-test("host state snapshots expose only sync-safe runtime fields", () => {
+test("world sync snapshots expose only sync-safe runtime fields", () => {
   const message = createStateSyncMessage({
     tick: 20,
-    runner: { x: 120.4, y: 400.8, vx: 9, vy: -3, dead: false },
-    tools: [{ id: "tool_1", toolType: "platform", x: 80, y: 520, active: true, extra: "ignored" }],
+    runner: { x: 120.4, y: 400.8, vx: 9, vy: -3, dead: false, deaths: 2, repositions: 1 },
+    tools: [{ id: "cmd_1_place_80_520", toolType: "platform", x: 80, y: 520, active: true, activated: true, extra: "ignored" }],
     timerMs: 89999.2,
+    elapsedMs: 10000.8,
     stageStatus: "playing",
     privateLocalOnly: true,
   });
 
   assertDeepEqual(message.value, {
     tick: 20,
-    runner: { x: 120.4, y: 400.8, vx: 9, vy: -3, dead: false },
-    tools: [{ id: "tool_1", toolType: "platform", x: 80, y: 520, active: true }],
+    runner: { x: 120.4, y: 400.8, vx: 9, vy: -3, dead: false, deaths: 2, repositions: 1 },
+    tools: [{ id: "cmd_1_place_80_520", toolType: "platform", x: 80, y: 520, active: true, activated: true }],
     timerMs: 89999.2,
+    elapsedMs: 10000.8,
     stageStatus: "playing",
   });
 });
 
-test("server-authoritative runners send periodic correction snapshots", () => {
+test("server-authoritative runners send periodic world syncs", () => {
   const serverState = createOnlineGameplayState({
     packId: "pack_01",
     stageSequence,
@@ -198,13 +200,13 @@ test("server-authoritative runners send periodic correction snapshots", () => {
     authorityPlayerId: "host",
   });
 
-  assertEqual(shouldSendServerRunnerState(serverState, "runner", 2), false);
-  assertEqual(shouldSendServerRunnerState(serverState, "runner", 3), true);
-  assertEqual(shouldSendServerRunnerState(serverState, "builder", 3), false);
-  assertEqual(shouldSendServerRunnerState(clientHostState, "runner", 3), false);
+  assertEqual(shouldSendServerWorldSync(serverState, "runner", 2), false);
+  assertEqual(shouldSendServerWorldSync(serverState, "runner", 3), true);
+  assertEqual(shouldSendServerWorldSync(serverState, "builder", 3), false);
+  assertEqual(shouldSendServerWorldSync(clientHostState, "runner", 3), false);
 });
 
-test("server-authoritative builders accept only fresh snapshots from the current Runner", () => {
+test("server-authoritative builders accept only fresh world syncs from the current Runner", () => {
   const state = createOnlineGameplayState({
     packId: "pack_01",
     stageSequence,
@@ -212,23 +214,29 @@ test("server-authoritative builders accept only fresh snapshots from the current
     localPlayerId: "guest",
     authorityPlayerId: "server",
   });
-  const accepted = acceptServerRunnerStateMessage(state, "builder", -1, {
+  const accepted = acceptServerWorldSyncMessage(state, "builder", -1, {
     senderId: "host",
-    value: { tick: 12, x: 100, y: 200, vx: 5, vy: -2, dead: false },
+    value: { tick: 12, runner: { x: 100, y: 200, vx: 5, vy: -2, dead: false }, tools: [{ id: "cmd_1", toolType: "platform", x: 40, y: 80 }] },
   });
-  const stale = acceptServerRunnerStateMessage(state, "builder", 12, {
+  const stale = acceptServerWorldSyncMessage(state, "builder", 12, {
     senderId: "host",
-    value: { tick: 11, x: 90, y: 200 },
+    value: { tick: 11, runner: { x: 90, y: 200 } },
   });
-  const wrongSender = acceptServerRunnerStateMessage(state, "builder", -1, {
+  const wrongSender = acceptServerWorldSyncMessage(state, "builder", -1, {
     senderId: "guest",
-    value: { tick: 13, x: 999, y: 999 },
+    value: { tick: 13, runner: { x: 999, y: 999 } },
+  });
+  const wrongRole = acceptServerWorldSyncMessage(state, "runner", -1, {
+    senderId: "host",
+    value: { tick: 14, runner: { x: 1, y: 1 } },
   });
 
   assertEqual(accepted.tick, 12);
-  assertEqual(accepted.x, 100);
+  assertEqual(accepted.runner.x, 100);
+  assertEqual(accepted.tools[0].id, "cmd_1");
   assertEqual(stale, null);
   assertEqual(wrongSender, null);
+  assertEqual(wrongRole, null);
 });
 
 test("only the host can record an authoritative stage result locally", () => {

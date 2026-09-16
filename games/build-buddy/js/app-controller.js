@@ -36,15 +36,15 @@ import {
 } from './app-shell.js';
 import { createOnlineClient } from './online-client.js';
 import {
-  acceptServerRunnerStateMessage,
+  acceptServerWorldSyncMessage,
   createBuilderCommandMessage,
   createBuilderCursorMessage,
   createRunnerInputMessage,
-  createRunnerStateMessage,
   createStageCompleteRequestMessage,
   createStageStartMessage,
+  createStateSyncMessage,
   receiveStageStartMessage,
-  shouldSendServerRunnerState,
+  shouldSendServerWorldSync,
 } from './online-gameplay.js';
 
 const FIXED_DT = 1 / 60;
@@ -142,7 +142,7 @@ export class AppController {
     // all we need — and it stays O(1) instead of the old unbounded Set that grew
     // for the whole run and re-hashed a full JSON string on every relay message.
     this.lastOnlineKeys = Object.create(null);
-    this.lastAppliedRunnerStateTick = -1;
+    this.lastAppliedWorldSyncTick = -1;
     this.lastAppliedBuilderCursorTick = -1;
     globalThis.document?.addEventListener?.('pointerdown', (event) => {
       const interactive = event.target?.closest?.('button, a');
@@ -222,6 +222,12 @@ export class AppController {
 
   createGame() {
     this.game?.input.dispose();
+    // Sync cursors are per stage: the chairs swap every stage and the new
+    // Runner's tick count is unrelated to the old one's (a throttled tab can be
+    // hundreds of ticks behind), so a cursor carried across would reject every
+    // sync from the new Runner as stale until they caught up.
+    this.lastAppliedWorldSyncTick = -1;
+    this.lastAppliedBuilderCursorTick = -1;
     const localControlRole = this.state.onlineGameplay ? localOnlineRole(this.state) : 'local';
     this.game = new Game(this.canvas, {
       initialStageId: this.state.session.currentStageId,
@@ -257,8 +263,11 @@ export class AppController {
     }
 
     if (this.state.onlineGameplay.authorityPlayerId === 'server') {
-      // sendLocalOnlineCommands() calls endFrame(); skip it here so justClicked survives to consumeLocalBuilderCommand().
-      this.game?.update(FIXED_DT, { skipEndFrame: true });
+      // Under server authority the Runner's client is the world authority and
+      // the Builder's is a replica: it previews placements, but its clicks are
+      // turned into commands (and local predictions) by sendLocalOnlineCommands,
+      // which also calls endFrame() — so neither is done here.
+      this.game?.update(FIXED_DT, { skipEndFrame: true, builderActions: false });
     } else if (this.localOnlineRole() === 'builder' && this.game) {
       // Builder is non-host: update camera to follow the synced runner position,
       // then update the hover ghost so it tracks the mouse in the correct world region.
@@ -285,18 +294,8 @@ export class AppController {
         jump: input?.jumpHeld(),
         reposition: input?.consumeReposition?.(),
       }));
-      if (shouldSendServerRunnerState(this.state.onlineGameplay, role, this.onlineTick) && this.game?.runner) {
-        this.onlineClient.sendOnlineGameplayMessage?.(createRunnerStateMessage({
-          tick: this.onlineTick,
-          x: this.game.runner.x,
-          y: this.game.runner.y,
-          vx: this.game.runner.vx,
-          vy: this.game.runner.vy,
-          dead: this.game.runner.dead,
-          grounded: this.game.runner.grounded,
-          climbing: this.game.runner.climbing,
-          facing: this.game.runner.facing,
-        }));
+      if (shouldSendServerWorldSync(this.state.onlineGameplay, role, this.onlineTick) && this.game) {
+        this.onlineClient.sendOnlineGameplayMessage?.(createStateSyncMessage(this.game.createStateSnapshot(this.onlineTick)));
       }
       input?.endFrame?.();
     }
@@ -317,7 +316,13 @@ export class AppController {
         }));
       }
       const command = this.consumeLocalBuilderCommand();
-      if (command) this.onlineClient.sendOnlineGameplayMessage?.(command);
+      if (command) {
+        if (this.state.onlineGameplay?.authorityPlayerId === 'server' && this.game) {
+          const result = this.game.applyBuilderCommand(command.value, { predicted: true });
+          this.game.builder?.announce(command.value.action, result, command.value.toolType);
+        }
+        this.onlineClient.sendOnlineGameplayMessage?.(command);
+      }
       this.game?.input?.endFrame?.();
     }
   }
@@ -329,12 +334,15 @@ export class AppController {
     const gridX = Math.round(world.x / 40) * 40;
     const gridY = Math.round(world.y / 40) * 40;
     if (input.consumePlace?.()) {
+      // Place where the ghost is drawn (the hover preview already snapped and
+      // normalised it), so the command names exactly the spot the Builder saw.
+      const hover = this.game.builder?.hover;
       return createBuilderCommandMessage({
         tick: this.onlineTick,
         action: 'place',
-        toolType: input.selectedTool,
-        gridX,
-        gridY,
+        toolType: this.game.builder?.selectedTool ?? input.selectedTool,
+        gridX: Number.isFinite(hover?.x) ? hover.x : gridX,
+        gridY: Number.isFinite(hover?.y) ? hover.y : gridY,
       });
     }
     if (input.consumeDelete?.()) {
@@ -413,6 +421,18 @@ export class AppController {
     const gameplay = snapshot.onlineGameplay ?? {};
     this.applyOnce('stage_start', gameplay.lastStageStart, (message) => {
       if (this.state.onlineGameplay?.isHost) return;
+      if (this.state.onlineGameplay?.authorityPlayerId === 'server') {
+        // The server's stage_start carries the next stage and its roles. Fold
+        // it into the session the same way a match_state would, so the stage
+        // change, the role swap and the fresh Game happen in one setState.
+        const value = message.value ?? {};
+        this.setState(applyServerMatchState(this.state, {
+          stage: { packId: value.packId, stageId: value.stageId, stageIndex: value.stageIndex, roles: value.roles ?? {} },
+          network: { authorityMode: 'server' },
+          phase: 'stage_play',
+        }));
+        return;
+      }
       const onlineGameplay = receiveStageStartMessage(this.state.onlineGameplay, message);
       const viewMode = localOnlineRole({ ...this.state, onlineGameplay, session: onlineGameplay.session }) || this.state.viewMode;
       this.setState({ ...this.state, onlineGameplay, session: onlineGameplay.session, viewMode });
@@ -424,9 +444,22 @@ export class AppController {
     this.applyOnce('builder_command', gameplay.lastBuilderCommand, (message) => {
       if (this.state.onlineGameplay?.isHost) this.game?.applyBuilderCommand(message.value);
     });
-    this.applyOnce('state_sync', gameplay.lastStateSync, (message) => {
-      if (!this.state.onlineGameplay?.isHost) this.game?.applyStateSnapshot(message.value ?? message);
-    });
+    if (this.state.onlineGameplay?.authorityPlayerId === 'server') {
+      const worldSync = acceptServerWorldSyncMessage(
+        this.state.onlineGameplay,
+        this.localOnlineRole(),
+        this.lastAppliedWorldSyncTick,
+        gameplay.lastStateSync,
+      );
+      if (worldSync) {
+        this.lastAppliedWorldSyncTick = worldSync.tick;
+        this.game?.applyStateSnapshot(worldSync);
+      }
+    } else {
+      this.applyOnce('state_sync', gameplay.lastStateSync, (message) => {
+        if (!this.state.onlineGameplay?.isHost) this.game?.applyStateSnapshot(message.value ?? message);
+      });
+    }
     this.applyOnce('stage_result', gameplay.lastStageResult, (message) => {
       this.setState(applyOnlineStageResult(this.state, message));
     });
@@ -436,19 +469,17 @@ export class AppController {
     this.applyOnce('match_state', gameplay.lastMatchState, (message) => {
       const nextState = applyServerMatchState(this.state, message.value);
       if (nextState === this.state) return;
-      this.setState(nextState);
+      // A match_state arrives with every relayed input. Only a stage, role or
+      // screen change needs the full setState (new Game, shell re-render); the
+      // rest just carries commands and the latest server payload.
+      const before = this.state;
+      const stageChanged = before.session?.currentStageId !== nextState.session?.currentStageId
+        || before.screen !== nextState.screen
+        || localOnlineRole(before) !== localOnlineRole(nextState);
+      if (stageChanged) this.setState(nextState);
+      else this.state = nextState;
       this.applyServerCommands(message.value?.commands);
     });
-    const runnerState = acceptServerRunnerStateMessage(
-      this.state.onlineGameplay,
-      this.localOnlineRole(),
-      this.lastAppliedRunnerStateTick,
-      gameplay.lastRunnerState,
-    );
-    if (runnerState) {
-      this.lastAppliedRunnerStateTick = runnerState.tick;
-      this.game?.applyStateSnapshot({ runner: runnerState });
-    }
     // Builder cursor: runner receives the ghost preview position so both players share intent
     const builderCursor = gameplay.lastBuilderCursor;
     if (builderCursor && this.localOnlineRole() === 'runner') {

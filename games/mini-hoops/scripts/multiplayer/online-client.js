@@ -129,7 +129,10 @@ export function createMiniHoopsOnlineClient(options = {}) {
       return;
     }
     if (data.event === "lobby_joined" || data.event === "lobby_updated") {
-      emit({ status: "lobby", lobby: normalizeLobby(data), error: null });
+      // The refresh that follows an opponent leaving an open lobby must not wipe
+      // the notice that says why the second chair just emptied.
+      const keep = snapshot.error?.code === "OPPONENT_LEFT" ? snapshot.error : null;
+      emit({ status: "lobby", lobby: normalizeLobby(data), error: keep });
       return;
     }
     if (data.event === "lobby_started") {
@@ -139,6 +142,12 @@ export function createMiniHoopsOnlineClient(options = {}) {
     if (data.event === "message" && data.scope === "lobby" && ["mini_hoops_match", "mini_hoops_match_ended"].includes(data.messageType)) {
       const matchState = json(data.value);
       if (matchState) emit({ status: matchState.phase === "complete" ? "complete" : "started", matchState, error: null });
+      return;
+    }
+    if (data.event === "lobby_player_left") {
+      // Mid-duel the server settles the match by forfeit and the result message
+      // follows this one; in an open lobby this notice is all there is.
+      emit({ error: { code: "OPPONENT_LEFT", message: "Your opponent left the match." } });
       return;
     }
     if (data.event === "lobby_left" || data.event === "lobby_closed") {

@@ -24,7 +24,7 @@ import {
   sanitizeAimIntent,
   sanitizeShotIntent,
 } from "../scripts/multiplayer/online-client.js";
-import { AIM_SEND_INTERVAL, MODE_ONLINE, createOnlineMatch } from "../scripts/multiplayer/online-match.js";
+import { AIM_SEND_INTERVAL, MODE_ONLINE, OPPONENT_LEFT_MESSAGE, createOnlineMatch } from "../scripts/multiplayer/online-match.js";
 import { PHASE_AIMING, PHASE_OVER, PHASE_PLACING, PHASE_SHOOTING } from "../scripts/match/match.js";
 import { rackBalls } from "../scripts/sim/balls.js";
 
@@ -264,6 +264,11 @@ function stubClient(clientId = "c1") {
     /** Test-side: hand the match a state, the way the socket would. */
     pushState(matchState) {
       snapshot = { ...snapshot, matchState };
+      for (const listener of snapshots) listener(snapshot);
+    },
+    /** Test-side: the server's word that the other seat has left the room. */
+    pushOpponentLeft(clientId = "c2") {
+      snapshot = { ...snapshot, opponentLeftClientId: clientId, lobby: { ...(snapshot.lobby || {}), playerCount: 1 } };
       for (const listener of snapshots) listener(snapshot);
     },
     pushShot(played) {
@@ -602,6 +607,50 @@ test("a decided match reports a winner and offers a rematch rather than a restar
 
   match.rack();
   assertDeepEqual(client.sent.at(-1), ["rematch"], "restarting a rack is not a thing online");
+});
+
+test("an opponent who leaves the decided table refuses the rematch instead of leaving it waiting", () => {
+  const client = stubClient();
+  const match = createOnlineMatch({ client });
+  client.pushState(matchState());
+  match.start();
+  client.pushState(matchState({ phase: "complete", matchWinner: 1, matchWinnerName: "Bo", message: "Bo wins the match 3-1." }));
+
+  const said = [];
+  const refused = [];
+  match.on("message", (text) => said.push(text));
+  match.on("opponent-left", (event) => refused.push(event));
+
+  assertEqual(match.rack(), true);
+  assertEqual(client.sent.at(-1)[0], "rematch");
+  assertEqual(said.at(-1), "Rematch offered · waiting for your opponent.");
+
+  // The server's only answer to a refusal: the other socket left the room.
+  client.pushOpponentLeft();
+  assertEqual(said.at(-1), OPPONENT_LEFT_MESSAGE);
+  assertEqual(refused.length, 1);
+
+  // Asking again sends nothing to an empty room.
+  const sentBefore = client.sent.length;
+  assertEqual(match.rack(), false);
+  assertEqual(client.sent.length, sentBefore);
+});
+
+test("the client remembers a departed opponent until the room fills again", () => {
+  const { client, socket } = makeClient();
+  const seen = [];
+  client.subscribe((snapshot) => seen.push(snapshot));
+  client.connect();
+  socket().fire("open", {});
+  socket().receive({ event: "connected", clientId: "socket-a", sessionToken: "token" });
+  socket().receive({ event: "lobby_joined", roomCode: "SHARK1", ownerId: "socket-a", members: ["socket-a", "socket-b"], playerCount: 2, status: "started" });
+  socket().receive({ event: "lobby_player_left", clientId: "socket-b", roomCode: "SHARK1", playerCount: 1, reason: "left" });
+  assertEqual(seen.at(-1).opponentLeftClientId, "socket-b");
+  assertEqual(seen.at(-1).lobby.playerCount, 1);
+  socket().receive({ event: "lobby_updated", roomCode: "SHARK1", ownerId: "socket-a", members: ["socket-a"], playerCount: 1, status: "ended" });
+  assertEqual(seen.at(-1).opponentLeftClientId, "socket-b", "the refresh with the chair still empty keeps it");
+  socket().receive({ event: "lobby_updated", roomCode: "SHARK1", ownerId: "socket-a", members: ["socket-a", "socket-c"], playerCount: 2, status: "open" });
+  assertEqual(seen.at(-1).opponentLeftClientId, "");
 });
 
 test("a dropped opponent is reported on their own plaque", () => {

@@ -269,3 +269,42 @@ test("a resumed paused match cannot expose a ready rack", () => {
   h.online.handleSnapshot(h.snapshot(0, { phase: "paused" }));
   assert.equal(h.session.scene.phase, "network-paused");
 });
+
+test("an opponent leaving the results screen refuses the rematch instead of leaving it waiting", () => {
+  const h = replayHarness();
+  const rematches = [];
+  const client = { leaveLobby() {}, connect() {}, requestRematch: () => rematches.push(1) };
+  let clientSnapshot = { clientId: "player-1", lobby: { playerCount: 2 }, matchState: { rematchRequestedBy: [] }, opponentLeftClientId: "" };
+  client.getSnapshot = () => structuredClone(clientSnapshot);
+  const online = createOnlineSession({
+    session: h.session, onlineClient: client,
+    onlineScreen: { renderLobby() {} }, scoreboard: { updateMatchUI() {} },
+    matchRuntime: { clonePins: pins => pins, prepareActivePlayer() {}, applyBallProfile() {} },
+    resultsScreen: { showResults() {} },
+  });
+  h.session.match.status = "complete";
+  const line = h.nodes.get("online-rematch-status") || (document.getElementById("online-rematch-status"));
+  const button = document.getElementById("rematch-button");
+
+  // Asking is a wait, said at once.
+  assert.equal(online.requestRematch(), true);
+  assert.equal(rematches.length, 1);
+  assert.equal(line.hidden, false);
+  assert.match(line.textContent, /Waiting for your opponent/);
+  assert.equal(button.disabled, true);
+
+  // The server's only answer to a refusal: the opponent's socket left the room.
+  clientSnapshot = { ...clientSnapshot, opponentLeftClientId: "player-2", lobby: { playerCount: 1 } };
+  online.handleSnapshot({ ...clientSnapshot, status: "complete", matchState: { sessionId: "session-1", rollNumber: 0, phase: "complete", nextPins: [], rematchRequestedBy: ["player-1"], match: { ...h.session.match } } });
+  assert.match(line.textContent, /opponent left the lane/);
+  assert.equal(button.disabled, true);
+
+  // Pressing again sends nothing to a room with nobody in it.
+  assert.equal(online.requestRematch(), false);
+  assert.equal(rematches.length, 1);
+
+  // Leaving clears the line so the next room starts clean.
+  online.leaveToTitle();
+  assert.equal(line.hidden, true);
+  assert.equal(button.disabled, false);
+});

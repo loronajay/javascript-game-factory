@@ -12,7 +12,7 @@ Build Buddy is a co-op platformer built around two asymmetric roles: the Runner 
 
 - Packs 01 and 02 are complete 10-stage packs registered through `js/stages/stage-registry.js`; the pack is picked on Mode Select and drives local runs, practice and online matchmaking (pools are split by `packId`). Each pack's first stage is unlocked from the start.
 - Local co-op is one shared screen: the Runner on the keyboard, the Builder on the mouse, both HUDs shown. Online sessions show the assigned role's view only. The prototype's Debug Lab and manual view switching are gone.
-- Online play assigns role-specific Runner and Builder clients, exchanges commands/snapshots through `js/online-client.js`, and supports both client-host and server-authoritative match payloads.
+- Online play assigns role-specific Runner and Builder clients and exchanges commands/snapshots through `js/online-client.js`. Live lobbies run under **server authority with a Runner-owned world** (see "Online sync model" below); the older client-host payload path is still understood but the live server never issues it.
 - Progression, stage results, run completion, disconnect handling, and online message contracts have Node regression coverage.
 
 The durable stage identifiers use pack/stage coordinates:
@@ -58,6 +58,17 @@ Right click         Delete
 Q/E                 Nudge builder camera
 ```
 
+
+## Online sync model
+
+`factory-network-server` owns the match: who sits in which chair each stage, when a stage ends and what the result was (`games/build-buddy/server/` in that repo). It does **not** simulate the world — there is no runner physics on the server. Instead:
+
+- **The Runner's client is the world authority for the stage.** It is the only client that physically touches platforms, springs, timers and hazards, so what it resolves is the truth. Every 3 ticks it publishes a `state_sync` (runner pose + tallies, the active tool list, timer and elapsed time). The server relays that only from the chair currently running and only to the other chair; a sync from the Builder is dropped, and a `stage_result` claim from anyone is refused.
+- **The Builder's client is a replica with prediction.** Its clicks become `builder_command`s relayed to the Runner; it also applies each one locally as a *prediction* so the click feels instant. Predicted tools carry `pendingSnapshots` and world syncs leave them alone until the Runner confirms them or a ~600ms grace window expires — which is what stops a sync the Runner sent *before* the command arrived from undoing the click, and what withdraws a placement the Runner rejected.
+- **Tool identity is shared, not minted.** A placed tool's id is the Builder's `commandId` on both clients and a stage's kit is `kit_N`, so the Builder's prediction and the Runner's copy are the same object when the sync merges them by id. The counter-based `tool_N` ids only exist in local co-op and practice.
+- **Sync cursors reset every stage.** The chairs swap each stage and tick counts are per client, so `AppController.createGame()` clears `lastAppliedWorldSyncTick`; otherwise a swapped-in Runner whose tab had been throttled would have every sync rejected as stale.
+
+`recall` is a real command on the server (it used to be sanitised into a nameless `place` and rejected, which silently cleared the Builder's screen and nobody else's). A world-state change here — anything that touches `createStateSnapshot`/`applyStateSnapshot` — only needs the cabinet deployed; a change to message routing or roles needs the server too.
 
 ## Structure
 

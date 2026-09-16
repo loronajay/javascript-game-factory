@@ -326,3 +326,11 @@ body {
 .score-overlay__action:hover {
   border-color: rgba(80, 180, 80, 0.8);
 }
+
+/* Already friends: a quiet badge, not a call to action. */
+.score-overlay__action--friends,
+.score-overlay__action--friends:hover {
+  color: rgba(200, 220, 200, 0.8);
+  border-color: rgba(200, 220, 200, 0.3);
+  cursor: default;
+}

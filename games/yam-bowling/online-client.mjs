@@ -178,6 +178,10 @@ export function createOnlineClient(options = {}) {
     matchState: null,
     disconnectedClientId: "",
     reconnectExpiresAt: null,
+    // The socket of an opponent who has actually left the room, as opposed to
+    // one in its reconnect window. The server sends nothing else after a
+    // results-screen departure, so this is what tells a rematch it is refused.
+    opponentLeftClientId: "",
     error: null,
     lastReaction: null,
   };
@@ -254,7 +258,9 @@ export function createOnlineClient(options = {}) {
         : lobby.status === "ended"
           ? "complete"
           : "lobby";
-      emit({ status, lobby, error: null });
+      // A full room again means whoever left has been replaced.
+      const opponentLeftClientId = lobby.playerCount >= 2 ? "" : snapshot.opponentLeftClientId;
+      emit({ status, lobby, opponentLeftClientId, error: null });
       if (data.event === "lobby_joined") publishProfile();
       return;
     }
@@ -266,6 +272,7 @@ export function createOnlineClient(options = {}) {
         matchState: data.matchState || snapshot.matchState,
         disconnectedClientId: "",
         reconnectExpiresAt: null,
+        opponentLeftClientId: "",
         error: null,
       });
       return;
@@ -303,9 +310,18 @@ export function createOnlineClient(options = {}) {
       return;
     }
 
+    if (data.event === "lobby_player_left") {
+      const clientId = boundedText(data.clientId, 80);
+      const lobby = snapshot.lobby
+        ? { ...snapshot.lobby, playerCount: Math.max(0, Number(data.playerCount) || 0) }
+        : snapshot.lobby;
+      emit({ opponentLeftClientId: clientId, disconnectedClientId: "", reconnectExpiresAt: null, lobby });
+      return;
+    }
+
     if (data.event === "lobby_left" || data.event === "lobby_closed") {
       clearSession(storage);
-      emit({ status: "idle", lobby: null, matchState: null, disconnectedClientId: "", reconnectExpiresAt: null });
+      emit({ status: "idle", lobby: null, matchState: null, disconnectedClientId: "", reconnectExpiresAt: null, opponentLeftClientId: "" });
       return;
     }
 

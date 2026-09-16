@@ -164,7 +164,7 @@ export function createOnline({
       }
       if (!entry.alive) { avatars.setVisible(entry.id, false); continue; }
       avatars.setVisible(entry.id, true);
-      const target = { x: entry.x, y: entry.y, z: entry.z, yaw: entry.yaw, crouching: entry.crouching, flashlightOn: entry.flashlight.on, flashlightCharge: entry.flashlight.charge };
+      const target = { x: entry.x, y: entry.y, z: entry.z, yaw: logic.avatarYaw(entry.yaw), crouching: entry.crouching, flashlightOn: entry.flashlight.on, flashlightCharge: entry.flashlight.charge };
       const pose = logic.interpolatePose(poses.get(entry.id), target, delta);
       poses.set(entry.id, pose);
       avatars.setPose(entry.id, pose);

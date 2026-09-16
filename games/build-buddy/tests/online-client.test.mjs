@@ -228,13 +228,6 @@ test("online gameplay relay messages are normalized before send and retained on 
     messageType: "builder_command",
     value: JSON.stringify({ tick: 11, action: "delete", gridX: 80, gridY: 120 }),
   });
-  MockWebSocket.instances[0].receive({
-    event: "message",
-    scope: "lobby",
-    senderId: "host",
-    messageType: "runner_state",
-    value: JSON.stringify({ tick: 12.9, x: 45, y: 67, vx: 2, vy: -3, dead: false, ignored: true }),
-  });
 
   const sent = MockWebSocket.instances[0].sent;
   assertEqual(sent[0].messageType, "runner_input");
@@ -243,11 +236,11 @@ test("online gameplay relay messages are normalized before send and retained on 
   assertEqual(sent[1].messageType, "builder_command");
   assertEqual(JSON.parse(sent[1].value).toolType, "springBlue");
   assertEqual(JSON.parse(sent[1].value).gridX, 100);
-  assertEqual(updates.at(-1).onlineGameplay.lastStateSync.tick, 9);
+  assertEqual(updates.at(-1).onlineGameplay.lastStateSync.senderId, "host");
+  assertEqual(updates.at(-1).onlineGameplay.lastStateSync.value.tick, 9);
+  assertEqual(updates.at(-1).onlineGameplay.lastStateSync.value.runner.x, 20);
   assertEqual(updates.at(-1).onlineGameplay.lastRunnerInput.value.right, true);
   assertEqual(updates.at(-1).onlineGameplay.lastBuilderCommand.value.action, "delete");
-  assertEqual(updates.at(-1).onlineGameplay.lastRunnerState.value.tick, 12);
-  assertEqual(updates.at(-1).onlineGameplay.lastRunnerState.value.x, 45);
 });
 
 console.log(`${passed + failed} tests: ${passed} passed, ${failed} failed`);

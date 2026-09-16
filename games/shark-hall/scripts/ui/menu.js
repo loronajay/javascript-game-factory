@@ -213,6 +213,11 @@ export function createMenu({ elements, audio, settings, onStart, onResume, onRes
       go(LAYER_RESULT, PANEL_MAIN);
     },
 
+    /** Rewrites the line under the result without leaving the card. */
+    noteResult(sub) {
+      if (elements.resultSub) elements.resultSub.textContent = sub;
+    },
+
     showPause() {
       go(LAYER_PAUSE, PANEL_MAIN);
     },

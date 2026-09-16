@@ -9,6 +9,15 @@ import { getEndedScreenCopy } from './presentation.js';
 import { publishBattleshitsMatchActivity } from '../../../js/platform/activity/activity.mjs';
 import { createPlatformApiClient } from '../../../js/platform/api/platform-api.mjs';
 import { createAuthApiClient } from '../../../js/platform/api/auth-api.mjs';
+import { describeOpponentFriendAction, loadOpponentFriendStatus } from '../../../js/platform/ui/opponent-friend-status.mjs';
+
+// An opponent already on the player's friends list is shown as one rather than
+// offered again; the verdict itself comes from the shared platform helper.
+function renderFriendAction(action, profileUrl) {
+  if (action.kind === 'add') return `<a class="ended-profile-action" href="${profileUrl}">Add Friend &rsaquo;</a>`;
+  if (action.kind === 'friends') return `<span class="ended-profile-action ended-profile-action--friends">Friends &#10003;</span>`;
+  return '';
+}
 
 function determineTurnOrder(gs) {
   const alphaFirst = (gs.seed % 2) === 0;
@@ -166,19 +175,15 @@ function transitionToOnlineEnded(gs, result) {
     const authClient = createAuthApiClient();
     Promise.all([
       apiClient.loadPlayerProfile(oppPlayerId),
-      authClient.getSession(),
-    ]).then(([oppProfile, session]) => {
+      loadOpponentFriendStatus({ apiClient, authClient, opponentPlayerId: oppPlayerId }),
+    ]).then(([oppProfile, friendStatus]) => {
       if (!oppProfile?.hasAccount) return;
       const profileUrl = `../../player/index.html?id=${encodeURIComponent(oppPlayerId)}`;
-      const isSignedIn = Boolean(session?.ok && session?.playerId);
-      const addFriendBtn = isSignedIn
-        ? `<a class="ended-profile-action" href="${profileUrl}">Add Friend &rsaquo;</a>`
-        : '';
       oppProfileEl.innerHTML = `
         <div class="ended-profile-chip">
           <span class="ended-profile-label">Opponent:</span>
           <a class="ended-profile-name" href="${profileUrl}">${oppProfile.profileName || oppPlayerId}</a>
-          ${addFriendBtn}
+          ${renderFriendAction(describeOpponentFriendAction(friendStatus), profileUrl)}
         </div>
       `;
     }).catch(() => {});

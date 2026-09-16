@@ -308,6 +308,15 @@
   z-index: 10;
 }
 
+/* A dropping piece is the one thing in motion on the table, so it is always on
+   top. The grid is its own stacking context (z-index 1 above), which means the
+   cell's z-index alone can never lift the piece past the bowl rim (z 2), the
+   emote bubbles (z 5) or the sunk flash (z 10) — so while a piece is in flight
+   the whole grid rises above all of them, and drops back once it lands. */
+.board-grid:has(.shot-falling) {
+  z-index: 20;
+}
+
 .board-cell.cell-incoming-pending {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),

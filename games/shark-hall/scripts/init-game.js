@@ -222,6 +222,9 @@ export async function bootGame() {
             : `${live.mode === MODE_CPU ? "Vs CPU" : "Hotseat"} · 8-ball rack complete.`,
         });
       }),
+      // Online only: the opponent walked after the result. The plaque under
+      // the winner's name says so, where the player is actually looking.
+      target.on("opponent-left", ({ message }) => menu.noteResult(message)),
       target.on("change", () => refresh()),
     ];
   }

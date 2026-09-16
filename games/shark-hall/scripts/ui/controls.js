@@ -7,9 +7,9 @@
 // THE POINTER MODEL IS ONE GESTURE WITH TWO MEANINGS, and which one is decided
 // entirely by whether the player has ball in hand:
 //
-//   ball in hand — press, drag to a legal spot, RELEASE TO CONFIRM. Placement is
-//     two-step on purpose: a single tap that spotted the ball wherever the
-//     finger landed would ruin a scratch as often as it fixed one.
+//   ball in hand — grab the cue ball and drag it to a legal spot, then release
+//     to confirm. Drag anywhere else to turn the view. Requiring the grab is
+//     what keeps a camera gesture from teleporting the ball under the finger.
 //   otherwise    — drag to sweep the aim, or tap to face a point on the cloth.
 //     The tap threshold is small; anything longer is a sweep.
 //
@@ -18,10 +18,14 @@
 // honest meter rather than an animation.
 
 import { ballAt } from "../sim/aim.js";
+import { CUE } from "../sim/balls.js";
+import { BALL_RADIUS } from "../sim/constants.js";
 import { heldPower } from "../sim/shot.js";
 
 /** A press that travels less than this many pixels is a tap, not a drag. */
 const TAP_SLOP = 7;
+/** A slightly generous world-space target makes the cue ball grabbable under a finger. */
+const PLACEMENT_GRAB_RADIUS = BALL_RADIUS * 1.65;
 /** Radians per keyboard nudge, and per click of the fine-aim buttons. */
 const NUDGE = (0.35 * Math.PI) / 180;
 
@@ -42,7 +46,10 @@ export function createControls({
   // Pointer state for the current gesture.
   let aiming = false;
   let placing = false;
+  let turningPlacement = false;
   let placementLanded = false;
+  let placementOffsetX = 0;
+  let placementOffsetZ = 0;
   let lastX = 0;
   let travelled = 0;
 
@@ -119,9 +126,18 @@ export function createControls({
     travelled = 0;
 
     if (match.snapshot().ballInHand !== "none") {
-      placing = true;
-      placementLanded = false;
-      tryPlace(event);
+      const point = scene.pointToTable(event.clientX, event.clientY);
+      const cue = match.balls().find((ball) => ball.n === CUE && !ball.pocketed);
+      if (point && cue && Math.hypot(point.x - cue.x, point.z - cue.z) <= PLACEMENT_GRAB_RADIUS) {
+        placing = true;
+        placementLanded = true;
+        // Keep the point that was grabbed under the pointer. Without this, even
+        // a careful press on the ball's edge jerks its centre under the finger.
+        placementOffsetX = cue.x - point.x;
+        placementOffsetZ = cue.z - point.z;
+      } else {
+        turningPlacement = true;
+      }
       return;
     }
 
@@ -130,7 +146,7 @@ export function createControls({
 
   function tryPlace(event) {
     const point = scene.pointToTable(event.clientX, event.clientY);
-    if (point && match.tryPlaceCue(point.x, point.z)) {
+    if (point && match.tryPlaceCue(point.x + placementOffsetX, point.z + placementOffsetZ)) {
       placementLanded = true;
       return true;
     }
@@ -141,6 +157,12 @@ export function createControls({
     updateHover(event);
     if (placing) {
       tryPlace(event);
+      return;
+    }
+    if (turningPlacement) {
+      const dx = event.clientX - lastX;
+      lastX = event.clientX;
+      match.nudgeAngle(dx * (scene.width < 650 ? 0.003 : 0.00235));
       return;
     }
     if (!aiming) return;
@@ -154,6 +176,10 @@ export function createControls({
   }
 
   function onPointerUp(event) {
+    if (turningPlacement) {
+      turningPlacement = false;
+      return;
+    }
     if (placing) {
       placing = false;
       if (placementLanded) {
@@ -176,6 +202,7 @@ export function createControls({
   function onPointerCancel() {
     aiming = false;
     placing = false;
+    turningPlacement = false;
     placementLanded = false;
     clearHover();
   }

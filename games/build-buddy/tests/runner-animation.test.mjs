@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RunnerAnimation } from '../js/render/runner-animation.js';
-import { createRunnerStateMessage, createStateSyncMessage } from '../js/online-gameplay.js';
+import { createStateSyncMessage } from '../js/online-gameplay.js';
 import { APP_SCREENS } from '../js/app-shell.js';
 import { AppController } from '../js/app-controller.js';
 
@@ -55,7 +55,7 @@ test('descending reverses the climbing cycle and holds the last grip when stoppe
 });
 test('online runner messages retain animation-driving motion flags', () => {
   const value = { x: 10, y: 20, facing: -1, grounded: true, climbing: false };
-  for(const result of [createRunnerStateMessage(value).value, createStateSyncMessage({ runner: value }).value.runner]) {
+  for(const result of [createStateSyncMessage({ runner: value }).value.runner]) {
     assert.equal(result.facing, -1);
     assert.equal(result.grounded, true);
     assert.equal(result.climbing, false);

@@ -4,10 +4,15 @@ import { activeCapFor, isToolEnabled, resolveBuilderRules } from './stage-rules.
 
 let nextToolId = 1;
 
-export function makeTool(toolType, x, y) {
+// A tool's id is how two online clients agree they are talking about the same
+// object: a placement is named by the Builder's command id (so the Builder's
+// prediction and the Runner's authoritative copy share it), and a stage's kit is
+// named by its slot. The counter id is only for placements nobody else needs to
+// recognise — local co-op and practice.
+export function makeTool(toolType, x, y, id = null) {
   const def = TOOL_DEFS[toolType];
   return {
-    id: `tool_${nextToolId++}`,
+    id: typeof id === 'string' && id ? id : `tool_${nextToolId++}`,
     toolType,
     kind: def.kind,
     x,
@@ -19,6 +24,9 @@ export function makeTool(toolType, x, y) {
     activated: false,
     usedForRespawn: false,
     inUse: false,
+    // > 0 while this tool's state is a local Builder prediction the Runner has
+    // not confirmed yet; world syncs leave it alone until then (see Game).
+    pendingSnapshots: 0,
   };
 }
 
@@ -35,7 +43,7 @@ export class ToolRegistry {
   constructor(stage) {
     this.stage = stage;
     this.rules = resolveBuilderRules(stage);
-    this.tools = stage.preplacedTools.map(t => makeTool(t.toolType, t.x, t.y));
+    this.tools = stage.preplacedTools.map((t, index) => makeTool(t.toolType, t.x, t.y, `kit_${index + 1}`));
     this.toolUseCount = 0;
   }
 
@@ -84,11 +92,12 @@ export class ToolRegistry {
     return null;
   }
 
-  add(toolType, x, y, runner) {
+  add(toolType, x, y, runner, { id = null } = {}) {
     const placement = this.normalizePlacement(toolType, x, y);
     const validation = this.validatePlacement(toolType, placement.x, placement.y, runner);
     if (!validation.valid) return validation;
-    const tool = makeTool(toolType, validation.x ?? placement.x, validation.y ?? placement.y);
+    if (id && this.tools.some((tool) => tool.id === id)) return { valid: false, reason: 'Duplicate placement' };
+    const tool = makeTool(toolType, validation.x ?? placement.x, validation.y ?? placement.y, id);
     this.tools.push(tool);
     this.toolUseCount += 1;
     return { valid: true, tool };
@@ -114,6 +123,7 @@ export class ToolRegistry {
     return {
       recalled: recalledTools.length > 0,
       count: recalledTools.length,
+      tools: recalledTools,
       inUseCount,
       reason: recalledTools.length > 0
         ? null
@@ -286,22 +296,34 @@ export class BuilderController {
     const world = camera.screenToWorld(input.mouse.x, input.mouse.y);
     if (input.consumePlace()) {
       const res = this.registry.add(this.selectedTool, this.hover.x, this.hover.y, runner);
-      this.toast(res.valid ? `${TOOL_DEFS[this.selectedTool].label} placed` : res.reason);
+      this.announce('place', res, this.selectedTool);
       this.audioEvents.push({ type: res.valid ? 'toolAction' : 'error' });
     }
     if (input.consumeDelete()) {
       const res = this.registry.deleteAt(world.x, world.y);
-      this.toast(res.deleted ? 'Tool deleted' : res.reason);
+      this.announce('delete', res);
       this.audioEvents.push({ type: res.deleted ? 'toolAction' : 'error' });
     }
     if (input.consumeRecall()) {
       const res = this.registry.recallAll();
-      const suffix = res.inUseCount > 0 ? ` (${res.inUseCount} still in use)` : '';
-      this.toast(res.recalled ? `${res.count} tool${res.count === 1 ? '' : 's'} returned${suffix}` : res.reason);
+      this.announce('recall', res);
       this.audioEvents.push({ type: res.recalled ? 'toolAction' : 'error' });
     }
 
     this.messageTime = Math.max(0, this.messageTime - dt);
+  }
+
+  // Toast the outcome of a registry action. Shared by the local click path
+  // above and the online path, where the controller applies the command itself.
+  announce(action, res, toolType = this.selectedTool) {
+    if (action === 'recall') {
+      const suffix = res.inUseCount > 0 ? ` (${res.inUseCount} still in use)` : '';
+      this.toast(res.recalled ? `${res.count} tool${res.count === 1 ? '' : 's'} returned${suffix}` : res.reason);
+    } else if (action === 'delete') {
+      this.toast(res.deleted ? 'Tool deleted' : res.reason);
+    } else {
+      this.toast(res.valid ? `${TOOL_DEFS[toolType]?.label ?? 'Tool'} placed` : res.reason);
+    }
   }
 
   toast(msg) {

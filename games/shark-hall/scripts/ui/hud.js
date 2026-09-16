@@ -74,8 +74,8 @@ export function createHud(elements) {
       setText(
         elements.placementBanner,
         snapshot.ballInHand === ZONE_KITCHEN
-          ? "Place the cue ball behind the head string, then release to confirm."
-          : "Ball in hand · place the cue ball, then release to confirm.",
+          ? "Drag the cue ball behind the head string · drag elsewhere to turn the view."
+          : "Ball in hand · drag the cue ball to place · drag elsewhere to turn the view.",
       );
 
       // --- controls -------------------------------------------------------
@@ -179,9 +179,7 @@ function subline(snapshot, placing) {
   if (!snapshot.started) return "Choose a match from the menu";
   if (snapshot.paused) return "Match paused";
   if (placing) {
-    return snapshot.ballInHand === ZONE_KITCHEN
-      ? "Place behind the head string · release to confirm"
-      : "Ball in hand · release to confirm placement";
+    return "Grab the cue ball to place · drag elsewhere to turn";
   }
   // A race is the one piece of state the plaques have no room for, and it is
   // the one a player checks between racks. Absent offline, where every match is

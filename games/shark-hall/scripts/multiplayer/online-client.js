@@ -127,7 +127,11 @@ export function createOnlineClient(options = {}) {
   let pending = [];
   let manualClose = false;
   let resumeCredentials = null;
-  let snapshot = { status: "idle", clientId: "", lobby: null, matchState: null, error: null };
+  // `opponentLeftClientId` is the socket of an opponent who has actually left
+  // the room, as opposed to one in its reconnect window (that is on the match
+  // state's seat). After a results-screen departure the server sends nothing
+  // else, so this is what tells an offered rematch it has been refused.
+  let snapshot = { status: "idle", clientId: "", lobby: null, matchState: null, error: null, opponentLeftClientId: "" };
 
   function emit(patch) {
     snapshot = { ...snapshot, ...patch };
@@ -218,7 +222,14 @@ export function createOnlineClient(options = {}) {
     }
 
     if (data.event === "lobby_joined" || data.event === "lobby_updated") {
-      emit({ status: snapshot.matchState ? snapshot.status : "lobby", lobby: normalizeLobby(data), error: null });
+      const lobby = normalizeLobby(data);
+      emit({
+        status: snapshot.matchState ? snapshot.status : "lobby",
+        lobby,
+        error: null,
+        // A full room again means whoever left has been replaced.
+        opponentLeftClientId: lobby.playerCount >= 2 ? "" : snapshot.opponentLeftClientId,
+      });
       // The protocol handshake. Announced once per CONNECTION rather than once
       // ever, because a reconnect is a fresh socket the server knows nothing
       // about, and it will not start a match until both seats have said which
@@ -233,7 +244,7 @@ export function createOnlineClient(options = {}) {
     }
 
     if (data.event === "lobby_started") {
-      emit({ status: "started", matchState: data.matchState || null, error: null });
+      emit({ status: "started", matchState: data.matchState || null, error: null, opponentLeftClientId: "" });
       return;
     }
 
@@ -267,9 +278,17 @@ export function createOnlineClient(options = {}) {
       return;
     }
 
+    if (data.event === "lobby_player_left") {
+      const lobby = snapshot.lobby
+        ? { ...snapshot.lobby, playerCount: Math.max(0, Number(data.playerCount) || 0) }
+        : snapshot.lobby;
+      emit({ opponentLeftClientId: text(data.clientId, 80), lobby });
+      return;
+    }
+
     if (data.event === "lobby_left" || data.event === "lobby_closed") {
       forget();
-      emit({ status: "idle", lobby: null, matchState: null });
+      emit({ status: "idle", lobby: null, matchState: null, opponentLeftClientId: "" });
       return;
     }
 

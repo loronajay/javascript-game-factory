@@ -111,7 +111,8 @@
     const view = state?.snapshot;
     if (!view?.round || !Array.isArray(view.players) || !selfOf(state)) return false;
     const seekers = view.players.filter(player => player.role === 'seeker');
-    return seekers.length === 1 && seekers[0].id === state.seekerId
+    return !isCpuSeat(state.seekerId)
+      && seekers.length === 1 && seekers[0].id === state.seekerId
       && view.players.every(player => ['seeker', 'hider'].includes(player.role));
   }
 
@@ -393,11 +394,18 @@
     };
   }
 
+  // Snapshot yaw is the camera's look direction (-Z), while the authored player rig faces +Z.
+  // Rotate the presentation half a turn without changing the authoritative movement direction.
+  function avatarYaw(yaw = 0) {
+    const turn = (Number.isFinite(yaw) ? yaw : 0) + Math.PI;
+    return ((turn % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  }
+
   return {
     INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, MAX_CPU_GUESTS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
     lobbySettingsFor, snapshotMapMismatch, hasPlayableSnapshot,
     canEditCpuCount, cpuCountRequest, cpuSeatsOf, isCpuSeat,
-    applyNetEvent, createNetState, describeCatchEvent, describeInput, interpolatePose, isSeeker,
+    applyNetEvent, avatarYaw, createNetState, describeCatchEvent, describeInput, interpolatePose, isSeeker,
     nameOf, othersOf, reconcilePosition, rememberSession, resumeRequestFor, roleOf, selfOf, shouldSendInput,
   };
 });

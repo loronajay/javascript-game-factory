@@ -1,5 +1,6 @@
 import { $, showScreen } from "../ui/dom.mjs";
 import { createModeReadiness } from "./mode-readiness.mjs";
+import { resolveRematchStatus } from "./rematch-status.mjs";
 
 export function sanitizeOnlineSetupSkin(onlineSetup, getOwnedSkinId) {
   const skinId = getOwnedSkinId?.(onlineSetup?.characterSlug);
@@ -78,6 +79,7 @@ export function createOnlineSession({
     // on the quit button of an online room.
     matchRuntime.syncPauseChrome();
     $("online-result-status").hidden = true;
+    renderRematchStatus({ kind: "hidden", text: "", rematchEnabled: true });
     audio.resumeMusic();
     matchRuntime.prepareActivePlayer();
     scoreboard.updateMatchUI();
@@ -176,9 +178,32 @@ export function createOnlineSession({
     matchRuntime.beginThrow(roll.shot.power, { release: roll.shot.release });
   }
 
+  // The rematch line and button live under the results, beside the record
+  // report in `online-result-status` rather than in it, so a late-landing
+  // rating line can never overwrite "your opponent left" or the reverse.
+  function renderRematchStatus(status) {
+    const line = $("online-rematch-status");
+    if (line) {
+      line.hidden = status.kind === "hidden";
+      line.textContent = status.text;
+      line.classList?.toggle?.("is-refused", status.kind === "opponent-left");
+    }
+    const button = $("rematch-button");
+    if (button) button.disabled = !status.rematchEnabled;
+  }
+
+  function syncRematchStatus(snapshot) {
+    if (!session.onlineMatch || typeof document === "undefined") return;
+    renderRematchStatus(resolveRematchStatus({
+      snapshot,
+      matchComplete: session.match?.status === "complete",
+    }));
+  }
+
   function handleSnapshot(snapshot) {
     if (snapshot?.matchState) snapshot = { ...snapshot, matchState: normalizeMatchState(snapshot.matchState) };
     onlineScreen.renderLobby(snapshot);
+    syncRematchStatus(snapshot);
     const style = snapshot.matchState?.match?.bowlingStyle || snapshot.lobby?.settings?.bowlingStyle;
     return readiness.run(style, () => acceptSnapshot(snapshot), loadingFailed);
   }
@@ -259,6 +284,7 @@ export function createOnlineSession({
     onlineClient.leaveLobby();
     session.onlineMatch = false;
     session.onlineSnapshot = null;
+    renderRematchStatus({ kind: "hidden", text: "", rematchEnabled: true });
     showScreen("online-screen");
     onlineScreen.renderSetup();
   }
@@ -269,13 +295,22 @@ export function createOnlineSession({
     readiness.cancel(); replayQueue.clear();
     onlineClient.leaveLobby();
     session.onlineMatch = false;
+    renderRematchStatus({ kind: "hidden", text: "", rematchEnabled: true });
     showScreen("title-screen");
   }
 
   function requestRematch() {
+    // An opponent who has already left cannot be asked; the screen says so
+    // instead of sending a request the server would file against nobody.
+    const current = resolveRematchStatus({ snapshot: onlineClient.getSnapshot(), matchComplete: true });
+    if (current.kind === "opponent-left") { renderRematchStatus(current); return false; }
     onlineClient.requestRematch();
-    $("online-result-status").hidden = false;
-    $("online-result-status").textContent = "Rematch requested. Waiting for your opponent…";
+    // Shown at once; the server's next snapshot carries the same verdict.
+    renderRematchStatus(resolveRematchStatus({
+      snapshot: { ...onlineClient.getSnapshot(), matchState: { rematchRequestedBy: [onlineClient.getSnapshot().clientId] } },
+      matchComplete: true,
+    }));
+    return true;
   }
 
   // Re-files results whose request never reached the server. It runs through the

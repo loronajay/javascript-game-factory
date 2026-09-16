@@ -356,5 +356,22 @@ test('falling shot travels visibly from above the board', () => {
   );
 });
 
+test('a falling shot is layered above the bowl rim, emote bubbles and sunk flash', () => {
+  // The grid is a stacking context, so the cell's own z-index can never escape it;
+  // the grid itself has to rise while a piece is in flight.
+  assertMatches(
+    files.board,
+    /\.board-grid:has\(\.shot-falling\)\s*\{[\s\S]*?z-index:\s*(\d+);/,
+    'Expected the board grid to rise while a shot is falling.',
+  );
+  const gridZ = Number(files.board.match(/\.board-grid:has\(\.shot-falling\)\s*\{[\s\S]*?z-index:\s*(\d+);/)[1]);
+  const rimZ = Number(files.board.match(/\.board-bowl-seat::before\s*\{[\s\S]*?z-index:\s*(\d+);/)[1]);
+  const flashZ = Number(files.battle.match(/\.board-bowl\.bowl--taking-sunk::after\s*\{[\s\S]*?z-index:\s*(\d+);/)[1]);
+  const emoteZ = Number(files.responsive.match(/\.screen-battle \.emote-bubble\s*\{[\s\S]*?z-index:\s*(\d+);/)[1]);
+  for (const [name, z] of [['bowl rim', rimZ], ['sunk flash', flashZ], ['emote bubble', emoteZ]]) {
+    if (!(gridZ > z)) throw new Error(`Expected the falling-shot grid (z ${gridZ}) above the ${name} (z ${z}).`);
+  }
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

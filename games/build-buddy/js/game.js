@@ -1,7 +1,7 @@
 import { Input } from './input.js';
 import { Runner } from './runner.js';
 import { Camera } from './camera.js';
-import { ToolRegistry, BuilderController } from './tools.js';
+import { ToolRegistry, BuilderController, makeTool } from './tools.js';
 import { Renderer } from './renderer.js';
 import { rectsOverlap } from './utils.js';
 import { getStageById, getStageSequence } from './stages/stage-registry.js';
@@ -16,6 +16,12 @@ const CONTROL_ROLES = Object.freeze({
   LOCAL: 'local',
   INERT: 'inert',
 });
+
+// How many Runner world syncs a Builder prediction outlives before the Builder
+// concludes the Runner never applied it. Syncs arrive every 3 ticks (50ms), so
+// this covers a 600ms round trip — generous for a relay, short enough that a
+// rejected placement does not linger.
+const PREDICTION_GRACE_SNAPSHOTS = 12;
 
 const INERT_INPUT = Object.freeze({
   axisX: () => 0,
@@ -116,6 +122,9 @@ export class Game {
     };
   }
 
+  // The world as the authoritative client (the Runner's, online) sees it. Only
+  // active tools ride along: a tool absent from a sync is a tool the Runner no
+  // longer has, and the replica deactivates it.
   createStateSnapshot(tick = 0) {
     return {
       tick,
@@ -128,19 +137,31 @@ export class Game {
         grounded: this.runner.grounded,
         climbing: this.runner.climbing,
         facing: this.runner.facing,
+        deaths: this.runner.deaths,
+        repositions: this.runner.repositions,
       },
-      tools: this.registry.tools.map((tool) => ({
+      tools: this.registry.tools.filter((tool) => tool.active).map((tool) => ({
         id: tool.id,
         toolType: tool.toolType,
         x: tool.x,
         y: tool.y,
-        active: tool.active,
+        active: true,
+        activated: tool.activated === true,
       })),
       timerMs: this.timeRemainingMs,
+      elapsedMs: this.elapsedMs,
       stageStatus: this.stageEnded ? (this.cleared ? 'clear' : 'fail') : 'playing',
     };
   }
 
+  // Reconcile this replica with an authoritative world sync. Tools are matched
+  // by id (a placement's command id, or a kit slot), so the Builder's predicted
+  // copy and the Runner's copy are the same object. A tool still marked as a
+  // prediction is left alone until the Runner either confirms it (the sync
+  // agrees with the prediction) or the grace window runs out — otherwise a sync
+  // the Runner sent *before* the command reached them would undo the click and
+  // the next one would redo it, and the Builder would watch their own tools
+  // flicker.
   applyStateSnapshot(snapshot = {}) {
     if (snapshot.runner) {
       this.runner.x = Number(snapshot.runner.x) || 0;
@@ -151,53 +172,65 @@ export class Game {
       if (typeof snapshot.runner.grounded === 'boolean') this.runner.grounded = snapshot.runner.grounded;
       if (typeof snapshot.runner.climbing === 'boolean') this.runner.climbing = snapshot.runner.climbing;
       if (snapshot.runner.facing === -1 || snapshot.runner.facing === 1) this.runner.facing = snapshot.runner.facing;
+      if (Number.isFinite(Number(snapshot.runner.deaths))) this.runner.deaths = Number(snapshot.runner.deaths);
+      if (Number.isFinite(Number(snapshot.runner.repositions))) this.runner.repositions = Number(snapshot.runner.repositions);
     }
     if (snapshot.timerMs !== undefined && Number.isFinite(Number(snapshot.timerMs))) {
       this.timeRemainingMs = Math.max(0, Number(snapshot.timerMs));
       this.syncMovingHazards();
     }
+    if (snapshot.elapsedMs !== undefined && Number.isFinite(Number(snapshot.elapsedMs))) {
+      this.elapsedMs = Math.max(0, Number(snapshot.elapsedMs));
+    }
     if (Array.isArray(snapshot.tools)) {
-      const remoteToolIds = new Set(snapshot.tools.map((tool) => tool.id));
+      const remoteById = new Map(snapshot.tools.map((tool) => [tool.id, tool]));
       for (const localTool of this.registry.tools) {
-        if (!remoteToolIds.has(localTool.id)) localTool.active = false;
-      }
-      for (const remoteTool of snapshot.tools) {
-        const localTool = this.registry.tools.find((tool) => tool.id === remoteTool.id);
-        if (localTool) {
+        const remoteTool = remoteById.get(localTool.id);
+        const remoteActive = !!remoteTool && remoteTool.active !== false;
+        if (localTool.pendingSnapshots > 0) {
+          if (remoteActive === localTool.active) {
+            localTool.pendingSnapshots = 0;
+          } else {
+            localTool.pendingSnapshots -= 1;
+            continue;
+          }
+        }
+        localTool.active = remoteActive;
+        if (remoteTool) {
           localTool.x = Number(remoteTool.x) || 0;
           localTool.y = Number(remoteTool.y) || 0;
-          localTool.active = remoteTool.active !== false;
-        } else if (remoteTool.active !== false && TOOL_DEFS[remoteTool.toolType]) {
-          const def = TOOL_DEFS[remoteTool.toolType];
-          this.registry.tools.push({
-            id: remoteTool.id,
-            toolType: remoteTool.toolType,
-            kind: def.kind,
-            x: Number(remoteTool.x) || 0,
-            y: Number(remoteTool.y) || 0,
-            w: def.width,
-            h: def.height,
-            bounceVy: def.bounceVy ?? 0,
-            active: true,
-            activated: false,
-            usedForRespawn: false,
-            inUse: false,
-          });
+          if (typeof remoteTool.activated === 'boolean') localTool.activated = remoteTool.activated;
         }
+      }
+      for (const remoteTool of snapshot.tools) {
+        if (remoteTool.active === false || !TOOL_DEFS[remoteTool.toolType]) continue;
+        if (this.registry.tools.some((tool) => tool.id === remoteTool.id)) continue;
+        const tool = makeTool(remoteTool.toolType, Number(remoteTool.x) || 0, Number(remoteTool.y) || 0, remoteTool.id);
+        if (typeof remoteTool.activated === 'boolean') tool.activated = remoteTool.activated;
+        this.registry.tools.push(tool);
       }
     }
   }
 
-  applyBuilderCommand(command = {}) {
+  // Apply a Builder command to this world. Online, the Runner's client applies
+  // the relayed command for real and the Builder's client applies its own as a
+  // `predicted` guess that the next world syncs confirm or withdraw. A placement
+  // is named by its command id on both sides.
+  applyBuilderCommand(command = {}, { predicted = false } = {}) {
     let result;
     if (command.action === 'recall') {
       result = this.registry.recallAll();
     } else if (command.action === 'delete') {
       result = this.registry.deleteAt(command.gridX, command.gridY);
     } else {
-      result = this.registry.add(command.toolType, command.gridX, command.gridY, this.runner);
+      result = this.registry.add(command.toolType, command.gridX, command.gridY, this.runner, {
+        id: typeof command.commandId === 'string' ? command.commandId : null,
+      });
     }
     const succeeded = result.valid === true || result.deleted === true || result.recalled === true;
+    if (predicted && succeeded) {
+      for (const tool of result.tools ?? [result.tool]) tool.pendingSnapshots = PREDICTION_GRACE_SNAPSHOTS;
+    }
     this.audioEvents.push({ type: succeeded ? 'toolAction' : 'error' });
     return result;
   }
@@ -238,7 +271,9 @@ export class Game {
     else this.onStageFailure?.(result);
   }
 
-  update(dt, { skipEndFrame = false } = {}) {
+  // `builderActions: false` keeps the Builder's hover preview live but leaves
+  // clicks unconsumed, for a controller that turns them into online commands.
+  update(dt, { skipEndFrame = false, builderActions = true } = {}) {
     if (this.stageEnded || this.cleared) {
       if (this.input.keys.has('Enter') || this.input.consumeReposition()) this.resetRuntime();
       if (this.input.keys.has('KeyN')) this.advanceStage();
@@ -255,7 +290,8 @@ export class Game {
     this.runner.update(dt, runnerInput, this.registry);
     this.registry.markInUse(this.runner);
     this.camera.update(dt, this.runner, builderInput ?? INERT_INPUT);
-    if (builderInput) this.builder.update(dt, builderInput, this.camera, this.runner);
+    if (builderInput && builderActions) this.builder.update(dt, builderInput, this.camera, this.runner);
+    else if (builderInput) this.builder.updateHover(builderInput, this.camera, this.runner);
 
     if (rectsOverlap(this.runner.rect(), this.stage.goal)) this.endStage('clear');
     if (this.timeRemainingMs <= 0) {

@@ -115,6 +115,10 @@ export function boot(root) {
   let onlineRating = null;
   let onlineMatchKey = "";
   let onlineStartsLocal = 0;
+  // The server pauses a duel while an opponent's socket is in its reconnect
+  // window and refuses every shot meanwhile, so the court refuses the pull too
+  // rather than letting a player shoot at nothing.
+  let onlinePaused = false;
   let onlineEndsLocal = 0;
   let onlineResultShown = false;
   let reportedOnlineSession = "";
@@ -462,6 +466,12 @@ export function boot(root) {
     syncMatchStrip();
   }
 
+  /** The opponent's name on the strip, with their absence written on it. */
+  function onlineOpponentLabel(opponent) {
+    const name = opponent?.name || "Opponent";
+    return opponent?.connected === false ? `${name} · reconnecting…` : name;
+  }
+
   function syncMatchStrip() {
     const strip = root.querySelector("#matchScoreStrip");
     if (!strip) return;
@@ -478,7 +488,7 @@ export function boot(root) {
       const me = state.players?.find(({ id }) => id === onlineSnapshot.clientId);
       const opponent = state.players?.find(({ id }) => id !== onlineSnapshot.clientId);
       root.querySelector("#matchLocalName").textContent = me?.name || "You";
-      root.querySelector("#matchRemoteName").textContent = opponent?.name || "Opponent";
+      root.querySelector("#matchRemoteName").textContent = onlineOpponentLabel(opponent);
       root.querySelector("#matchLocalScore").textContent = me?.score || 0;
       root.querySelector("#matchRemoteScore").textContent = opponent?.score || 0;
     }
@@ -495,7 +505,7 @@ export function boot(root) {
       !resultsShown &&
       shot.state !== SHOT_FLIGHT &&
       run.status !== RUN_EXPIRED
-      && (playMode !== "online" || Date.now() >= onlineStartsLocal)
+      && (playMode !== "online" || (Date.now() >= onlineStartsLocal && !onlinePaused))
     );
   }
 
@@ -662,12 +672,18 @@ export function boot(root) {
     if (onlineMatchKey !== key) {
       onlineMatchKey = key;
       onlineResultShown = false;
+      onlinePaused = false;
       const offset = Date.now() - Number(state.serverNow || Date.now());
       onlineStartsLocal = Number(state.startAt) + offset;
       onlineEndsLocal = Number(state.endsAt) + offset;
       startRun(state.config);
     }
     syncAuthoritativeOnlineState(state);
+    const nowPaused = state.phase === "paused";
+    if (nowPaused !== onlinePaused) {
+      onlinePaused = nowPaused;
+      if (!resultsShown) hud.shout(nowPaused ? "OPPONENT DROPPED" : "BACK ON");
+    }
     if (state.phase === "complete") finishOnlineMatch(state);
   }
 
@@ -679,6 +695,7 @@ export function boot(root) {
     onlineStartsLocal = 0;
     onlineEndsLocal = 0;
     onlineResultShown = false;
+    onlinePaused = false;
   }
 
   function syncAuthoritativeOnlineState(state) {
@@ -702,9 +719,14 @@ export function boot(root) {
     const winners = state.result?.winnerIds || [];
     const draw = winners.length > 1;
     const won = winners.includes(me?.id);
-    const title = draw ? `Draw · ${me?.score || 0} each` : won
-      ? `You win ${me?.score || 0}–${opponent?.score || 0}`
-      : `${opponent?.name || "Opponent"} wins ${opponent?.score || 0}–${me?.score || 0}`;
+    const forfeit = state.result?.reason === "forfeit";
+    // A forfeit is named as one: the score line alone would read as if the
+    // other player had simply been outshot in the time that was left.
+    const title = forfeit
+      ? (won ? `${opponent?.name || "Opponent"} left · you win by forfeit` : "You left the court · forfeit")
+      : draw ? `Draw · ${me?.score || 0} each` : won
+        ? `You win ${me?.score || 0}–${opponent?.score || 0}`
+        : `${opponent?.name || "Opponent"} wins ${opponent?.score || 0}–${me?.score || 0}`;
     overlays.showDuelResults(runSummary(run), {
       title,
       record: onlineRating ? `${onlineRating.wins}W–${onlineRating.losses}L` : "Saving…",

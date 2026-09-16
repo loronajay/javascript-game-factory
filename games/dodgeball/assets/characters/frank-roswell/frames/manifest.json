@@ -1,0 +1,798 @@
+{
+  "idle": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/idle-0.png",
+      "w": 334,
+      "h": 471,
+      "pivotX": 157,
+      "pivotY": 463,
+      "sourceBox": [
+        24,
+        147,
+        358,
+        618
+      ],
+      "ownedComponents": [
+        3
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/idle-1.png",
+      "w": 321,
+      "h": 477,
+      "pivotX": 151,
+      "pivotY": 469,
+      "sourceBox": [
+        392,
+        142,
+        713,
+        619
+      ],
+      "ownedComponents": [
+        1
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/idle-2.png",
+      "w": 332,
+      "h": 469,
+      "pivotX": 158,
+      "pivotY": 461,
+      "sourceBox": [
+        747,
+        149,
+        1079,
+        618
+      ],
+      "ownedComponents": [
+        6
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/idle-3.png",
+      "w": 333,
+      "h": 470,
+      "pivotX": 158,
+      "pivotY": 462,
+      "sourceBox": [
+        1109,
+        148,
+        1442,
+        618
+      ],
+      "ownedComponents": [
+        5
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/idle-4.png",
+      "w": 321,
+      "h": 476,
+      "pivotX": 153,
+      "pivotY": 468,
+      "sourceBox": [
+        1476,
+        143,
+        1797,
+        619
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/idle-5.png",
+      "w": 326,
+      "h": 470,
+      "pivotX": 168,
+      "pivotY": 462,
+      "sourceBox": [
+        1823,
+        147,
+        2149,
+        617
+      ],
+      "ownedComponents": [
+        4
+      ]
+    }
+  ],
+  "run": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/run-0.png",
+      "w": 365,
+      "h": 481,
+      "pivotX": 165,
+      "pivotY": 473,
+      "sourceBox": [
+        16,
+        145,
+        381,
+        626
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/run-1.png",
+      "w": 308,
+      "h": 477,
+      "pivotX": 145,
+      "pivotY": 469,
+      "sourceBox": [
+        398,
+        150,
+        706,
+        627
+      ],
+      "ownedComponents": [
+        5
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/run-2.png",
+      "w": 337,
+      "h": 485,
+      "pivotX": 194,
+      "pivotY": 477,
+      "sourceBox": [
+        711,
+        142,
+        1048,
+        627
+      ],
+      "ownedComponents": [
+        1
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/run-3.png",
+      "w": 379,
+      "h": 478,
+      "pivotX": 185,
+      "pivotY": 470,
+      "sourceBox": [
+        1082,
+        148,
+        1461,
+        626
+      ],
+      "ownedComponents": [
+        4
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/run-4.png",
+      "w": 301,
+      "h": 477,
+      "pivotX": 140,
+      "pivotY": 469,
+      "sourceBox": [
+        1489,
+        150,
+        1790,
+        627
+      ],
+      "ownedComponents": [
+        6
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/run-5.png",
+      "w": 347,
+      "h": 482,
+      "pivotX": 188,
+      "pivotY": 474,
+      "sourceBox": [
+        1803,
+        145,
+        2150,
+        627
+      ],
+      "ownedComponents": [
+        3
+      ]
+    }
+  ],
+  "crouch": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/crouch-0.png",
+      "w": 333,
+      "h": 468,
+      "pivotX": 154,
+      "pivotY": 460,
+      "sourceBox": [
+        27,
+        149,
+        360,
+        617
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/crouch-1.png",
+      "w": 321,
+      "h": 411,
+      "pivotX": 148,
+      "pivotY": 403,
+      "sourceBox": [
+        395,
+        207,
+        716,
+        618
+      ],
+      "ownedComponents": [
+        6
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/crouch-2.png",
+      "w": 282,
+      "h": 333,
+      "pivotX": 146,
+      "pivotY": 325,
+      "sourceBox": [
+        759,
+        284,
+        1041,
+        617
+      ],
+      "ownedComponents": [
+        8
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/crouch-3.png",
+      "w": 280,
+      "h": 330,
+      "pivotX": 155,
+      "pivotY": 322,
+      "sourceBox": [
+        1112,
+        287,
+        1392,
+        617
+      ],
+      "ownedComponents": [
+        11
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/crouch-4.png",
+      "w": 318,
+      "h": 416,
+      "pivotX": 155,
+      "pivotY": 408,
+      "sourceBox": [
+        1474,
+        202,
+        1792,
+        618
+      ],
+      "ownedComponents": [
+        5
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/crouch-5.png",
+      "w": 319,
+      "h": 469,
+      "pivotX": 170,
+      "pivotY": 461,
+      "sourceBox": [
+        1821,
+        148,
+        2140,
+        617
+      ],
+      "ownedComponents": [
+        1
+      ]
+    }
+  ],
+  "jump": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/jump-0.png",
+      "w": 301,
+      "h": 316,
+      "pivotX": 166,
+      "pivotY": 308,
+      "sourceBox": [
+        15,
+        347,
+        316,
+        663
+      ],
+      "ownedComponents": [
+        13
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/jump-1.png",
+      "w": 329,
+      "h": 436,
+      "pivotX": 191,
+      "pivotY": 428,
+      "sourceBox": [
+        352,
+        224,
+        681,
+        660
+      ],
+      "ownedComponents": [
+        10,
+        27
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/jump-2.png",
+      "w": 347,
+      "h": 388,
+      "pivotX": 199,
+      "pivotY": 380,
+      "sourceBox": [
+        706,
+        153,
+        1053,
+        541
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/jump-3.png",
+      "w": 373,
+      "h": 406,
+      "pivotX": 214,
+      "pivotY": 398,
+      "sourceBox": [
+        1053,
+        107,
+        1426,
+        513
+      ],
+      "ownedComponents": [
+        1
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/jump-4.png",
+      "w": 406,
+      "h": 406,
+      "pivotX": 217,
+      "pivotY": 398,
+      "sourceBox": [
+        1412,
+        212,
+        1818,
+        618
+      ],
+      "ownedComponents": [
+        8,
+        17,
+        18
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/jump-5.png",
+      "w": 356,
+      "h": 301,
+      "pivotX": 194,
+      "pivotY": 293,
+      "sourceBox": [
+        1797,
+        368,
+        2153,
+        669
+      ],
+      "ownedComponents": [
+        15,
+        25,
+        26,
+        30,
+        34
+      ]
+    }
+  ],
+  "groundAttack": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/groundAttack-0.png",
+      "w": 334,
+      "h": 462,
+      "pivotX": 167,
+      "pivotY": 454,
+      "sourceBox": [
+        14,
+        150,
+        348,
+        612
+      ],
+      "ownedComponents": [
+        6
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/groundAttack-1.png",
+      "w": 364,
+      "h": 465,
+      "pivotX": 189,
+      "pivotY": 457,
+      "sourceBox": [
+        354,
+        148,
+        718,
+        613
+      ],
+      "ownedComponents": [
+        1
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/groundAttack-2.png",
+      "w": 306,
+      "h": 464,
+      "pivotX": 188,
+      "pivotY": 456,
+      "sourceBox": [
+        717,
+        148,
+        1023,
+        612
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/groundAttack-3.png",
+      "w": 481,
+      "h": 464,
+      "pivotX": 211,
+      "pivotY": 456,
+      "sourceBox": [
+        1056,
+        149,
+        1537,
+        613
+      ],
+      "ownedComponents": [
+        3
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/groundAttack-4.png",
+      "w": 281,
+      "h": 458,
+      "pivotX": 98,
+      "pivotY": 450,
+      "sourceBox": [
+        1531,
+        149,
+        1812,
+        607
+      ],
+      "ownedComponents": [
+        4
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/groundAttack-5.png",
+      "w": 330,
+      "h": 463,
+      "pivotX": 158,
+      "pivotY": 455,
+      "sourceBox": [
+        1833,
+        149,
+        2163,
+        612
+      ],
+      "ownedComponents": [
+        5
+      ]
+    }
+  ],
+  "airAttack": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/airAttack-0.png",
+      "w": 350,
+      "h": 392,
+      "pivotX": 173,
+      "pivotY": 384,
+      "sourceBox": [
+        8,
+        138,
+        358,
+        530
+      ],
+      "ownedComponents": [
+        1
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airAttack-1.png",
+      "w": 288,
+      "h": 428,
+      "pivotX": 178,
+      "pivotY": 420,
+      "sourceBox": [
+        365,
+        144,
+        653,
+        572
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airAttack-2.png",
+      "w": 384,
+      "h": 411,
+      "pivotX": 216,
+      "pivotY": 403,
+      "sourceBox": [
+        689,
+        157,
+        1073,
+        568
+      ],
+      "ownedComponents": [
+        3
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airAttack-3.png",
+      "w": 516,
+      "h": 363,
+      "pivotX": 249,
+      "pivotY": 355,
+      "sourceBox": [
+        1018,
+        157,
+        1534,
+        520
+      ],
+      "ownedComponents": [
+        4
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airAttack-4.png",
+      "w": 364,
+      "h": 385,
+      "pivotX": 118,
+      "pivotY": 377,
+      "sourceBox": [
+        1511,
+        157,
+        1875,
+        542
+      ],
+      "ownedComponents": [
+        5
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airAttack-5.png",
+      "w": 281,
+      "h": 427,
+      "pivotX": 114,
+      "pivotY": 419,
+      "sourceBox": [
+        1877,
+        163,
+        2158,
+        590
+      ],
+      "ownedComponents": [
+        7
+      ]
+    }
+  ],
+  "spotDodge": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/spotDodge-0.png",
+      "w": 328,
+      "h": 446,
+      "pivotX": 162,
+      "pivotY": 438,
+      "sourceBox": [
+        19,
+        150,
+        347,
+        596
+      ],
+      "ownedComponents": [
+        2
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/spotDodge-1.png",
+      "w": 294,
+      "h": 397,
+      "pivotX": 152,
+      "pivotY": 389,
+      "sourceBox": [
+        391,
+        198,
+        685,
+        595
+      ],
+      "ownedComponents": [
+        6
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/spotDodge-2.png",
+      "w": 309,
+      "h": 430,
+      "pivotX": 162,
+      "pivotY": 422,
+      "sourceBox": [
+        743,
+        168,
+        1052,
+        598
+      ],
+      "ownedComponents": [
+        5
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/spotDodge-3.png",
+      "w": 423,
+      "h": 391,
+      "pivotX": 192,
+      "pivotY": 383,
+      "sourceBox": [
+        1075,
+        208,
+        1498,
+        599
+      ],
+      "ownedComponents": [
+        8
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/spotDodge-4.png",
+      "w": 279,
+      "h": 434,
+      "pivotX": 99,
+      "pivotY": 426,
+      "sourceBox": [
+        1530,
+        165,
+        1809,
+        599
+      ],
+      "ownedComponents": [
+        3
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/spotDodge-5.png",
+      "w": 316,
+      "h": 447,
+      "pivotX": 150,
+      "pivotY": 439,
+      "sourceBox": [
+        1841,
+        149,
+        2157,
+        596
+      ],
+      "ownedComponents": [
+        1
+      ]
+    }
+  ],
+  "airDodge": [
+    {
+      "src": "./assets/characters/frank-roswell/frames/airDodge-0.png",
+      "w": 330,
+      "h": 414,
+      "pivotX": 181,
+      "pivotY": 406,
+      "sourceBox": [
+        0,
+        151,
+        330,
+        565
+      ],
+      "ownedComponents": [
+        1
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airDodge-1.png",
+      "w": 320,
+      "h": 338,
+      "pivotX": 186,
+      "pivotY": 330,
+      "sourceBox": [
+        357,
+        203,
+        677,
+        541
+      ],
+      "ownedComponents": [
+        11,
+        13,
+        22
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airDodge-2.png",
+      "w": 438,
+      "h": 348,
+      "pivotX": 213,
+      "pivotY": 340,
+      "sourceBox": [
+        692,
+        183,
+        1130,
+        531
+      ],
+      "ownedComponents": [
+        4
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airDodge-3.png",
+      "w": 321,
+      "h": 333,
+      "pivotX": 117,
+      "pivotY": 325,
+      "sourceBox": [
+        1150,
+        197,
+        1471,
+        530
+      ],
+      "ownedComponents": [
+        12,
+        9
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airDodge-4.png",
+      "w": 346,
+      "h": 379,
+      "pivotX": 150,
+      "pivotY": 371,
+      "sourceBox": [
+        1479,
+        184,
+        1825,
+        563
+      ],
+      "ownedComponents": [
+        5,
+        6,
+        28
+      ]
+    },
+    {
+      "src": "./assets/characters/frank-roswell/frames/airDodge-5.png",
+      "w": 326,
+      "h": 416,
+      "pivotX": 152,
+      "pivotY": 408,
+      "sourceBox": [
+        1839,
+        153,
+        2165,
+        569
+      ],
+      "ownedComponents": [
+        2
+      ]
+    }
+  ]
+}

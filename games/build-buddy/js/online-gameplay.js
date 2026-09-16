@@ -173,22 +173,13 @@ export function createRunnerInputMessage(input = {}) {
   };
 }
 
-export function createRunnerStateMessage(runner = {}) {
-  return {
-    messageType: 'runner_state',
-    value: {
-      tick: normalizeTick(runner.tick),
-      x: Number(runner.x) || 0,
-      y: Number(runner.y) || 0,
-      vx: Number(runner.vx) || 0,
-      vy: Number(runner.vy) || 0,
-      dead: runner.dead === true,
-      ...runnerPoseFlags(runner),
-    },
-  };
-}
-
-export function shouldSendServerRunnerState(state, localRole, tick) {
+// World sync under server authority. The server owns roles and stage results;
+// the world itself (Runner, tools, timer) is resolved on the Runner's client and
+// mirrored to the Builder as a `state_sync` every three ticks. The server relays
+// it only from the chair currently running, and the Builder accepts it only from
+// that chair and only if it is newer than the last one applied — so a swapped
+// or stale sync can never drag the replica backwards.
+export function shouldSendServerWorldSync(state, localRole, tick) {
   return state?.authorityPlayerId === 'server'
     && localRole === 'runner'
     && normalizeTick(tick) % 3 === 0;
@@ -199,14 +190,16 @@ function runnerPoseFlags(runner) {
     ...(typeof runner.grounded === 'boolean' ? { grounded: runner.grounded } : {}),
     ...(typeof runner.climbing === 'boolean' ? { climbing: runner.climbing } : {}),
     ...(runner.facing === -1 || runner.facing === 1 ? { facing: runner.facing } : {}),
+    ...(Number.isFinite(Number(runner.deaths)) ? { deaths: Math.max(0, Math.floor(Number(runner.deaths))) } : {}),
+    ...(Number.isFinite(Number(runner.repositions)) ? { repositions: Math.max(0, Math.floor(Number(runner.repositions))) } : {}),
   };
 }
 
-export function acceptServerRunnerStateMessage(state, localRole, lastAppliedTick, message = {}) {
+export function acceptServerWorldSyncMessage(state, localRole, lastAppliedTick, message = {}) {
   if (state?.authorityPlayerId !== 'server' || localRole !== 'builder') return null;
   if (message.senderId !== getCurrentRoles(state.session).runnerPlayerId) return null;
 
-  const value = createRunnerStateMessage(message.value).value;
+  const value = createStateSyncMessage(message.value).value;
   return value.tick > normalizeTick(lastAppliedTick) ? value : null;
 }
 
@@ -278,6 +271,7 @@ export function createStateSyncMessage(snapshot = {}) {
       x: Number(tool?.x) || 0,
       y: Number(tool?.y) || 0,
       active: tool?.active !== false,
+      ...(typeof tool?.activated === 'boolean' ? { activated: tool.activated } : {}),
     }))
     : [];
   return {
@@ -287,6 +281,7 @@ export function createStateSyncMessage(snapshot = {}) {
       runner,
       tools,
       timerMs: Number.isFinite(Number(snapshot.timerMs)) ? Math.max(0, Number(snapshot.timerMs)) : 0,
+      ...(Number.isFinite(Number(snapshot.elapsedMs)) ? { elapsedMs: Math.max(0, Number(snapshot.elapsedMs)) } : {}),
       stageStatus: boundedText(snapshot.stageStatus, 'playing', 32),
     },
   };

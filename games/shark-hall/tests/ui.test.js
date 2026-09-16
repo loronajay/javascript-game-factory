@@ -19,6 +19,7 @@ import {
   normalizePanel,
 } from "../scripts/ui/screens.js";
 import { createFullscreen, fullscreenLabel } from "../scripts/ui/fullscreen.js";
+import { createControls } from "../scripts/ui/controls.js";
 import { CAMERA_MODES, DEFAULT_SETTINGS, GUIDE_MODES, normalizeSettings } from "../scripts/store/settings.js";
 import { DIFFICULTIES } from "../scripts/sim/cpu.js";
 
@@ -172,6 +173,88 @@ test("without the API, or when it says no, the same class pins the cabinet to th
     assertEqual(fullscreen.isActive(), false);
     assert(!doc.classes.has("fullscreen"));
   }
+});
+
+// --- table gestures -------------------------------------------------------
+
+function eventTarget() {
+  const listeners = new Map();
+  return {
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    emit(type, event = {}) {
+      for (const listener of listeners.get(type) || []) listener(event);
+    },
+    setPointerCapture() {},
+  };
+}
+
+function placementControls() {
+  const canvas = eventTarget();
+  const fakeWindow = eventTarget();
+  const previousWindow = globalThis.window;
+  globalThis.window = fakeWindow;
+  const calls = { places: [], nudges: [], confirms: 0 };
+  const cue = { n: 0, x: 0, z: 0, pocketed: false };
+  const match = {
+    humanCanAct: () => true,
+    snapshot: () => ({ ballInHand: "anywhere", moving: false }),
+    balls: () => [cue],
+    tryPlaceCue(x, z) {
+      calls.places.push({ x, z });
+      cue.x = x;
+      cue.z = z;
+      return true;
+    },
+    confirmPlacement() {
+      calls.confirms++;
+    },
+    nudgeAngle(amount) {
+      calls.nudges.push(amount);
+    },
+  };
+  const scene = {
+    width: 900,
+    pointToTable: (clientX, clientY) => ({ x: clientX / 1000, z: clientY / 1000 }),
+  };
+  const controls = createControls({ canvas, elements: {}, match, scene, audio: null });
+  return {
+    canvas,
+    calls,
+    destroy() {
+      controls.destroy();
+      globalThis.window = previousWindow;
+    },
+  };
+}
+
+test("dragging away from the cue ball turns the placement camera without moving the ball", () => {
+  const rig = placementControls();
+  rig.canvas.emit("pointerdown", { pointerId: 1, clientX: 300, clientY: 200 });
+  rig.canvas.emit("pointermove", { pointerId: 1, clientX: 340, clientY: 200 });
+  rig.canvas.emit("pointerup", { pointerId: 1, clientX: 340, clientY: 200 });
+  assertEqual(rig.calls.places.length, 0, "a camera turn must not teleport the cue ball");
+  assert(rig.calls.nudges.length > 0, "the horizontal drag should turn the view");
+  assertEqual(rig.calls.confirms, 0, "turning the view must not confirm placement");
+  rig.destroy();
+});
+
+test("dragging the cue ball keeps the original grab offset and confirms on release", () => {
+  const rig = placementControls();
+  rig.canvas.emit("pointerdown", { pointerId: 2, clientX: 20, clientY: 0 });
+  assertEqual(rig.calls.places.length, 0, "pressing the edge of the cue ball must not snap its centre under the pointer");
+  rig.canvas.emit("pointermove", { pointerId: 2, clientX: 120, clientY: 40 });
+  rig.canvas.emit("pointerup", { pointerId: 2, clientX: 120, clientY: 40 });
+  assertEqual(rig.calls.places.length, 1);
+  assert(Math.abs(rig.calls.places[0].x - 0.1) < 1e-9, "the cue ball should follow the drag without losing its grab offset");
+  assert(Math.abs(rig.calls.places[0].z - 0.04) < 1e-9);
+  assertEqual(rig.calls.confirms, 1);
+  rig.destroy();
 });
 
 finish();

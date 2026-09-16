@@ -296,6 +296,30 @@ test("server match snapshots, errors, and disconnect state reach subscribers", (
   assert.equal(updates.at(-1).error.code, "NOT_YOUR_TURN");
 });
 
+test("an opponent leaving the room is remembered until the room fills again", () => {
+  const client = createClient();
+  const updates = [];
+  client.subscribe((snapshot) => updates.push(snapshot));
+  client.connect();
+  const socket = MockWebSocket.instances[0];
+  socket.open();
+  socket.receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
+  socket.receive({ event: "lobby_joined", roomCode: "YAM42", ownerId: "socket-1", members: ["socket-1", "socket-2"], playerCount: 2, status: "started" });
+  socket.receive({ event: "message", scope: "lobby", senderId: "server", messageType: "yam_match_ended", value: JSON.stringify({ sessionId: "yam:YAM42:1", phase: "complete", rematchRequestedBy: [] }) });
+
+  // The results-screen departure: the server sends this and nothing else.
+  socket.receive({ event: "lobby_player_left", clientId: "socket-2", roomCode: "YAM42", playerCount: 1, reason: "left" });
+  assert.equal(updates.at(-1).opponentLeftClientId, "socket-2");
+  assert.equal(updates.at(-1).lobby.playerCount, 1);
+  assert.equal(updates.at(-1).status, "complete", "the finished match is still on screen");
+
+  // A later refresh with the chair still empty keeps it; a full room clears it.
+  socket.receive({ event: "lobby_updated", roomCode: "YAM42", ownerId: "socket-1", members: ["socket-1"], playerCount: 1, status: "ended" });
+  assert.equal(updates.at(-1).opponentLeftClientId, "socket-2");
+  socket.receive({ event: "lobby_updated", roomCode: "YAM42", ownerId: "socket-1", members: ["socket-1", "socket-3"], playerCount: 2, status: "open" });
+  assert.equal(updates.at(-1).opponentLeftClientId, "");
+});
+
 test("shot and rematch requests carry no client-authored result", () => {
   const client = createClient();
   client.connect();

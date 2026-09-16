@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dodgeballs — Frank Sprite Lab</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #07101b; color: #dcecff; font: 13px system-ui, sans-serif; }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    p { margin: 0 0 22px; color: #8299b2; }
+    section { margin-bottom: 30px; }
+    h2 { margin: 0 0 8px; color: #6ee6ff; font-size: 14px; text-transform: uppercase; letter-spacing: .12em; }
+    .row { display: grid; grid-template-columns: repeat(6, minmax(150px, 1fr)); gap: 8px; }
+    figure { position: relative; height: 230px; margin: 0; overflow: hidden; border: 1px solid #243b51; border-radius: 6px; background-color: #101b29; background-image: linear-gradient(45deg,#172536 25%,transparent 25%),linear-gradient(-45deg,#172536 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#172536 75%),linear-gradient(-45deg,transparent 75%,#172536 75%); background-size: 20px 20px; background-position: 0 0,0 10px,10px -10px,-10px 0; }
+    canvas { width: 100%; height: 100%; }
+    figcaption { position: absolute; left: 6px; top: 5px; padding: 2px 5px; border-radius: 3px; background: #06101bdd; color: #b7c9dc; font: 11px ui-monospace, monospace; }
+  </style>
+</head>
+<body>
+  <h1>Frank Roswell — isolated frame inspection</h1>
+  <p>Each card is one standalone PNG. Cyan is the root axis; magenta is the shared baseline.</p>
+  <main id="gallery"></main>
+  <script type="module" src="src/sprite-lab.js"></script>
+</body>
+</html>

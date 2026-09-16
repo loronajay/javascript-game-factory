@@ -95,6 +95,7 @@
 .online-player-card.is-disconnected { opacity: .55; }
 .online-lobby-actions { display: flex; justify-content: center; }
 .online-result-status { margin: 1rem 0 0; color: var(--gold); font-size: .72rem; font-weight: 800; }
+.online-rematch-status.is-refused { color: var(--danger, #ff7a7a); }
 
 .compact-identity-card { display: grid; min-height: 150px; overflow: hidden; grid-template-columns: 112px 1fr; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.035); text-align: left; }
 .compact-identity-card.is-you { border-color: rgba(243,46,63,.6); background: rgba(243,46,63,.08); }

@@ -132,6 +132,31 @@ test('a remote body is walked toward its last pose and turns the short way', () 
   assert.deepEqual(online.interpolatePose(null, target, 1 / 60), { ...target });
 });
 
+test('network camera yaw is turned into the avatar rig facing direction', () => {
+  assert.equal(online.avatarYaw(0), Math.PI);
+  assert.equal(online.avatarYaw(Math.PI / 2), Math.PI * 1.5);
+  assert.equal(online.avatarYaw(-Math.PI), 0);
+});
+
+test('a CPU guest can never be accepted as the seeker', () => {
+  let state = online.applyNetEvent(online.createNetState(), {
+    event: 'connected', clientId: 'me',
+  });
+  state = online.applyNetEvent(state, {
+    event: 'lobby_started',
+    matchState: {
+      seekerId: 'cpu-1',
+      players: [
+        { id: 'me', role: 'hider' },
+        { id: 'cpu-1', role: 'seeker' },
+      ],
+      round: { phase: 'hiding' },
+    },
+  });
+
+  assert.equal(online.hasPlayableSnapshot(state), false);
+});
+
 test('both halves of an interact press reach the authority', () => {
   const resting = online.describeInput({ yaw: 0.4 });
   const pressed = online.describeInput({ yaw: 0.4, interact: true });

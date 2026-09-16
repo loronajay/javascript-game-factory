@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dodgeballs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section class="game-shell" aria-label="Dodgeballs local versus game">
+      <div id="loading">CHARGING THE BALL…</div>
+      <canvas id="game"></canvas>
+    </section>
+    <section class="controls">
+      <div><strong>P1</strong><span>A D</span> move <span>W</span> jump <span>S</span> crouch / fast-fall <span>F</span> kick <span>G</span> dodge</div>
+      <div><strong>P2</strong><span>← →</span> move <span>↑</span> jump <span>↓</span> crouch / fast-fall <span>K</span> kick <span>L</span> dodge</div>
+      <div class="meta"><span>F1</span> hitboxes <span>R</span> restart</div>
+    </section>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
