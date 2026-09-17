@@ -20,6 +20,14 @@ const DEFAULT_CABINETS = Object.freeze([
         rotationY: 0,
         hidden: false,
     }),
+    Object.freeze({
+        instanceId: "sumorai-1",
+        cabinetId: "cabinet.sumorai.standard",
+        x: 0,
+        z: -2.8,
+        rotationY: 0,
+        hidden: false,
+    }),
 ]);
 /**
  * The three neon bars the room shipped with, now ordinary decor on the north

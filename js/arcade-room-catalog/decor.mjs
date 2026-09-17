@@ -18,8 +18,10 @@
 // SOME DECOR IS INTERACTIVE. An `interaction` names a page the player opens by
 // walking up and pressing E, with the same reach rules a cabinet has; the room
 // shows it in an overlay and knows nothing about what is inside. The Yam Bowling
-// calendar is the first: the print on the wall is the real cover, and the page
-// behind it is the calendar's own flip-through viewer.
+// calendar was the first: the print on the wall is the real cover, and the page
+// behind it is the calendar's own flip-through viewer. The jukebox is the second,
+// and the one whose page talks back — see `jukebox.mts`. Interactive items sit
+// first in their category so the editor shows them before the plain decor.
 export const DECOR_MOUNTS = Object.freeze(["floor", "wall", "ceiling"]);
 export const DECOR_CATEGORIES = Object.freeze([
     "neon",
@@ -146,23 +148,37 @@ export const DECOR_CATALOG = Object.freeze([
     decor({ slug: "beanbag", category: "furniture", title: "Beanbag", mounts: ["floor"], size: { width: 1.0, height: 0.55, depth: 1.0 }, blocksWalking: true, tint: "#a35bff", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "beanbag" } }),
     decor({ slug: "counter", category: "furniture", title: "Prize Counter", mounts: ["floor"], size: { width: 2.4, height: 1.1, depth: 0.8 }, blocksWalking: true, tint: "#22e5ff", light: { intensity: 1.2, distance: 3.5 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "counter" } }),
     // — Props (solid) —
+    // The jukebox is interactive: walk up, press E, and pick a record from every cabinet's
+    // soundtrack (`jukebox.mts`). The page only picks; the room plays, so the song keeps
+    // going after the overlay closes and gets quieter the further you walk from the box.
+    decor({
+        slug: "jukebox",
+        category: "prop",
+        title: "Jukebox",
+        mounts: ["floor"],
+        size: { width: 0.9, height: 1.5, depth: 0.65 },
+        blocksWalking: true,
+        tint: "#ff7a1a",
+        light: { intensity: 1.6, distance: 4 },
+        scale: SCALE_RANGES.prop,
+        model: { kind: "prop", prop: "jukebox" },
+        interaction: {
+            prompt: "Press E to pick a record on the jukebox",
+            url: "jukebox/index.html",
+            title: "Jukebox",
+            radius: 1.7,
+            facingThreshold: 0.45,
+        },
+    }),
     decor({ slug: "plant", category: "prop", title: "Potted Plant", mounts: ["floor"], size: { width: 0.55, height: 1.3, depth: 0.55 }, blocksWalking: true, tint: "#3e8a5a", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "plant" } }),
     decor({ slug: "trash-can", category: "prop", title: "Trash Can", mounts: ["floor"], size: { width: 0.42, height: 0.8, depth: 0.42 }, blocksWalking: true, tint: "#3c424b", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "trash-can" } }),
     decor({ slug: "stanchion", category: "prop", title: "Velvet Rope Post", mounts: ["floor"], size: { width: 0.36, height: 1.0, depth: 0.36 }, blocksWalking: true, tint: "#c9a24a", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "stanchion" } }),
-    decor({ slug: "jukebox", category: "prop", title: "Jukebox", mounts: ["floor"], size: { width: 0.9, height: 1.5, depth: 0.65 }, blocksWalking: true, tint: "#ff7a1a", light: { intensity: 1.6, distance: 4 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "jukebox" } }),
     decor({ slug: "vending", category: "prop", title: "Vending Machine", mounts: ["floor"], size: { width: 0.9, height: 1.9, depth: 0.8 }, blocksWalking: true, tint: "#3d7bff", light: { intensity: 1.4, distance: 3.5 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "vending" } }),
     decor({ slug: "claw", category: "prop", title: "Claw Machine", mounts: ["floor"], size: { width: 0.9, height: 2.0, depth: 0.9 }, blocksWalking: true, tint: "#ff2d95", light: { intensity: 1.4, distance: 3.5 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "claw" } }),
     decor({ slug: "pinball", category: "prop", title: "Pinball Table", mounts: ["floor"], size: { width: 0.75, height: 1.9, depth: 1.5 }, blocksWalking: true, tint: "#ffd33d", light: { intensity: 1.4, distance: 3.5 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "pinball" } }),
     decor({ slug: "popcorn", category: "prop", title: "Popcorn Cart", mounts: ["floor"], size: { width: 0.9, height: 1.6, depth: 0.7 }, blocksWalking: true, tint: "#ff3b3b", light: { intensity: 1.2, distance: 3 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "popcorn" } }),
     decor({ slug: "speaker-stack", category: "prop", title: "Speaker Stack", mounts: ["floor"], size: { width: 0.6, height: 1.4, depth: 0.5 }, blocksWalking: true, tint: "#111318", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "speaker-stack" } }),
     // — Wall —
-    decor({ slug: "clock", category: "wall", title: "Wall Clock", mounts: ["wall"], size: { width: 0.5, height: 0.5, depth: 0.06 }, wallHeight: 2.6, tint: "#eef0f2", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "clock" } }),
-    decor({ slug: "shelf", category: "wall", title: "Shelf", mounts: ["wall"], size: { width: 1.2, height: 0.3, depth: 0.28 }, wallHeight: 1.7, tint: "#9a6b36", length: { min: 0.6, max: 4, default: 1.2 }, model: { kind: "wall-prop", prop: "shelf" } }),
-    decor({ slug: "speaker", category: "wall", title: "Wall Speaker", mounts: ["wall"], size: { width: 0.35, height: 0.5, depth: 0.3 }, wallHeight: 3.0, tint: "#111318", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "speaker" } }),
-    decor({ slug: "tv", category: "wall", title: "Flat Screen", mounts: ["wall"], size: { width: 1.4, height: 0.8, depth: 0.08 }, wallHeight: 2.2, tint: "#22e5ff", light: { intensity: 1.2, distance: 3.5 }, scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "tv" } }),
-    decor({ slug: "mirror", category: "wall", title: "Mirror", mounts: ["wall"], size: { width: 0.8, height: 1.2, depth: 0.05 }, wallHeight: 1.7, tint: "#c9a24a", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "mirror" } }),
-    decor({ slug: "exit-sign", category: "wall", title: "Exit Sign", mounts: ["wall"], size: { width: 0.5, height: 0.25, depth: 0.1 }, wallHeight: 3.6, tint: "#7dff4d", light: { intensity: 0.8, distance: 2.5 }, scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "exit-sign" } }),
-    decor({ slug: "coat-hook", category: "wall", title: "Coat Hooks", mounts: ["wall"], size: { width: 0.6, height: 0.15, depth: 0.12 }, wallHeight: 1.7, tint: "#c7ccd3", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "coat-hook" } }),
     // The Yam Bowling 2027 calendar: the closed cover at 11 x 8.5 in, hung by a hook, and
     // interactive — walk up and press E to flip through it. Size is twice the real print so it
     // reads across the room; the player can scale it back down or up to a feature wall.
@@ -183,6 +199,13 @@ export const DECOR_CATALOG = Object.freeze([
             facingThreshold: 0.45,
         },
     }),
+    decor({ slug: "clock", category: "wall", title: "Wall Clock", mounts: ["wall"], size: { width: 0.5, height: 0.5, depth: 0.06 }, wallHeight: 2.6, tint: "#eef0f2", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "clock" } }),
+    decor({ slug: "shelf", category: "wall", title: "Shelf", mounts: ["wall"], size: { width: 1.2, height: 0.3, depth: 0.28 }, wallHeight: 1.7, tint: "#9a6b36", length: { min: 0.6, max: 4, default: 1.2 }, model: { kind: "wall-prop", prop: "shelf" } }),
+    decor({ slug: "speaker", category: "wall", title: "Wall Speaker", mounts: ["wall"], size: { width: 0.35, height: 0.5, depth: 0.3 }, wallHeight: 3.0, tint: "#111318", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "speaker" } }),
+    decor({ slug: "tv", category: "wall", title: "Flat Screen", mounts: ["wall"], size: { width: 1.4, height: 0.8, depth: 0.08 }, wallHeight: 2.2, tint: "#22e5ff", light: { intensity: 1.2, distance: 3.5 }, scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "tv" } }),
+    decor({ slug: "mirror", category: "wall", title: "Mirror", mounts: ["wall"], size: { width: 0.8, height: 1.2, depth: 0.05 }, wallHeight: 1.7, tint: "#c9a24a", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "mirror" } }),
+    decor({ slug: "exit-sign", category: "wall", title: "Exit Sign", mounts: ["wall"], size: { width: 0.5, height: 0.25, depth: 0.1 }, wallHeight: 3.6, tint: "#7dff4d", light: { intensity: 0.8, distance: 2.5 }, scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "exit-sign" } }),
+    decor({ slug: "coat-hook", category: "wall", title: "Coat Hooks", mounts: ["wall"], size: { width: 0.6, height: 0.15, depth: 0.12 }, wallHeight: 1.7, tint: "#c7ccd3", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "coat-hook" } }),
 ]);
 /**
  * Lit decor beyond this many gets no light source, only its glow material.

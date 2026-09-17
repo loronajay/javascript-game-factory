@@ -1,0 +1,131 @@
+/* The jukebox page: a warm record-list card that fits the Arcade Room's overlay frame
+   and stands on its own as a page. Nothing here knows how the sound is made. */
+
+.jukebox {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(120% 80% at 50% 0%, #2a1408 0%, #0b0f16 60%);
+  color: #f4f1ec;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.jukebox__stage {
+  box-sizing: border-box;
+  max-width: 900px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(14px, 2.5vw, 26px) clamp(12px, 3vw, 28px) clamp(18px, 3vw, 30px);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.jukebox__now {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 170, 90, .35);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 190, 120, .12), rgba(255, 190, 120, .03));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+.jukebox__disc {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, #101010 0 3px, #1c1c1c 3px 5px);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .06);
+}
+.jukebox__disc span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ff7a1a;
+  box-shadow: inset 0 0 0 3px #ffb070;
+}
+.jukebox[data-playing="true"] .jukebox__disc { animation: jukebox-spin 2.4s linear infinite; }
+@keyframes jukebox-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .jukebox[data-playing="true"] .jukebox__disc { animation: none; } }
+
+.jukebox__now-text { display: grid; gap: 2px; min-width: 0; }
+.jukebox__now-text strong { font-size: clamp(18px, 2.6vw, 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jukebox__now-text > span:last-child { color: #d8b89a; font-size: 13px; }
+.jukebox__eyebrow { font-size: 11px; letter-spacing: .18em; font-weight: 800; color: #ffb070; }
+.jukebox[data-playing="true"] .jukebox__eyebrow { color: #7dff4d; }
+
+.jukebox__controls { display: flex; gap: 6px; }
+.jukebox__controls button {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  color: #f4f1ec;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.jukebox__controls button:hover:not(:disabled) { background: rgba(255, 255, 255, .14); }
+.jukebox__controls button:disabled { opacity: .35; cursor: default; }
+.jukebox__toggle { background: #ff7a1a !important; color: #1a0c04 !important; border-color: transparent !important; min-width: 74px !important; }
+.jukebox__toggle:disabled { background: rgba(255, 122, 26, .3) !important; }
+
+.jukebox__hint { margin: 0; text-align: center; font-size: 13px; color: #9fb2c2; }
+
+.jukebox__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.jukebox-game {
+  padding: 12px 12px 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .03);
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+.jukebox-game h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #ffb070;
+}
+
+.jukebox-record {
+  display: grid;
+  grid-template-columns: 28px 1fr 14px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.jukebox-record:hover { background: rgba(255, 255, 255, .07); }
+.jukebox-record.is-current { border-color: rgba(255, 170, 90, .5); background: rgba(255, 122, 26, .12); }
+.jukebox-record__index { font-variant-numeric: tabular-nums; font-size: 12px; color: #8fa3b8; }
+.jukebox-record__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jukebox-record__mark { width: 10px; height: 10px; border-radius: 50%; background: transparent; }
+.jukebox-record.is-playing .jukebox-record__mark { background: #7dff4d; box-shadow: 0 0 10px #7dff4d; }
+.jukebox-record.is-current:not(.is-playing) .jukebox-record__mark { background: #ffb070; }
+
+@media (max-width: 560px) {
+  .jukebox__now { grid-template-columns: auto 1fr; }
+  .jukebox__controls { grid-column: 1 / -1; justify-content: center; }
+}

@@ -23,13 +23,27 @@ export const LOVERS_LOST_CABINET_ART = Object.freeze({
   spriteSheet: Object.freeze({ frameWidth: 16, frameHeight: 16, frameCount: 6 }),
 });
 
+export const SUMORAI_CABINET_ART = Object.freeze({
+  keyArt: "../grid-previews/sumorai.png",
+  sideArt: "../room/assets/cabinets/sumorai-side-panel.png",
+  splashArt: "../games/sumorai/assets/pngs/bg-splash.png",
+  playerOne: "../games/sumorai/assets/sprites/Player_1/idle.svg",
+  playerTwo: "../games/sumorai/assets/sprites/Player_2/idle.svg",
+});
+
+export const CABINET_MARQUEE_GEOMETRY = Object.freeze({
+  birdDuty: Object.freeze({ depth: 0.8, centerZ: 0, artZ: 0.407, bodyFrontZ: 0.28 }),
+  loversLost: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
+  sumorai: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
+});
+
 export const CABINET_CONTROL_SURFACE = Object.freeze({
   tiltRadians: -0.105,
   buttonAxis: "panel-normal" as const,
-  // Keep the playable edge close to the body. Deep, over-wide boxes read as
-  // disconnected bars when a cabinet is viewed from the side.
-  singleDeck: Object.freeze({ width: 0.82, depth: 0.3, centerZ: 0.285, faceZ: 0.43 }),
-  dualDeck: Object.freeze({ width: 0.88, depth: 0.32, centerZ: 0.295, faceZ: 0.45 }),
+  // Depth gives the player a readable control shelf while width stays inside
+  // the cabinet sides, avoiding the detached horizontal-bar silhouette.
+  singleDeck: Object.freeze({ width: 0.82, depth: 0.4, centerZ: 0.31, faceZ: 0.505 }),
+  dualDeck: Object.freeze({ width: 0.88, depth: 0.42, centerZ: 0.32, faceZ: 0.525 }),
   joystick: Object.freeze({
     shaftY: 1.165,
     shaftHeight: 0.09,
@@ -46,6 +60,13 @@ export const CABINET_PLAY_VIEW = Object.freeze({
 });
 
 export const LOVERS_LOST_PLAY_VIEW = Object.freeze({
+  position: Object.freeze({ x: 0, y: 1.49, z: 1.52 }),
+  fov: 34,
+  screen: Object.freeze({ width: 0.68, height: 0.3825, y: 1.5, z: 0.285 }),
+  gameAspect: 16 / 9,
+});
+
+export const SUMORAI_PLAY_VIEW = Object.freeze({
   position: Object.freeze({ x: 0, y: 1.49, z: 1.52 }),
   fov: 34,
   screen: Object.freeze({ width: 0.68, height: 0.3825, y: 1.5, z: 0.285 }),

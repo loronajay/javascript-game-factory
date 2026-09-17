@@ -1,8 +1,10 @@
 import type { CabinetDefinition } from "./arcade-room-cabinet.mjs";
 import {
   BIRD_DUTY_CABINET_ART,
+  CABINET_MARQUEE_GEOMETRY,
   CABINET_CONTROL_SURFACE,
   LOVERS_LOST_CABINET_ART,
+  SUMORAI_CABINET_ART,
 } from "./arcade-room-scene.mjs";
 
 // Three is vendored by the repository without type declarations. Keeping it at this module boundary
@@ -158,9 +160,6 @@ function createSideArtTexture(THREE: ThreeNamespace, side: "left" | "right"): an
     shade.addColorStop(1, "rgba(3, 12, 33, .68)");
     context.fillStyle = shade;
     context.fillRect(0, 0, 512, 1280);
-    context.strokeStyle = "#ff315f";
-    context.lineWidth = 18;
-    context.strokeRect(9, 9, 494, 1262);
     texture.needsUpdate = true;
   });
   return texture;
@@ -250,9 +249,77 @@ function createLoversSideArtTexture(THREE: ThreeNamespace, side: "left" | "right
     shade.addColorStop(1, "rgba(7, 4, 25, .72)");
     context.fillStyle = shade;
     context.fillRect(0, 0, 512, 1280);
-    context.strokeStyle = "#ff8ebd";
+    texture.needsUpdate = true;
+  });
+  return texture;
+}
+
+function createSumoraiMarqueeTexture(THREE: ThreeNamespace): any {
+  const texture = canvasTexture(THREE, 1024, 288, (context) => {
+    context.fillStyle = "#090607";
+    context.fillRect(0, 0, 1024, 288);
+    context.strokeStyle = "#c63c32";
     context.lineWidth = 18;
-    context.strokeRect(9, 9, 494, 1262);
+    context.strokeRect(9, 9, 1006, 270);
+  });
+  void loadImage(SUMORAI_CABINET_ART.splashArt).then((image) => {
+    const context = (texture.image as HTMLCanvasElement).getContext("2d");
+    if (!context) return;
+    const sourceHeight = image.naturalHeight * 0.42;
+    context.drawImage(image, 0, 0, image.naturalWidth, sourceHeight, 0, 0, 1024, 288);
+    context.strokeStyle = "#c63c32";
+    context.lineWidth = 18;
+    context.strokeRect(9, 9, 1006, 270);
+    texture.needsUpdate = true;
+  });
+  return texture;
+}
+
+function createSumoraiScreenTexture(THREE: ThreeNamespace): any {
+  const texture = canvasTexture(THREE, 960, 540, (context) => {
+    context.fillStyle = "#080607";
+    context.fillRect(0, 0, 960, 540);
+    context.fillStyle = "#e6d5b8";
+    context.font = "700 28px ui-monospace, monospace";
+    context.textAlign = "center";
+    context.fillText("SUMORAI · ATTRACT MODE", 480, 280);
+  });
+  void loadImage(SUMORAI_CABINET_ART.keyArt).then((image) => {
+    const context = (texture.image as HTMLCanvasElement).getContext("2d");
+    if (!context) return;
+    context.imageSmoothingEnabled = false;
+    drawImageCover(context, image, 960, 540);
+    texture.needsUpdate = true;
+  });
+  return texture;
+}
+
+function createSumoraiSideArtTexture(THREE: ThreeNamespace, side: "left" | "right"): any {
+  const texture = canvasTexture(THREE, 512, 1280, (context) => {
+    const gradient = context.createLinearGradient(0, 0, 0, 1280);
+    gradient.addColorStop(0, "#142c4d");
+    gradient.addColorStop(0.58, "#160d10");
+    gradient.addColorStop(1, "#050304");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 512, 1280);
+  });
+  void loadImage(SUMORAI_CABINET_ART.sideArt).then((image) => {
+    const context = (texture.image as HTMLCanvasElement).getContext("2d");
+    if (!context) return;
+    context.save();
+    if (side === "right") {
+      context.translate(512, 0);
+      context.scale(-1, 1);
+    }
+    context.imageSmoothingEnabled = true;
+    drawImageCover(context, image, 512, 1280);
+    context.restore();
+    const shade = context.createLinearGradient(0, 0, 0, 1280);
+    shade.addColorStop(0, "rgba(5, 3, 4, 0)");
+    shade.addColorStop(0.72, "rgba(5, 3, 4, .08)");
+    shade.addColorStop(1, "rgba(5, 3, 4, .66)");
+    context.fillStyle = shade;
+    context.fillRect(0, 0, 512, 1280);
     texture.needsUpdate = true;
   });
   return texture;
@@ -320,6 +387,23 @@ function addHeartTopper(THREE: ThreeNamespace, parent: any, palette: CabinetDefi
   return group;
 }
 
+function addEnsoTopper(THREE: ThreeNamespace, parent: any, palette: CabinetDefinition["palette"]): any {
+  const group = new THREE.Group();
+  group.name = "topper";
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.022, 10, 38, Math.PI * 1.72),
+    new THREE.MeshBasicMaterial({ color: palette.trim }),
+  );
+  ring.position.set(0, 2.17, 0.01);
+  ring.rotation.z = -0.42;
+  group.add(ring);
+  const halo = new THREE.PointLight(palette.trim, 1.35, 2.1, 2);
+  halo.position.set(0, 2.17, 0.08);
+  group.add(halo);
+  parent.add(group);
+  return group;
+}
+
 export function createBirdDutyCabinet(THREE: ThreeNamespace, definition: CabinetDefinition): any {
   const root = new THREE.Group();
   root.name = definition.id;
@@ -333,7 +417,8 @@ export function createBirdDutyCabinet(THREE: ThreeNamespace, definition: Cabinet
 
   addBox(THREE, root, "shell", [0.86, 1.13, 0.75], [0, 0.565, 0], shell);
   addBox(THREE, root, "upper-shell", [0.86, 0.73, 0.57], [0, 1.44, -0.09], shell);
-  addBox(THREE, root, "marquee-housing", [0.9, 0.28, 0.62], [0, 1.84, -0.055], trim);
+  const marqueeGeometry = CABINET_MARQUEE_GEOMETRY.birdDuty;
+  addBox(THREE, root, "marquee-housing", [0.9, 0.28, marqueeGeometry.depth], [0, 1.84, marqueeGeometry.centerZ], trim);
   addBox(THREE, root, "base-trim", [0.91, 0.08, 0.8], [0, 0.04, 0], black);
 
   const marquee = new THREE.Mesh(
@@ -341,7 +426,7 @@ export function createBirdDutyCabinet(THREE: ThreeNamespace, definition: Cabinet
     new THREE.MeshBasicMaterial({ map: createMarqueeTexture(THREE) }),
   );
   marquee.name = "marquee";
-  marquee.position.set(0, 1.84, 0.262);
+  marquee.position.set(0, 1.84, marqueeGeometry.artZ);
   root.add(marquee);
 
   addBox(THREE, root, "screen-bezel", [0.73, 0.53, 0.055], [0, 1.47, 0.225], black);
@@ -412,18 +497,15 @@ export function createLoversLostCabinet(THREE: ThreeNamespace, definition: Cabin
 
   addBox(THREE, root, "shell", [0.92, 1.14, 0.79], [0, 0.57, 0], shell);
   addBox(THREE, root, "upper-shell", [0.92, 0.75, 0.61], [0, 1.49, -0.09], shell);
-  addBox(THREE, root, "marquee-housing", [0.97, 0.3, 0.66], [0, 1.9, -0.045], trim);
+  const marqueeGeometry = CABINET_MARQUEE_GEOMETRY.loversLost;
+  addBox(THREE, root, "marquee-housing", [0.97, 0.3, marqueeGeometry.depth], [0, 1.9, marqueeGeometry.centerZ], trim);
   addBox(THREE, root, "base-trim", [0.97, 0.085, 0.84], [0, 0.043, 0], black);
-  for (const side of [-1, 1]) {
-    addBox(THREE, root, `light-rail-${side < 0 ? "left" : "right"}`, [0.035, 1.73, 0.04], [side * 0.472, 1.04, 0.39], trim);
-  }
-
   const marquee = new THREE.Mesh(
     new THREE.PlaneGeometry(0.84, 0.235),
     new THREE.MeshBasicMaterial({ map: createLoversMarqueeTexture(THREE) }),
   );
   marquee.name = "marquee";
-  marquee.position.set(0, 1.9, 0.292);
+  marquee.position.set(0, 1.9, marqueeGeometry.artZ);
   root.add(marquee);
 
   addBox(THREE, root, "screen-bezel", [0.8, 0.51, 0.06], [0, 1.5, 0.25], black);
@@ -482,8 +564,92 @@ export function createLoversLostCabinet(THREE: ThreeNamespace, definition: Cabin
   return root;
 }
 
+export function createSumoraiCabinet(THREE: ThreeNamespace, definition: CabinetDefinition): any {
+  const root = new THREE.Group();
+  root.name = definition.id;
+  root.userData = { cabinetId: definition.id, gameSlug: definition.gameSlug };
+
+  const shell = standardMaterial(THREE, definition.palette.shell, 0.52, 0.2);
+  const trim = standardMaterial(THREE, definition.palette.trim, 0.38, 0.18);
+  const deckPaint = standardMaterial(THREE, definition.palette.sky, 0.42, 0.18);
+  const black = standardMaterial(THREE, "#060405", 0.46, 0.34);
+  const bone = standardMaterial(THREE, definition.palette.warning, 0.38, 0.2);
+  const metal = standardMaterial(THREE, "#292629", 0.25, 0.74);
+
+  addBox(THREE, root, "shell", [0.92, 1.14, 0.79], [0, 0.57, 0], shell);
+  addBox(THREE, root, "upper-shell", [0.92, 0.75, 0.61], [0, 1.49, -0.09], shell);
+  const marqueeGeometry = CABINET_MARQUEE_GEOMETRY.sumorai;
+  addBox(THREE, root, "marquee-housing", [0.97, 0.3, marqueeGeometry.depth], [0, 1.9, marqueeGeometry.centerZ], trim);
+  addBox(THREE, root, "base-trim", [0.97, 0.085, 0.84], [0, 0.043, 0], black);
+
+  const marquee = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.84, 0.235),
+    new THREE.MeshBasicMaterial({ map: createSumoraiMarqueeTexture(THREE) }),
+  );
+  marquee.name = "marquee";
+  marquee.position.set(0, 1.9, marqueeGeometry.artZ);
+  root.add(marquee);
+
+  addBox(THREE, root, "screen-bezel", [0.8, 0.51, 0.06], [0, 1.5, 0.25], black);
+  const screen = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.68, 0.3825),
+    new THREE.MeshBasicMaterial({ map: createSumoraiScreenTexture(THREE) }),
+  );
+  screen.name = "screen";
+  screen.position.set(0, 1.5, 0.285);
+  root.add(screen);
+
+  const dualDeck = CABINET_CONTROL_SURFACE.dualDeck;
+  const deck = addBox(THREE, root, "control-deck", [dualDeck.width, 0.11, dualDeck.depth], [0, 1.105, dualDeck.centerZ], deckPaint);
+  deck.rotation.x = CABINET_CONTROL_SURFACE.tiltRadians;
+  addBox(THREE, root, "deck-face", [0.86, 0.18, 0.055], [0, 1.005, dualDeck.faceZ], shell);
+
+  for (const side of [-1, 1]) {
+    const stickX = side * 0.25;
+    const playerMaterial = side < 0 ? trim : bone;
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.023, 0.09, 12), metal);
+    stick.name = side < 0 ? "joystick-left" : "joystick-right";
+    stick.position.set(stickX, 1.165, 0.33);
+    stick.rotation.x = CABINET_CONTROL_SURFACE.tiltRadians;
+    stick.castShadow = true;
+    root.add(stick);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.046, 16, 12), playerMaterial);
+    ball.position.set(stickX, 1.215, 0.33);
+    ball.castShadow = true;
+    root.add(ball);
+    for (const [offsetX, z] of [[-0.064, 0.43], [0, 0.405], [0.064, 0.43]] as const) {
+      const button = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.027, 0.022, 16), playerMaterial);
+      button.rotation.x = CABINET_CONTROL_SURFACE.tiltRadians;
+      button.position.set(stickX + offsetX, 1.17, z);
+      button.castShadow = true;
+      root.add(button);
+    }
+  }
+
+  addBox(THREE, root, "coin-door", [0.42, 0.5, 0.038], [0, 0.52, 0.417], metal);
+  addBox(THREE, root, "coin-slot-left", [0.075, 0.14, 0.025], [-0.11, 0.64, 0.447], black);
+  addBox(THREE, root, "coin-slot-right", [0.075, 0.14, 0.025], [0.11, 0.64, 0.447], black);
+  addBox(THREE, root, "coin-return", [0.19, 0.075, 0.025], [0, 0.39, 0.447], black);
+
+  for (const side of [-1, 1]) {
+    const sideTexture = createSumoraiSideArtTexture(THREE, side < 0 ? "left" : "right");
+    const sideArt = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.66, 1.62),
+      new THREE.MeshBasicMaterial({ map: sideTexture }),
+    );
+    sideArt.name = side < 0 ? "side-art-left" : "side-art-right";
+    sideArt.rotation.y = side * Math.PI / 2;
+    sideArt.position.set(side * 0.463, 1.05, -0.025);
+    root.add(sideArt);
+  }
+
+  addEnsoTopper(THREE, root, definition.palette);
+  return root;
+}
+
 export function createCabinetModel(THREE: ThreeNamespace, definition: CabinetDefinition): any {
   if (definition.gameSlug === "bird-duty") return createBirdDutyCabinet(THREE, definition);
   if (definition.gameSlug === "lovers-lost") return createLoversLostCabinet(THREE, definition);
+  if (definition.gameSlug === "sumorai") return createSumoraiCabinet(THREE, definition);
   throw new Error(`No 3D cabinet model is registered for ${definition.gameSlug}`);
 }

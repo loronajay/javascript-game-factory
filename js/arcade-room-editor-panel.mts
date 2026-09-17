@@ -260,6 +260,11 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
       const meta = definition.mounts.map((mount) => MOUNT_TITLES[mount]).join(" · ");
       card.append(element("small", "decor-card__meta", meta));
+      // Something you can walk up to and use, not just look at: badge it so it stands out.
+      if (definition.interaction) {
+        card.classList.add("is-interactive");
+        card.append(element("span", "decor-card__badge", "PRESS E"));
+      }
       return card;
     }));
   }

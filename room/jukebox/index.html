@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jukebox | Javascript Game Factory</title>
+  <meta name="robots" content="noindex">
+  <!-- The jukebox's record list. The Arcade Room opens this over the 3D room when a player
+       walks up to a placed jukebox and presses E; picking a record here tells the room to
+       play it, and the song keeps going after this closes. Opened directly, it plays on
+       its own. -->
+  <link rel="stylesheet" href="jukebox.css">
+</head>
+<body class="jukebox" data-playing="false">
+  <main class="jukebox__stage">
+    <header class="jukebox__now">
+      <div class="jukebox__disc" aria-hidden="true"><span></span></div>
+      <div class="jukebox__now-text">
+        <span id="jukeboxNowState" class="jukebox__eyebrow">IDLE</span>
+        <strong id="jukeboxNowTitle">Nothing on the turntable</strong>
+        <span id="jukeboxNowGame">Pick a record below</span>
+      </div>
+      <div class="jukebox__controls" role="group" aria-label="Playback">
+        <button id="jukeboxPrevious" type="button" title="Previous record">&#9664;&#9664;</button>
+        <button id="jukeboxToggle" type="button" class="jukebox__toggle" disabled>Play</button>
+        <button id="jukeboxNext" type="button" title="Next record">&#9654;&#9654;</button>
+        <button id="jukeboxStop" type="button" title="Stop" disabled>&#9632;</button>
+      </div>
+    </header>
+    <p class="jukebox__hint">Every cabinet's soundtrack, one turntable &middot; <span id="jukeboxCount"></span> &middot; the music follows you round the room</p>
+    <div id="jukeboxList" class="jukebox__list" aria-label="Records"></div>
+  </main>
+  <script type="module" src="../../js/arcade-room-jukebox-page.mjs"></script>
+</body>
+</html>

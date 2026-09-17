@@ -13,7 +13,7 @@
     <header class="room-header">
       <a href="../grid.html" class="back-link">← Game Grid</a>
       <div>
-        <span id="roomEyebrow" class="eyebrow">PERSONAL SPACE · 2 CABINETS</span>
+        <span id="roomEyebrow" class="eyebrow">PERSONAL SPACE · 3 CABINETS</span>
         <h1 id="roomTitle">My Arcade</h1>
       </div>
       <a id="roomOwnerLink" class="back-link room-owner-link" href="../player/index.html" hidden>View profile</a>
@@ -24,13 +24,18 @@
       <div class="start-card">
         <span id="startTag" class="start-card__tag">YOUR 3D ARCADE</span>
         <h2 id="startHeading">Make the room yours.</h2>
-        <p id="startCopy">Walk up to play Bird Duty or Lovers Lost, then build the room out — floors, walls, neon and decor.</p>
+        <p id="startCopy">Walk up to play Bird Duty, Lovers Lost, or Sumorai, then build the room out — floors, walls, neon and decor.</p>
         <button id="enterShowroom" type="button">Enter my arcade</button>
         <small id="roomStatus">Click to capture the mouse · WASD to move · E to play · B to build</small>
       </div>
     </section>
 
     <div id="cabinetPrompt" class="cabinet-prompt" aria-live="polite"></div>
+    <div id="jukeboxNowPlaying" class="jukebox-chip" aria-live="polite" hidden>
+      <span class="jukebox-chip__disc" aria-hidden="true"></span>
+      <span class="jukebox-chip__label">NOW PLAYING</span>
+      <span id="jukeboxNowPlayingTitle" class="jukebox-chip__title"></span>
+    </div>
     <div class="control-hint" aria-hidden="true">
       <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span><span class="control-hint__build"><b>B</b> Build</span>
     </div>

@@ -94,6 +94,41 @@ button, a { font: inherit; }
 .cabinet-prompt.is-visible { opacity: 1; translate: -50% 0; }
 .cabinet-prompt::first-letter { color: #ffd33d; }
 
+/* What the jukebox is playing, pinned to the bottom-left while a record is on. */
+.jukebox-chip {
+  position: fixed;
+  z-index: 5;
+  left: 18px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  padding: 9px 14px 9px 10px;
+  border: 1px solid rgba(255, 170, 90, .55);
+  border-radius: 10px;
+  background: rgba(7, 16, 27, .9);
+  color: #fff1d6;
+  pointer-events: none;
+  box-shadow: 0 15px 45px rgba(0,0,0,.4);
+}
+.jukebox-chip[hidden] { display: none; }
+.jukebox-chip__disc {
+  grid-row: 1 / span 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, #101010 0 2px, #1e1e1e 2px 3px);
+  box-shadow: inset 0 0 0 4px #ff7a1a, inset 0 0 0 6px #101010;
+  animation: jukebox-chip-spin 2.4s linear infinite;
+}
+@keyframes jukebox-chip-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .jukebox-chip__disc { animation: none; } }
+.jukebox-chip__label { font-size: 10px; letter-spacing: .18em; font-weight: 800; color: #ffb070; }
+.jukebox-chip__title { font-size: 13px; font-weight: 700; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-playing .jukebox-chip, .is-editing .jukebox-chip { display: none; }
+
 .control-hint { position: fixed; z-index: 2; right: 24px; bottom: 20px; display: flex; gap: 8px; color: #9db0c0; font-size: 11px; }
 .control-hint span { padding: 7px 9px; background: rgba(4, 10, 18, .68); border: 1px solid rgba(255,255,255,.1); border-radius: 7px; }
 .control-hint b { color: #fff; margin-right: 5px; }
@@ -279,7 +314,7 @@ button, a { font: inherit; }
 .category-chip:hover { border-color: rgba(112, 232, 255, .6); color: #fff; }
 .category-chip[aria-pressed="true"] { border-color: #70e8ff; background: rgba(112, 232, 255, .16); color: #fff; }
 .decor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.decor-card { display: grid; gap: 4px; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.04); color: #e6f0f8; text-align: center; cursor: pointer; }
+.decor-card { position: relative; display: grid; gap: 4px; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.04); color: #e6f0f8; text-align: center; cursor: pointer; }
 .decor-card:hover { border-color: #70e8ff; background: rgba(112, 232, 255, .1); }
 .decor-card:active { transform: scale(.97); }
 .decor-card:disabled { opacity: .35; cursor: not-allowed; }
@@ -294,6 +329,8 @@ button, a { font: inherit; }
 .decor-card__icon[data-kind="poster"] img { object-fit: cover; padding: 0; }
 .decor-card__title { font: 800 10px/1.2 ui-monospace, monospace; }
 .decor-card__meta { color: #71899a; font: 700 8px/1 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.decor-card.is-interactive { border-color: rgba(255, 211, 61, .55); }
+.decor-card__badge { position: absolute; top: 6px; left: 6px; padding: 3px 5px; border-radius: 4px; background: #ffd33d; color: #1a1400; font: 900 7px/1 ui-monospace, monospace; letter-spacing: .1em; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
 
 .inspector { margin-bottom: 12px; padding: 12px; border: 1px solid rgba(255, 211, 61, .45); border-radius: 12px; background: rgba(255, 211, 61, .06); }
 .inspector[hidden] { display: none; }

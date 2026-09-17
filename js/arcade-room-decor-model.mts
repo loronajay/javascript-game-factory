@@ -116,6 +116,104 @@ function rugPattern(context: CanvasRenderingContext2D, w: number, h: number, col
   }
 }
 
+/**
+ * A 1950s bubbler jukebox: a wood body, a domed top with the tinted bubble tubes
+ * running up and over it, a lit title window with a record on the turntable, a
+ * slatted speaker grille, chrome pilasters and a row of selector keys. The arch
+ * tubes carry `userData.jukeboxGlow` so the room can pulse them while a record
+ * plays; nothing else here knows the box makes sound.
+ */
+function buildJukebox(THREE: ThreeNamespace, group: any, size: Size, color: string): void {
+  const w = size.width;
+  const h = size.height;
+  const d = size.depth;
+  const bottom = -h / 2;
+  const wood = standard(THREE, "#4a2416", 0.5, 0.15);
+  const darkWood = standard(THREE, "#2b140c", 0.6, 0.1);
+  const chrome = standard(THREE, "#d8dde4", 0.18, 0.95);
+  const domeY = bottom + h * 0.68;
+  const domeRadius = w / 2;
+  // Body up to where the dome starts, plus a plinth so it sits on the floor.
+  box(THREE, group, [w, h * 0.06, d], [0, bottom + h * 0.03, 0], darkWood);
+  box(THREE, group, [w, h * 0.62, d], [0, bottom + h * 0.06 + h * 0.31, 0], wood);
+  // The dome: a half cylinder whose flat face is the body top, arching over the front-to-back
+  // axis. CylinderGeometry's arc runs around its own Y from +Z, so a half arc starting a
+  // quarter-turn back covers the +Z side, and tipping it back a quarter-turn puts that side UP.
+  const dome = new THREE.Mesh(new THREE.CylinderGeometry(domeRadius, domeRadius, d, 32, 1, false, -Math.PI / 2, Math.PI), wood);
+  dome.rotation.x = -Math.PI / 2;
+  dome.position.set(0, domeY, 0);
+  dome.castShadow = true;
+  dome.receiveShadow = true;
+  group.add(dome);
+  // Chrome pilasters down each front edge, meeting the dome.
+  for (const x of [-w / 2 + 0.035, w / 2 - 0.035]) {
+    box(THREE, group, [0.05, h * 0.62, 0.04], [x, bottom + h * 0.06 + h * 0.31, d / 2 - 0.01], chrome, false);
+  }
+  // Bubble tubes: two arches over the dome and a straight run down each pilaster, all in the tint.
+  const frontZ = d / 2 + 0.012;
+  for (const [radius, tube] of [[domeRadius - 0.045, 0.028], [domeRadius - 0.13, 0.02]] as const) {
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 10, 40, Math.PI), glow(THREE, color, 2.2));
+    arch.position.set(0, domeY, frontZ);
+    arch.userData.jukeboxGlow = true;
+    group.add(arch);
+    const legMaterial = glow(THREE, color, 2.2);
+    for (const sign of [-1, 1]) {
+      const leg = box(THREE, group, [tube * 2, h * 0.58, tube * 2], [sign * radius, bottom + h * 0.06 + h * 0.33, frontZ], legMaterial, false);
+      leg.userData.jukeboxGlow = true;
+    }
+  }
+  // The lit title window under the dome, with a spinning-record graphic on it.
+  canvasPlane(THREE, group, w * 0.66, h * 0.22, [512, 176], (context, cw, ch) => {
+    const gradient = context.createLinearGradient(0, 0, 0, ch);
+    gradient.addColorStop(0, "#fff1d6");
+    gradient.addColorStop(1, "#ffcf8a");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, cw, ch);
+    context.fillStyle = "#151515";
+    context.beginPath();
+    context.arc(cw * 0.3, ch * 0.5, ch * 0.36, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(cw * 0.3, ch * 0.5, ch * 0.13, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(255,255,255,.35)";
+    context.lineWidth = 2;
+    for (const r of [0.2, 0.26, 0.32]) {
+      context.beginPath();
+      context.arc(cw * 0.3, ch * 0.5, ch * r, 0, Math.PI * 2);
+      context.stroke();
+    }
+    context.fillStyle = "#3a1e12";
+    context.font = "900 54px 'Arial Black', Impact, sans-serif";
+    context.textAlign = "left";
+    context.textBaseline = "middle";
+    context.fillText("JAY", cw * 0.55, ch * 0.36);
+    context.font = "700 30px 'Arial', sans-serif";
+    context.fillText("ARCADE", cw * 0.55, ch * 0.7);
+  }, [0, bottom + h * 0.6, frontZ], false);
+  box(THREE, group, [w * 0.66, h * 0.22, 0.01], [0, bottom + h * 0.6, frontZ - 0.006], glow(THREE, "#ffd8a8", 0.5), false);
+  // The selector keys: a chrome ledge and a row of round buttons.
+  box(THREE, group, [w * 0.7, 0.03, 0.05], [0, bottom + h * 0.44, frontZ + 0.02], chrome, false);
+  for (let index = 0; index < 8; index += 1) {
+    const key = cylinder(THREE, group, 0.016, 0.016, 0.02, [(index - 3.5) * (w * 0.62 / 7), bottom + h * 0.465, frontZ + 0.02], index % 2 ? standard(THREE, "#f0f0f0", 0.4, 0.2) : standard(THREE, color, 0.4, 0.2), 10);
+    key.rotation.x = Math.PI / 2;
+  }
+  // The speaker grille: a warm cloth panel behind chrome slats.
+  canvasPlane(THREE, group, w * 0.72, h * 0.28, [512, 220], (context, cw, ch) => {
+    context.fillStyle = "#6b3d22";
+    context.fillRect(0, 0, cw, ch);
+    context.fillStyle = "rgba(0,0,0,.35)";
+    for (let y = 0; y < ch; y += 8) {
+      for (let x = (y / 8) % 2 ? 4 : 0; x < cw; x += 8) context.fillRect(x, y, 3, 3);
+    }
+    context.fillStyle = "#d8dde4";
+    for (let y = 10; y < ch; y += 34) context.fillRect(0, y, cw, 6);
+  }, [0, bottom + h * 0.23, frontZ], false);
+  // A chrome band across the bottom of the front.
+  box(THREE, group, [w, 0.035, 0.03], [0, bottom + h * 0.08, d / 2 + 0.005], chrome, false);
+}
+
 const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
   "strip": (THREE, group, size, color) => {
     box(THREE, group, [size.width, size.height * 0.7, size.depth * 0.7], [0, 0, -size.depth * 0.1], standard(THREE, "#1a1d24", 0.5, 0.4), false);
@@ -275,16 +373,7 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
         break;
       }
       case "jukebox": {
-        box(THREE, group, [w, h * 0.62, d], [0, bottom + h * 0.31, 0], standard(THREE, "#3a1e12", 0.55, 0.15));
-        const dome = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, d, 24, 1, false, 0, Math.PI), standard(THREE, "#3a1e12", 0.55, 0.15));
-        dome.rotation.set(Math.PI / 2, 0, 0);
-        dome.position.set(0, bottom + h * 0.62, 0);
-        group.add(dome);
-        const arch = new THREE.Mesh(new THREE.TorusGeometry(w * 0.42, 0.035, 8, 24, Math.PI), glow(THREE, color, 2));
-        arch.position.set(0, bottom + h * 0.62, d / 2 + 0.01);
-        group.add(arch);
-        box(THREE, group, [w * 0.7, h * 0.22, 0.02], [0, bottom + h * 0.52, d / 2 + 0.005], glow(THREE, "#ffd8a8", 0.8), false);
-        box(THREE, group, [w * 0.8, h * 0.16, 0.03], [0, bottom + h * 0.2, d / 2 + 0.01], standard(THREE, "#c9a24a", 0.3, 0.8), false);
+        buildJukebox(THREE, group, size, color);
         break;
       }
       case "vending": {
@@ -499,6 +588,18 @@ export function createDecorModel(THREE: ThreeNamespace, definition: DecorDefinit
 export function placeDecorModel(model: any, item: RoomDecorItem): void {
   model.position.set(item.x, item.y, item.z);
   model.rotation.set(0, item.rotationY, 0);
+}
+
+/**
+ * Breathe the jukebox's bubble tubes while a record plays: `pulse` is 0–1 from the room's
+ * clock, 0 meaning silent, and only meshes the builder tagged are touched.
+ */
+export function pulseJukeboxGlow(model: any, pulse: number): void {
+  if (!model) return;
+  const intensity = 2.2 + pulse * 1.8;
+  model.traverse((object: any) => {
+    if (object.userData?.jukeboxGlow && object.material) object.material.emissiveIntensity = intensity;
+  });
 }
 
 export function disposeDecorModel(model: any): void {

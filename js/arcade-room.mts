@@ -12,12 +12,14 @@ import {
 } from "./arcade-room-interaction.mjs";
 import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
 import { createCabinetModel } from "./arcade-room-model.mjs";
+import { JUKEBOX_ITEM_ID, createRoomJukebox } from "./arcade-room-jukebox.mjs";
+import { pulseJukeboxGlow } from "./arcade-room-decor-model.mjs";
 import { createRoomInventory } from "./arcade-room-catalog/inventory.mjs";
 import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
-import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL } from "./arcade-room-scene.mjs";
+import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SUMORAI_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
 
 const THREE: any = THREE_VENDOR;
@@ -40,6 +42,8 @@ const decorOverlayLayer = requiredElement<HTMLElement>("#decorOverlay");
 const decorOverlayFrame = requiredElement<HTMLIFrameElement>("#decorOverlayFrame");
 const decorOverlayTitle = requiredElement<HTMLElement>("#decorOverlayTitle");
 const decorOverlayClose = requiredElement<HTMLButtonElement>("#closeDecorOverlay");
+const jukeboxChip = requiredElement<HTMLElement>("#jukeboxNowPlaying");
+const jukeboxChipTitle = requiredElement<HTMLElement>("#jukeboxNowPlayingTitle");
 const enterButton = requiredElement<HTMLButtonElement>("#enterShowroom");
 const status = requiredElement<HTMLElement>("#roomStatus");
 const editorPanel = requiredElement<HTMLElement>("#roomEditor");
@@ -99,7 +103,7 @@ function applyRoomIdentity(): void {
   roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
   ownerLink.hidden = true;
   if (!layoutStore.accountBacked) {
-    startCopy.textContent = "Walk up to play Bird Duty or Lovers Lost, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
+    startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, or Sumorai, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
   }
 }
 applyRoomIdentity();
@@ -174,6 +178,7 @@ type CabinetRuntime = Readonly<{
 const playViews: Readonly<Record<string, CabinetPlayView>> = Object.freeze({
   "bird-duty": CABINET_PLAY_VIEW,
   "lovers-lost": LOVERS_LOST_PLAY_VIEW,
+  "sumorai": SUMORAI_PLAY_VIEW,
 });
 
 const cabinets: CabinetRuntime[] = CABINET_CATALOG.map((definition) => {
@@ -337,8 +342,20 @@ const decorOverlay = createDecorOverlay({
   },
 });
 
+// The jukebox is the one decor item whose page talks back: the room plays what it picks,
+// from the box the player opened, and keeps playing after the overlay closes.
+const jukebox = createRoomJukebox({
+  siteRoot: new URL("../", location.href).toString(),
+  frame: decorOverlayFrame,
+  onChange: (state) => {
+    jukeboxChip.hidden = !state.playing || !state.track;
+    jukeboxChipTitle.textContent = state.track ? `${state.track.title} · ${state.track.gameTitle}` : "";
+  },
+});
+
 function openDecor(): void {
   if (!nearbyDecor || playing || decorOverlay.isOpen() || roomEditor.isEditing()) return;
+  if (nearbyDecor.item.itemId === JUKEBOX_ITEM_ID) jukebox.attach(nearbyDecor.item.instanceId);
   decorOverlay.open(nearbyDecor.definition);
 }
 
@@ -363,6 +380,7 @@ function openCabinet(): void {
   activeCabinet = nearbyCabinet;
   session = openCabinetSession(createCabinetSession(activeCabinet.definition.id));
   playing = true;
+  jukebox.suspend();
   prePlayView = { ...player, fov: camera.fov };
   const placement = roomEditor.getCabinetPlacement(activeCabinet.definition.id);
   if (!placement) return;
@@ -391,6 +409,7 @@ function closeCabinet(): void {
   setPlayFullscreen(false);
   session = closeCabinetSession(session);
   playing = false;
+  jukebox.resume();
   gameFrame.src = "about:blank";
   playLayer.hidden = true;
   playLayer.setAttribute("aria-hidden", "true");
@@ -548,8 +567,11 @@ function frame(now: number): void {
   while (accumulator >= TICK_SECONDS) {
     updatePlayer(TICK_SECONDS);
     updateInteraction();
+    jukebox.update(player, roomEditor.getLayout().decor);
     accumulator -= TICK_SECONDS;
   }
+  const jukeboxSource = jukebox.status().sourceInstanceId;
+  if (jukeboxSource) pulseJukeboxGlow(decorRuntime.modelFor(jukeboxSource), jukebox.pulse(now));
   applyCamera();
   resize();
   camera.updateMatrixWorld();

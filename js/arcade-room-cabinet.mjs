@@ -62,9 +62,42 @@ export const LOVERS_LOST_CABINET = Object.freeze({
         Object.freeze({ id: "topper", material: "emissive" }),
     ]),
 });
+export const SUMORAI_CABINET = Object.freeze({
+    id: "cabinet.sumorai.standard",
+    kind: "arcade-cabinet",
+    gameSlug: "sumorai",
+    title: "Sumorai",
+    description: "A black-and-crimson two-player cabinet with moonlit forest art, dueling controls, and an enso blade topper.",
+    dimensions: Object.freeze({ width: 0.92, depth: 0.98, height: 2.3 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+    unlock: Object.freeze({ type: "starter", source: "Sumorai cabinet collection" }),
+    interaction: Object.freeze({
+        radius: 1.62,
+        facingThreshold: 0.42,
+        anchor: Object.freeze({ x: 0, y: 1.2, z: 0.51 }),
+    }),
+    palette: Object.freeze({
+        shell: "#160d10",
+        trim: "#c63c32",
+        sky: "#142c4d",
+        grass: "#243f43",
+        warning: "#e6d5b8",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "shell", material: "paint" }),
+        Object.freeze({ id: "side-art-left", material: "decal" }),
+        Object.freeze({ id: "side-art-right", material: "decal" }),
+        Object.freeze({ id: "marquee", material: "emissive" }),
+        Object.freeze({ id: "screen", material: "emissive" }),
+        Object.freeze({ id: "control-deck", material: "paint" }),
+        Object.freeze({ id: "coin-door", material: "metal" }),
+        Object.freeze({ id: "topper", material: "emissive" }),
+    ]),
+});
 export const CABINET_CATALOG = Object.freeze([
     BIRD_DUTY_CABINET,
     LOVERS_LOST_CABINET,
+    SUMORAI_CABINET,
 ]);
 export function getCabinetFootprint(definition) {
     const padding = definition.placement.clearance * 2;
