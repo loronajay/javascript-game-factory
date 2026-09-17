@@ -5,6 +5,7 @@
 // `PLAYING` is the game's single "the simulation is running" answer: the loop pauses whenever the
 // player is not locked in, which is what stops meters like heat from ticking behind a menu.
 import { createMapPicker } from './map-picker.js';
+import { createFullscreen } from './fullscreen.js';
 
 export function createMenu({ logic, document, window, onPlay, onStartSingle, onScreen, onQuit, onPrepareMap, maps = null, mapSession = null, canPause = () => true }) {
   const overlay = document.getElementById('overlay');
@@ -19,6 +20,9 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     [logic.SCREENS.PAUSE, document.getElementById('menuPause')],
   ]);
   let state = logic.createMenuState();
+  // The fullscreen toggles on the title and pause screens. Not a menu action: it never changes which
+  // screen is showing, so it does not go through the state machine.
+  createFullscreen({ document });
   let onlineResult = false;
   let onlineMatch = false;
   const hiderInput = document.getElementById('soloHiderCount');

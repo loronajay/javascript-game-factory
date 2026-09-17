@@ -22,6 +22,7 @@ From a terminal the equivalent is `npm start`.
 | Interact | E |
 | Flashlight | F |
 | Pause | Esc |
+| Fullscreen | the **Fullscreen** button on the title screen or the pause menu (Esc leaves it) |
 | Spectate | Q / E, brackets, arrows, or the on-screen buttons |
 
 Browsers without Pointer Lock fall back to click-and-drag mouse look automatically.

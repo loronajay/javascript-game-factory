@@ -58,7 +58,14 @@ export function createOnlineController({ doc, match, account = unavailableAccoun
     on(doc.defaultView, 'focus', refreshAccount);
     on(doc.defaultView, 'storage', refreshAccount);
     on(doc.defaultView, 'pagehide', () => client.leave());
-    const unsubscribe = client.subscribe(render);
+    // Snapshots arrive at SNAPSHOT_HZ during a match; the lobby panel has
+    // nothing new to say until the status changes, so it does not redraw.
+    let renderedStatus = '';
+    const unsubscribe = client.subscribe(snapshot => {
+        if (snapshot.status === 'playing' && renderedStatus === 'playing') return;
+        renderedStatus = snapshot.status;
+        render();
+    });
     render();
     return {
         handle(event) {

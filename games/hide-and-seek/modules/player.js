@@ -5,6 +5,12 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   const forceDragLook = controls.shouldAutoStartDragLook(window.location.search);
   const raycaster = new THREE.Raycaster(); raycaster.far = CONFIG.interactDistance;
   const shouldScanInteractions = performance.createIntervalGate(0.08);
+  // E as the wire sees it. Online the authority reads a rising edge off the input stream, so a tap
+  // has to be in at least one sent frame as down and a later one as up; the latch guarantees both
+  // however short the tap was. Offline `interact()` fires straight off the keydown and never reads it,
+  // and nothing samples it, so it is reset whenever the player is not in play rather than banking
+  // presses that a later online round would replay.
+  const interactKey = controls.createPressLatch();
   let currentEyeHeight = CONFIG.eyeHeight;
   let flashlightState = flashlightLogic.createFlashlightState();
   // The toggle this client is still waiting for the authority to acknowledge. Offline it is set and
@@ -174,13 +180,13 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     // E and F belong to the spectator's switcher and to nothing else once the player is out. The
     // interaction scan stops with `update`, so `activeInteractable` keeps whatever the crosshair was
     // on at the moment of the catch — and E used to keep opening that same door from the grave.
-    window.addEventListener('keydown', (event) => { keys[event.code] = true; if (world.state.playerSpectating) return; if (event.code === 'Escape' && dragLookMode) leaveDragLookMode(); if (event.code === 'KeyE' && !event.repeat) interact(); if (event.code === 'KeyF' && !event.repeat && world.state.isLocked && !world.state.gameOver) toggleFlashlight(); }); window.addEventListener('keyup', (event) => { keys[event.code] = false; });
+    window.addEventListener('keydown', (event) => { keys[event.code] = true; if (world.state.playerSpectating) return; if (event.code === 'Escape' && dragLookMode) leaveDragLookMode(); if (event.code === 'KeyE' && !event.repeat) { interactKey.press(); interact(); } if (event.code === 'KeyF' && !event.repeat && world.state.isLocked && !world.state.gameOver) toggleFlashlight(); }); window.addEventListener('keyup', (event) => { keys[event.code] = false; if (event.code === 'KeyE') interactKey.release(); });
     for (const [id, code] of Object.entries({ moveUp: 'KeyW', moveDown: 'KeyS', moveLeft: 'KeyA', moveRight: 'KeyD' })) { const button = document.getElementById(id); const press = (event) => { event.preventDefault(); keys[code] = true; }; const release = (event) => { event.preventDefault(); keys[code] = false; }; button.addEventListener('pointerdown', press); button.addEventListener('pointerup', release); button.addEventListener('pointercancel', release); button.addEventListener('pointerleave', release); }
     const interactButton = document.getElementById('interactBtn');
-    // The button holds the key down for a beat rather than firing once: online the authority reads a
-    // rising edge off the input stream, and a flag that is never true in a sent frame is never seen.
-    interactButton.addEventListener('pointerdown', (event) => { event.preventDefault(); keys.KeyE = true; interact(); });
-    for (const release of ['pointerup', 'pointercancel', 'pointerleave']) interactButton.addEventListener(release, () => { keys.KeyE = false; }); renderer.domElement.style.touchAction = 'none';
+    // The button is the same latched key as E: a tap is sent as one down frame and one up frame
+    // even when the finger was gone before the next tick sampled it.
+    interactButton.addEventListener('pointerdown', (event) => { event.preventDefault(); interactKey.press(); interact(); });
+    for (const release of ['pointerup', 'pointercancel', 'pointerleave']) interactButton.addEventListener(release, () => { interactKey.release(); }); renderer.domElement.style.touchAction = 'none';
     const crouchButton = document.getElementById('crouchBtn');
     if (crouchButton) { const crouchOn = (event) => { event.preventDefault(); keys.KeyC = true; }; const crouchOff = (event) => { event.preventDefault(); keys.KeyC = false; }; crouchButton.addEventListener('pointerdown', crouchOn); crouchButton.addEventListener('pointerup', crouchOff); crouchButton.addEventListener('pointercancel', crouchOff); crouchButton.addEventListener('pointerleave', crouchOff); }
     const flashlightButton = document.getElementById('flashlightBtn');
@@ -190,7 +196,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     const clearLook = (event) => { if (event.pointerId === lookTouchId) lookTouchId = null; if (event.pointerId === mouseLookPointerId) mouseLookPointerId = null; }; renderer.domElement.addEventListener('pointerup', clearLook); renderer.domElement.addEventListener('pointercancel', clearLook);
   }
   function update(delta, elapsed) {
-    if (!world.state.isLocked || world.state.gameOver || world.state.playerSpectating) { world.state.activeInteractable = null; world.promptEl.classList.remove('visible'); return; }
+    if (!world.state.isLocked || world.state.gameOver || world.state.playerSpectating) { world.state.activeInteractable = null; world.promptEl.classList.remove('visible'); interactKey.reset(); return; }
     const previousFlashlight = flashlightState;
     flashlightState = flashlightLogic.tickFlashlight(flashlightState, delta, flashlightConfig);
     if (Math.ceil(previousFlashlight.charge * 100) !== Math.ceil(flashlightState.charge * 100) || previousFlashlight.on !== flashlightState.on) paintFlashlight();
@@ -225,7 +231,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
       crouch: !!(keys.KeyC || keys.ControlLeft || keys.ControlRight),
       sprint: !!(keys.ShiftLeft || keys.ShiftRight),
       light: flashlightState.on,
-      interact: !!keys.KeyE,
+      interact: interactKey.sample(),
       // What the crosshair is on. The authority still decides what opened — it re-tests reach on
       // this exact fixture and falls back to its own cone pick — but without it, two fixtures in one
       // cone are resolved by distance on the server and by the raycast here, and the player watches

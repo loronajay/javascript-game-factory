@@ -610,6 +610,55 @@ function beginUnit(unit) {
   }
 }
 
+<<<<<<< Updated upstream
+=======
+// Command one of my ready units in real-time — instantly, no matter what is on the board.
+// Frees the shared activation slot from whoever holds it (a CPU mid-animation, or my own
+// previous piece) and opens this unit's command HUD right away. The one thing that defers a
+// click is an instant-ART cast in flight (tempoBusy), guarded by beginUnit/inputLocked.
+function beginTempoUnit(unit) {
+  if (state.phase !== "playing" || dialogue.isOpen() || tempoBusy) return;
+  if (!isLocalTempoCommander(unit)) return;
+  // Already commanding this unit — just refocus its panel.
+  if (state.activation?.unitId === unit.id) {
+    selectedId = unit.id;
+    mode = null;
+    volleyShotOrigin = null;
+    audio.play("unitSelect");
+    setMessage(`${unit.nickname || getUnitType(unit.type).name} ready. Choose an action.`);
+    render();
+    return;
+  }
+  releaseTempoSlot(unit.id);
+  // beginActivation replaces a fresh (un-acted) foreign activation and starts on a freed slot,
+  // so we just dispatch — releaseTempoSlot already retired any activation that had acted/moved.
+  if (dispatch(beginActivation(unit.player, unit.id))) {
+    selectedId = unit.id;
+    mode = null;
+    volleyShotOrigin = null;
+    audio.play("unitSelect");
+    setMessage(`${unit.nickname || getUnitType(unit.type).name} ready. Choose an action.`);
+    render();
+  }
+}
+
+// Free the single activation slot for the player, whoever holds it. A CPU holder is told to
+// stand down (tempoCpuAbort). Whatever it had already done in state stays; because rolled
+// actions commit up front, the board is consistent. A slot that has already acted is finished;
+// a move-only one is reverted (cancelMove) so the piece keeps its readiness for a retry; a
+// fresh one is simply left for beginActivation to replace.
+function releaseTempoSlot(exceptId) {
+  const activation = state.activation;
+  if (!activation || activation.unitId === exceptId) return;
+  const holder = findUnit(state, activation.unitId);
+  if (isCpu(holder?.player)) tempoCpuAbort = true;
+  if (!holder) return;
+  if (activation.primaryUsed) dispatch(finishActivation(holder.player, holder.id));
+  else if (activation.moved) dispatch(cancelMove(holder.player, holder.id));
+}
+
+
+>>>>>>> Stashed changes
 // --- Input wiring ---
 
 document.querySelector("#restartBtn").addEventListener("click", resetBattle);

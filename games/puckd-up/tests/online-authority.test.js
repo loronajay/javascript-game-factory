@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAuthority } from '../server/authority.js';
 import { createMatch } from '../scripts/core/match.js';
-import { toSeatSnapshot, validSnapshot } from '../scripts/online/protocol.js';
+import { INPUT_BURST, toSeatSnapshot, validSnapshot } from '../scripts/online/protocol.js';
 
 function bodies() {
     const vec = (x = 0, y = 0, z = 0) => ({ x, y, z, set(x, y, z) { Object.assign(this, { x, y, z }); } });
@@ -23,7 +23,11 @@ test('authority accepts only current seated, sequenced, finite, bounded intent',
     assert.equal(engine.input('a', { ...input, x: NaN }), false);
     assert.equal(engine.input('a', input), true);
     assert.equal(engine.input('a', input), false);
-    assert.equal(engine.input('a', { ...input, seq: 2 }), false, 'rate limit within a server tick');
+    // Coalesced commands are honoured up to the burst budget; a flood is not.
+    for (let seq = 2; seq <= INPUT_BURST; seq++) assert.equal(engine.input('a', { ...input, seq }), true, `burst ${seq}`);
+    assert.equal(engine.input('a', { ...input, seq: INPUT_BURST + 1 }), false, 'budget spent within a server tick');
+    advance(engine, 4);
+    assert.equal(engine.input('a', { ...input, seq: INPUT_BURST + 1 }), true, 'one credit per 240/INPUT_HZ ticks');
     advance(engine, 240);
     const snapshot = engine.snapshot();
     assert.ok(snapshot.paddles[0].x <= 4.23);
@@ -106,5 +110,20 @@ test('online match cannot score, restart or pause locally and returns to CPU saf
     match.menu(); match.setup(); match.start();
     assert.equal(match.state.mode, 'cpu');
     assert.equal(match.state.screen, 'playing');
+    engine.dispose();
+});
+
+test('snapshots carry recent events only, so a long rally does not grow the wire', () => {
+    const engine = make(); advance(engine, 160);
+    // Drive the puck into the rail a few times, well apart.
+    const rail = () => { engine.simulation.bodies.puckBody.position.set(4.9, .2, 0); engine.simulation.bodies.puckBody.velocity.set(20, 0, 0); advance(engine, 1); };
+    rail();
+    const early = engine.snapshot().events.length;
+    assert.ok(early >= 1, 'a wall hit is reported');
+    advance(engine, 300);
+    rail();
+    const events = engine.snapshot().events;
+    assert.ok(events.length >= 1 && events.length < early + 1 + early, 'the 300-tick-old impacts have aged out');
+    assert.ok(events.every(event => engine.snapshot().tick - event.tick <= 240));
     engine.dispose();
 });

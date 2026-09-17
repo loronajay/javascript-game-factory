@@ -637,6 +637,15 @@ server. It owns the fixtures, the demons and catch resolution.
 - **The cabinet is served from the repo root.** `modules/account-access.js` imports `/js/platform/**`
   for the sign-in gate, so `server.mjs` roots at the repo and opens `/games/hide-and-seek/`. Rooting
   it at the cabinet again 404s those modules and the whole module graph fails to boot.
+- **A press is latched on both ends of the wire.** The authority is edge-triggered on `interact`
+  and reads one input per client, but it advances at snapshot cadence (~67ms) — shorter than a
+  normal tap — so a press and its release used to both land in one window and the release overwrote
+  the press before any tick read it. The symptom was "I have to mash E". The server keeps
+  `match.presses` (a press no tick has seen yet, with the aim that rode with it) and
+  `inputsForTick` spends it on exactly one tick, showing the key *up* first if the previous tick
+  already had it down. The client does the same one level down: `controls.createPressLatch` is the E
+  key as `getInput` reports it, so a tap between two samples is still one down frame and one up
+  frame. Do not go back to `!!keys.KeyE` or to `match.inputs.get(id)` as the tick's input.
 - **Automation cannot playtest this.** Chrome freezes `requestAnimationFrame` in unfocused tabs, so
   two scripted clients cannot both simulate a round. Connection, lobby, roles and replication can be
   verified from a script; how movement feels cannot.

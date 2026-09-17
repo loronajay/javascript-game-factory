@@ -144,6 +144,10 @@ is the shared-account boundary. Factory Network's corresponding definition is
 platform ratings API can serve this slug without a schema/registry change;
 secure completed-match reporting is a separate milestone, not lobby metadata.
 
+`scripts/online/sync.js` predicts the local paddle and carries the puck and remote
+paddle forward to its time frame with `scripts/online/puck-predictor.js` (pure, built
+on `physics/collisions.js`); see MULTIPLAYER.md "Presentation model" for why.
+
 Run `npm test` for cabinet tests. With the sibling server repo present, run
 `npm run test:network` for real sockets with 0/80/200 ms added round-trip latency.
 For browser QA, start the local server, serve the platform root, and open

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bird Duty Cabinet Showroom | Javascript Game Factory</title>
+  <link rel="stylesheet" href="room.css">
+</head>
+<body>
+  <main class="room-shell">
+    <canvas id="roomCanvas" tabindex="0" aria-label="3D Bird Duty arcade cabinet showroom"></canvas>
+
+    <header class="room-header">
+      <a href="../grid.html" class="back-link">← Game Grid</a>
+      <div>
+        <span class="eyebrow">PLAYER ARCADE · CABINET 001</span>
+        <h1>Bird Duty</h1>
+      </div>
+    </header>
+
+    <section id="startGate" class="start-gate">
+      <div class="start-card">
+        <span class="start-card__tag">3D CABINET SHOWROOM</span>
+        <h2>Walk up. Press play.</h2>
+        <p>This is the first placeable cabinet for the customizable player arcade.</p>
+        <button id="enterShowroom" type="button">Enter showroom</button>
+        <small id="roomStatus">Click to capture the mouse · WASD to move · E to play</small>
+      </div>
+    </section>
+
+    <div id="cabinetPrompt" class="cabinet-prompt" aria-live="polite"></div>
+    <div class="control-hint" aria-hidden="true">
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span>
+    </div>
+
+    <section id="cabinetPlayLayer" class="play-layer" aria-hidden="true" hidden>
+      <div class="play-cabinet">
+        <div class="play-marquee"><span>BIRD DUTY</span></div>
+        <div class="play-bezel">
+          <iframe id="cabinetGame" title="Bird Duty arcade game" src="about:blank" allow="fullscreen; autoplay; gamepad"></iframe>
+        </div>
+        <div class="play-controls">
+          <span class="joystick" aria-hidden="true"></span>
+          <span class="play-button play-button--yellow" aria-hidden="true"></span>
+          <span class="play-button play-button--red" aria-hidden="true"></span>
+          <button id="leaveCabinet" type="button">Leave cabinet</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="../js/arcade-room.mjs"></script>
+</body>
+</html>

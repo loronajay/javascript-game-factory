@@ -34,6 +34,41 @@ reconnect grace, and authoritative forfeit on disconnect are wired. Server and
 client match gates were removed together once `cabinet npm test`, `npm run
 test:network`, and `factory-network-server npm test` all passed.
 
+### Presentation model (2026-09-16 smoothness pass)
+
+Playtesting reported the puck passing through paddles and a generally "off"
+feel. Four causes were found and fixed together; both repos deploy together
+(`PROTOCOL_VERSION` 4).
+
+- **Time-frame gap.** The local paddle is predicted (one round trip ahead of
+  the server) while the puck was interpolated two snapshot intervals *behind*
+  it, so a striking player watched the puck arrive ~RTT + 66 ms after their
+  paddle had swept through. The puck is now carried *forward* from the newest
+  snapshot by the measured round trip (`scripts/online/puck-predictor.js`) —
+  ballistic motion with Cannon-shaped damping, rail reflection, the same swept
+  mallet contact and strike boost the authority runs, against the local
+  paddle's own recent prediction trail and the remote paddle run to the target
+  its velocity names. A strike lands on the striker's screen when it lands on
+  the server. The RTT is measured from acknowledged commands (window minimum);
+  the horizon caps at 150 ms and freezes there on a stall.
+- **Corrections popped.** Every snapshot is now blended in: the difference
+  between what was shown and what the new prediction says is carried as a
+  visual offset that decays over ~40 ms, for puck, remote paddle and the
+  reconciled local paddle alike. A serve/goal-sized jump snaps instead.
+- **Bunched inputs were dropped.** The authority rejected any command within
+  two ticks of the last, and WebSocket coalescing delivers 60 Hz commands in
+  pairs, so the server paddle was stuck on stale targets. Inputs are budgeted
+  (token bucket, `INPUT_BURST`) rather than spaced. The client also predicts
+  with the target the server will *hold* for each command, not the fresher
+  per-tick pointer, so replay matches the authority to the tick.
+- **Snapshot cadence.** 30 Hz off an 8 ms timer's wall-clock remainder produced
+  32/40 ms alternating gaps; snapshots are now 60 Hz paced by simulation
+  ticks, and each carries only the last second of events instead of the whole
+  64-event ring (which was most of the bandwidth).
+
+The sync layer is still presentation-only: nothing predicted is sent, and no
+goal, cooldown or result is decided on a client.
+
 Still deferred: Player Factory records. Online matches remain casual and write
 nothing to platform-api — see the section below before adding any record,
 ladder, or ranked stakes.
