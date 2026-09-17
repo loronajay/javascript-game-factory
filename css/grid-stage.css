@@ -119,6 +119,13 @@
   padding: 0 18px;
 }
 
+.grid-stage__chips {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .grid-stage__nav {
   display: flex;
   align-items: center;
@@ -527,6 +534,10 @@
   .grid-stage__controls {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .grid-stage__chips {
+    flex-direction: column;
   }
 
   .grid-stage__nav {

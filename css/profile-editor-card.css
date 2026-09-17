@@ -12,8 +12,11 @@
     linear-gradient(180deg, rgba(255, 232, 167, 0.12), rgba(20, 11, 52, 0.88) 34%, rgba(7, 6, 20, 0.96)),
     rgba(9, 8, 22, 0.92);
   color: #fff8ff;
+  font: inherit;
   text-align: right;
   text-transform: uppercase;
+  /* The chip is a <button> on the grid and an <a> on the profile pages; both must read the same. */
+  text-decoration: none;
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.22),
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
@@ -62,6 +65,10 @@
 .player-card[hidden],
 .profile-chip[hidden] {
   display: none !important;
+}
+
+.profile-chip--arcade .profile-chip__kicker {
+  color: #8fd7ff;
 }
 
 .player-card__topline,

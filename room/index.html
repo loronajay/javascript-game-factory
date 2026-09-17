@@ -3,51 +3,79 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Bird Duty Cabinet Showroom | Javascript Game Factory</title>
+  <title>My Arcade | Javascript Game Factory</title>
   <link rel="stylesheet" href="room.css">
 </head>
 <body>
   <main class="room-shell">
-    <canvas id="roomCanvas" tabindex="0" aria-label="3D Bird Duty arcade cabinet showroom"></canvas>
+    <canvas id="roomCanvas" tabindex="0" aria-label="Customizable 3D personal arcade"></canvas>
 
     <header class="room-header">
       <a href="../grid.html" class="back-link">← Game Grid</a>
       <div>
-        <span class="eyebrow">PLAYER ARCADE · CABINET 001</span>
-        <h1>Bird Duty</h1>
+        <span id="roomEyebrow" class="eyebrow">PERSONAL SPACE · 2 CABINETS</span>
+        <h1 id="roomTitle">My Arcade</h1>
       </div>
+      <a id="roomOwnerLink" class="back-link room-owner-link" href="../player/index.html" hidden>View profile</a>
+      <button id="editArcade" class="edit-arcade" type="button" aria-pressed="false" title="Toggle build mode (B)">Edit arcade <kbd>B</kbd></button>
     </header>
 
     <section id="startGate" class="start-gate">
       <div class="start-card">
-        <span class="start-card__tag">3D CABINET SHOWROOM</span>
-        <h2>Walk up. Press play.</h2>
-        <p>This is the first placeable cabinet for the customizable player arcade.</p>
-        <button id="enterShowroom" type="button">Enter showroom</button>
-        <small id="roomStatus">Click to capture the mouse · WASD to move · E to play</small>
+        <span id="startTag" class="start-card__tag">YOUR 3D ARCADE</span>
+        <h2 id="startHeading">Make the room yours.</h2>
+        <p id="startCopy">Walk up to play Bird Duty or Lovers Lost, then arrange both cabinets in build mode.</p>
+        <button id="enterShowroom" type="button">Enter my arcade</button>
+        <small id="roomStatus">Click to capture the mouse · WASD to move · E to play · B to build</small>
       </div>
     </section>
 
     <div id="cabinetPrompt" class="cabinet-prompt" aria-live="polite"></div>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span><span class="control-hint__build"><b>B</b> Build</span>
     </div>
 
-    <section id="cabinetPlayLayer" class="play-layer" aria-hidden="true" hidden>
-      <div class="play-cabinet">
-        <div class="play-marquee"><span>BIRD DUTY</span></div>
-        <div class="play-bezel">
-          <iframe id="cabinetGame" title="Bird Duty arcade game" src="about:blank" allow="fullscreen; autoplay; gamepad"></iframe>
-        </div>
-        <div class="play-controls">
-          <span class="joystick" aria-hidden="true"></span>
-          <span class="play-button play-button--yellow" aria-hidden="true"></span>
-          <span class="play-button play-button--red" aria-hidden="true"></span>
-          <button id="leaveCabinet" type="button">Leave cabinet</button>
-        </div>
+    <aside id="roomEditor" class="room-editor" aria-label="Arcade editor" hidden>
+      <div class="room-editor__heading">
+        <span class="eyebrow">BUILD MODE</span>
+        <h2>Arrange your arcade</h2>
+        <p>Pick a cabinet below or click it in the room, then drag it across the floor. Drag empty floor to orbit, right-drag to pan, scroll to zoom.</p>
       </div>
+
+      <div id="cameraViews" class="camera-views" role="group" aria-label="Camera view">
+        <button type="button" data-view="overview" aria-pressed="true" title="Overview (O)">Overview</button>
+        <button type="button" data-view="front" aria-pressed="false" title="Front (F)">Front</button>
+        <button type="button" data-view="left" aria-pressed="false">Left</button>
+        <button type="button" data-view="right" aria-pressed="false">Right</button>
+        <button type="button" data-view="back" aria-pressed="false">Back</button>
+        <button type="button" data-view="top" aria-pressed="false" title="Top-down (T)">Top</button>
+      </div>
+
+      <div id="cabinetList" class="cabinet-list" role="group" aria-label="Cabinets"></div>
+
+      <div class="editor-tools" aria-label="Cabinet rotation">
+        <button id="rotateCabinetLeft" type="button" title="Rotate left (Q)">↶ <span>Rotate left</span></button>
+        <button id="rotateCabinetRight" type="button" title="Rotate right (R)">↷ <span>Rotate right</span></button>
+      </div>
+
+      <p id="editorStatus" class="editor-status" aria-live="polite">Drag a cabinet to move it.</p>
+
+      <div class="editor-actions">
+        <button id="resetRoomLayout" class="editor-action editor-action--quiet" type="button">Reset</button>
+        <button id="saveRoomLayout" class="editor-action" type="button">Save layout</button>
+        <button id="finishEditing" class="editor-action editor-action--primary" type="button">Done</button>
+      </div>
+      <small class="editor-shortcuts"><b>1 / 2</b> select · <b>Arrows</b> nudge · <b>Q / R</b> rotate · <b>H</b> hide / show · <b>O / F / T</b> views · <b>B</b> save &amp; close</small>
+    </aside>
+
+    <section id="cabinetPlayLayer" class="play-layer" aria-hidden="true" hidden>
+      <div id="cabinetGameScreen" class="play-screen">
+        <iframe id="cabinetGame" title="Bird Duty arcade game" src="about:blank" allow="fullscreen; autoplay; gamepad"></iframe>
+      </div>
+      <button id="leaveCabinet" class="leave-cabinet" type="button">Step away</button>
     </section>
   </main>
+  <script type="module" src="../js/platform-config.mjs"></script>
   <script type="module" src="../js/arcade-room.mjs"></script>
 </body>
 </html>

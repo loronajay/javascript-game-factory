@@ -28,16 +28,22 @@
 
       <div class="grid-stage__controls page-stage__controls">
         <div id="gridPrimaryNav" class="grid-stage__nav page-stage__nav"></div>
-        <button
-          id="playerProfileButton"
-          class="profile-chip"
-          type="button"
-          aria-controls="playerProfilePanel"
-          aria-expanded="false"
-        >
-          <span class="profile-chip__kicker">Factory Pilot</span>
-          <span id="playerProfileSummary" class="profile-chip__name">UNNAMED PILOT</span>
-        </button>
+        <div class="grid-stage__chips">
+          <a id="myArcadeLink" class="profile-chip profile-chip--arcade" href="room/">
+            <span class="profile-chip__kicker">3D Showroom</span>
+            <span class="profile-chip__name">My Arcade</span>
+          </a>
+          <button
+            id="playerProfileButton"
+            class="profile-chip"
+            type="button"
+            aria-controls="playerProfilePanel"
+            aria-expanded="false"
+          >
+            <span class="profile-chip__kicker">Factory Pilot</span>
+            <span id="playerProfileSummary" class="profile-chip__name">UNNAMED PILOT</span>
+          </button>
+        </div>
       </div>
 
       <div class="grid-stage__header page-stage__header">

@@ -1,5 +1,6 @@
 import * as THREE_VENDOR from "./vendor/three.module.js";
-import { BIRD_DUTY_CABINET, getCabinetLaunchUrl } from "./arcade-room-cabinet.mjs";
+import { CABINET_CATALOG, getCabinetFootprint, getCabinetLaunchUrl, type CabinetDefinition } from "./arcade-room-cabinet.mjs";
+import { createRoomEditor } from "./arcade-room-editor.mjs";
 import {
   canInteractWithCabinet,
   closeCabinetSession,
@@ -7,7 +8,11 @@ import {
   getCabinetPrompt,
   openCabinetSession,
 } from "./arcade-room-interaction.mjs";
-import { createBirdDutyCabinet } from "./arcade-room-model.mjs";
+import { createCabinetModel } from "./arcade-room-model.mjs";
+import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
+import { createRoomLayoutStore } from "./arcade-room-store.mjs";
+import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL } from "./arcade-room-scene.mjs";
+import { fitAspectRect } from "./arcade-room-screen.mjs";
 
 const THREE: any = THREE_VENDOR;
 
@@ -22,9 +27,63 @@ const prompt = requiredElement<HTMLElement>("#cabinetPrompt");
 const startGate = requiredElement<HTMLElement>("#startGate");
 const playLayer = requiredElement<HTMLElement>("#cabinetPlayLayer");
 const gameFrame = requiredElement<HTMLIFrameElement>("#cabinetGame");
+const gameScreen = requiredElement<HTMLElement>("#cabinetGameScreen");
 const leaveButton = requiredElement<HTMLButtonElement>("#leaveCabinet");
 const enterButton = requiredElement<HTMLButtonElement>("#enterShowroom");
 const status = requiredElement<HTMLElement>("#roomStatus");
+const editorPanel = requiredElement<HTMLElement>("#roomEditor");
+const editArcadeButton = requiredElement<HTMLButtonElement>("#editArcade");
+const rotateLeftButton = requiredElement<HTMLButtonElement>("#rotateCabinetLeft");
+const rotateRightButton = requiredElement<HTMLButtonElement>("#rotateCabinetRight");
+const resetLayoutButton = requiredElement<HTMLButtonElement>("#resetRoomLayout");
+const saveLayoutButton = requiredElement<HTMLButtonElement>("#saveRoomLayout");
+const finishEditingButton = requiredElement<HTMLButtonElement>("#finishEditing");
+const editorStatus = requiredElement<HTMLElement>("#editorStatus");
+const cabinetList = requiredElement<HTMLElement>("#cabinetList");
+const viewButtons = requiredElement<HTMLElement>("#cameraViews");
+const roomTitle = requiredElement<HTMLElement>("#roomTitle");
+const roomEyebrow = requiredElement<HTMLElement>("#roomEyebrow");
+const startTag = requiredElement<HTMLElement>("#startTag");
+const startHeading = requiredElement<HTMLElement>("#startHeading");
+const startCopy = requiredElement<HTMLElement>("#startCopy");
+const ownerLink = requiredElement<HTMLAnchorElement>("#roomOwnerLink");
+
+// Whose room this is. `?id=` names a player to visit; without it, this is the
+// signed-in player's own room (or a local-only room when signed out). The store
+// decides which, and everything below asks it rather than re-deriving the answer.
+const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
+const layoutStore = createRoomLayoutStore({ visitPlayerId });
+const visiting = layoutStore.mode === "visitor";
+const loaded = await layoutStore.load();
+
+function applyRoomIdentity(): void {
+  document.body.classList.toggle("is-visiting", visiting);
+  const floorCount = visibleRoomItems(loaded.layout).length;
+  const cabinetCount = `${floorCount} CABINET${floorCount === 1 ? "" : "S"}`;
+  if (visiting) {
+    const ownerName = loaded.ownerName || "Player";
+    document.title = `${ownerName}'s Arcade | Javascript Game Factory`;
+    roomEyebrow.textContent = `VISITING · ${cabinetCount}`;
+    roomTitle.textContent = `${ownerName}'s Arcade`;
+    startTag.textContent = "YOU ARE A GUEST HERE";
+    startHeading.textContent = `Step into ${ownerName}'s arcade.`;
+    startCopy.textContent = loaded.source === "account"
+      ? "Walk the room they built and play any cabinet on the floor."
+      : "They have not arranged their room yet, so this is the starter floor. Every cabinet still plays.";
+    enterButton.textContent = "Enter the arcade";
+    editArcadeButton.hidden = true;
+    ownerLink.href = `../player/index.html?id=${encodeURIComponent(layoutStore.ownerPlayerId)}`;
+    ownerLink.hidden = false;
+    status.textContent = "Click to capture the mouse · WASD to move · E to play";
+    return;
+  }
+  roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
+  ownerLink.hidden = true;
+  if (!layoutStore.accountBacked) {
+    startCopy.textContent = "Walk up to play Bird Duty or Lovers Lost, then arrange both cabinets in build mode. Sign in to keep your layout on your account so friends can visit it.";
+  }
+}
+applyRoomIdentity();
 
 let renderer: any;
 try {
@@ -44,7 +103,7 @@ renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07101b);
-scene.fog = new THREE.Fog(0x07101b, 8, 18);
+scene.fog = new THREE.Fog(0x07101b, 12, 27);
 
 const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 40);
 camera.rotation.order = "YXZ";
@@ -57,55 +116,183 @@ keyLight.position.set(3.5, 6.8, 4.5);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
 scene.add(keyLight);
-const marqueeGlow = new THREE.PointLight(0x65cfff, 2.7, 5.5, 2);
-marqueeGlow.position.set(0, 2.05, -1.65);
-scene.add(marqueeGlow);
-
 const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x151c29, roughness: 0.7, metalness: 0.18 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12, 12, 12), floorMaterial);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(PLAYER_ROOM_SHELL.width, PLAYER_ROOM_SHELL.depth, 20, 20), floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-const grid = new THREE.GridHelper(12, 24, 0x297697, 0x1d3447);
+const grid = new THREE.GridHelper(PLAYER_ROOM_SHELL.width, 40, 0x297697, 0x1d3447);
 grid.position.y = 0.004;
 scene.add(grid);
 
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x101a2a, roughness: 0.82 });
-const backWall = new THREE.Mesh(new THREE.BoxGeometry(12, 4, 0.2), wallMaterial);
-backWall.position.set(0, 2, -4.5);
-backWall.receiveShadow = true;
-scene.add(backWall);
-for (const side of [-1, 1]) {
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4, 9), wallMaterial);
-  wall.position.set(side * 6, 2, 0);
+const wallMaterial = new THREE.MeshStandardMaterial({
+  color: 0x203a50,
+  emissive: 0x071522,
+  emissiveIntensity: 0.82,
+  roughness: 0.82,
+});
+const roomHalfWidth = PLAYER_ROOM_SHELL.width / 2;
+const roomHalfDepth = PLAYER_ROOM_SHELL.depth / 2;
+const wallY = PLAYER_ROOM_SHELL.height / 2;
+
+for (const z of [-roomHalfDepth, roomHalfDepth]) {
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(PLAYER_ROOM_SHELL.width, PLAYER_ROOM_SHELL.height, PLAYER_ROOM_SHELL.wallThickness),
+    wallMaterial,
+  );
+  wall.position.set(0, wallY, z);
   wall.receiveShadow = true;
   scene.add(wall);
+}
+for (const side of [-1, 1]) {
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(PLAYER_ROOM_SHELL.wallThickness, PLAYER_ROOM_SHELL.height, PLAYER_ROOM_SHELL.depth),
+    wallMaterial,
+  );
+  wall.position.set(side * roomHalfWidth, wallY, 0);
+  wall.receiveShadow = true;
+  scene.add(wall);
+}
+
+const ceilingMaterial = new THREE.MeshStandardMaterial({
+  color: 0x172a3d,
+  emissive: 0x07121c,
+  emissiveIntensity: 0.7,
+  roughness: 0.76,
+});
+const ceiling = new THREE.Mesh(
+  new THREE.BoxGeometry(PLAYER_ROOM_SHELL.width, 0.18, PLAYER_ROOM_SHELL.depth),
+  ceilingMaterial,
+);
+ceiling.position.set(0, PLAYER_ROOM_SHELL.height + 0.09, 0);
+ceiling.receiveShadow = true;
+scene.add(ceiling);
+
+const trimMaterial = new THREE.MeshStandardMaterial({ color: 0x1b4058, roughness: 0.52, metalness: 0.34 });
+for (const x of [-roomHalfWidth + 0.18, roomHalfWidth - 0.18]) {
+  for (const z of [-roomHalfDepth + 0.18, roomHalfDepth - 0.18]) {
+    const column = new THREE.Mesh(new THREE.BoxGeometry(0.28, PLAYER_ROOM_SHELL.height, 0.28), trimMaterial);
+    column.position.set(x, wallY, z);
+    scene.add(column);
+  }
 }
 
 function neonBar(x: number, y: number, width: number, color: number): void {
   const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.4, roughness: 0.25 });
   const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.035, 0.035), material);
-  bar.position.set(x, y, -4.37);
+  bar.position.set(x, y, -roomHalfDepth + 0.14);
   scene.add(bar);
 }
 neonBar(-3.1, 2.8, 2.4, 0xff4d91);
 neonBar(3.1, 2.8, 2.4, 0x53d8ff);
 neonBar(0, 3.35, 1.8, 0xffd33d);
 
-const cabinetPosition = new THREE.Vector3(0, 0, -2.3);
-const cabinetModel = createBirdDutyCabinet(THREE, BIRD_DUTY_CABINET);
-cabinetModel.position.copy(cabinetPosition);
-scene.add(cabinetModel);
+type CabinetPlayView = Readonly<{
+  position: Readonly<{ x: number; y: number; z: number }>;
+  fov: number;
+  screen: Readonly<{ width: number; height: number; y: number; z: number }>;
+  gameAspect: number;
+}>;
+type CabinetRuntime = Readonly<{
+  definition: CabinetDefinition;
+  model: any;
+  screen: any;
+  footprint: ReturnType<typeof getCabinetFootprint>;
+  playView: CabinetPlayView;
+}>;
+
+const playViews: Readonly<Record<string, CabinetPlayView>> = Object.freeze({
+  "bird-duty": CABINET_PLAY_VIEW,
+  "lovers-lost": LOVERS_LOST_PLAY_VIEW,
+});
+
+const cabinets: CabinetRuntime[] = CABINET_CATALOG.map((definition) => {
+  const model = createCabinetModel(THREE, definition);
+  scene.add(model);
+  return {
+    definition,
+    model,
+    screen: model.getObjectByName("screen"),
+    footprint: getCabinetFootprint(definition),
+    playView: playViews[definition.gameSlug] ?? CABINET_PLAY_VIEW,
+  };
+});
+
+for (const [x, color] of [[-1.35, 0x65cfff], [1.35, 0xff5caf]] as const) {
+  const glow = new THREE.PointLight(color, 2.4, 5.2, 2);
+  glow.position.set(x, 2.08, -2.15);
+  scene.add(glow);
+}
 
 const keys = new Set<string>();
-let session = createCabinetSession(BIRD_DUTY_CABINET.id);
+let session = createCabinetSession(CABINET_CATALOG[0].id);
 let interactionReady = false;
+let nearbyCabinet: CabinetRuntime | null = null;
+let activeCabinet: CabinetRuntime | null = null;
 let playing = false;
 let roomEntered = false;
 let draggingLook = false;
+let prePlayView: { x: number; y: number; z: number; yaw: number; pitch: number; fov: number } | null = null;
+
+const roomEditor = createRoomEditor({
+  THREE,
+  scene,
+  camera,
+  canvas,
+  floor,
+  cabinets: cabinets.map((cabinet) => ({
+    model: cabinet.model,
+    cabinet: cabinet.definition,
+    footprint: cabinet.footprint,
+  })),
+  room: {
+    width: PLAYER_ROOM_SHELL.width,
+    depth: PLAYER_ROOM_SHELL.depth,
+    wallInset: PLAYER_ROOM_SHELL.wallThickness + 0.28,
+  },
+  initialLayout: loaded.layout,
+  // The store owns where a save lands — the account when signed in, this device otherwise —
+  // and the message here says which, so the player is never told a save happened that
+  // never left the tab.
+  persist: async (layout) => {
+    const result = await layoutStore.save(layout);
+    if (result.ok && result.target === "account") return { ok: true, message: "Saved to your account. Friends can visit this room." };
+    if (result.ok) return { ok: true, message: "Saved on this device only. Sign in to keep it on your account." };
+    if (result.target === "account") return { ok: false, message: "Kept on this device, but the account save failed. Try again in a moment." };
+    return { ok: false, message: "This browser could not save the layout." };
+  },
+  elements: {
+    panel: editorPanel,
+    editButton: editArcadeButton,
+    cabinetList,
+    rotateLeftButton,
+    rotateRightButton,
+    resetButton: resetLayoutButton,
+    saveButton: saveLayoutButton,
+    finishButton: finishEditingButton,
+    status: editorStatus,
+    viewButtons,
+  },
+  // A visitor can look but never build: the store has no write path for them either.
+  canEnter: () => !playing && !visiting,
+  onEditingChange: (editing) => {
+    keys.clear();
+    // Roof off while building: the overview and top-down views look into the room from
+    // above the ceiling, which would otherwise be all they could see.
+    ceiling.visible = !editing;
+    if (editing) {
+      roomEntered = true;
+      startGate.classList.add("is-hidden");
+      status.textContent = "Build mode · drag cabinets to place · B to walk again";
+    } else {
+      status.textContent = "Click the room to look around again · B to build";
+    }
+  },
+});
 
 function applyCamera(): void {
+  if (roomEditor.isEditing()) return;
   camera.position.set(player.x, player.y, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0);
 }
@@ -115,28 +302,59 @@ function forwardVector(): { x: number; z: number } {
 }
 
 function updateInteraction(): void {
-  interactionReady = canInteractWithCabinet(
-    { x: player.x, z: player.z, forward: forwardVector() },
-    {
-      position: { x: cabinetPosition.x, z: cabinetPosition.z },
-      forward: { x: 0, z: 1 },
-      radius: BIRD_DUTY_CABINET.interaction.radius,
-      facingThreshold: BIRD_DUTY_CABINET.interaction.facingThreshold,
-    },
-  );
-  prompt.textContent = roomEntered ? getCabinetPrompt(interactionReady, BIRD_DUTY_CABINET.title) : "";
+  nearbyCabinet = null;
+  let nearestDistance = Infinity;
+  for (const cabinet of cabinets) {
+    const placement = roomEditor.getCabinetPlacement(cabinet.definition.id);
+    if (!placement) continue;
+    const cabinetForward = worldPointFromPlacement(placement, { x: 0, z: 1 });
+    const canInteract = canInteractWithCabinet(
+      { x: player.x, z: player.z, forward: forwardVector() },
+      {
+        position: { x: placement.x, z: placement.z },
+        forward: { x: cabinetForward.x - placement.x, z: cabinetForward.z - placement.z },
+        radius: cabinet.definition.interaction.radius,
+        facingThreshold: cabinet.definition.interaction.facingThreshold,
+      },
+    );
+    const distance = Math.hypot(player.x - placement.x, player.z - placement.z);
+    if (canInteract && distance < nearestDistance) {
+      nearbyCabinet = cabinet;
+      nearestDistance = distance;
+    }
+  }
+  interactionReady = Boolean(nearbyCabinet);
+  prompt.textContent = roomEntered && nearbyCabinet
+    ? getCabinetPrompt(true, nearbyCabinet.definition.title)
+    : "";
   prompt.classList.toggle("is-visible", interactionReady && !playing);
 }
 
 function openCabinet(): void {
-  if (!interactionReady || playing) return;
-  session = openCabinetSession(session);
+  if (!interactionReady || !nearbyCabinet || playing || roomEditor.isEditing()) return;
+  activeCabinet = nearbyCabinet;
+  session = openCabinetSession(createCabinetSession(activeCabinet.definition.id));
   playing = true;
+  prePlayView = { ...player, fov: camera.fov };
+  const placement = roomEditor.getCabinetPlacement(activeCabinet.definition.id);
+  if (!placement) return;
+  const playPosition = worldPointFromPlacement(placement, activeCabinet.playView.position);
+  Object.assign(player, {
+    ...playPosition,
+    y: activeCabinet.playView.position.y,
+    yaw: placement.rotationY,
+    pitch: 0,
+  });
+  camera.fov = activeCabinet.playView.fov;
+  camera.updateProjectionMatrix();
+  if (activeCabinet.screen) activeCabinet.screen.visible = false;
+  document.body.classList.add("is-playing");
+  document.body.style.setProperty("--active-cabinet-accent", activeCabinet.definition.palette.trim);
   document.exitPointerLock?.();
-  gameFrame.src = getCabinetLaunchUrl(BIRD_DUTY_CABINET, location.href);
+  gameFrame.title = `${activeCabinet.definition.title} arcade game`;
+  gameFrame.src = getCabinetLaunchUrl(activeCabinet.definition, location.href);
   playLayer.hidden = false;
   playLayer.setAttribute("aria-hidden", "false");
-  leaveButton.focus();
   prompt.classList.remove("is-visible");
 }
 
@@ -147,12 +365,26 @@ function closeCabinet(): void {
   gameFrame.src = "about:blank";
   playLayer.hidden = true;
   playLayer.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("is-playing");
+  if (activeCabinet?.screen) activeCabinet.screen.visible = true;
+  if (prePlayView) {
+    const { fov, ...pose } = prePlayView;
+    Object.assign(player, pose);
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+    prePlayView = null;
+  }
   canvas.focus();
   status.textContent = "Click the room to look around again";
+  activeCabinet = null;
 }
 
 leaveButton.addEventListener("click", closeCabinet);
+gameFrame.addEventListener("load", () => {
+  if (playing) gameFrame.focus();
+});
 window.addEventListener("keydown", (event) => {
+  if (roomEditor.isEditing()) return;
   if (playing) {
     if (event.code === "Escape") closeCabinet();
     return;
@@ -167,7 +399,7 @@ window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => keys.clear());
 
 canvas.addEventListener("click", () => {
-  if (!playing && roomEntered) canvas.requestPointerLock?.().catch(() => undefined);
+  if (!playing && !roomEditor.isEditing() && roomEntered) canvas.requestPointerLock?.().catch(() => undefined);
 });
 enterButton.addEventListener("click", () => {
   if (playing) return;
@@ -183,16 +415,16 @@ document.addEventListener("pointerlockchange", () => {
     ? "WASD to move · Mouse to look · E to interact"
     : "WASD to move · Drag to look · Click for mouse capture";
 });
-canvas.addEventListener("pointerdown", () => { draggingLook = true; });
+canvas.addEventListener("pointerdown", () => { draggingLook = !roomEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-  if ((document.pointerLockElement !== canvas && !draggingLook) || playing) return;
+  if ((document.pointerLockElement !== canvas && !draggingLook) || playing || roomEditor.isEditing()) return;
   player.yaw -= event.movementX * 0.0022;
   player.pitch = THREE.MathUtils.clamp(player.pitch - event.movementY * 0.0018, -1.1, 1.05);
 });
 
 function updatePlayer(dt: number): void {
-  if (playing || !roomEntered) return;
+  if (playing || roomEditor.isEditing() || !roomEntered) return;
   const forward = forwardVector();
   const right = { x: -forward.z, z: forward.x };
   let moveX = 0;
@@ -204,11 +436,20 @@ function updatePlayer(dt: number): void {
   const length = Math.hypot(moveX, moveZ);
   if (!length) return;
   const speed = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4.3 : 2.65;
-  const nextX = THREE.MathUtils.clamp(player.x + (moveX / length) * speed * dt, -5.45, 5.45);
-  const nextZ = THREE.MathUtils.clamp(player.z + (moveZ / length) * speed * dt, -4.0, 5.45);
-  const cabinetDx = nextX - cabinetPosition.x;
-  const cabinetDz = nextZ - cabinetPosition.z;
-  const blockedByCabinet = Math.abs(cabinetDx) < 0.63 && Math.abs(cabinetDz) < 0.73;
+  const nextX = THREE.MathUtils.clamp(player.x + (moveX / length) * speed * dt, -roomHalfWidth + 0.55, roomHalfWidth - 0.55);
+  const nextZ = THREE.MathUtils.clamp(player.z + (moveZ / length) * speed * dt, -roomHalfDepth + 0.55, roomHalfDepth - 0.55);
+  const blockedByCabinet = cabinets.some((cabinet) => {
+    const placement = roomEditor.getCabinetPlacement(cabinet.definition.id);
+    if (!placement) return false;
+    const cabinetDx = nextX - placement.x;
+    const cabinetDz = nextZ - placement.z;
+    const cosine = Math.cos(placement.rotationY);
+    const sine = Math.sin(placement.rotationY);
+    const localX = cabinetDx * cosine - cabinetDz * sine;
+    const localZ = cabinetDx * sine + cabinetDz * cosine;
+    return Math.abs(localX) < cabinet.footprint.width / 2 + 0.18
+      && Math.abs(localZ) < cabinet.footprint.depth / 2 + 0.18;
+  });
   if (!blockedByCabinet) {
     player.x = nextX;
     player.z = nextZ;
@@ -225,6 +466,33 @@ function resize(): void {
   camera.updateProjectionMatrix();
 }
 
+function positionGameOnCabinetScreen(): void {
+  if (!playing || !activeCabinet) return;
+  const placement = roomEditor.getCabinetPlacement(activeCabinet.definition.id);
+  if (!placement) return;
+  const { width, height, y, z } = activeCabinet.playView.screen;
+  const corners = [
+    { x: -width / 2, y: y + height / 2 },
+    { x: width / 2, y: y + height / 2 },
+    { x: -width / 2, y: y - height / 2 },
+    { x: width / 2, y: y - height / 2 },
+  ].map((corner) => {
+    const world = worldPointFromPlacement(placement, { x: corner.x, z });
+    return new THREE.Vector3(world.x, corner.y, world.z).project(camera);
+  });
+  const xValues = corners.map((point: any) => (point.x + 1) * 0.5 * canvas.clientWidth);
+  const yValues = corners.map((point: any) => (1 - point.y) * 0.5 * canvas.clientHeight);
+  const left = Math.min(...xValues);
+  const right = Math.max(...xValues);
+  const top = Math.min(...yValues);
+  const bottom = Math.max(...yValues);
+  const fitted = fitAspectRect({ left, top, width: right - left, height: bottom - top }, activeCabinet.playView.gameAspect);
+  gameScreen.style.left = `${fitted.left}px`;
+  gameScreen.style.top = `${fitted.top}px`;
+  gameScreen.style.width = `${fitted.width}px`;
+  gameScreen.style.height = `${fitted.height}px`;
+}
+
 const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;
@@ -238,6 +506,8 @@ function frame(now: number): void {
   }
   applyCamera();
   resize();
+  camera.updateMatrixWorld();
+  positionGameOnCabinetScreen();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

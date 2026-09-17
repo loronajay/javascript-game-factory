@@ -77,6 +77,29 @@ export function renderPlayerPage(doc: Document = globalThis.document, options: a
   return model;
 }
 
+/**
+ * The chip that opens this player's 3D arcade room. Their own room when the page
+ * is the viewer's, otherwise a visit to the room under `?id=` — the same seam the
+ * room page reads, so the two never disagree about whose room it is.
+ */
+export function wirePlayerArcadeLink(
+  doc: Document,
+  { requestedPlayerId, viewerPlayerId }: { requestedPlayerId: string; viewerPlayerId: string },
+): void {
+  const link = doc.getElementById("playerArcadeLink") as HTMLAnchorElement | null;
+  const label = doc.getElementById("playerArcadeLinkLabel");
+  if (!link) return;
+  const targetId = requestedPlayerId || viewerPlayerId;
+  if (!targetId) {
+    link.hidden = true;
+    return;
+  }
+  const isOwn = targetId === viewerPlayerId;
+  link.href = isOwn ? "../room/" : `../room/?id=${encodeURIComponent(targetId)}`;
+  if (label) label.textContent = isOwn ? "My Arcade" : "Visit Arcade";
+  link.hidden = false;
+}
+
 const doc = globalThis.document;
 
 if (typeof doc?.getElementById === "function") {
@@ -96,6 +119,7 @@ if (typeof doc?.getElementById === "function") {
   const currentPage = authSession?.playerId && (!requestedPlayerId || requestedPlayerId === authSession.playerId)
     ? "me"
     : "";
+  wirePlayerArcadeLink(doc, { requestedPlayerId, viewerPlayerId: authSession?.playerId || "" });
   renderPrimaryAppNav(doc.getElementById("playerPrimaryNav"), {
     basePath: "../",
     currentPage,

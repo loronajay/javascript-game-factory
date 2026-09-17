@@ -30,6 +30,42 @@ export const BIRD_DUTY_CABINET = Object.freeze({
         Object.freeze({ id: "topper", material: "paint" }),
     ]),
 });
+export const LOVERS_LOST_CABINET = Object.freeze({
+    id: "cabinet.lovers-lost.standard",
+    kind: "arcade-cabinet",
+    gameSlug: "lovers-lost",
+    title: "Lovers Lost",
+    description: "A cosmic-purple twin-player cabinet with split controls, reunion-heart lighting, and mirrored runner art.",
+    dimensions: Object.freeze({ width: 0.92, depth: 0.98, height: 2.3 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+    unlock: Object.freeze({ type: "starter", source: "Lovers Lost cabinet collection" }),
+    interaction: Object.freeze({
+        radius: 1.62,
+        facingThreshold: 0.42,
+        anchor: Object.freeze({ x: 0, y: 1.2, z: 0.51 }),
+    }),
+    palette: Object.freeze({
+        shell: "#241342",
+        trim: "#ff8ebd",
+        sky: "#181568",
+        grass: "#6633aa",
+        warning: "#ffd166",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "shell", material: "paint" }),
+        Object.freeze({ id: "side-art-left", material: "decal" }),
+        Object.freeze({ id: "side-art-right", material: "decal" }),
+        Object.freeze({ id: "marquee", material: "emissive" }),
+        Object.freeze({ id: "screen", material: "emissive" }),
+        Object.freeze({ id: "control-deck", material: "paint" }),
+        Object.freeze({ id: "coin-door", material: "metal" }),
+        Object.freeze({ id: "topper", material: "emissive" }),
+    ]),
+});
+export const CABINET_CATALOG = Object.freeze([
+    BIRD_DUTY_CABINET,
+    LOVERS_LOST_CABINET,
+]);
 export function getCabinetFootprint(definition) {
     const padding = definition.placement.clearance * 2;
     return {

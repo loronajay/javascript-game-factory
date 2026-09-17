@@ -187,11 +187,20 @@
   padding-top: 8px;
 }
 
-.me-stage__edit-chip {
+/* Top-right chip row: Edit Profile on /me, the arcade-room link on both profile views. */
+.me-stage__chips {
   position: absolute;
   top: 18px;
   right: clamp(16px, 4vw, 36px);
   z-index: 10;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.me-stage__chips:empty,
+.me-stage__chips[hidden] {
+  display: none;
 }
 
 .me-stage__header,
@@ -247,9 +256,11 @@
     align-items: stretch;
   }
 
-  .me-stage__edit-chip {
+  .me-stage__chips {
     position: static;
-    align-self: center;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 8px;
   }
 
   .me-stage__header,
