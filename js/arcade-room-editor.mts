@@ -11,14 +11,18 @@ import {
   rotateDecorItem,
   setDecorColor,
   setDecorLength,
+  setDecorScale,
+  type DecorResult,
   type DecorTarget,
 } from "./arcade-room-decor-layout.mjs";
 import type { DecorRuntime } from "./arcade-room-decor-runtime.mjs";
-import { createEditorPanel, type EditorSelection, type EditorTab, type PanelElements } from "./arcade-room-editor-panel.mjs";
+import { createDecorThumbnails } from "./arcade-room-decor-thumbnails.mjs";
+import { createEditorPanel, type EditPhase, type EditorSelection, type EditorTab, type PanelElements } from "./arcade-room-editor-panel.mjs";
 import {
   ROOM_BOUNDS_DEFAULTS,
   createDefaultRoomLayout,
   floorObstacles,
+  roomLayoutsEqual,
   rotatePlacement,
   setItemHidden,
   setRoomSurface,
@@ -108,7 +112,13 @@ export type RoomEditor = Readonly<{
 export const ROOM_EDITOR_TOGGLE_KEY = "KeyB";
 const NUDGE_STEP = 0.1;
 const DECOR_SNAP_DEGREES = 15;
+const SCALE_STEP = 0.1;
+const LENGTH_STEP = 0.1;
 const UNDO_DEPTH = 40;
+/** A press that travels less than this before release is a click, not an orbit. */
+const CLICK_SLOP_PX = 4;
+/** How long after the last resize wheel notch the gesture closes and becomes one undo step. */
+const WHEEL_GESTURE_MS = 350;
 
 export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   const { THREE, scene, camera, canvas, shell, decor, inventory, cabinets, room, initialLayout, persist, elements, canEnter, onEditingChange } = options;
@@ -122,11 +132,19 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   let dragging = false;
   let saving = false;
   const undoStack: RoomLayout[] = [];
+  // A colour or slider drag is one gesture: the layout before it is pushed once, every
+  // preview replaces the working layout without a panel re-render, and the commit closes it.
+  let gestureOpen = false;
+  let previewFrame = 0;
+  let wheelGestureTimer: ReturnType<typeof setTimeout> | undefined;
+  const thumbnails = createDecorThumbnails(THREE);
   // Which camera gesture the current pointer owns: orbit on a left-drag over empty floor,
   // pan on a right/middle-drag or a Shift+left-drag anywhere. Decided on pointerdown.
   let cameraGesture: "none" | "orbit" | "pan" = "none";
   let view: EditorCameraState = createEditorCamera(room);
   const lastPointer = { x: 0, y: 0 };
+  // Where a camera gesture began: a press on empty floor that never moves is a click, and a click on nothing deselects.
+  const gestureStart = { x: 0, y: 0 };
   // Grab offset between the floor point under the cursor and the item's origin, so a cabinet
   // picked up by its edge stays under the hand instead of snapping its centre to the cursor.
   const dragOffset = { x: 0, z: 0 };
@@ -150,12 +168,14 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     setDecorCategory: (category) => { decorCategory = category; renderPanel(); },
     addDecor: (itemId) => addDecor(itemId),
     selectDecor: (instanceId) => selectDecor(instanceId),
+    clearSelection: () => clearSelection(),
     removeDecor: (instanceId) => removeDecor(instanceId),
     duplicateDecor: (instanceId) => duplicateDecor(instanceId),
-    setDecorColor: (instanceId, color) => commitDecor(setDecorColor(layout, instanceId, color).layout, "Colour changed"),
-    setDecorLength: (instanceId, length) => commitDecor(setDecorLength(layout, instanceId, length, room, catalog).layout, "Length changed"),
+    setDecorColor: (instanceId, color, phase) => editDecor(setDecorColor(layout, instanceId, color), "Colour changed", phase),
+    setDecorLength: (instanceId, length, phase) => editDecor(setDecorLength(layout, instanceId, length, room, catalog), "Length changed", phase),
+    setDecorScale: (instanceId, scale, phase) => editDecor(setDecorScale(layout, instanceId, scale, room, catalog), "Resized", phase),
     setDecorMount: (instanceId, mount) => remount(instanceId, mount),
-  });
+  }, { thumbnail: (definition) => thumbnails.get(definition) });
 
   function selectedCabinet(): RoomLayoutItem | undefined {
     return selection?.kind === "cabinet" ? layout.items.find((item) => item.instanceId === selection!.instanceId) : undefined;
@@ -221,7 +241,84 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     commit(next, `${message} · unsaved`);
   }
 
+  function pushUndo(): void {
+    undoStack.push(layout);
+    if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+  }
+
+  /** Redraw the scene once per frame however many previews arrive in between. */
+  function schedulePreviewRender(): void {
+    if (previewFrame) return;
+    previewFrame = requestAnimationFrame(() => {
+      previewFrame = 0;
+      renderScene();
+    });
+  }
+
+  /**
+   * A finish edit (colour, length, size) from the inspector. A PREVIEW opens
+   * the gesture on its first call and only redraws the room; the COMMIT closes
+   * it, drops the undo step if nothing changed, and lets the panel catch up.
+   * A refused edit mid-drag (a prop that would grow into a cabinet) leaves the
+   * last accepted value in place and says why.
+   */
+  function editDecor(result: DecorResult, message: string, phase: EditPhase): void {
+    if (phase === "preview") {
+      if (!result.valid) {
+        setStatus(result.reason === "blocked" ? "No room to grow there · move it first." : "That change is not possible here.", "error");
+        return;
+      }
+      if (!gestureOpen) {
+        gestureOpen = true;
+        pushUndo();
+      }
+      layout = result.layout;
+      schedulePreviewRender();
+      setStatus(`${message} · unsaved`, "dirty");
+      return;
+    }
+    if (gestureOpen) {
+      gestureOpen = false;
+      if (result.valid) layout = result.layout;
+      const before = undoStack[undoStack.length - 1];
+      if (before && roomLayoutsEqual(before, layout)) undoStack.pop();
+      if (previewFrame) {
+        cancelAnimationFrame(previewFrame);
+        previewFrame = 0;
+      }
+      renderScene();
+      renderPanel();
+      setStatus(result.valid ? `${message} · unsaved` : "No room to grow there · move it first.", result.valid ? "dirty" : "error");
+      return;
+    }
+    if (!result.valid) {
+      setStatus(result.reason === "blocked" ? "No room to grow there · move it first." : "That change is not possible here.", "error");
+      return;
+    }
+    commitDecor(result.layout, message);
+  }
+
+  /** Resize or stretch the selected item by a step, from a key or a wheel notch. */
+  function resizeSelected(direction: -1 | 1, phase: EditPhase): void {
+    const item = selectedDecor();
+    const definition = item && findDecor(item.itemId);
+    if (!item || !definition) return;
+    const atLimit = (): void => setStatus(direction > 0 ? "That's as big as it goes." : "That's as small as it goes.", "error");
+    if (definition.scale.enabled) {
+      const result = setDecorScale(layout, item.instanceId, item.scale + direction * SCALE_STEP, room, catalog);
+      if (result.valid && roomLayoutsEqual(result.layout, layout)) atLimit();
+      else editDecor(result, "Resized", phase);
+    } else if (definition.length.enabled) {
+      const result = setDecorLength(layout, item.instanceId, (item.length || definition.length.default) + direction * LENGTH_STEP, room, catalog);
+      if (result.valid && roomLayoutsEqual(result.layout, layout)) atLimit();
+      else editDecor(result, "Length changed", phase);
+    } else {
+      setStatus(`${definition.title} comes in one size.`, "error");
+    }
+  }
+
   function undo(): void {
+    if (gestureOpen) return;
     const previous = undoStack.pop();
     if (!previous) return;
     layout = previous;
@@ -255,7 +352,16 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     const hint = item.mount === "wall"
       ? "drag it along the wall, arrows to slide and raise"
       : "drag it, arrows to nudge, Q/R to rotate";
-    setStatus(`${definition?.title ?? "Item"} selected · ${hint} · Delete to remove.`);
+    const size = definition?.scale.enabled ? " · - / + to resize" : definition?.length.enabled ? " · [ / ] to stretch" : "";
+    setStatus(`${definition?.title ?? "Item"} selected · ${hint}${size} · Delete to remove.`);
+  }
+
+  function clearSelection(): void {
+    if (!selection) return;
+    selection = null;
+    renderScene();
+    renderPanel();
+    setStatus("Nothing selected · click anything in the room, or add something from the catalog.");
   }
 
   function setHidden(instanceId: string, hidden: boolean): void {
@@ -633,6 +739,8 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     canvas.setPointerCapture?.(event.pointerId);
     lastPointer.x = event.clientX;
     lastPointer.y = event.clientY;
+    gestureStart.x = event.clientX;
+    gestureStart.y = event.clientY;
     if (panButton) {
       cameraGesture = "pan";
       canvas.style.cursor = "all-scroll";
@@ -683,6 +791,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   });
   const endPointer = (event: PointerEvent): void => {
     const wasDragging = dragging;
+    const wasOrbit = cameraGesture === "orbit";
     dragging = false;
     cameraGesture = "none";
     canvas.releasePointerCapture?.(event.pointerId);
@@ -692,11 +801,25 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       // Drop an undo step that changed nothing, then let the panel catch up with the final spot.
       if (undoStack[undoStack.length - 1] === layout) undoStack.pop();
       renderPanel();
+      return;
+    }
+    if (wasOrbit && event.type === "pointerup" && Math.hypot(event.clientX - gestureStart.x, event.clientY - gestureStart.y) < CLICK_SLOP_PX) {
+      clearSelection();
     }
   };
   canvas.addEventListener("wheel", (event) => {
     if (!editing) return;
     event.preventDefault();
+    // Alt+wheel over the room resizes the selected item; the notches within a beat are one undo step.
+    if (event.altKey && selectedDecor()) {
+      resizeSelected(event.deltaY < 0 ? 1 : -1, "preview");
+      clearTimeout(wheelGestureTimer);
+      wheelGestureTimer = setTimeout(() => {
+        const item = selectedDecor();
+        if (item) editDecor({ valid: true, layout, instanceId: item.instanceId, reason: "" }, "Resized", "commit");
+      }, WHEEL_GESTURE_MS);
+      return;
+    }
     view = zoomEditorCamera(view, event.deltaY);
     applyViewCamera();
     renderViewButtons();
@@ -725,7 +848,8 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       return;
     }
     const bindings: Record<string, () => void> = {
-      Escape: finish,
+      // Escape backs out one level: a selection first, then build mode itself.
+      Escape: () => { if (selection) clearSelection(); else finish(); },
       KeyQ: () => rotate(-1),
       KeyR: () => rotate(1),
       KeyH: () => toggleHidden(),
@@ -734,6 +858,12 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       KeyO: () => setView("overview"),
       Delete: () => { const item = selectedDecor(); if (item) removeDecor(item.instanceId); },
       Backspace: () => { const item = selectedDecor(); if (item) removeDecor(item.instanceId); },
+      Minus: () => resizeSelected(-1, "commit"),
+      NumpadSubtract: () => resizeSelected(-1, "commit"),
+      Equal: () => resizeSelected(1, "commit"),
+      NumpadAdd: () => resizeSelected(1, "commit"),
+      BracketLeft: () => resizeSelected(-1, "commit"),
+      BracketRight: () => resizeSelected(1, "commit"),
       ArrowUp: () => nudge(0, 1),
       KeyW: () => nudge(0, 1),
       ArrowDown: () => nudge(0, -1),

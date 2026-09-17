@@ -1,4 +1,4 @@
-import { DECOR_MOUNTS, clampDecorLength, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
+import { DECOR_MOUNTS, clampDecorLength, clampDecorScale, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface } from "./arcade-room-catalog/surfaces.mjs";
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
 export const WALL_SIDES = Object.freeze(["north", "south", "east", "west"]);
@@ -27,9 +27,9 @@ const DEFAULT_CABINETS = Object.freeze([
  * face for the 20 m starter room (wall centre −10, thickness 0.24).
  */
 const DEFAULT_DECOR = Object.freeze([
-    Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ff4d91", length: 2.4 }),
-    Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4 }),
-    Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8 }),
+    Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ff4d91", length: 2.4, scale: 1 }),
+    Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4, scale: 1 }),
+    Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8, scale: 1 }),
 ]);
 function rounded(value) {
     return Number(value.toFixed(4));
@@ -108,7 +108,7 @@ export function floorObstacles(layout, catalog) {
         const definition = findDecor(item.itemId);
         if (!definition || !definition.blocksWalking)
             continue;
-        obstacles.push({ instanceId: item.instanceId, x: item.x, z: item.z, rotationY: item.rotationY, footprint: decorFootprint(definition, item.length) });
+        obstacles.push({ instanceId: item.instanceId, x: item.x, z: item.z, rotationY: item.rotationY, footprint: decorFootprint(definition, item.length, item.scale) });
     }
     return obstacles;
 }
@@ -192,7 +192,7 @@ export function isHexColor(value) {
 /**
  * Coerce one stored decor row, or drop it. An unknown item id is dropped (the
  * catalog entry it named is gone); a mount the item does not support falls back
- * to its first mount; a bad colour or length falls back to the catalog default.
+ * to its first mount; a bad colour, length or scale falls back to the catalog default.
  */
 export function normalizeDecorItem(value) {
     if (!value || typeof value !== "object")
@@ -222,6 +222,7 @@ export function normalizeDecorItem(value) {
         wall,
         color: definition.tint.enabled && isHexColor(source.color) ? source.color.toLowerCase() : "",
         length: definition.length.enabled ? clampDecorLength(definition, typeof source.length === "number" ? source.length : 0) : 0,
+        scale: clampDecorScale(definition, typeof source.scale === "number" ? source.scale : 1),
     };
 }
 function normalizeSurfaces(value) {
@@ -314,7 +315,8 @@ function decorItemsEqual(first, second) {
         && first.mount === second.mount
         && first.wall === second.wall
         && first.color === second.color
-        && first.length === second.length;
+        && first.length === second.length
+        && first.scale === second.scale;
 }
 /** True when both layouts place the same things in the same spots with the same finishes. */
 export function roomLayoutsEqual(first, second) {

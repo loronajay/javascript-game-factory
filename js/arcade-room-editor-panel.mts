@@ -4,14 +4,23 @@
 // Pure rendering. It is handed a snapshot of editor state and draws it; every
 // click is reported back through `actions` and the editor decides what it
 // means. Nothing here touches THREE or the layout rules, so the editor file
-// stays about input and state rather than markup.
+// stays about input and state rather than markup. Catalog pictures come in
+// through `thumbnail`, a function the editor supplies, so the renderer that
+// makes them stays out of here too.
+//
+// THE INSPECTOR IS BUILT ONCE PER SELECTION AND PATCHED. Rebuilding it on
+// every change destroyed the colour picker under the player's pointer and the
+// slider under their thumb; now the same nodes live for as long as the same
+// item is selected, and a re-render only updates their values.
 
 import type { CabinetDefinition } from "./arcade-room-cabinet.mjs";
+import { createColorPicker, type ColorPicker } from "./arcade-room-color-picker.mjs";
 import {
   DECOR_CATEGORIES,
   DECOR_CATEGORY_TITLES,
   NEON_TINTS,
   decorByCategory,
+  decorExtent,
   findDecor,
   type DecorCategory,
   type DecorDefinition,
@@ -35,6 +44,12 @@ export type PanelState = Readonly<{
   decorCategory: DecorCategory;
 }>;
 
+/**
+ * A slider drag or a colour drag is many previews and one commit: the editor
+ * redraws the room on every preview and records a single undo step on commit.
+ */
+export type EditPhase = "preview" | "commit";
+
 export type PanelActions = Readonly<{
   selectTab: (tab: EditorTab) => void;
   selectCabinet: (instanceId: string) => void;
@@ -43,11 +58,19 @@ export type PanelActions = Readonly<{
   setDecorCategory: (category: DecorCategory) => void;
   addDecor: (itemId: string) => void;
   selectDecor: (instanceId: string) => void;
+  /** Drop the selection so the inspector closes and the catalog gets the panel back. */
+  clearSelection: () => void;
   removeDecor: (instanceId: string) => void;
   duplicateDecor: (instanceId: string) => void;
-  setDecorColor: (instanceId: string, color: string) => void;
-  setDecorLength: (instanceId: string, length: number) => void;
+  setDecorColor: (instanceId: string, color: string, phase: EditPhase) => void;
+  setDecorLength: (instanceId: string, length: number, phase: EditPhase) => void;
+  setDecorScale: (instanceId: string, scale: number, phase: EditPhase) => void;
   setDecorMount: (instanceId: string, mount: DecorMount) => void;
+}>;
+
+export type PanelOptions = Readonly<{
+  /** A picture of the catalog item for its card, or null to fall back to a tinted chip. */
+  thumbnail?: (definition: DecorDefinition) => string | null;
 }>;
 
 export type PanelElements = Readonly<{
@@ -92,16 +115,19 @@ function decorLabel(item: RoomDecorItem): string {
   return `${MOUNT_TITLES[item.mount]} · X ${item.x.toFixed(1)} · Z ${item.z.toFixed(1)} · ${degrees}°`;
 }
 
-/** A small coloured chip that stands in for an item picture in the catalog grid. */
-function decorIcon(definition: DecorDefinition): HTMLElement {
+/** The item's picture for its catalog card: a render of the model when one is available, else a tinted chip. */
+function decorIcon(definition: DecorDefinition, thumbnail: PanelOptions["thumbnail"]): HTMLElement {
   const icon = element("span", "decor-card__icon");
   icon.dataset.kind = definition.model.kind;
   const tint = definition.tint.enabled ? definition.tint.default : "#8fa3b8";
   icon.style.setProperty("--decor-tint", tint);
-  if (definition.model.kind === "poster") {
+  const picture = definition.model.kind === "poster" ? definition.model.image : thumbnail?.(definition) ?? null;
+  if (picture) {
     const image = element("img");
-    image.src = definition.model.image;
+    image.src = picture;
     image.alt = "";
+    image.decoding = "async";
+    icon.dataset.picture = "true";
     icon.append(image);
   } else if (definition.model.kind === "text-sign") {
     icon.textContent = definition.model.text.slice(0, 4);
@@ -111,9 +137,27 @@ function decorIcon(definition: DecorDefinition): HTMLElement {
   return icon;
 }
 
-export function createEditorPanel(elements: PanelElements, actions: PanelActions): EditorPanel {
+/** "0.6 × 0.8 m" for the inspector's size readouts. */
+function extentLabel(definition: DecorDefinition, item: RoomDecorItem): string {
+  const extent = decorExtent(definition, item.length, item.scale);
+  return `${extent.width.toFixed(1)} × ${extent.height.toFixed(1)} m`;
+}
+
+type InspectorRefs = Readonly<{
+  key: string;
+  where: HTMLElement;
+  mounts: HTMLElement[];
+  picker: ColorPicker | null;
+  lengthLabel: HTMLElement | null;
+  lengthSlider: HTMLInputElement | null;
+  scaleLabel: HTMLElement | null;
+  scaleSlider: HTMLInputElement | null;
+}>;
+
+export function createEditorPanel(elements: PanelElements, actions: PanelActions, options: PanelOptions = {}): EditorPanel {
   let lastCatalogCategory: DecorCategory | null = null;
   let surfacesBuilt = false;
+  let inspector: InspectorRefs | null = null;
 
   function renderTabs(state: PanelState): void {
     for (const button of elements.tabs.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
@@ -212,27 +256,43 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       card.dataset.addDecor = definition.id;
       card.title = `Add ${definition.title}`;
       card.disabled = !state.inventory.owns(definition.id);
-      card.append(decorIcon(definition), element("span", "decor-card__title", definition.title));
+      card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
       const meta = definition.mounts.map((mount) => MOUNT_TITLES[mount]).join(" · ");
       card.append(element("small", "decor-card__meta", meta));
       return card;
     }));
   }
 
-  function renderDecorInspector(state: PanelState): void {
-    const selected = state.selection?.kind === "decor"
-      ? state.layout.decor.find((item) => item.instanceId === state.selection!.instanceId)
-      : undefined;
-    const definition = selected ? findDecor(selected.itemId) : undefined;
-    if (!selected || !definition) {
-      elements.decorInspector.hidden = true;
-      elements.decorInspector.replaceChildren();
-      return;
-    }
-    elements.decorInspector.hidden = false;
+  function sliderRow(label: string, min: number, max: number, step: number, value: number, dataKey: string): { row: HTMLElement; label: HTMLElement; slider: HTMLInputElement } {
+    const row = element("div", "inspector__row");
+    const text = element("span", "inspector__label", label);
+    const slider = element("input", "inspector__slider");
+    slider.type = "range";
+    slider.min = String(min);
+    slider.max = String(max);
+    slider.step = String(step);
+    slider.value = String(value);
+    slider.dataset[dataKey] = "true";
+    row.append(text, slider);
+    return { row, label: text, slider };
+  }
+
+  function buildDecorInspector(selected: RoomDecorItem, definition: DecorDefinition): InspectorRefs {
     const heading = element("div", "inspector__heading");
-    heading.append(element("span", "eyebrow", "SELECTED"), element("strong", "", definition.title), element("small", "", decorLabel(selected)));
+    const where = element("small", "", decorLabel(selected));
+    const close = element("button", "inspector__close", "×");
+    close.type = "button";
+    close.dataset.clearSelection = "true";
+    close.title = "Deselect (Esc)";
+    close.setAttribute("aria-label", "Deselect");
+    heading.append(element("span", "eyebrow", "SELECTED"), element("strong", "", definition.title), where, close);
     const nodes: HTMLElement[] = [heading];
+    const mounts: HTMLElement[] = [];
+    let picker: ColorPicker | null = null;
+    let lengthLabel: HTMLElement | null = null;
+    let lengthSlider: HTMLInputElement | null = null;
+    let scaleLabel: HTMLElement | null = null;
+    let scaleSlider: HTMLInputElement | null = null;
 
     if (definition.mounts.length > 1) {
       const row = element("div", "inspector__row");
@@ -242,8 +302,8 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
         const button = element("button", "inspector__choice", MOUNT_TITLES[mount]);
         button.type = "button";
         button.dataset.mount = mount;
-        button.setAttribute("aria-pressed", String(mount === selected.mount));
         group.append(button);
+        mounts.push(button);
       }
       row.append(group);
       nodes.push(row);
@@ -252,38 +312,30 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     if (definition.tint.enabled) {
       const row = element("div", "inspector__row");
       row.append(element("span", "inspector__label", "Colour"));
-      const tints = element("div", "tint-grid");
-      for (const tint of NEON_TINTS) {
-        const button = element("button", "tint");
-        button.type = "button";
-        button.dataset.color = tint.hex;
-        button.title = tint.title;
-        button.style.setProperty("--tint", tint.hex);
-        button.setAttribute("aria-pressed", String(tint.hex === (selected.color || definition.tint.default)));
-        tints.append(button);
-      }
-      const custom = element("input", "tint-custom");
-      custom.type = "color";
-      custom.value = selected.color || definition.tint.default;
-      custom.dataset.customColor = "true";
-      custom.title = "Any colour";
-      tints.append(custom);
-      row.append(tints);
+      picker = createColorPicker({
+        presets: NEON_TINTS,
+        onPreview: (hex) => actions.setDecorColor(selected.instanceId, hex, "preview"),
+        onCommit: (hex) => actions.setDecorColor(selected.instanceId, hex, "commit"),
+      });
+      picker.setValue(selected.color || definition.tint.default);
+      row.append(picker.element);
       nodes.push(row);
     }
 
     if (definition.length.enabled) {
-      const row = element("div", "inspector__row");
-      const label = element("span", "inspector__label", `Length · ${(selected.length || definition.length.default).toFixed(1)} m`);
-      const slider = element("input", "inspector__slider");
-      slider.type = "range";
-      slider.min = String(definition.length.min);
-      slider.max = String(definition.length.max);
-      slider.step = "0.1";
-      slider.value = String(selected.length || definition.length.default);
-      slider.dataset.length = "true";
-      row.append(label, slider);
-      nodes.push(row);
+      const built = sliderRow("Length", definition.length.min, definition.length.max, 0.1, selected.length || definition.length.default, "length");
+      built.slider.title = "Stretch ([ / ])";
+      lengthLabel = built.label;
+      lengthSlider = built.slider;
+      nodes.push(built.row);
+    }
+
+    if (definition.scale.enabled) {
+      const built = sliderRow("Size", definition.scale.min, definition.scale.max, 0.05, selected.scale, "scale");
+      built.slider.title = "Resize (- / +)";
+      scaleLabel = built.label;
+      scaleSlider = built.slider;
+      nodes.push(built.row);
     }
 
     const tools = element("div", "inspector__tools");
@@ -298,6 +350,45 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     tools.append(duplicate, remove);
     nodes.push(tools);
     elements.decorInspector.replaceChildren(...nodes);
+    return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, picker, lengthLabel, lengthSlider, scaleLabel, scaleSlider };
+  }
+
+  /** Bring the live inspector up to date with the item without touching its nodes. */
+  function updateDecorInspector(refs: InspectorRefs, selected: RoomDecorItem, definition: DecorDefinition): void {
+    refs.where.textContent = decorLabel(selected);
+    for (const button of refs.mounts) button.setAttribute("aria-pressed", String(button.dataset.mount === selected.mount));
+    refs.picker?.setValue(selected.color || definition.tint.default);
+    if (refs.lengthLabel && refs.lengthSlider) {
+      const length = selected.length || definition.length.default;
+      refs.lengthLabel.textContent = `Length · ${length.toFixed(1)} m`;
+      if (document.activeElement !== refs.lengthSlider) refs.lengthSlider.value = String(length);
+    }
+    if (refs.scaleLabel && refs.scaleSlider) {
+      refs.scaleLabel.textContent = `Size · ×${selected.scale.toFixed(2)} · ${extentLabel(definition, selected)}`;
+      if (document.activeElement !== refs.scaleSlider) refs.scaleSlider.value = String(selected.scale);
+    }
+  }
+
+  function renderDecorInspector(state: PanelState): void {
+    const selected = state.selection?.kind === "decor"
+      ? state.layout.decor.find((item) => item.instanceId === state.selection!.instanceId)
+      : undefined;
+    const definition = selected ? findDecor(selected.itemId) : undefined;
+    if (!selected || !definition) {
+      inspector = null;
+      elements.decorInspector.hidden = true;
+      elements.decorInspector.replaceChildren();
+      return;
+    }
+    elements.decorInspector.hidden = false;
+    const key = `${selected.instanceId}|${selected.itemId}`;
+    if (!inspector || inspector.key !== key) {
+      inspector = buildDecorInspector(selected, definition);
+      // The inspector heads a scrolling column the catalog lives in; a card clicked far down
+      // that column must not leave the new item's controls out of sight above it.
+      elements.decorInspector.scrollIntoView({ block: "start" });
+    }
+    updateDecorInspector(inspector, selected, definition);
   }
 
   function renderDecorPlaced(state: PanelState): void {
@@ -364,6 +455,10 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
   });
   const inspectorClick = (event: Event): void => {
     const target = event.target as HTMLElement;
+    if (target.closest("[data-clear-selection]")) {
+      actions.clearSelection();
+      return;
+    }
     const remove = target.closest<HTMLElement>("[data-remove-decor]");
     if (remove?.dataset.removeDecor) {
       actions.removeDecor(remove.dataset.removeDecor);
@@ -381,23 +476,21 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     }
     const selectedId = elements.decorInspector.querySelector<HTMLElement>("[data-duplicate-decor]")?.dataset.duplicateDecor;
     if (!selectedId) return;
-    const tint = target.closest<HTMLElement>("[data-color]");
-    if (tint?.dataset.color) {
-      actions.setDecorColor(selectedId, tint.dataset.color);
-      return;
-    }
     const mount = target.closest<HTMLElement>("[data-mount]");
     if (mount?.dataset.mount) actions.setDecorMount(selectedId, mount.dataset.mount as DecorMount);
   };
   elements.decorInspector.addEventListener("click", inspectorClick);
   elements.decorPlaced.addEventListener("click", inspectorClick);
-  elements.decorInspector.addEventListener("input", (event) => {
-    const target = event.target as HTMLInputElement;
+  // A slider fires `input` on every step of a drag and `change` once when it is let go.
+  const sliderEdit = (event: Event, phase: EditPhase): void => {
+    const target = event.target;
     const selectedId = elements.decorInspector.querySelector<HTMLElement>("[data-duplicate-decor]")?.dataset.duplicateDecor;
-    if (!selectedId) return;
-    if (target.dataset.length) actions.setDecorLength(selectedId, Number(target.value));
-    if (target.dataset.customColor) actions.setDecorColor(selectedId, target.value);
-  });
+    if (!selectedId || !(target instanceof HTMLInputElement) || target.type !== "range") return;
+    if (target.dataset.length) actions.setDecorLength(selectedId, Number(target.value), phase);
+    if (target.dataset.scale) actions.setDecorScale(selectedId, Number(target.value), phase);
+  };
+  elements.decorInspector.addEventListener("input", (event) => sliderEdit(event, "preview"));
+  elements.decorInspector.addEventListener("change", (event) => sliderEdit(event, "commit"));
 
   return Object.freeze({ render });
 }

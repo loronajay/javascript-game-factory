@@ -34,7 +34,8 @@
 // are checked for NAMESPACE (`floor.<name>`, `decor.<category>.<variant>`),
 // numbers are bounded, and the client's catalog decides what an id means. A
 // surface id that fails the pattern is stored as "" (client default); a decor
-// row that cannot be made valid is dropped. The `decor` key is emitted only
+// row that cannot be made valid is dropped. A decor row also carries `scale`
+// (2026-09-17), the player's resize of a sign, poster, rug or prop. The `decor` key is emitted only
 // when the client sent one, because the client seeds its starter neon exactly
 // when the key is ABSENT — a version 2 row with `decor: []` is a room the
 // player deliberately stripped, and must come back stripped.
@@ -50,6 +51,8 @@ const COORDINATE_LIMIT = 12;
 const HEIGHT_LIMIT = 8;
 /** The longest stretchable item the client offers is 10 m. */
 const LENGTH_LIMIT = 20;
+/** The biggest resize the client offers is ×3. */
+const SCALE_LIMIT = 5;
 const INSTANCE_ID_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 /** `cabinet.<game-slug>.<variant>` — the namespace every catalog cabinet id lives in. */
 const CABINET_ID_PATTERN = /^cabinet\.[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -114,7 +117,10 @@ function normalizeDecorRow(raw) {
     const color = typeof source.color === "string" && HEX_COLOR.test(source.color.toLowerCase()) ? source.color.toLowerCase() : "";
     const rawLength = boundedNumber(source.length, LENGTH_LIMIT);
     const length = rawLength === null ? 0 : Math.max(0, rawLength);
-    return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length };
+    // A missing or non-positive scale is size 1 — a stored 0 would make the client draw nothing.
+    const rawScale = boundedNumber(source.scale, SCALE_LIMIT);
+    const scale = rawScale === null || rawScale <= 0 ? 1 : rawScale;
+    return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length, scale };
 }
 /**
  * Coerce any stored or submitted document into a layout.

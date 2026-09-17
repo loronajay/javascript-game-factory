@@ -10,8 +10,9 @@
 // to know which layout row a click landed on.
 
 import type { DecorDefinition, DecorModelSpec, DecorMount } from "./arcade-room-catalog/decor.mjs";
-import { decorFootprint } from "./arcade-room-catalog/decor.mjs";
+import { decorExtent } from "./arcade-room-catalog/decor.mjs";
 import type { RoomDecorItem } from "./arcade-room-layout.mjs";
+import { drawNeonShape, drawNeonText } from "./arcade-room-neon-art.mjs";
 
 type ThreeNamespace = Record<string, any>;
 type Size = Readonly<{ width: number; height: number; depth: number }>;
@@ -68,78 +69,10 @@ function canvasPlane(THREE: ThreeNamespace, group: any, width: number, height: n
   return mesh;
 }
 
-function neonStroke(context: CanvasRenderingContext2D, color: string, lineWidth: number): void {
-  context.strokeStyle = color;
-  context.lineWidth = lineWidth;
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.shadowColor = color;
-  context.shadowBlur = lineWidth * 2.2;
-}
-
 function withAlpha(hex: string, alpha: number): string {
   const value = Number.parseInt(hex.slice(1), 16);
   return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
 }
-
-const SHAPES: Record<string, (context: CanvasRenderingContext2D, w: number, h: number) => void> = {
-  heart: (context, w, h) => {
-    context.beginPath();
-    context.moveTo(w / 2, h * 0.85);
-    context.bezierCurveTo(w * 0.05, h * 0.5, w * 0.15, h * 0.1, w / 2, h * 0.3);
-    context.bezierCurveTo(w * 0.85, h * 0.1, w * 0.95, h * 0.5, w / 2, h * 0.85);
-    context.closePath();
-  },
-  star: (context, w, h) => {
-    context.beginPath();
-    for (let index = 0; index < 10; index += 1) {
-      const radius = index % 2 ? w * 0.18 : w * 0.42;
-      const angle = -Math.PI / 2 + index * Math.PI / 5;
-      context.lineTo(w / 2 + radius * Math.cos(angle), h / 2 + radius * Math.sin(angle));
-    }
-    context.closePath();
-  },
-  bolt: (context, w, h) => {
-    context.beginPath();
-    context.moveTo(w * 0.62, h * 0.06);
-    context.lineTo(w * 0.22, h * 0.54);
-    context.lineTo(w * 0.48, h * 0.54);
-    context.lineTo(w * 0.38, h * 0.94);
-    context.lineTo(w * 0.78, h * 0.42);
-    context.lineTo(w * 0.52, h * 0.42);
-    context.closePath();
-  },
-  joystick: (context, w, h) => {
-    context.beginPath();
-    context.arc(w / 2, h * 0.22, w * 0.16, 0, Math.PI * 2);
-    context.moveTo(w / 2, h * 0.38);
-    context.lineTo(w / 2, h * 0.68);
-    context.moveTo(w * 0.2, h * 0.68);
-    context.lineTo(w * 0.8, h * 0.68);
-    context.lineTo(w * 0.8, h * 0.9);
-    context.lineTo(w * 0.2, h * 0.9);
-    context.closePath();
-  },
-  ghost: (context, w, h) => {
-    context.beginPath();
-    context.arc(w / 2, h * 0.42, w * 0.34, Math.PI, 0);
-    context.lineTo(w * 0.84, h * 0.9);
-    for (let index = 0; index < 4; index += 1) {
-      const x = w * 0.84 - (index + 0.5) * w * 0.17;
-      context.lineTo(x, index % 2 ? h * 0.9 : h * 0.78);
-    }
-    context.lineTo(w * 0.16, h * 0.9);
-    context.closePath();
-    context.moveTo(w * 0.42, h * 0.42);
-    context.arc(w * 0.38, h * 0.42, w * 0.05, 0, Math.PI * 2);
-    context.moveTo(w * 0.66, h * 0.42);
-    context.arc(w * 0.62, h * 0.42, w * 0.05, 0, Math.PI * 2);
-  },
-  circle: (context, w, h) => {
-    context.beginPath();
-    context.arc(w / 2, h / 2, w * 0.4, 0, Math.PI * 2);
-  },
-};
 
 function rugPattern(context: CanvasRenderingContext2D, w: number, h: number, color: string, pattern: string, round: boolean): void {
   if (round) {
@@ -191,39 +124,13 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
   "text-sign": (THREE, group, size, color, spec: { text: string; font: "block" | "script" }) => {
     box(THREE, group, [size.width, size.height, size.depth * 0.3], [0, 0, -size.depth * 0.3], standard(THREE, "#0b0d12", 0.6, 0.3), false);
     canvasPlane(THREE, group, size.width, size.height, [1024, Math.round(1024 * size.height / size.width)], (context, w, h) => {
-      const family = spec.font === "script" ? "italic 700 " : "900 ";
-      const fontName = spec.font === "script" ? "Georgia, 'Brush Script MT', serif" : "'Arial Black', Impact, sans-serif";
-      context.font = `${family}${Math.round(h * 0.72)}px ${fontName}`;
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      let fontSize = h * 0.72;
-      while (context.measureText(spec.text).width > w * 0.9 && fontSize > 8) {
-        fontSize -= 4;
-        context.font = `${family}${Math.round(fontSize)}px ${fontName}`;
-      }
-      neonStroke(context, color, Math.max(6, h * 0.06));
-      context.strokeText(spec.text, w / 2, h / 2);
-      context.strokeText(spec.text, w / 2, h / 2);
-      context.shadowBlur = 0;
-      context.fillStyle = "#ffffff";
-      context.globalAlpha = 0.85;
-      context.font = `${family}${Math.round(fontSize)}px ${fontName}`;
-      context.fillText(spec.text, w / 2, h / 2);
+      drawNeonText(context, w, h, spec.text, spec.font, color);
     }, [0, 0, size.depth * 0.2]);
   },
   "shape-sign": (THREE, group, size, color, spec: { shape: string }) => {
     box(THREE, group, [size.width, size.height, size.depth * 0.3], [0, 0, -size.depth * 0.3], standard(THREE, "#0b0d12", 0.6, 0.3), false);
     canvasPlane(THREE, group, size.width, size.height, [512, Math.round(512 * size.height / size.width)], (context, w, h) => {
-      const shape = SHAPES[spec.shape] ?? SHAPES.circle!;
-      neonStroke(context, color, 18);
-      shape(context, w, h);
-      context.stroke();
-      context.stroke();
-      context.shadowBlur = 0;
-      context.strokeStyle = "rgba(255,255,255,.85)";
-      context.lineWidth = 6;
-      shape(context, w, h);
-      context.stroke();
+      drawNeonShape(context, w, h, spec.shape, color, 18);
     }, [0, 0, size.depth * 0.2]);
   },
   "poster": (THREE, group, size, _color, spec: { image: string; frame: string }) => {
@@ -533,16 +440,20 @@ export function createDecorModel(THREE: ThreeNamespace, definition: DecorDefinit
   const root = new THREE.Group();
   root.name = item.instanceId;
   root.userData = { decorInstanceId: item.instanceId, decorItemId: item.itemId };
-  const footprint = decorFootprint(definition, item.length);
-  const size: Size = { width: footprint.width, height: definition.size.height, depth: definition.size.depth };
+  // The builder always works at catalog size (a stretched strip's length included) and
+  // the group is scaled, so every builder's hard-coded thicknesses grow with the item.
+  const base: Size = decorExtent(definition, item.length, 1);
+  const size: Size = decorExtent(definition, item.length, item.scale);
+  const factor = definition.scale.enabled ? size.height / base.height : 1;
   const color = item.color || definition.tint.default || "#ffffff";
   const centred = new THREE.Group();
   const offset = mountOffset(item.mount, size);
   centred.position.set(offset.x, offset.y, offset.z);
-  BUILDERS[definition.model.kind](THREE, centred, size, color, definition.model);
+  centred.scale.setScalar(factor);
+  BUILDERS[definition.model.kind](THREE, centred, base, color, definition.model);
   if (definition.light && lit) {
-    const light = new THREE.PointLight(color, definition.light.intensity, definition.light.distance, 2);
-    light.position.set(...lightOffset(definition, item.mount, size));
+    const light = new THREE.PointLight(color, definition.light.intensity, definition.light.distance * Math.sqrt(factor), 2);
+    light.position.set(...lightOffset(definition, item.mount, base));
     centred.add(light);
   }
   root.add(centred);

@@ -11,7 +11,7 @@
 // faces into the room, so it has no free rotation. A ceiling item hangs from
 // the ceiling plane and rotates freely. Rugs and lights never block anything,
 // so they may overlap whatever they like — that is what a rug is for.
-import { clampDecorLength, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
+import { clampDecorLength, clampDecorScale, decorExtent, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
 import { ROOM_BOUNDS_DEFAULTS, WALL_SIDES, clampPlacementToRoom, placementBlocked, } from "./arcade-room-layout.mjs";
 /** How much of the wall's centre-to-face half thickness plus a hair, so an item hangs on the face not in it. */
 function wallFace(room) {
@@ -49,10 +49,10 @@ function rounded(value) {
  * Pin a wall item to a wall: on the inner face, slid along it within the
  * corners, at a height that keeps the whole item on the wall.
  */
-export function snapToWall(point, wall, room, definition, length) {
+export function snapToWall(point, wall, room, definition, length, scale = 1) {
     const face = wallFace(room);
-    const { width } = decorFootprint(definition, length);
-    const halfHeight = definition.size.height / 2;
+    const { width, height } = decorExtent(definition, length, scale);
+    const halfHeight = height / 2;
     const y = rounded(Math.min(face.height - halfHeight, Math.max(halfHeight, point.y)));
     const alongLimitX = Math.max(0, face.halfWidth - width / 2);
     const alongLimitZ = Math.max(0, face.halfDepth - width / 2);
@@ -88,10 +88,10 @@ export function placeDecorItem(layout, instanceId, target, room, catalog, rotati
     const face = wallFace(room);
     if (mount === "wall") {
         const wall = nearestWall(target.point, room);
-        const snapped = snapToWall(target.point, wall, room, definition, item.length);
+        const snapped = snapToWall(target.point, wall, room, definition, item.length, item.scale);
         return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...snapped, mount }) };
     }
-    const footprint = decorFootprint(definition, item.length);
+    const footprint = decorFootprint(definition, item.length, item.scale);
     const clamped = clampPlacementToRoom({ x: target.point.x, z: target.point.z, rotationY: rotation }, room, footprint);
     if (mount === "ceiling") {
         return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...clamped, y: rounded(face.height), mount, wall: "" }) };
@@ -132,6 +132,17 @@ export function setDecorLength(layout, instanceId, length, room, catalog) {
     const next = replaceDecor(layout, { ...found.item, length: clampDecorLength(found.definition, length) });
     const placed = placeDecorItem(next, instanceId, { mount: found.item.mount, point: found.item }, room, catalog);
     // A longer prop that now overlaps a neighbour keeps its old length rather than sitting inside it.
+    return placed.valid ? placed : { valid: false, layout, instanceId, reason: placed.reason };
+}
+/** Resize a resizable item and re-place it so the new extent still fits; refused when it would grow into a neighbour. */
+export function setDecorScale(layout, instanceId, scale, room, catalog) {
+    const found = findItem(layout, instanceId);
+    if (!found)
+        return { valid: false, layout, instanceId, reason: "missing" };
+    if (!found.definition.scale.enabled)
+        return { valid: false, layout, instanceId, reason: "not-scalable" };
+    const next = replaceDecor(layout, { ...found.item, scale: clampDecorScale(found.definition, scale) });
+    const placed = placeDecorItem(next, instanceId, { mount: found.item.mount, point: found.item }, room, catalog);
     return placed.valid ? placed : { valid: false, layout, instanceId, reason: placed.reason };
 }
 export function removeDecorItem(layout, instanceId) {
@@ -175,6 +186,7 @@ export function addDecorItem(layout, definition, room, catalog, at) {
         wall: mount === "wall" ? "north" : "",
         color: definition.tint.enabled ? definition.tint.default : "",
         length: definition.length.enabled ? definition.length.default : 0,
+        scale: 1,
     };
     const withSeed = { ...layout, decor: [...layout.decor, seed] };
     const base = at?.point ?? (mount === "wall" ? { x: 0, y: definition.wallHeight, z: -face.halfDepth }
@@ -189,13 +201,13 @@ export function addDecorItem(layout, definition, room, catalog, at) {
     }
     return { valid: false, layout, instanceId, reason: "no-room" };
 }
-/** A copy of an item beside the original, keeping its colour and length. */
+/** A copy of an item beside the original, keeping its colour, length and size. */
 export function duplicateDecorItem(layout, instanceId, room, catalog) {
     const found = findItem(layout, instanceId);
     if (!found)
         return { valid: false, layout, instanceId, reason: "missing" };
     const { item, definition } = found;
-    const { width } = decorFootprint(definition, item.length);
+    const { width } = decorFootprint(definition, item.length, item.scale);
     const step = width + 0.2;
     const along = item.mount === "wall" && (item.wall === "east" || item.wall === "west")
         ? { x: 0, z: step }
@@ -207,5 +219,8 @@ export function duplicateDecorItem(layout, instanceId, room, catalog) {
     if (!added.valid)
         return added;
     const copy = added.layout.decor.find((candidate) => candidate.instanceId === added.instanceId);
-    return { ...added, layout: replaceDecor(added.layout, { ...copy, color: item.color, length: item.length, rotationY: item.mount === "wall" ? copy.rotationY : item.rotationY }) };
+    const finished = { ...copy, color: item.color, length: item.length, scale: item.scale, rotationY: item.mount === "wall" ? copy.rotationY : item.rotationY };
+    // The copy was placed at catalog size; re-place it at the original's size so a big sign is not left hanging off the wall.
+    const refit = placeDecorItem(replaceDecor(added.layout, finished), finished.instanceId, { mount: finished.mount, point: finished }, room, catalog);
+    return refit.valid ? refit : { valid: false, layout, instanceId, reason: refit.reason };
 }
