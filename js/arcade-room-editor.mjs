@@ -1,4 +1,7 @@
-import { createDefaultRoomLayout, rotatePlacement, setItemHidden, updateItemPlacement, } from "./arcade-room-layout.mjs";
+import { findDecor } from "./arcade-room-catalog/decor.mjs";
+import { addDecorItem, duplicateDecorItem, nearestWall, placeDecorItem, removeDecorItem, rotateDecorItem, setDecorColor, setDecorLength, } from "./arcade-room-decor-layout.mjs";
+import { createEditorPanel } from "./arcade-room-editor-panel.mjs";
+import { ROOM_BOUNDS_DEFAULTS, createDefaultRoomLayout, floorObstacles, rotatePlacement, setItemHidden, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
 import { EDITOR_CAMERA_PRESETS, applyEditorCameraPreset, createEditorCamera, editorCameraPose, orbitEditorCamera, panEditorCamera, zoomEditorCamera, } from "./arcade-room-camera.mjs";
 /**
  * Key that flips build mode on and off. It has to be a key rather than only a button because pointer
@@ -6,81 +9,71 @@ import { EDITOR_CAMERA_PRESETS, applyEditorCameraPreset, createEditorCamera, edi
  */
 export const ROOM_EDITOR_TOGGLE_KEY = "KeyB";
 const NUDGE_STEP = 0.1;
+const DECOR_SNAP_DEGREES = 15;
+const UNDO_DEPTH = 40;
 export function createRoomEditor(options) {
-    const { THREE, scene, camera, canvas, floor, cabinets, room, initialLayout, persist, elements, canEnter, onEditingChange } = options;
+    const { THREE, scene, camera, canvas, shell, decor, inventory, cabinets, room, initialLayout, persist, elements, canEnter, onEditingChange } = options;
     const catalog = Object.fromEntries(cabinets.map((entry) => [entry.cabinet.id, entry.footprint]));
+    const roomHeight = room.height ?? ROOM_BOUNDS_DEFAULTS.height;
     let layout = initialLayout;
-    let selectedInstanceId = layout.items[0]?.instanceId ?? "";
+    let selection = layout.items[0] ? { kind: "cabinet", instanceId: layout.items[0].instanceId } : null;
+    let tab = "cabinets";
+    let decorCategory = "neon";
     let editing = false;
     let dragging = false;
     let saving = false;
+    const undoStack = [];
     // Which camera gesture the current pointer owns: orbit on a left-drag over empty floor,
     // pan on a right/middle-drag or a Shift+left-drag anywhere. Decided on pointerdown.
     let cameraGesture = "none";
     let view = createEditorCamera(room);
     const lastPointer = { x: 0, y: 0 };
-    // Grab offset between the floor point under the cursor and the cabinet's origin, so a cabinet
+    // Grab offset between the floor point under the cursor and the item's origin, so a cabinet
     // picked up by its edge stays under the hand instead of snapping its centre to the cursor.
     const dragOffset = { x: 0, z: 0 };
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    const selection = new THREE.BoxHelper(cabinets[0]?.model, 0x70e8ff);
-    selection.material.depthTest = false;
-    selection.material.transparent = true;
-    selection.material.opacity = 0.9;
-    selection.renderOrder = 10;
-    selection.visible = false;
-    scene.add(selection);
-    function cabinetPlacement() {
-        return layout.items.find((item) => item.instanceId === selectedInstanceId)
-            ?? layout.items[0]
-            ?? createDefaultRoomLayout().items[0];
+    const ceilingPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), roomHeight);
+    const planeHit = new THREE.Vector3();
+    const selectionBox = new THREE.BoxHelper(cabinets[0]?.model, 0x70e8ff);
+    selectionBox.material.depthTest = false;
+    selectionBox.material.transparent = true;
+    selectionBox.material.opacity = 0.9;
+    selectionBox.renderOrder = 10;
+    selectionBox.visible = false;
+    scene.add(selectionBox);
+    const panel = createEditorPanel(elements, {
+        selectTab: (next) => { tab = next; renderPanel(); },
+        selectCabinet: (instanceId) => selectCabinet(instanceId),
+        toggleCabinetHidden: (instanceId) => toggleHidden(instanceId),
+        setSurface: (kind, id) => setSurface(kind, id),
+        setDecorCategory: (category) => { decorCategory = category; renderPanel(); },
+        addDecor: (itemId) => addDecor(itemId),
+        selectDecor: (instanceId) => selectDecor(instanceId),
+        removeDecor: (instanceId) => removeDecor(instanceId),
+        duplicateDecor: (instanceId) => duplicateDecor(instanceId),
+        setDecorColor: (instanceId, color) => commitDecor(setDecorColor(layout, instanceId, color).layout, "Colour changed"),
+        setDecorLength: (instanceId, length) => commitDecor(setDecorLength(layout, instanceId, length, room, catalog).layout, "Length changed"),
+        setDecorMount: (instanceId, mount) => remount(instanceId, mount),
+    });
+    function selectedCabinet() {
+        return selection?.kind === "cabinet" ? layout.items.find((item) => item.instanceId === selection.instanceId) : undefined;
+    }
+    function selectedDecor() {
+        return selection?.kind === "decor" ? layout.decor.find((item) => item.instanceId === selection.instanceId) : undefined;
     }
     function cabinetEntry(cabinetId) {
         return cabinets.find((entry) => entry.cabinet.id === cabinetId);
     }
-    function placementLabel(placement) {
-        const degrees = Math.round(placement.rotationY * 180 / Math.PI);
-        return `X ${placement.x.toFixed(1)} · Z ${placement.z.toFixed(1)} · ${degrees}°`;
+    function selectedModel() {
+        const cabinet = selectedCabinet();
+        if (cabinet)
+            return cabinet.hidden ? undefined : cabinetEntry(cabinet.cabinetId)?.model;
+        const item = selectedDecor();
+        return item ? decor.modelFor(item.instanceId) : undefined;
     }
-    function renderCabinetList() {
-        elements.cabinetList.replaceChildren(...layout.items.map((placement, index) => {
-            const entry = cabinetEntry(placement.cabinetId);
-            const row = document.createElement("div");
-            row.className = "cabinet-list__row";
-            row.dataset.hidden = String(placement.hidden);
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "cabinet-list__item";
-            button.dataset.instanceId = placement.instanceId;
-            button.setAttribute("aria-pressed", String(placement.instanceId === selectedInstanceId));
-            button.title = `Select ${entry?.cabinet.title ?? "cabinet"} (${index + 1})`;
-            const image = document.createElement("img");
-            image.src = `../grid-previews/${entry?.cabinet.gameSlug ?? "bird-duty"}.png`;
-            image.alt = "";
-            const text = document.createElement("div");
-            const hotkey = document.createElement("span");
-            hotkey.textContent = `CABINET ${index + 1}`;
-            const title = document.createElement("strong");
-            title.textContent = entry?.cabinet.title ?? placement.cabinetId;
-            const position = document.createElement("small");
-            position.textContent = placement.hidden ? "Hidden · off the floor" : placementLabel(placement);
-            text.append(hotkey, title, position);
-            button.append(image, text);
-            // The toggle sits beside the select button rather than inside it: a button
-            // cannot contain a button, and the two are different decisions anyway.
-            const toggle = document.createElement("button");
-            toggle.type = "button";
-            toggle.className = "cabinet-list__toggle";
-            toggle.dataset.toggleInstanceId = placement.instanceId;
-            toggle.setAttribute("aria-pressed", String(!placement.hidden));
-            toggle.title = placement.hidden ? "Put this cabinet back on the floor (H)" : "Take this cabinet off the floor (H)";
-            toggle.textContent = placement.hidden ? "Show" : "Hide";
-            row.append(button, toggle);
-            return row;
-        }));
-    }
-    function renderPlacement() {
+    /** Push the scene into step with the layout: cabinet poses, decor meshes, surfaces, the selection box. */
+    function renderScene() {
         for (const placement of layout.items) {
             const entry = cabinetEntry(placement.cabinetId);
             if (!entry)
@@ -89,28 +82,77 @@ export function createRoomEditor(options) {
             entry.model.rotation.y = placement.rotationY;
             entry.model.visible = !placement.hidden;
         }
-        const current = cabinetPlacement();
-        const selected = cabinetEntry(current.cabinetId);
-        if (selected)
-            selection.setFromObject(selected.model);
-        selection.visible = editing && !current.hidden;
-        renderCabinetList();
+        decor.sync(layout);
+        shell.applySurfaces(layout.surfaces);
+        const model = selectedModel();
+        if (model)
+            selectionBox.setFromObject(model);
+        selectionBox.visible = editing && Boolean(model);
+    }
+    function renderPanel() {
+        panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory });
+        elements.undoButton.disabled = undoStack.length === 0;
     }
     function setStatus(message, state = "ready") {
         elements.status.textContent = message;
         elements.status.dataset.state = state;
     }
-    function select(instanceId) {
-        if (!layout.items.some((item) => item.instanceId === instanceId))
+    /** Replace the layout, remembering the old one for undo, and redraw everything. */
+    function commit(next, message, state = "dirty") {
+        if (next === layout)
             return;
-        selectedInstanceId = instanceId;
-        renderPlacement();
-        const current = cabinetPlacement();
-        const entry = cabinetEntry(current.cabinetId);
-        const title = entry?.cabinet.title ?? "Cabinet";
-        setStatus(current.hidden
+        undoStack.push(layout);
+        if (undoStack.length > UNDO_DEPTH)
+            undoStack.shift();
+        layout = next;
+        renderScene();
+        renderPanel();
+        setStatus(message, state);
+    }
+    function commitDecor(next, message) {
+        if (next === layout) {
+            setStatus("That change is not possible here.", "error");
+            return;
+        }
+        commit(next, `${message} · unsaved`);
+    }
+    function undo() {
+        const previous = undoStack.pop();
+        if (!previous)
+            return;
+        layout = previous;
+        if (selection && !selectedCabinet() && !selectedDecor())
+            selection = null;
+        renderScene();
+        renderPanel();
+        setStatus("Undone · unsaved", "dirty");
+    }
+    function selectCabinet(instanceId) {
+        const item = layout.items.find((candidate) => candidate.instanceId === instanceId);
+        if (!item)
+            return;
+        selection = { kind: "cabinet", instanceId };
+        tab = "cabinets";
+        renderScene();
+        renderPanel();
+        const title = cabinetEntry(item.cabinetId)?.cabinet.title ?? "Cabinet";
+        setStatus(item.hidden
             ? `${title} is hidden · press H or Show to put it back on the floor.`
             : `${title} selected · drag it, nudge with arrows, Q/R to rotate, H to hide.`);
+    }
+    function selectDecor(instanceId) {
+        const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
+        if (!item)
+            return;
+        selection = { kind: "decor", instanceId };
+        tab = "decor";
+        renderScene();
+        renderPanel();
+        const definition = findDecor(item.itemId);
+        const hint = item.mount === "wall"
+            ? "drag it along the wall, arrows to slide and raise"
+            : "drag it, arrows to nudge, Q/R to rotate";
+        setStatus(`${definition?.title ?? "Item"} selected · ${hint} · Delete to remove.`);
     }
     function setHidden(instanceId, hidden) {
         const result = setItemHidden(layout, instanceId, hidden, room, catalog);
@@ -119,15 +161,81 @@ export function createRoomEditor(options) {
             setStatus(`No room for ${title} · clear its old spot or the starter spot first.`, "error");
             return;
         }
-        layout = result.layout;
-        selectedInstanceId = instanceId;
-        renderPlacement();
-        setStatus(hidden ? `${title} is off the floor · unsaved` : `${title} is back on the floor · unsaved`, "dirty");
+        selection = { kind: "cabinet", instanceId };
+        commit(result.layout, hidden ? `${title} is off the floor · unsaved` : `${title} is back on the floor · unsaved`);
     }
-    function toggleHidden(instanceId = cabinetPlacement().instanceId) {
+    function toggleHidden(instanceId = selectedCabinet()?.instanceId ?? "") {
         const item = layout.items.find((candidate) => candidate.instanceId === instanceId);
         if (item)
             setHidden(instanceId, !item.hidden);
+    }
+    function setSurface(kind, id) {
+        if (!inventory.owns(id)) {
+            setStatus("You do not own that finish yet.", "error");
+            return;
+        }
+        const result = setRoomSurface(layout, kind, id);
+        if (!result.valid)
+            return;
+        commit(result.layout, `${kind[0].toUpperCase()}${kind.slice(1)} changed · unsaved`);
+    }
+    /** Where a freshly added item lands: near the camera's target so it appears in view. */
+    function addTarget(mounts, wallHeight) {
+        const target = view.target;
+        const mount = mounts[0];
+        if (mount === "wall") {
+            const wall = nearestWall(target, room);
+            const half = { x: room.width / 2, z: room.depth / 2 };
+            const point = wall === "north" ? { x: target.x, y: wallHeight, z: -half.z }
+                : wall === "south" ? { x: target.x, y: wallHeight, z: half.z }
+                    : wall === "east" ? { x: half.x, y: wallHeight, z: target.z }
+                        : { x: -half.x, y: wallHeight, z: target.z };
+            return { mount, point };
+        }
+        return { mount, point: { x: target.x, y: mount === "ceiling" ? roomHeight : 0, z: target.z } };
+    }
+    function addDecor(itemId) {
+        const definition = findDecor(itemId);
+        if (!definition || !inventory.owns(itemId)) {
+            setStatus("You do not own that item yet.", "error");
+            return;
+        }
+        const result = addDecorItem(layout, definition, room, catalog, addTarget(definition.mounts, definition.wallHeight));
+        if (!result.valid) {
+            setStatus(`No room for ${definition.title} near here · move the view and try again.`, "error");
+            return;
+        }
+        selection = { kind: "decor", instanceId: result.instanceId };
+        commit(result.layout, `${definition.title} added · drag it into place · unsaved`);
+    }
+    function removeDecor(instanceId) {
+        const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
+        if (!item)
+            return;
+        if (selection?.kind === "decor" && selection.instanceId === instanceId)
+            selection = null;
+        commit(removeDecorItem(layout, instanceId), `${findDecor(item.itemId)?.title ?? "Item"} removed · unsaved`);
+    }
+    function duplicateDecor(instanceId) {
+        const result = duplicateDecorItem(layout, instanceId, room, catalog);
+        if (!result.valid) {
+            setStatus("No room beside it for a copy.", "error");
+            return;
+        }
+        selection = { kind: "decor", instanceId: result.instanceId };
+        commit(result.layout, "Copied · unsaved");
+    }
+    function remount(instanceId, mount) {
+        const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
+        if (!item || item.mount === mount)
+            return;
+        const target = addTarget([mount], findDecor(item.itemId)?.wallHeight ?? 1.6);
+        const result = placeDecorItem(layout, instanceId, target, room, catalog, mount === "wall" ? undefined : 0);
+        if (!result.valid) {
+            setStatus("No room there.", "error");
+            return;
+        }
+        commit(result.layout, `Moved to the ${mount} · unsaved`);
     }
     async function storeLayout() {
         if (saving)
@@ -147,40 +255,107 @@ export function createRoomEditor(options) {
             elements.saveButton.disabled = false;
         }
     }
-    function applyPlacement(next) {
-        const current = cabinetPlacement();
+    /** Move the selected cabinet; the layout rules decide whether the spot is allowed. */
+    function applyCabinetPlacement(next, quiet = false) {
+        const current = selectedCabinet();
+        if (!current)
+            return false;
         if (current.hidden) {
             setStatus("That cabinet is hidden · show it before moving it.", "error");
             return false;
         }
         const result = updateItemPlacement(layout, current.instanceId, next, room, catalog);
         if (!result.valid) {
-            setStatus("That spot is blocked by another cabinet.", "error");
+            setStatus("That spot is blocked.", "error");
             return false;
         }
-        layout = result.layout;
-        renderPlacement();
-        setStatus("Unsaved changes", "dirty");
+        if (quiet) {
+            // Mid-drag: every pointer move is one gesture, so only the first move is an undo step.
+            layout = result.layout;
+            renderScene();
+            setStatus("Unsaved changes", "dirty");
+        }
+        else {
+            commit(result.layout, "Unsaved changes");
+        }
+        return true;
+    }
+    function applyDecorTarget(target, quiet = false) {
+        const current = selectedDecor();
+        if (!current)
+            return false;
+        const result = placeDecorItem(layout, current.instanceId, target, room, catalog);
+        if (!result.valid) {
+            setStatus("That spot is blocked.", "error");
+            return false;
+        }
+        if (quiet) {
+            layout = result.layout;
+            renderScene();
+            setStatus("Unsaved changes", "dirty");
+        }
+        else {
+            commit(result.layout, "Unsaved changes");
+        }
         return true;
     }
     function rotate(direction) {
-        const current = cabinetPlacement();
-        const entry = cabinetEntry(current.cabinetId);
-        if (entry)
-            applyPlacement(rotatePlacement(current, direction, entry.cabinet.placement.snapDegrees));
+        const cabinet = selectedCabinet();
+        if (cabinet) {
+            const entry = cabinetEntry(cabinet.cabinetId);
+            if (entry)
+                applyCabinetPlacement(rotatePlacement(cabinet, direction, entry.cabinet.placement.snapDegrees));
+            return;
+        }
+        const item = selectedDecor();
+        if (!item)
+            return;
+        const result = rotateDecorItem(layout, item.instanceId, direction, DECOR_SNAP_DEGREES, room, catalog);
+        if (!result.valid) {
+            setStatus(result.reason === "wall" ? "Wall items always face the room." : "That spot is blocked.", "error");
+            return;
+        }
+        commit(result.layout, "Unsaved changes");
     }
-    function nudge(screenX, screenY) {
-        // Camera-relative so "up" pushes the cabinet away from the viewer whichever way the room is orbited.
+    function cameraAxes() {
+        // Camera-relative so "up" pushes the item away from the viewer whichever way the room is orbited.
         const forward = new THREE.Vector3();
         camera.getWorldDirection(forward);
         forward.y = 0;
         forward.normalize();
-        const right = { x: -forward.z, z: forward.x };
-        const current = cabinetPlacement();
-        applyPlacement({
-            x: current.x + (right.x * screenX + forward.x * screenY) * NUDGE_STEP,
-            z: current.z + (right.z * screenX + forward.z * screenY) * NUDGE_STEP,
-            rotationY: current.rotationY,
+        return { forward: { x: forward.x, z: forward.z }, right: { x: -forward.z, z: forward.x } };
+    }
+    function nudge(screenX, screenY) {
+        const { forward, right } = cameraAxes();
+        const cabinet = selectedCabinet();
+        if (cabinet) {
+            applyCabinetPlacement({
+                x: cabinet.x + (right.x * screenX + forward.x * screenY) * NUDGE_STEP,
+                z: cabinet.z + (right.z * screenX + forward.z * screenY) * NUDGE_STEP,
+                rotationY: cabinet.rotationY,
+            });
+            return;
+        }
+        const item = selectedDecor();
+        if (!item)
+            return;
+        if (item.mount === "wall") {
+            // On a wall, left/right slide along it and up/down raise or lower it.
+            const along = item.wall === "east" || item.wall === "west" ? { x: 0, z: 1 } : { x: 1, z: 0 };
+            const sign = item.wall === "south" || item.wall === "west" ? -1 : 1;
+            applyDecorTarget({
+                mount: "wall",
+                point: { x: item.x + along.x * screenX * NUDGE_STEP * sign, y: item.y + screenY * NUDGE_STEP, z: item.z + along.z * screenX * NUDGE_STEP * sign },
+            });
+            return;
+        }
+        applyDecorTarget({
+            mount: item.mount,
+            point: {
+                x: item.x + (right.x * screenX + forward.x * screenY) * NUDGE_STEP,
+                y: item.y,
+                z: item.z + (right.z * screenX + forward.z * screenY) * NUDGE_STEP,
+            },
         });
     }
     function applyViewCamera() {
@@ -205,30 +380,87 @@ export function createRoomEditor(options) {
     }
     function floorPoint(event) {
         updatePointer(event);
-        return raycaster.intersectObject(floor, false)[0]?.point ?? null;
+        return raycaster.intersectObject(shell.floor, false)[0]?.point ?? null;
+    }
+    function wallPoint(event) {
+        updatePointer(event);
+        return raycaster.intersectObjects(shell.wallMeshes, false)[0]?.point ?? null;
+    }
+    function ceilingPoint(event) {
+        updatePointer(event);
+        return raycaster.ray.intersectPlane(ceilingPlane, planeHit) ? planeHit.clone() : null;
+    }
+    function rootOf(hit, roots) {
+        let object = hit;
+        while (object) {
+            if (roots.includes(object))
+                return object;
+            object = object.parent;
+        }
+        return undefined;
     }
     function hitCabinet(event) {
         updatePointer(event);
-        const hit = raycaster.intersectObjects(cabinets.map((entry) => entry.model), true)[0]?.object;
-        if (!hit)
-            return undefined;
-        const entry = cabinets.find((candidate) => {
-            let object = hit;
-            while (object) {
-                if (object === candidate.model)
-                    return true;
-                object = object.parent;
-            }
-            return false;
-        });
+        const models = cabinets.map((entry) => entry.model);
+        const hit = raycaster.intersectObjects(models, true)[0]?.object;
+        const root = hit && rootOf(hit, models);
+        const entry = root && cabinets.find((candidate) => candidate.model === root);
         return entry && layout.items.find((candidate) => candidate.cabinetId === entry.cabinet.id && !candidate.hidden);
     }
+    function hitDecor(event) {
+        updatePointer(event);
+        const models = decor.models();
+        const hit = raycaster.intersectObjects(models, true)[0]?.object;
+        const root = hit && rootOf(hit, models);
+        return root && layout.decor.find((candidate) => candidate.instanceId === root.userData.decorInstanceId);
+    }
+    /**
+     * Turn the pointer into a placement target for the dragged decor. The item
+     * follows whichever visible surface is under the cursor that it can mount on,
+     * preferring the surface it is already on; the ceiling plane is invisible with
+     * the roof off, so a ceiling item stays on the ceiling and the inspector's
+     * Mount buttons are how an item gets up there.
+     */
+    function decorTargetFromPointer(event, item) {
+        const definition = findDecor(item.itemId);
+        if (!definition)
+            return null;
+        const mounts = definition.mounts;
+        if (item.mount === "ceiling") {
+            const point = ceilingPoint(event);
+            return point ? { mount: "ceiling", point: { x: point.x + dragOffset.x, y: roomHeight, z: point.z + dragOffset.z } } : null;
+        }
+        const wall = mounts.includes("wall") ? wallPoint(event) : null;
+        const floor = mounts.includes("floor") ? floorPoint(event) : null;
+        if (item.mount === "wall") {
+            if (wall)
+                return { mount: "wall", point: { x: wall.x, y: wall.y, z: wall.z } };
+            if (floor)
+                return { mount: "floor", point: { x: floor.x + dragOffset.x, y: 0, z: floor.z + dragOffset.z } };
+            // A wall-only item dragged onto the floor slides down its nearest wall instead.
+            const fallback = floorPoint(event);
+            return fallback ? { mount: "wall", point: { x: fallback.x, y: item.y, z: fallback.z } } : null;
+        }
+        if (floor)
+            return { mount: "floor", point: { x: floor.x + dragOffset.x, y: 0, z: floor.z + dragOffset.z } };
+        if (wall)
+            return { mount: "wall", point: { x: wall.x, y: wall.y, z: wall.z } };
+        return null;
+    }
     function moveFromPointer(event) {
-        const point = floorPoint(event);
-        if (!point)
+        const cabinet = selectedCabinet();
+        if (cabinet) {
+            const point = floorPoint(event);
+            if (point)
+                applyCabinetPlacement({ x: point.x + dragOffset.x, z: point.z + dragOffset.z, rotationY: cabinet.rotationY }, true);
             return;
-        const current = cabinetPlacement();
-        applyPlacement({ x: point.x + dragOffset.x, z: point.z + dragOffset.z, rotationY: current.rotationY });
+        }
+        const item = selectedDecor();
+        if (!item)
+            return;
+        const target = decorTargetFromPointer(event, item);
+        if (target)
+            applyDecorTarget(target, true);
     }
     function enter() {
         if (editing || !canEnter())
@@ -241,8 +473,9 @@ export function createRoomEditor(options) {
         elements.panel.hidden = false;
         elements.editButton.setAttribute("aria-pressed", "true");
         setView("overview");
-        setStatus("Drag a cabinet to move it · drag the floor to orbit · right-drag to pan · scroll to zoom.");
-        renderPlacement();
+        setStatus("Drag anything to move it · drag the floor to orbit · right-drag to pan · scroll to zoom.");
+        renderScene();
+        renderPanel();
         onEditingChange(true);
     }
     function finish() {
@@ -256,7 +489,7 @@ export function createRoomEditor(options) {
         document.body.classList.remove("is-editing");
         elements.panel.hidden = true;
         elements.editButton.setAttribute("aria-pressed", "false");
-        selection.visible = false;
+        selectionBox.visible = false;
         onEditingChange(false);
         canvas.focus();
     }
@@ -269,6 +502,7 @@ export function createRoomEditor(options) {
     elements.editButton.addEventListener("click", toggle);
     elements.rotateLeftButton.addEventListener("click", () => rotate(-1));
     elements.rotateRightButton.addEventListener("click", () => rotate(1));
+    elements.undoButton.addEventListener("click", undo);
     elements.saveButton.addEventListener("click", () => { void storeLayout(); });
     elements.viewButtons.addEventListener("click", (event) => {
         const button = event.target.closest("[data-view]");
@@ -281,23 +515,11 @@ export function createRoomEditor(options) {
         event.preventDefault(); });
     elements.finishButton.addEventListener("click", finish);
     elements.resetButton.addEventListener("click", () => {
-        if (!confirm("Reset the room to the starter layout? Hidden cabinets come back too."))
+        if (!confirm("Reset the room to the starter layout? Finishes and decor go back too, and hidden cabinets come back."))
             return;
-        layout = createDefaultRoomLayout();
-        selectedInstanceId = layout.items[0]?.instanceId ?? "";
-        renderPlacement();
-        setStatus("Starter layout restored. Save to keep it.", "dirty");
-    });
-    elements.cabinetList.addEventListener("click", (event) => {
-        const target = event.target;
-        const toggle = target.closest("[data-toggle-instance-id]");
-        if (toggle?.dataset.toggleInstanceId) {
-            toggleHidden(toggle.dataset.toggleInstanceId);
-            return;
-        }
-        const button = target.closest("[data-instance-id]");
-        if (button?.dataset.instanceId)
-            select(button.dataset.instanceId);
+        const starter = createDefaultRoomLayout();
+        selection = starter.items[0] ? { kind: "cabinet", instanceId: starter.items[0].instanceId } : null;
+        commit(starter, "Starter room restored. Save to keep it.");
     });
     canvas.addEventListener("pointerdown", (event) => {
         if (!editing)
@@ -313,13 +535,21 @@ export function createRoomEditor(options) {
             canvas.style.cursor = "all-scroll";
             return;
         }
-        const hit = hitCabinet(event);
-        if (hit) {
-            select(hit.instanceId);
-            const point = floorPoint(event);
-            const current = cabinetPlacement();
-            dragOffset.x = point ? current.x - point.x : 0;
-            dragOffset.z = point ? current.z - point.z : 0;
+        const cabinet = hitCabinet(event);
+        const item = cabinet ? undefined : hitDecor(event);
+        if (cabinet || item) {
+            if (cabinet)
+                selectCabinet(cabinet.instanceId);
+            else
+                selectDecor(item.instanceId);
+            const anchor = item?.mount === "ceiling" ? ceilingPoint(event) : floorPoint(event);
+            const origin = cabinet ?? item;
+            dragOffset.x = anchor ? origin.x - anchor.x : 0;
+            dragOffset.z = anchor ? origin.z - anchor.z : 0;
+            // The whole drag is one undo step.
+            undoStack.push(layout);
+            if (undoStack.length > UNDO_DEPTH)
+                undoStack.shift();
             dragging = true;
             canvas.style.cursor = "grabbing";
             return;
@@ -350,14 +580,22 @@ export function createRoomEditor(options) {
             renderViewButtons();
             return;
         }
-        canvas.style.cursor = hitCabinet(event) ? "grab" : "";
+        canvas.style.cursor = hitCabinet(event) || hitDecor(event) ? "grab" : "";
     });
     const endPointer = (event) => {
+        const wasDragging = dragging;
         dragging = false;
         cameraGesture = "none";
         canvas.releasePointerCapture?.(event.pointerId);
-        if (editing)
-            canvas.style.cursor = hitCabinet(event) ? "grab" : "";
+        if (!editing)
+            return;
+        canvas.style.cursor = hitCabinet(event) || hitDecor(event) ? "grab" : "";
+        if (wasDragging) {
+            // Drop an undo step that changed nothing, then let the panel catch up with the final spot.
+            if (undoStack[undoStack.length - 1] === layout)
+                undoStack.pop();
+            renderPanel();
+        }
     };
     canvas.addEventListener("wheel", (event) => {
         if (!editing)
@@ -370,15 +608,29 @@ export function createRoomEditor(options) {
     canvas.addEventListener("pointerup", endPointer);
     canvas.addEventListener("pointercancel", endPointer);
     window.addEventListener("keydown", (event) => {
+        // Keys typed into the panel's inputs (a colour, a length) are never room commands.
+        const typing = event.target instanceof HTMLElement && Boolean(event.target.closest("input, textarea, select"));
         if (event.code === ROOM_EDITOR_TOGGLE_KEY) {
+            if (typing)
+                return;
             event.preventDefault();
             toggle();
             return;
         }
-        if (!editing)
+        if (!editing || typing)
             return;
-        if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select"))
+        if ((event.ctrlKey || event.metaKey) && event.code === "KeyZ") {
+            event.preventDefault();
+            undo();
             return;
+        }
+        if ((event.ctrlKey || event.metaKey) && event.code === "KeyD") {
+            event.preventDefault();
+            const item = selectedDecor();
+            if (item)
+                duplicateDecor(item.instanceId);
+            return;
+        }
         const bindings = {
             Escape: finish,
             KeyQ: () => rotate(-1),
@@ -387,6 +639,10 @@ export function createRoomEditor(options) {
             KeyF: () => setView("front"),
             KeyT: () => setView("top"),
             KeyO: () => setView("overview"),
+            Delete: () => { const item = selectedDecor(); if (item)
+                removeDecor(item.instanceId); },
+            Backspace: () => { const item = selectedDecor(); if (item)
+                removeDecor(item.instanceId); },
             ArrowUp: () => nudge(0, 1),
             KeyW: () => nudge(0, 1),
             ArrowDown: () => nudge(0, -1),
@@ -400,7 +656,7 @@ export function createRoomEditor(options) {
         if (digit) {
             const item = layout.items[Number(digit[1]) - 1];
             if (item)
-                select(item.instanceId);
+                selectCabinet(item.instanceId);
             event.preventDefault();
             return;
         }
@@ -410,7 +666,8 @@ export function createRoomEditor(options) {
         event.preventDefault();
         action();
     });
-    renderPlacement();
+    renderScene();
+    renderPanel();
     return {
         enter,
         finish,
@@ -420,5 +677,6 @@ export function createRoomEditor(options) {
         // Hidden cabinets have no placement as far as the room is concerned: nothing to
         // walk into, nothing to play, nothing to prompt for.
         getCabinetPlacement: (cabinetId) => layout.items.find((item) => item.cabinetId === cabinetId && !item.hidden),
+        getFloorObstacles: () => floorObstacles(layout, catalog),
     };
 }

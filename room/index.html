@@ -24,7 +24,7 @@
       <div class="start-card">
         <span id="startTag" class="start-card__tag">YOUR 3D ARCADE</span>
         <h2 id="startHeading">Make the room yours.</h2>
-        <p id="startCopy">Walk up to play Bird Duty or Lovers Lost, then arrange both cabinets in build mode.</p>
+        <p id="startCopy">Walk up to play Bird Duty or Lovers Lost, then build the room out — floors, walls, neon and decor.</p>
         <button id="enterShowroom" type="button">Enter my arcade</button>
         <small id="roomStatus">Click to capture the mouse · WASD to move · E to play · B to build</small>
       </div>
@@ -38,8 +38,8 @@
     <aside id="roomEditor" class="room-editor" aria-label="Arcade editor" hidden>
       <div class="room-editor__heading">
         <span class="eyebrow">BUILD MODE</span>
-        <h2>Arrange your arcade</h2>
-        <p>Pick a cabinet below or click it in the room, then drag it across the floor. Drag empty floor to orbit, right-drag to pan, scroll to zoom.</p>
+        <h2>Build your arcade</h2>
+        <p>Click anything in the room to move it. Pick floors, walls and trim under Surfaces; add neon, signs, posters and props under Decor. Drag empty floor to orbit, right-drag to pan, scroll to zoom.</p>
       </div>
 
       <div id="cameraViews" class="camera-views" role="group" aria-label="Camera view">
@@ -51,11 +51,31 @@
         <button type="button" data-view="top" aria-pressed="false" title="Top-down (T)">Top</button>
       </div>
 
-      <div id="cabinetList" class="cabinet-list" role="group" aria-label="Cabinets"></div>
+      <div id="editorTabs" class="editor-tabs" role="tablist" aria-label="Editor sections">
+        <button type="button" role="tab" data-tab="cabinets" aria-selected="true">Cabinets</button>
+        <button type="button" role="tab" data-tab="surfaces" aria-selected="false">Surfaces</button>
+        <button type="button" role="tab" data-tab="decor" aria-selected="false">Decor</button>
+      </div>
 
-      <div class="editor-tools" aria-label="Cabinet rotation">
-        <button id="rotateCabinetLeft" type="button" title="Rotate left (Q)">↶ <span>Rotate left</span></button>
-        <button id="rotateCabinetRight" type="button" title="Rotate right (R)">↷ <span>Rotate right</span></button>
+      <div id="editorTabPanels" class="editor-tab-panels">
+        <section data-tab-panel="cabinets" class="editor-tab-panel">
+          <div id="cabinetList" class="cabinet-list" role="group" aria-label="Cabinets"></div>
+        </section>
+        <section data-tab-panel="surfaces" class="editor-tab-panel" hidden>
+          <div id="surfacePicker" class="surface-picker" role="group" aria-label="Room finishes"></div>
+        </section>
+        <section data-tab-panel="decor" class="editor-tab-panel" hidden>
+          <div id="decorInspector" class="inspector" hidden></div>
+          <div id="decorCategories" class="category-chips" role="group" aria-label="Decor categories"></div>
+          <div id="decorCatalog" class="decor-grid" role="group" aria-label="Decor catalog"></div>
+          <div id="decorPlaced" class="placed-list" role="group" aria-label="Placed decor"></div>
+        </section>
+      </div>
+
+      <div class="editor-tools" aria-label="Rotate and undo">
+        <button id="rotateCabinetLeft" type="button" title="Rotate left (Q)">↶ <span>Rotate</span></button>
+        <button id="rotateCabinetRight" type="button" title="Rotate right (R)">↷ <span>Rotate</span></button>
+        <button id="undoRoomEdit" type="button" title="Undo (Ctrl+Z)" disabled>↩ <span>Undo</span></button>
       </div>
 
       <p id="editorStatus" class="editor-status" aria-live="polite">Drag a cabinet to move it.</p>
@@ -65,7 +85,7 @@
         <button id="saveRoomLayout" class="editor-action" type="button">Save layout</button>
         <button id="finishEditing" class="editor-action editor-action--primary" type="button">Done</button>
       </div>
-      <small class="editor-shortcuts"><b>1 / 2</b> select · <b>Arrows</b> nudge · <b>Q / R</b> rotate · <b>H</b> hide / show · <b>O / F / T</b> views · <b>B</b> save &amp; close</small>
+      <small class="editor-shortcuts"><b>1 / 2</b> cabinets · <b>Arrows</b> nudge · <b>Q / R</b> rotate · <b>H</b> hide / show · <b>Del</b> remove · <b>Ctrl+D</b> duplicate · <b>Ctrl+Z</b> undo · <b>O / F / T</b> views · <b>B</b> save &amp; close</small>
     </aside>
 
     <section id="cabinetPlayLayer" class="play-layer" aria-hidden="true" hidden>

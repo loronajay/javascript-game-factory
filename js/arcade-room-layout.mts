@@ -1,3 +1,6 @@
+import { DECOR_MOUNTS, clampDecorLength, decorFootprint, findDecor, type DecorMount } from "./arcade-room-catalog/decor.mjs";
+import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
+
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
 
 export type RoomPlacement = Readonly<{
@@ -17,41 +20,85 @@ export type RoomLayoutItem = RoomPlacement & Readonly<{
   hidden: boolean;
 }>;
 
+export type WallSide = "north" | "south" | "east" | "west";
+export const WALL_SIDES: readonly WallSide[] = Object.freeze(["north", "south", "east", "west"]);
+
+/**
+ * A placed decor item. `x/z` is the item's centre on the floor plane; `y` is
+ * the centre height for a wall item, the floor (0) for a floor item and the
+ * ceiling height for a ceiling item. `wall` names which wall a wall-mounted
+ * item hangs on, and its `rotationY` always faces into the room from there.
+ */
+export type RoomDecorItem = Readonly<{
+  instanceId: string;
+  itemId: string;
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
+  mount: DecorMount;
+  wall: WallSide | "";
+  /** A `#rrggbb` tint for tintable items, "" for the catalog default. */
+  color: string;
+  /** The stretched width for stretchable items, 0 for the catalog default. */
+  length: number;
+}>;
+
+export type RoomSurfaces = Readonly<Record<SurfaceKind, string>>;
+
 export type RoomLayout = Readonly<{
-  version: 1;
+  version: 2;
+  surfaces: RoomSurfaces;
   items: readonly RoomLayoutItem[];
+  decor: readonly RoomDecorItem[];
 }>;
 
 export type RoomBounds = Readonly<{
   width: number;
   depth: number;
+  /** How far in from the wall's centre line a floor item's edge must stay. */
   wallInset: number;
+  height?: number;
+  wallThickness?: number;
 }>;
+
+export const ROOM_BOUNDS_DEFAULTS = Object.freeze({ height: 4.8, wallThickness: 0.24 });
 
 export type ItemFootprint = Readonly<{ width: number; depth: number }>;
 export type FootprintCatalog = Readonly<Record<string, ItemFootprint>>;
 
-const DEFAULT_LAYOUT: RoomLayout = Object.freeze({
-  version: 1,
-  items: Object.freeze([
-    Object.freeze({
-      instanceId: "bird-duty-1",
-      cabinetId: "cabinet.bird-duty.standard",
-      x: -1.35,
-      z: -2.8,
-      rotationY: 0,
-      hidden: false,
-    }),
-    Object.freeze({
-      instanceId: "lovers-lost-1",
-      cabinetId: "cabinet.lovers-lost.standard",
-      x: 1.35,
-      z: -2.8,
-      rotationY: 0,
-      hidden: false,
-    }),
-  ]),
-});
+/** Anything standing on the floor that takes space: a visible cabinet or a solid decor item. */
+export type FloorObstacle = RoomPlacement & Readonly<{ footprint: ItemFootprint; instanceId: string }>;
+
+const DEFAULT_CABINETS: readonly RoomLayoutItem[] = Object.freeze([
+  Object.freeze({
+    instanceId: "bird-duty-1",
+    cabinetId: "cabinet.bird-duty.standard",
+    x: -1.35,
+    z: -2.8,
+    rotationY: 0,
+    hidden: false,
+  }),
+  Object.freeze({
+    instanceId: "lovers-lost-1",
+    cabinetId: "cabinet.lovers-lost.standard",
+    x: 1.35,
+    z: -2.8,
+    rotationY: 0,
+    hidden: false,
+  }),
+]);
+
+/**
+ * The three neon bars the room shipped with, now ordinary decor on the north
+ * wall so they can be moved, recoloured or taken down. `z` is the wall's inner
+ * face for the 20 m starter room (wall centre −10, thickness 0.24).
+ */
+const DEFAULT_DECOR: readonly RoomDecorItem[] = Object.freeze([
+  Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ff4d91", length: 2.4 }),
+  Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#53d8ff", length: 2.4 }),
+  Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ffd33d", length: 1.8 }),
+]);
 
 function rounded(value: number): number {
   return Number(value.toFixed(4));
@@ -66,10 +113,16 @@ function rotatedFootprint(placement: RoomPlacement, footprint: ItemFootprint): I
   };
 }
 
+export function defaultRoomSurfaces(): Record<SurfaceKind, string> {
+  return { ...DEFAULT_SURFACE_IDS };
+}
+
 export function createDefaultRoomLayout(): RoomLayout {
   return {
-    version: 1,
-    items: DEFAULT_LAYOUT.items.map((item) => ({ ...item })),
+    version: 2,
+    surfaces: defaultRoomSurfaces(),
+    items: DEFAULT_CABINETS.map((item) => ({ ...item })),
+    decor: DEFAULT_DECOR.map((item) => ({ ...item })),
   };
 }
 
@@ -125,19 +178,37 @@ export function visibleRoomItems(layout: RoomLayout): readonly RoomLayoutItem[] 
   return layout.items.filter((item) => !item.hidden);
 }
 
-/** Hidden cabinets take no floor space, so only the visible ones can block a spot. */
-function placementBlocked(
+/**
+ * Everything on the floor that takes space: visible cabinets plus solid floor
+ * decor. Rugs, wall and ceiling items are not obstacles. This is the one list
+ * placement checks and the walking player both consult.
+ */
+export function floorObstacles(layout: RoomLayout, catalog: FootprintCatalog): FloorObstacle[] {
+  const obstacles: FloorObstacle[] = [];
+  for (const item of layout.items) {
+    if (item.hidden) continue;
+    const footprint = catalog[item.cabinetId];
+    if (footprint) obstacles.push({ instanceId: item.instanceId, x: item.x, z: item.z, rotationY: item.rotationY, footprint });
+  }
+  for (const item of layout.decor) {
+    if (item.mount !== "floor") continue;
+    const definition = findDecor(item.itemId);
+    if (!definition || !definition.blocksWalking) continue;
+    obstacles.push({ instanceId: item.instanceId, x: item.x, z: item.z, rotationY: item.rotationY, footprint: decorFootprint(definition, item.length) });
+  }
+  return obstacles;
+}
+
+/** True when the spot is taken by some other obstacle. */
+export function placementBlocked(
   layout: RoomLayout,
   instanceId: string,
   placement: RoomPlacement,
   footprint: ItemFootprint,
   catalog: FootprintCatalog,
 ): boolean {
-  return layout.items.some((other) => {
-    if (other.instanceId === instanceId || other.hidden) return false;
-    const otherFootprint = catalog[other.cabinetId];
-    return otherFootprint ? placementsOverlap(placement, footprint, other, otherFootprint) : false;
-  });
+  return floorObstacles(layout, catalog).some((other) =>
+    other.instanceId !== instanceId && placementsOverlap(placement, footprint, other, other.footprint));
 }
 
 export function updateItemPlacement(
@@ -191,7 +262,7 @@ export function setItemHidden(
   });
   if (hidden) return { valid: true, layout: withItem({ ...item, hidden: true }) };
 
-  const starter = DEFAULT_LAYOUT.items.find((candidate) => candidate.cabinetId === item.cabinetId);
+  const starter = DEFAULT_CABINETS.find((candidate) => candidate.cabinetId === item.cabinetId);
   const candidates: RoomPlacement[] = starter ? [item, starter] : [item];
   for (const candidate of candidates) {
     const clamped = clampPlacementToRoom(candidate, room, footprint);
@@ -199,6 +270,13 @@ export function setItemHidden(
     return { valid: true, layout: withItem({ ...item, ...clamped, hidden: false }) };
   }
   return { valid: false, layout };
+}
+
+/** Swap one surface. Unknown ids are refused rather than stored. */
+export function setRoomSurface(layout: RoomLayout, kind: SurfaceKind, id: string): Readonly<{ valid: boolean; layout: RoomLayout }> {
+  if (!findSurface(kind, id)) return { valid: false, layout };
+  if (layout.surfaces[kind] === id) return { valid: true, layout };
+  return { valid: true, layout: { ...layout, surfaces: { ...layout.surfaces, [kind]: id } } };
 }
 
 function isStoredItem(value: unknown): value is RoomLayoutItem {
@@ -213,6 +291,53 @@ function isStoredItem(value: unknown): value is RoomLayoutItem {
     && Number.isFinite(item.rotationY);
 }
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && HEX_COLOR.test(value);
+}
+
+/**
+ * Coerce one stored decor row, or drop it. An unknown item id is dropped (the
+ * catalog entry it named is gone); a mount the item does not support falls back
+ * to its first mount; a bad colour or length falls back to the catalog default.
+ */
+export function normalizeDecorItem(value: unknown): RoomDecorItem | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Partial<RoomDecorItem>;
+  if (typeof source.instanceId !== "string" || !source.instanceId || typeof source.itemId !== "string") return null;
+  const definition = findDecor(source.itemId);
+  if (!definition) return null;
+  if (!Number.isFinite(source.x) || !Number.isFinite(source.z) || !Number.isFinite(source.rotationY)) return null;
+  const mount = (DECOR_MOUNTS as readonly string[]).includes(source.mount as string) && definition.mounts.includes(source.mount as DecorMount)
+    ? source.mount as DecorMount
+    : definition.mounts[0]!;
+  const wall = mount === "wall" && (WALL_SIDES as readonly string[]).includes(source.wall as string) ? source.wall as WallSide : "";
+  if (mount === "wall" && !wall) return null;
+  return {
+    instanceId: source.instanceId,
+    itemId: source.itemId,
+    x: source.x as number,
+    y: Number.isFinite(source.y) ? source.y as number : 0,
+    z: source.z as number,
+    rotationY: source.rotationY as number,
+    mount,
+    wall,
+    color: definition.tint.enabled && isHexColor(source.color) ? source.color.toLowerCase() : "",
+    length: definition.length.enabled ? clampDecorLength(definition, typeof source.length === "number" ? source.length : 0) : 0,
+  };
+}
+
+function normalizeSurfaces(value: unknown): RoomSurfaces {
+  const source = (value && typeof value === "object" ? value : {}) as Partial<Record<SurfaceKind, unknown>>;
+  const surfaces: Record<SurfaceKind, string> = defaultRoomSurfaces();
+  for (const kind of SURFACE_KINDS) {
+    const id = source[kind];
+    if (typeof id === "string" && findSurface(kind, id)) surfaces[kind] = id;
+  }
+  return surfaces;
+}
+
 /**
  * Coerce any stored or fetched document into a layout.
  *
@@ -222,11 +347,17 @@ function isStoredItem(value: unknown): value is RoomLayoutItem {
  * starter cabinets are added at their starter positions whenever a stored layout
  * has no placement for one of them, which is also how a newly granted cabinet
  * first appears in an existing room.
+ *
+ * Version 1 documents (cabinets only) are upgraded in place: they get the
+ * starter surfaces and the starter neon, which is exactly the room they had.
+ * A version 2 document with an EMPTY decor list keeps it empty — the player
+ * took everything down — so starter decor is seeded only when the `decor`
+ * array is missing altogether.
  */
 export function normalizeRoomLayout(value: unknown): RoomLayout {
   if (!value || typeof value !== "object") return createDefaultRoomLayout();
-  const source = value as { version?: unknown; items?: unknown };
-  if (source.version !== 1 || !Array.isArray(source.items) || !source.items.every(isStoredItem)) {
+  const source = value as { version?: unknown; items?: unknown; decor?: unknown; surfaces?: unknown };
+  if ((source.version !== 1 && source.version !== 2) || !Array.isArray(source.items) || !source.items.every(isStoredItem)) {
     return createDefaultRoomLayout();
   }
   const instanceIds = new Set(source.items.map((item) => item.instanceId));
@@ -240,10 +371,30 @@ export function normalizeRoomLayout(value: unknown): RoomLayout {
     hidden: item.hidden === true,
   }));
   const storedCabinetIds = new Set(storedItems.map((item) => item.cabinetId));
-  const starterAdditions = DEFAULT_LAYOUT.items
+  const starterAdditions = DEFAULT_CABINETS
     .filter((item) => !storedCabinetIds.has(item.cabinetId))
     .map((item) => ({ ...item }));
-  return { version: 1, items: [...storedItems, ...starterAdditions] };
+
+  let decor: RoomDecorItem[];
+  if (Array.isArray(source.decor)) {
+    const seen = new Set<string>(instanceIds);
+    decor = [];
+    for (const raw of source.decor) {
+      const item = normalizeDecorItem(raw);
+      if (!item || seen.has(item.instanceId)) continue;
+      seen.add(item.instanceId);
+      decor.push(item);
+    }
+  } else {
+    decor = DEFAULT_DECOR.map((item) => ({ ...item }));
+  }
+
+  return {
+    version: 2,
+    surfaces: normalizeSurfaces(source.surfaces),
+    items: [...storedItems, ...starterAdditions],
+    decor,
+  };
 }
 
 export function parseRoomLayout(serialized: string | null): RoomLayout {
@@ -255,10 +406,24 @@ export function parseRoomLayout(serialized: string | null): RoomLayout {
   }
 }
 
-/** True when both layouts place the same items in the same spots. */
+function decorItemsEqual(first: RoomDecorItem, second: RoomDecorItem): boolean {
+  return first.instanceId === second.instanceId
+    && first.itemId === second.itemId
+    && first.x === second.x
+    && first.y === second.y
+    && first.z === second.z
+    && first.rotationY === second.rotationY
+    && first.mount === second.mount
+    && first.wall === second.wall
+    && first.color === second.color
+    && first.length === second.length;
+}
+
+/** True when both layouts place the same things in the same spots with the same finishes. */
 export function roomLayoutsEqual(first: RoomLayout, second: RoomLayout): boolean {
-  if (first.items.length !== second.items.length) return false;
-  return first.items.every((item, index) => {
+  if (first.items.length !== second.items.length || first.decor.length !== second.decor.length) return false;
+  if (SURFACE_KINDS.some((kind) => first.surfaces[kind] !== second.surfaces[kind])) return false;
+  const itemsEqual = first.items.every((item, index) => {
     const other = second.items[index];
     return other !== undefined
       && item.instanceId === other.instanceId
@@ -267,5 +432,9 @@ export function roomLayoutsEqual(first: RoomLayout, second: RoomLayout): boolean
       && item.z === other.z
       && item.rotationY === other.rotationY
       && item.hidden === other.hidden;
+  });
+  return itemsEqual && first.decor.every((item, index) => {
+    const other = second.decor[index];
+    return other !== undefined && decorItemsEqual(item, other);
   });
 }

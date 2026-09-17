@@ -3,7 +3,10 @@ import { CABINET_CATALOG, getCabinetFootprint, getCabinetLaunchUrl } from "./arc
 import { createRoomEditor } from "./arcade-room-editor.mjs";
 import { canInteractWithCabinet, closeCabinetSession, createCabinetSession, getCabinetPrompt, openCabinetSession, } from "./arcade-room-interaction.mjs";
 import { createCabinetModel } from "./arcade-room-model.mjs";
+import { createRoomInventory } from "./arcade-room-catalog/inventory.mjs";
+import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
+import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
 import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL } from "./arcade-room-scene.mjs";
 import { fitAspectRect } from "./arcade-room-screen.mjs";
@@ -31,7 +34,15 @@ const resetLayoutButton = requiredElement("#resetRoomLayout");
 const saveLayoutButton = requiredElement("#saveRoomLayout");
 const finishEditingButton = requiredElement("#finishEditing");
 const editorStatus = requiredElement("#editorStatus");
+const undoButton = requiredElement("#undoRoomEdit");
 const cabinetList = requiredElement("#cabinetList");
+const editorTabs = requiredElement("#editorTabs");
+const editorTabPanels = requiredElement("#editorTabPanels");
+const surfacePicker = requiredElement("#surfacePicker");
+const decorCategories = requiredElement("#decorCategories");
+const decorCatalog = requiredElement("#decorCatalog");
+const decorInspector = requiredElement("#decorInspector");
+const decorPlaced = requiredElement("#decorPlaced");
 const viewButtons = requiredElement("#cameraViews");
 const roomTitle = requiredElement("#roomTitle");
 const roomEyebrow = requiredElement("#roomEyebrow");
@@ -70,7 +81,7 @@ function applyRoomIdentity() {
     roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
     ownerLink.hidden = true;
     if (!layoutStore.accountBacked) {
-        startCopy.textContent = "Walk up to play Bird Duty or Lovers Lost, then arrange both cabinets in build mode. Sign in to keep your layout on your account so friends can visit it.";
+        startCopy.textContent = "Walk up to play Bird Duty or Lovers Lost, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
     }
 }
 applyRoomIdentity();
@@ -102,62 +113,25 @@ keyLight.position.set(3.5, 6.8, 4.5);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
 scene.add(keyLight);
-const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x151c29, roughness: 0.7, metalness: 0.18 });
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(PLAYER_ROOM_SHELL.width, PLAYER_ROOM_SHELL.depth, 20, 20), floorMaterial);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
-const grid = new THREE.GridHelper(PLAYER_ROOM_SHELL.width, 40, 0x297697, 0x1d3447);
-grid.position.y = 0.004;
-scene.add(grid);
-const wallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x203a50,
-    emissive: 0x071522,
-    emissiveIntensity: 0.82,
-    roughness: 0.82,
+// The shell — floor, walls, ceiling, trim — is built once and re-dressed from
+// the layout's surfaces; the neon that used to be hardcoded here is starter decor.
+const shell = createRoomShell(THREE, scene, {
+    width: PLAYER_ROOM_SHELL.width,
+    depth: PLAYER_ROOM_SHELL.depth,
+    height: PLAYER_ROOM_SHELL.height,
+    wallThickness: PLAYER_ROOM_SHELL.wallThickness,
 });
+const { floor, ceiling } = shell;
 const roomHalfWidth = PLAYER_ROOM_SHELL.width / 2;
 const roomHalfDepth = PLAYER_ROOM_SHELL.depth / 2;
-const wallY = PLAYER_ROOM_SHELL.height / 2;
-for (const z of [-roomHalfDepth, roomHalfDepth]) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(PLAYER_ROOM_SHELL.width, PLAYER_ROOM_SHELL.height, PLAYER_ROOM_SHELL.wallThickness), wallMaterial);
-    wall.position.set(0, wallY, z);
-    wall.receiveShadow = true;
-    scene.add(wall);
-}
-for (const side of [-1, 1]) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(PLAYER_ROOM_SHELL.wallThickness, PLAYER_ROOM_SHELL.height, PLAYER_ROOM_SHELL.depth), wallMaterial);
-    wall.position.set(side * roomHalfWidth, wallY, 0);
-    wall.receiveShadow = true;
-    scene.add(wall);
-}
-const ceilingMaterial = new THREE.MeshStandardMaterial({
-    color: 0x172a3d,
-    emissive: 0x07121c,
-    emissiveIntensity: 0.7,
-    roughness: 0.76,
-});
-const ceiling = new THREE.Mesh(new THREE.BoxGeometry(PLAYER_ROOM_SHELL.width, 0.18, PLAYER_ROOM_SHELL.depth), ceilingMaterial);
-ceiling.position.set(0, PLAYER_ROOM_SHELL.height + 0.09, 0);
-ceiling.receiveShadow = true;
-scene.add(ceiling);
-const trimMaterial = new THREE.MeshStandardMaterial({ color: 0x1b4058, roughness: 0.52, metalness: 0.34 });
-for (const x of [-roomHalfWidth + 0.18, roomHalfWidth - 0.18]) {
-    for (const z of [-roomHalfDepth + 0.18, roomHalfDepth - 0.18]) {
-        const column = new THREE.Mesh(new THREE.BoxGeometry(0.28, PLAYER_ROOM_SHELL.height, 0.28), trimMaterial);
-        column.position.set(x, wallY, z);
-        scene.add(column);
-    }
-}
-function neonBar(x, y, width, color) {
-    const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.4, roughness: 0.25 });
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.035, 0.035), material);
-    bar.position.set(x, y, -roomHalfDepth + 0.14);
-    scene.add(bar);
-}
-neonBar(-3.1, 2.8, 2.4, 0xff4d91);
-neonBar(3.1, 2.8, 2.4, 0x53d8ff);
-neonBar(0, 3.35, 1.8, 0xffd33d);
+// The placement grid only shows in build mode: it is a tool, not a floor.
+const grid = new THREE.GridHelper(PLAYER_ROOM_SHELL.width, 40, 0x297697, 0x1d3447);
+grid.position.y = 0.004;
+grid.visible = false;
+scene.add(grid);
+const decorRuntime = createDecorRuntime(THREE, scene);
+// Everything in the catalog is granted in this phase; see arcade-room-catalog/inventory.mts.
+const inventory = createRoomInventory({ grantAll: true });
 const playViews = Object.freeze({
     "bird-duty": CABINET_PLAY_VIEW,
     "lovers-lost": LOVERS_LOST_PLAY_VIEW,
@@ -173,10 +147,11 @@ const cabinets = CABINET_CATALOG.map((definition) => {
         playView: playViews[definition.gameSlug] ?? CABINET_PLAY_VIEW,
     };
 });
-for (const [x, color] of [[-1.35, 0x65cfff], [1.35, 0xff5caf]]) {
-    const glow = new THREE.PointLight(color, 2.4, 5.2, 2);
-    glow.position.set(x, 2.08, -2.15);
-    scene.add(glow);
+// Each cabinet carries its own marquee glow so the light moves with it.
+for (const cabinet of cabinets) {
+    const glow = new THREE.PointLight(cabinet.definition.palette.trim, 2.4, 5.2, 2);
+    glow.position.set(0, 2.08, 0.65);
+    cabinet.model.add(glow);
 }
 const keys = new Set();
 let session = createCabinetSession(CABINET_CATALOG[0].id);
@@ -192,7 +167,9 @@ const roomEditor = createRoomEditor({
     scene,
     camera,
     canvas,
-    floor,
+    shell,
+    decor: decorRuntime,
+    inventory,
     cabinets: cabinets.map((cabinet) => ({
         model: cabinet.model,
         cabinet: cabinet.definition,
@@ -202,6 +179,8 @@ const roomEditor = createRoomEditor({
         width: PLAYER_ROOM_SHELL.width,
         depth: PLAYER_ROOM_SHELL.depth,
         wallInset: PLAYER_ROOM_SHELL.wallThickness + 0.28,
+        height: PLAYER_ROOM_SHELL.height,
+        wallThickness: PLAYER_ROOM_SHELL.wallThickness,
     },
     initialLayout: loaded.layout,
     // The store owns where a save lands — the account when signed in, this device otherwise —
@@ -221,6 +200,14 @@ const roomEditor = createRoomEditor({
         panel: editorPanel,
         editButton: editArcadeButton,
         cabinetList,
+        tabs: editorTabs,
+        tabPanels: editorTabPanels,
+        surfacePicker,
+        decorCategories,
+        decorCatalog,
+        decorInspector,
+        decorPlaced,
+        undoButton,
         rotateLeftButton,
         rotateRightButton,
         resetButton: resetLayoutButton,
@@ -236,6 +223,7 @@ const roomEditor = createRoomEditor({
         // Roof off while building: the overview and top-down views look into the room from
         // above the ceiling, which would otherwise be all they could see.
         ceiling.visible = !editing;
+        grid.visible = editing;
         if (editing) {
             roomEntered = true;
             startGate.classList.add("is-hidden");
@@ -410,20 +398,18 @@ function updatePlayer(dt) {
     const speed = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4.3 : 2.65;
     const nextX = THREE.MathUtils.clamp(player.x + (moveX / length) * speed * dt, -roomHalfWidth + 0.55, roomHalfWidth - 0.55);
     const nextZ = THREE.MathUtils.clamp(player.z + (moveZ / length) * speed * dt, -roomHalfDepth + 0.55, roomHalfDepth - 0.55);
-    const blockedByCabinet = cabinets.some((cabinet) => {
-        const placement = roomEditor.getCabinetPlacement(cabinet.definition.id);
-        if (!placement)
-            return false;
-        const cabinetDx = nextX - placement.x;
-        const cabinetDz = nextZ - placement.z;
-        const cosine = Math.cos(placement.rotationY);
-        const sine = Math.sin(placement.rotationY);
-        const localX = cabinetDx * cosine - cabinetDz * sine;
-        const localZ = cabinetDx * sine + cabinetDz * cosine;
-        return Math.abs(localX) < cabinet.footprint.width / 2 + 0.18
-            && Math.abs(localZ) < cabinet.footprint.depth / 2 + 0.18;
+    // Cabinets and solid decor alike: one obstacle list, the same one placement uses.
+    const blocked = roomEditor.getFloorObstacles().some((obstacle) => {
+        const dx = nextX - obstacle.x;
+        const dz = nextZ - obstacle.z;
+        const cosine = Math.cos(obstacle.rotationY);
+        const sine = Math.sin(obstacle.rotationY);
+        const localX = dx * cosine - dz * sine;
+        const localZ = dx * sine + dz * cosine;
+        return Math.abs(localX) < obstacle.footprint.width / 2 + 0.18
+            && Math.abs(localZ) < obstacle.footprint.depth / 2 + 0.18;
     });
-    if (!blockedByCabinet) {
+    if (!blocked) {
         player.x = nextX;
         player.z = nextZ;
     }

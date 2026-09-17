@@ -27,15 +27,38 @@
 // `items: []`, and the client's own normalizer fills in the starter cabinets at
 // their starter positions. Keeping those coordinates out of this file means a
 // starter-layout retune is a client change, not a two-repo deploy.
+//
+// VERSION 2 ADDED SURFACES AND DECOR (2026-09-17). `surfaces` names the floor,
+// wall, ceiling and trim finish by catalog id; `decor` is the list of placed
+// neon, signs, posters, rugs, lights and props. The same policy applies: ids
+// are checked for NAMESPACE (`floor.<name>`, `decor.<category>.<variant>`),
+// numbers are bounded, and the client's catalog decides what an id means. A
+// surface id that fails the pattern is stored as "" (client default); a decor
+// row that cannot be made valid is dropped. The `decor` key is emitted only
+// when the client sent one, because the client seeds its starter neon exactly
+// when the key is ABSENT — a version 2 row with `decor: []` is a room the
+// player deliberately stripped, and must come back stripped.
 export const ARCADE_ROOM_GAME_SLUG = "arcade-room";
-const LAYOUT_VERSION = 1;
+const LAYOUT_VERSION = 2;
 /** Plenty for a room that seats two cabinets today; a bound, not a plan. */
 const MAX_ITEMS = 32;
+/** A wall of neon strips and a floor of props; a bound, not a plan. */
+const MAX_DECOR = 96;
 /** The room is 20×20; ±12 leaves margin for a wider room without accepting nonsense. */
 const COORDINATE_LIMIT = 12;
+/** Decor height: the floor to a generous ceiling. */
+const HEIGHT_LIMIT = 8;
+/** The longest stretchable item the client offers is 10 m. */
+const LENGTH_LIMIT = 20;
 const INSTANCE_ID_PATTERN = /^[A-Za-z0-9_-]{1,40}$/;
 /** `cabinet.<game-slug>.<variant>` — the namespace every catalog cabinet id lives in. */
 const CABINET_ID_PATTERN = /^cabinet\.[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** `decor.<category>.<variant>` — every decor id, whatever the client's catalog holds. */
+const DECOR_ID_PATTERN = /^decor\.[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SURFACE_KINDS = ["floor", "wall", "ceiling", "trim"];
+const DECOR_MOUNTS = new Set(["floor", "wall", "ceiling"]);
+const WALL_SIDES = new Set(["north", "south", "east", "west"]);
+const HEX_COLOR = /^#[0-9a-f]{6}$/;
 function cleanText(value, maxLength) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -56,8 +79,42 @@ function normalizeRotation(value) {
     const wrapped = ((value % turn) + turn) % turn;
     return Number(wrapped.toFixed(4));
 }
+function surfaceIdPattern(kind) {
+    return new RegExp(`^${kind}\\.[a-z0-9]+(?:-[a-z0-9]+)*$`);
+}
 export function defaultArcadeRoomGarage() {
-    return { version: LAYOUT_VERSION, items: [] };
+    return { version: LAYOUT_VERSION, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, items: [] };
+}
+function normalizeSurfaces(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const surfaces = {};
+    for (const kind of SURFACE_KINDS) {
+        const id = cleanText(source[kind], 80);
+        surfaces[kind] = surfaceIdPattern(kind).test(id) ? id : "";
+    }
+    return surfaces;
+}
+function normalizeDecorRow(raw) {
+    const source = raw && typeof raw === "object" ? raw : {};
+    const instanceId = cleanText(source.instanceId, 40);
+    const itemId = cleanText(source.itemId, 80);
+    if (!INSTANCE_ID_PATTERN.test(instanceId) || !DECOR_ID_PATTERN.test(itemId))
+        return null;
+    const x = boundedNumber(source.x, COORDINATE_LIMIT);
+    const z = boundedNumber(source.z, COORDINATE_LIMIT);
+    const rotationY = normalizeRotation(source.rotationY);
+    if (x === null || z === null || rotationY === null)
+        return null;
+    const rawY = boundedNumber(source.y, HEIGHT_LIMIT);
+    const y = rawY === null ? 0 : Math.max(0, rawY);
+    const mount = typeof source.mount === "string" && DECOR_MOUNTS.has(source.mount) ? source.mount : "floor";
+    const wall = mount === "wall" && typeof source.wall === "string" && WALL_SIDES.has(source.wall) ? source.wall : "";
+    if (mount === "wall" && !wall)
+        return null;
+    const color = typeof source.color === "string" && HEX_COLOR.test(source.color.toLowerCase()) ? source.color.toLowerCase() : "";
+    const rawLength = boundedNumber(source.length, LENGTH_LIMIT);
+    const length = rawLength === null ? 0 : Math.max(0, rawLength);
+    return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length };
 }
 /**
  * Coerce any stored or submitted document into a layout.
@@ -72,6 +129,7 @@ export function normalizeArcadeRoomGarage(value) {
     const rawItems = Array.isArray(input.items) ? input.items.slice(0, MAX_ITEMS) : [];
     const seen = new Set();
     const items = [];
+    const surfaces = normalizeSurfaces(input.surfaces);
     for (const raw of rawItems) {
         const source = raw && typeof raw === "object" ? raw : {};
         const instanceId = cleanText(source.instanceId, 40);
@@ -90,7 +148,19 @@ export function normalizeArcadeRoomGarage(value) {
         // document so the client never re-seeds it as a starter. Only a real `true` hides.
         items.push({ instanceId, cabinetId, x, z, rotationY, hidden: source.hidden === true });
     }
-    return { version: LAYOUT_VERSION, items };
+    const garage = { version: LAYOUT_VERSION, surfaces, items };
+    if (Array.isArray(input.decor)) {
+        const decor = [];
+        for (const raw of input.decor.slice(0, MAX_DECOR)) {
+            const row = normalizeDecorRow(raw);
+            if (!row || seen.has(row.instanceId))
+                continue;
+            seen.add(row.instanceId);
+            decor.push(row);
+        }
+        garage.decor = decor;
+    }
+    return garage;
 }
 /** What a visitor draws: the layout itself. See the note at the top of this file. */
 export function arcadeRoomLoadoutFromGarage(garage) {
