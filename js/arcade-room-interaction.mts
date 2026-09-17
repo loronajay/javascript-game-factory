@@ -1,3 +1,6 @@
+import { findDecor, type DecorDefinition } from "./arcade-room-catalog/decor.mjs";
+import type { RoomDecorItem } from "./arcade-room-layout.mjs";
+
 export const CABINET_SESSION_READY = "ready" as const;
 export const CABINET_SESSION_PLAYING = "playing" as const;
 export const CABINET_SESSION_CLOSED = "closed" as const;
@@ -36,6 +39,34 @@ export function canInteractWithCabinet(player: PlayerPose, cabinet: CabinetInter
   const playerIsFacingCabinet = normalizedDot(player.forward, playerToCabinet) >= cabinet.facingThreshold;
   const playerIsInFront = normalizedDot(cabinet.forward, cabinetToPlayer) >= 0;
   return playerIsFacingCabinet && playerIsInFront;
+}
+
+export type InteractiveDecorHit = Readonly<{ item: RoomDecorItem; definition: DecorDefinition }>;
+
+/**
+ * The nearest placed decor item the player can open right now, by the same reach rules a
+ * cabinet uses. A wall item's local +Z faces into the room, so its forward is its rotation.
+ */
+export function findInteractiveDecor(decor: readonly RoomDecorItem[], player: PlayerPose): InteractiveDecorHit | null {
+  let hit: InteractiveDecorHit | null = null;
+  let nearest = Infinity;
+  for (const item of decor) {
+    const definition = findDecor(item.itemId);
+    if (!definition?.interaction) continue;
+    const reachable = canInteractWithCabinet(player, {
+      position: { x: item.x, z: item.z },
+      forward: { x: Math.sin(item.rotationY), z: Math.cos(item.rotationY) },
+      radius: definition.interaction.radius,
+      facingThreshold: definition.interaction.facingThreshold,
+    });
+    if (!reachable) continue;
+    const distance = Math.hypot(player.x - item.x, player.z - item.z);
+    if (distance < nearest) {
+      nearest = distance;
+      hit = { item, definition };
+    }
+  }
+  return hit;
 }
 
 export function getCabinetPrompt(canInteract: boolean, title: string): string {

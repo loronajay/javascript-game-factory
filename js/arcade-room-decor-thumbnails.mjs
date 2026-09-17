@@ -7,6 +7,7 @@
 // hands back a data URL the panel drops into an `<img>`. Cached per item id,
 // built on demand so only the open category pays, and the panel stays free of
 // THREE: it is handed a `(definition) => url | null` and nothing else.
+import { decorCardImage } from "./arcade-room-catalog/decor.mjs";
 import { createDecorModel, disposeDecorModel } from "./arcade-room-decor-model.mjs";
 export const THUMBNAIL_SIZE = Object.freeze({ width: 176, height: 128 });
 /** The layout row a thumbnail is rendered from: catalog defaults, first mount, size 1. */
@@ -57,8 +58,8 @@ export function createDecorThumbnails(THREE) {
         return true;
     }
     function render(definition) {
-        // A poster is the grid preview itself and its texture loads asynchronously; the card shows the image directly.
-        if (definition.model.kind === "poster")
+        // A poster or calendar is its own picture and its texture loads asynchronously; the card shows the image directly.
+        if (decorCardImage(definition))
             return null;
         if (!ensureRenderer())
             return null;

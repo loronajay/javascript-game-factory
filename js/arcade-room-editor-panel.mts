@@ -20,6 +20,7 @@ import {
   DECOR_CATEGORY_TITLES,
   NEON_TINTS,
   decorByCategory,
+  decorCardImage,
   decorExtent,
   findDecor,
   type DecorCategory,
@@ -121,7 +122,7 @@ function decorIcon(definition: DecorDefinition, thumbnail: PanelOptions["thumbna
   icon.dataset.kind = definition.model.kind;
   const tint = definition.tint.enabled ? definition.tint.default : "#8fa3b8";
   icon.style.setProperty("--decor-tint", tint);
-  const picture = definition.model.kind === "poster" ? definition.model.image : thumbnail?.(definition) ?? null;
+  const picture = decorCardImage(definition) ?? thumbnail?.(definition) ?? null;
   if (picture) {
     const image = element("img");
     image.src = picture;

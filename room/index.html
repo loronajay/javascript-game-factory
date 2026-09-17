@@ -95,7 +95,20 @@
       <div id="cabinetGameScreen" class="play-screen">
         <iframe id="cabinetGame" title="Bird Duty arcade game" src="about:blank" allow="fullscreen; autoplay; gamepad"></iframe>
       </div>
-      <button id="leaveCabinet" class="leave-cabinet" type="button">Step away</button>
+      <div class="play-actions">
+        <button id="fullscreenCabinet" class="leave-cabinet" type="button" aria-pressed="false" title="Fill the screen with the game">Fullscreen</button>
+        <button id="leaveCabinet" class="leave-cabinet" type="button">Step away</button>
+      </div>
+    </section>
+
+    <section id="decorOverlay" class="decor-overlay" aria-hidden="true" hidden>
+      <div class="decor-overlay__card" role="dialog" aria-modal="true" aria-labelledby="decorOverlayTitle">
+        <header class="decor-overlay__bar">
+          <span id="decorOverlayTitle" class="decor-overlay__title"></span>
+          <button id="closeDecorOverlay" class="leave-cabinet decor-overlay__close" type="button">Step back <kbd>Esc</kbd></button>
+        </header>
+        <iframe id="decorOverlayFrame" title="" src="about:blank"></iframe>
+      </div>
     </section>
   </main>
   <script type="module" src="../js/platform-config.mjs"></script>

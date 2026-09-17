@@ -144,6 +144,41 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
     print.position.set(0, 0, size.depth / 2 + 0.002);
     group.add(print);
   },
+  // A closed wall calendar: a stack of pages a hair thicker than the cover, the cover print
+  // on the face, a wire binding across the top edge and the hook it hangs from. The print
+  // is the product's real cover, so the wall shows what arrives in the box.
+  "calendar": (THREE, group, size, _color, spec: { cover: string }) => {
+    const paper = standard(THREE, "#f7f4ef", 0.85, 0);
+    const wire = standard(THREE, "#c7ccd3", 0.3, 0.85);
+    const stack = box(THREE, group, [size.width, size.height, size.depth], [0, 0, 0], paper, false);
+    stack.castShadow = true;
+    // Page edges read as many sheets: a few thin darker lines along the bottom edge.
+    box(THREE, group, [size.width * 0.98, size.depth * 0.5, size.depth * 0.9], [0, -size.height / 2 + size.depth * 0.25, 0], standard(THREE, "#d9d4c8", 0.9, 0), false);
+    const texture = new THREE.TextureLoader().load(spec.cover);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const print = new THREE.Mesh(
+      new THREE.PlaneGeometry(size.width * 0.985, size.height * 0.985),
+      new THREE.MeshBasicMaterial({ map: texture }),
+    );
+    print.position.set(0, 0, size.depth / 2 + 0.002);
+    group.add(print);
+    // Wire-o binding: a bar along the top with loops over it.
+    const binding = box(THREE, group, [size.width * 0.98, size.depth * 0.7, size.depth * 1.3], [0, size.height / 2 - size.depth * 0.2, 0], wire, false);
+    binding.castShadow = false;
+    const loops = 18;
+    for (let index = 0; index < loops; index += 1) {
+      const x = -size.width * 0.46 + (size.width * 0.92 * index) / (loops - 1);
+      const loop = new THREE.Mesh(new THREE.TorusGeometry(size.depth * 0.9, size.depth * 0.12, 6, 14), wire);
+      loop.position.set(x, size.height / 2, 0);
+      loop.rotation.y = Math.PI / 2;
+      group.add(loop);
+    }
+    // The hook: a short loop of wire rising from the middle of the binding to a wall pin.
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(size.height * 0.05, size.depth * 0.12, 6, 14, Math.PI), wire);
+    hook.position.set(0, size.height / 2 + size.height * 0.05, -size.depth * 0.3);
+    group.add(hook);
+    cylinder(THREE, group, size.depth * 0.25, size.depth * 0.25, size.depth * 0.6, [0, size.height / 2 + size.height * 0.1, -size.depth * 0.4], wire, 8).rotation.x = Math.PI / 2;
+  },
   "rug": (THREE, group, size, color, spec: { shape: "rect" | "round"; pattern: string }) => {
     const round = spec.shape === "round";
     const pixels: [number, number] = [512, Math.max(64, Math.round(512 * size.depth / size.width))];

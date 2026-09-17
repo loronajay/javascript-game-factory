@@ -13,7 +13,7 @@
 // slider under their thumb; now the same nodes live for as long as the same
 // item is selected, and a re-render only updates their values.
 import { createColorPicker } from "./arcade-room-color-picker.mjs";
-import { DECOR_CATEGORIES, DECOR_CATEGORY_TITLES, NEON_TINTS, decorByCategory, decorExtent, findDecor, } from "./arcade-room-catalog/decor.mjs";
+import { DECOR_CATEGORIES, DECOR_CATEGORY_TITLES, NEON_TINTS, decorByCategory, decorCardImage, decorExtent, findDecor, } from "./arcade-room-catalog/decor.mjs";
 import { SURFACE_CATALOG, SURFACE_KINDS, surfaceGroups } from "./arcade-room-catalog/surfaces.mjs";
 export const EDITOR_TABS = Object.freeze(["cabinets", "surfaces", "decor"]);
 const SURFACE_TITLES = Object.freeze({
@@ -47,7 +47,7 @@ function decorIcon(definition, thumbnail) {
     icon.dataset.kind = definition.model.kind;
     const tint = definition.tint.enabled ? definition.tint.default : "#8fa3b8";
     icon.style.setProperty("--decor-tint", tint);
-    const picture = definition.model.kind === "poster" ? definition.model.image : thumbnail?.(definition) ?? null;
+    const picture = decorCardImage(definition) ?? thumbnail?.(definition) ?? null;
     if (picture) {
         const image = element("img");
         image.src = picture;

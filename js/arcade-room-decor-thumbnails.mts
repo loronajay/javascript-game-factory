@@ -8,7 +8,7 @@
 // built on demand so only the open category pays, and the panel stays free of
 // THREE: it is handed a `(definition) => url | null` and nothing else.
 
-import type { DecorDefinition } from "./arcade-room-catalog/decor.mjs";
+import { decorCardImage, type DecorDefinition } from "./arcade-room-catalog/decor.mjs";
 import type { RoomDecorItem } from "./arcade-room-layout.mjs";
 import { createDecorModel, disposeDecorModel } from "./arcade-room-decor-model.mjs";
 
@@ -71,8 +71,8 @@ export function createDecorThumbnails(THREE: ThreeNamespace): DecorThumbnails {
   }
 
   function render(definition: DecorDefinition): string | null {
-    // A poster is the grid preview itself and its texture loads asynchronously; the card shows the image directly.
-    if (definition.model.kind === "poster") return null;
+    // A poster or calendar is its own picture and its texture loads asynchronously; the card shows the image directly.
+    if (decorCardImage(definition)) return null;
     if (!ensureRenderer()) return null;
     const model = createDecorModel(THREE, definition, thumbnailItem(definition), false);
     scene.add(model);

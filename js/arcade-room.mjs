@@ -1,7 +1,8 @@
 import * as THREE_VENDOR from "./vendor/three.module.js";
 import { CABINET_CATALOG, getCabinetFootprint, getCabinetLaunchUrl } from "./arcade-room-cabinet.mjs";
 import { createRoomEditor } from "./arcade-room-editor.mjs";
-import { canInteractWithCabinet, closeCabinetSession, createCabinetSession, getCabinetPrompt, openCabinetSession, } from "./arcade-room-interaction.mjs";
+import { canInteractWithCabinet, closeCabinetSession, createCabinetSession, findInteractiveDecor, getCabinetPrompt, openCabinetSession, } from "./arcade-room-interaction.mjs";
+import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
 import { createCabinetModel } from "./arcade-room-model.mjs";
 import { createRoomInventory } from "./arcade-room-catalog/inventory.mjs";
 import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
@@ -9,7 +10,7 @@ import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
 import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL } from "./arcade-room-scene.mjs";
-import { fitAspectRect } from "./arcade-room-screen.mjs";
+import { playScreenRect } from "./arcade-room-screen.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -24,6 +25,11 @@ const playLayer = requiredElement("#cabinetPlayLayer");
 const gameFrame = requiredElement("#cabinetGame");
 const gameScreen = requiredElement("#cabinetGameScreen");
 const leaveButton = requiredElement("#leaveCabinet");
+const fullscreenButton = requiredElement("#fullscreenCabinet");
+const decorOverlayLayer = requiredElement("#decorOverlay");
+const decorOverlayFrame = requiredElement("#decorOverlayFrame");
+const decorOverlayTitle = requiredElement("#decorOverlayTitle");
+const decorOverlayClose = requiredElement("#closeDecorOverlay");
 const enterButton = requiredElement("#enterShowroom");
 const status = requiredElement("#roomStatus");
 const editorPanel = requiredElement("#roomEditor");
@@ -157,8 +163,11 @@ const keys = new Set();
 let session = createCabinetSession(CABINET_CATALOG[0].id);
 let interactionReady = false;
 let nearbyCabinet = null;
+let nearbyDecor = null;
 let activeCabinet = null;
 let playing = false;
+/** The game fills the viewport instead of the cabinet's screen. */
+let playFullscreen = false;
 let roomEntered = false;
 let draggingLook = false;
 let prePlayView = null;
@@ -217,7 +226,7 @@ const roomEditor = createRoomEditor({
         viewButtons,
     },
     // A visitor can look but never build: the store has no write path for them either.
-    canEnter: () => !playing && !visiting,
+    canEnter: () => !playing && !decorOverlay.isOpen() && !visiting,
     onEditingChange: (editing) => {
         keys.clear();
         // Roof off while building: the overview and top-down views look into the room from
@@ -263,14 +272,57 @@ function updateInteraction() {
             nearestDistance = distance;
         }
     }
-    interactionReady = Boolean(nearbyCabinet);
-    prompt.textContent = roomEntered && nearbyCabinet
-        ? getCabinetPrompt(true, nearbyCabinet.definition.title)
-        : "";
-    prompt.classList.toggle("is-visible", interactionReady && !playing);
+    // A cabinet wins when both are in reach; otherwise any interactive decor (the calendar).
+    nearbyDecor = nearbyCabinet ? null : findInteractiveDecor(roomEditor.getLayout().decor, { x: player.x, z: player.z, forward: forwardVector() });
+    interactionReady = Boolean(nearbyCabinet || nearbyDecor);
+    prompt.textContent = !roomEntered
+        ? ""
+        : nearbyCabinet
+            ? getCabinetPrompt(true, nearbyCabinet.definition.title)
+            : nearbyDecor?.definition.interaction?.prompt ?? "";
+    prompt.classList.toggle("is-visible", interactionReady && !playing && !decorOverlay.isOpen());
+}
+// Interactive decor opens its page over the room; the walk resumes where it left off.
+const decorOverlay = createDecorOverlay({
+    elements: { layer: decorOverlayLayer, frame: decorOverlayFrame, title: decorOverlayTitle, closeButton: decorOverlayClose },
+    roomHref: location.href,
+    onOpen: () => {
+        keys.clear();
+        document.exitPointerLock?.();
+        document.body.classList.add("is-viewing");
+        prompt.classList.remove("is-visible");
+    },
+    onClose: () => {
+        document.body.classList.remove("is-viewing");
+        canvas.focus();
+        status.textContent = "Click the room to look around again";
+    },
+});
+function openDecor() {
+    if (!nearbyDecor || playing || decorOverlay.isOpen() || roomEditor.isEditing())
+        return;
+    decorOverlay.open(nearbyDecor.definition);
+}
+function setPlayFullscreen(on) {
+    playFullscreen = on;
+    playLayer.classList.toggle("is-fullscreen", on);
+    fullscreenButton.setAttribute("aria-pressed", String(on));
+    fullscreenButton.textContent = on ? "Exit fullscreen" : "Fullscreen";
+    // Real browser fullscreen when the page is allowed it; the viewport-fill layout above does
+    // not depend on the answer, so an embed that refuses still gets a full-window game.
+    if (on) {
+        playLayer.requestFullscreen?.().catch(() => undefined);
+    }
+    else if (document.fullscreenElement === playLayer) {
+        document.exitFullscreen?.().catch(() => undefined);
+    }
+    if (playing)
+        gameFrame.focus();
 }
 function openCabinet() {
     if (!interactionReady || !nearbyCabinet || playing || roomEditor.isEditing())
+        return;
+    if (decorOverlay.isOpen())
         return;
     activeCabinet = nearbyCabinet;
     session = openCabinetSession(createCabinetSession(activeCabinet.definition.id));
@@ -302,6 +354,7 @@ function openCabinet() {
 function closeCabinet() {
     if (!playing)
         return;
+    setPlayFullscreen(false);
     session = closeCabinetSession(session);
     playing = false;
     gameFrame.src = "about:blank";
@@ -322,6 +375,12 @@ function closeCabinet() {
     activeCabinet = null;
 }
 leaveButton.addEventListener("click", closeCabinet);
+fullscreenButton.addEventListener("click", () => setPlayFullscreen(!playFullscreen));
+// The browser's own Esc (or a swipe on a phone) leaves fullscreen without telling us.
+document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && playFullscreen)
+        setPlayFullscreen(false);
+});
 gameFrame.addEventListener("load", () => {
     if (playing)
         gameFrame.focus();
@@ -330,20 +389,32 @@ window.addEventListener("keydown", (event) => {
     if (roomEditor.isEditing())
         return;
     if (playing) {
+        if (event.code === "Escape") {
+            if (playFullscreen)
+                setPlayFullscreen(false);
+            else
+                closeCabinet();
+        }
+        return;
+    }
+    if (decorOverlay.isOpen()) {
         if (event.code === "Escape")
-            closeCabinet();
+            decorOverlay.close();
         return;
     }
     keys.add(event.code);
     if (event.code === "KeyE" && interactionReady) {
         event.preventDefault();
-        openCabinet();
+        if (nearbyCabinet)
+            openCabinet();
+        else
+            openDecor();
     }
 });
 window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => keys.clear());
 canvas.addEventListener("click", () => {
-    if (!playing && !roomEditor.isEditing() && roomEntered)
+    if (!playing && !decorOverlay.isOpen() && !roomEditor.isEditing() && roomEntered)
         canvas.requestPointerLock?.().catch(() => undefined);
 });
 enterButton.addEventListener("click", () => {
@@ -364,13 +435,13 @@ document.addEventListener("pointerlockchange", () => {
 canvas.addEventListener("pointerdown", () => { draggingLook = !roomEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-    if ((document.pointerLockElement !== canvas && !draggingLook) || playing || roomEditor.isEditing())
+    if ((document.pointerLockElement !== canvas && !draggingLook) || playing || decorOverlay.isOpen() || roomEditor.isEditing())
         return;
     player.yaw -= event.movementX * 0.0022;
     player.pitch = THREE.MathUtils.clamp(player.pitch - event.movementY * 0.0018, -1.1, 1.05);
 });
 function updatePlayer(dt) {
-    if (playing || roomEditor.isEditing() || !roomEntered)
+    if (playing || decorOverlay.isOpen() || roomEditor.isEditing() || !roomEntered)
         return;
     const forward = forwardVector();
     const right = { x: -forward.z, z: forward.x };
@@ -445,7 +516,12 @@ function positionGameOnCabinetScreen() {
     const right = Math.max(...xValues);
     const top = Math.min(...yValues);
     const bottom = Math.max(...yValues);
-    const fitted = fitAspectRect({ left, top, width: right - left, height: bottom - top }, activeCabinet.playView.gameAspect);
+    const fitted = playScreenRect({
+        fullscreen: playFullscreen,
+        viewport: { width: playLayer.clientWidth, height: playLayer.clientHeight },
+        projected: { left, top, width: right - left, height: bottom - top },
+        aspect: activeCabinet.playView.gameAspect,
+    });
     gameScreen.style.left = `${fitted.left}px`;
     gameScreen.style.top = `${fitted.top}px`;
     gameScreen.style.width = `${fitted.width}px`;

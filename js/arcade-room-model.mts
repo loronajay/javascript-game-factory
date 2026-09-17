@@ -32,6 +32,28 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+function drawImageCover(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+): void {
+  const sourceAspect = image.naturalWidth / image.naturalHeight;
+  const targetAspect = width / height;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = image.naturalWidth;
+  let sourceHeight = image.naturalHeight;
+  if (sourceAspect > targetAspect) {
+    sourceWidth = image.naturalHeight * targetAspect;
+    sourceX = (image.naturalWidth - sourceWidth) / 2;
+  } else {
+    sourceHeight = image.naturalWidth / targetAspect;
+    sourceY = (image.naturalHeight - sourceHeight) / 2;
+  }
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -118,14 +140,18 @@ function createSideArtTexture(THREE: ThreeNamespace, side: "left" | "right"): an
     context.fillRect(0, 0, 384, 288);
     context.fillRect(0, 0, 512, 1280);
   });
-  void loadImage(BIRD_DUTY_CABINET_ART.keyArt).then((image) => {
+  void loadImage(BIRD_DUTY_CABINET_ART.sideArt).then((image) => {
     const canvas = texture.image as HTMLCanvasElement;
     const context = canvas.getContext("2d");
     if (!context) return;
-    const sourceWidth = image.naturalWidth / 2;
-    const sourceX = side === "left" ? 0 : sourceWidth;
     context.imageSmoothingEnabled = true;
-    context.drawImage(image, sourceX, 0, sourceWidth, image.naturalHeight, 0, 0, 512, 1280);
+    context.save();
+    if (side === "right") {
+      context.translate(512, 0);
+      context.scale(-1, 1);
+    }
+    drawImageCover(context, image, 512, 1280);
+    context.restore();
     const shade = context.createLinearGradient(0, 0, 0, 1280);
     shade.addColorStop(0, "rgba(3, 12, 33, 0)");
     shade.addColorStop(0.72, "rgba(3, 12, 33, 0)");
@@ -207,7 +233,7 @@ function createLoversSideArtTexture(THREE: ThreeNamespace, side: "left" | "right
     context.fillStyle = gradient;
     context.fillRect(0, 0, 512, 1280);
   });
-  void loadImage(LOVERS_LOST_CABINET_ART.keyArt).then((image) => {
+  void loadImage(LOVERS_LOST_CABINET_ART.sideArt).then((image) => {
     const context = (texture.image as HTMLCanvasElement).getContext("2d");
     if (!context) return;
     context.save();
@@ -216,7 +242,7 @@ function createLoversSideArtTexture(THREE: ThreeNamespace, side: "left" | "right
       context.scale(-1, 1);
     }
     context.imageSmoothingEnabled = true;
-    context.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight, 0, 0, 512, 1280);
+    drawImageCover(context, image, 512, 1280);
     context.restore();
     const shade = context.createLinearGradient(0, 0, 0, 1280);
     shade.addColorStop(0, "rgba(7, 4, 25, .08)");
@@ -327,9 +353,10 @@ export function createBirdDutyCabinet(THREE: ThreeNamespace, definition: Cabinet
   screen.position.set(0, 1.49, 0.255);
   root.add(screen);
 
-  const deck = addBox(THREE, root, "control-deck", [0.9, 0.105, 0.42], [0, 1.105, 0.275], trim);
+  const singleDeck = CABINET_CONTROL_SURFACE.singleDeck;
+  const deck = addBox(THREE, root, "control-deck", [singleDeck.width, 0.105, singleDeck.depth], [0, 1.105, singleDeck.centerZ], trim);
   deck.rotation.x = CABINET_CONTROL_SURFACE.tiltRadians;
-  addBox(THREE, root, "deck-face", [0.87, 0.19, 0.08], [0, 1.01, 0.47], shell);
+  addBox(THREE, root, "deck-face", [0.8, 0.17, 0.055], [0, 1.01, singleDeck.faceZ], shell);
 
   const joystick = CABINET_CONTROL_SURFACE.joystick;
   const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, joystick.shaftHeight, 12), metal);
@@ -408,9 +435,10 @@ export function createLoversLostCabinet(THREE: ThreeNamespace, definition: Cabin
   screen.position.set(0, 1.5, 0.285);
   root.add(screen);
 
-  const deck = addBox(THREE, root, "control-deck", [0.98, 0.11, 0.44], [0, 1.105, 0.3], violet);
+  const dualDeck = CABINET_CONTROL_SURFACE.dualDeck;
+  const deck = addBox(THREE, root, "control-deck", [dualDeck.width, 0.11, dualDeck.depth], [0, 1.105, dualDeck.centerZ], violet);
   deck.rotation.x = CABINET_CONTROL_SURFACE.tiltRadians;
-  addBox(THREE, root, "deck-face", [0.94, 0.2, 0.08], [0, 1.005, 0.505], shell);
+  addBox(THREE, root, "deck-face", [0.86, 0.18, 0.055], [0, 1.005, dualDeck.faceZ], shell);
 
   for (const side of [-1, 1]) {
     const stickX = side * 0.25;

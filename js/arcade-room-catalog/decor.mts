@@ -14,6 +14,12 @@
 // the one place an image is used, and it is the game's own grid preview, which
 // is how a player hangs any cabinet on the grid on their wall without anyone
 // drawing a poster.
+//
+// SOME DECOR IS INTERACTIVE. An `interaction` names a page the player opens by
+// walking up and pressing E, with the same reach rules a cabinet has; the room
+// shows it in an overlay and knows nothing about what is inside. The Yam Bowling
+// calendar is the first: the print on the wall is the real cover, and the page
+// behind it is the calendar's own flip-through viewer.
 
 export type DecorMount = "floor" | "wall" | "ceiling";
 export const DECOR_MOUNTS: readonly DecorMount[] = Object.freeze(["floor", "wall", "ceiling"]);
@@ -59,6 +65,7 @@ export type DecorModelSpec =
   | Readonly<{ kind: "text-sign"; text: string; font: "block" | "script" }>
   | Readonly<{ kind: "shape-sign"; shape: "heart" | "star" | "bolt" | "joystick" | "ghost" | "circle" }>
   | Readonly<{ kind: "poster"; image: string; frame: string }>
+  | Readonly<{ kind: "calendar"; cover: string }>
   | Readonly<{ kind: "rug"; shape: "rect" | "round"; pattern: "solid" | "border" | "stripes" | "checker" }>
   | Readonly<{ kind: "ceiling-light"; style: "spot" | "pendant" | "disco" | "tube" }>
   | Readonly<{ kind: "prop"; prop: "plant" | "bench" | "stool" | "floor-lamp" | "trash-can" | "stanchion" | "jukebox" | "vending" | "claw" | "pinball" | "popcorn" | "counter" | "speaker-stack" | "beanbag" | "table" }>
@@ -85,7 +92,21 @@ export type DecorDefinition = Readonly<{
   scale: Readonly<{ enabled: boolean; min: number; max: number }>;
   light: Readonly<{ intensity: number; distance: number }> | null;
   model: DecorModelSpec;
+  /** A page the player can open from the room by walking up to the item, or null for plain decor. */
+  interaction: DecorInteraction | null;
   unlock: Readonly<{ type: "starter" | "achievement" | "purchase"; source: string }>;
+}>;
+
+export type DecorInteraction = Readonly<{
+  /** Shown in the room's interaction prompt: "Press E to …". */
+  prompt: string;
+  /** The page to open, relative to the room page. */
+  url: string;
+  /** The overlay's accessible title. */
+  title: string;
+  /** How close the player must be, in metres, and how squarely they must face it (a cosine). */
+  radius: number;
+  facingThreshold: number;
 }>;
 
 const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" } as const);
@@ -120,6 +141,7 @@ type DecorInput = Readonly<{
   scale?: Readonly<{ min: number; max: number }>;
   light?: Readonly<{ intensity: number; distance: number }>;
   model: DecorModelSpec;
+  interaction?: DecorInteraction;
 }>;
 
 function decor(input: DecorInput): DecorDefinition {
@@ -136,6 +158,7 @@ function decor(input: DecorInput): DecorDefinition {
     scale: input.scale && !input.length ? Object.freeze({ enabled: true, ...input.scale }) : NO_SCALE,
     light: input.light ? Object.freeze({ ...input.light }) : null,
     model: Object.freeze({ ...input.model }) as DecorModelSpec,
+    interaction: input.interaction ? Object.freeze({ ...input.interaction }) : null,
     unlock: STARTER,
   });
 }
@@ -225,6 +248,26 @@ export const DECOR_CATALOG: readonly DecorDefinition[] = Object.freeze([
   decor({ slug: "mirror", category: "wall", title: "Mirror", mounts: ["wall"], size: { width: 0.8, height: 1.2, depth: 0.05 }, wallHeight: 1.7, tint: "#c9a24a", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "mirror" } }),
   decor({ slug: "exit-sign", category: "wall", title: "Exit Sign", mounts: ["wall"], size: { width: 0.5, height: 0.25, depth: 0.1 }, wallHeight: 3.6, tint: "#7dff4d", light: { intensity: 0.8, distance: 2.5 }, scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "exit-sign" } }),
   decor({ slug: "coat-hook", category: "wall", title: "Coat Hooks", mounts: ["wall"], size: { width: 0.6, height: 0.15, depth: 0.12 }, wallHeight: 1.7, tint: "#c7ccd3", scale: SCALE_RANGES.wall, model: { kind: "wall-prop", prop: "coat-hook" } }),
+  // The Yam Bowling 2027 calendar: the closed cover at 11 x 8.5 in, hung by a hook, and
+  // interactive — walk up and press E to flip through it. Size is twice the real print so it
+  // reads across the room; the player can scale it back down or up to a feature wall.
+  decor({
+    slug: "yam-calendar",
+    category: "wall",
+    title: "Yam Bowling 2027 Calendar",
+    mounts: ["wall"],
+    size: { width: 0.66, height: 0.513, depth: 0.03 },
+    wallHeight: 1.75,
+    scale: { min: 0.5, max: 3 },
+    model: { kind: "calendar", cover: "../games/yam-bowling/assets/calendar/cover.webp" },
+    interaction: {
+      prompt: "Press E to flip through the Yam Bowling calendar",
+      url: "../games/yam-bowling/calendar/viewer.html",
+      title: "Yam Bowling 2027 Pinup Calendar",
+      radius: 1.6,
+      facingThreshold: 0.45,
+    },
+  }),
 ]);
 
 /**
@@ -244,6 +287,21 @@ export function decorByCategory(category: DecorCategory): readonly DecorDefiniti
 
 export function allDecorIds(): string[] {
   return DECOR_CATALOG.map((entry) => entry.id);
+}
+
+/** Every item the player can walk up to and open. */
+export function interactiveDecor(): readonly DecorDefinition[] {
+  return DECOR_CATALOG.filter((entry) => entry.interaction !== null);
+}
+
+/**
+ * The picture an item's catalog card shows when the item IS a picture — a poster's grid
+ * preview, the calendar's cover. Null for everything else, which is rendered from its model.
+ */
+export function decorCardImage(definition: DecorDefinition): string | null {
+  if (definition.model.kind === "poster") return definition.model.image;
+  if (definition.model.kind === "calendar") return definition.model.cover;
+  return null;
 }
 
 /** The item's full extent once its stored length and scale are applied. A stretched length is absolute; scale multiplies everything. */

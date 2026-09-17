@@ -1,0 +1,53 @@
+/* The embed page around the viewer: a dark stage that fits the calendar to whatever frame
+   the Arcade Room gives it. calendar.css owns the object itself. */
+
+.cal-embed {
+  margin: 0;
+  min-height: 100vh;
+  background: #0b0f16;
+  color: #f4f1ec;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.cal-embed__stage {
+  box-sizing: border-box;
+  max-width: 900px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(12px, 2.5vw, 26px) clamp(12px, 3vw, 28px) clamp(18px, 3vw, 30px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+}
+
+.cal-embed .cal-viewer {
+  /* A shorter stage than the shop page: the frame is the whole overlay, so size the object
+     from its height so the open spread never scrolls. */
+  --cal-closed-w: min(100%, 600px, 54vh);
+  --cal-open-w: min(100%, 460px, 36vh);
+}
+
+.cal-embed__hint,
+.cal-embed__shop {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: #9fb2c2;
+}
+
+.cal-embed__shop {
+  display: grid;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(143, 215, 255, .14);
+}
+
+.cal-embed__shop a {
+  color: #ffd33d;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.cal-embed__shop a:hover,
+.cal-embed__shop a:focus-visible { text-decoration: underline; }

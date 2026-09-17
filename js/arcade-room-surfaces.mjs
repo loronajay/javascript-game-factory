@@ -383,6 +383,148 @@ const PATTERNS = {
         speckle(context, size, 260, 59, (random) => (random() < 0.8 ? color(colors, 1) : color(colors, 2)), 1.4);
         speckle(context, size, 14, 61, () => withAlpha(color(colors, 2), 0.35), 4);
     },
+    // Parquet: two interleaved runs of blocks at 45deg. The tile is drawn oversized and
+    // rotated so the zig-zag wraps seamlessly on a square repeat.
+    "herringbone": (context, size, colors) => {
+        fill(context, size, color(colors, 1));
+        const random = seeded(67);
+        const blockLength = size / 4;
+        const blockWidth = blockLength / 4;
+        context.save();
+        context.translate(size / 2, size / 2);
+        context.rotate(Math.PI / 4);
+        const reach = size;
+        for (let row = -8; row <= 8; row += 1) {
+            for (let col = -8; col <= 8; col += 1) {
+                const shade = random();
+                context.fillStyle = shade < 0.33 ? color(colors, 0) : shade < 0.66 ? color(colors, 1) : color(colors, 2);
+                const x = col * blockLength - reach / 2;
+                const y = row * blockWidth * 2 - reach / 2;
+                // Horizontal block, then the vertical one that tucks under its end.
+                context.fillRect(x + 2, y + 2, blockLength - 4, blockWidth - 4);
+                context.fillStyle = random() < 0.5 ? color(colors, 0) : color(colors, 2);
+                context.fillRect(x + blockLength - blockWidth + 2, y + blockWidth + 2, blockWidth - 4, blockLength - 4);
+            }
+        }
+        context.restore();
+    },
+    // Veined stone: a base, a handful of soft wandering veins in the second colour, and a few
+    // sharp hairlines in the third.
+    "marble": (context, size, colors) => {
+        fill(context, size, color(colors, 0));
+        const random = seeded(71);
+        const vein = (stroke, width, alpha, count) => {
+            context.strokeStyle = withAlpha(stroke, alpha);
+            context.lineWidth = width;
+            context.lineCap = "round";
+            for (let index = 0; index < count; index += 1) {
+                let x = random() * size;
+                let y = random() * size;
+                context.beginPath();
+                context.moveTo(x, y);
+                for (let step = 0; step < 14; step += 1) {
+                    x += (random() - 0.5) * 90;
+                    y += (random() - 0.5) * 90;
+                    context.lineTo(x, y);
+                }
+                context.stroke();
+            }
+        };
+        context.filter = "blur(6px)";
+        vein(color(colors, 1), 18, 0.35, 7);
+        context.filter = "blur(2px)";
+        vein(color(colors, 1), 5, 0.5, 9);
+        context.filter = "none";
+        vein(color(colors, 2), 1.2, 0.8, 6);
+        speckle(context, size, 900, 73, () => withAlpha(color(colors, 1), 0.08), 1.2);
+    },
+    // Diagonal warning stripes, wrapped so the tile repeats without a seam.
+    "hazard": (context, size, colors) => {
+        fill(context, size, color(colors, 0));
+        context.fillStyle = color(colors, 1);
+        const band = size / 4;
+        for (let index = -1; index < 5; index += 1) {
+            context.beginPath();
+            context.moveTo(index * band, 0);
+            context.lineTo(index * band + band / 2, 0);
+            context.lineTo(index * band + band / 2 + size, size);
+            context.lineTo(index * band + size, size);
+            context.closePath();
+            context.fill();
+        }
+        speckle(context, size, 1200, 79, () => "rgba(0,0,0,.14)", 1.6);
+    },
+    // Running-bond 2:1 tiles with a grout line and a glazed highlight along each top edge.
+    "subway": (context, size, colors) => {
+        fill(context, size, color(colors, 1));
+        const rows = 6;
+        const rowHeight = size / rows;
+        const tileWidth = size / 3;
+        const gap = 5;
+        for (let row = 0; row < rows; row += 1) {
+            const offset = (row % 2) * tileWidth / 2;
+            for (let col = -1; col <= 3; col += 1) {
+                const x = col * tileWidth + offset;
+                const y = row * rowHeight;
+                context.fillStyle = color(colors, 0);
+                context.fillRect(x + gap / 2, y + gap / 2, tileWidth - gap, rowHeight - gap);
+                context.fillStyle = "rgba(255,255,255,.16)";
+                context.fillRect(x + gap / 2, y + gap / 2, tileWidth - gap, 5);
+                context.fillStyle = "rgba(0,0,0,.14)";
+                context.fillRect(x + gap / 2, y + rowHeight - gap / 2 - 4, tileWidth - gap, 4);
+            }
+        }
+    },
+    // Plaid: broad bands both ways in the second colour, fine over-check in the third.
+    "tartan": (context, size, colors) => {
+        fill(context, size, color(colors, 0));
+        const band = size / 4;
+        context.fillStyle = withAlpha(color(colors, 1), 0.75);
+        for (let index = 0; index < 2; index += 1) {
+            context.fillRect(index * band * 2 + band / 2, 0, band, size);
+            context.fillRect(0, index * band * 2 + band / 2, size, band);
+        }
+        context.fillStyle = withAlpha(color(colors, 2), 0.55);
+        for (let index = 0; index < 4; index += 1) {
+            context.fillRect(index * band + band - 6, 0, 4, size);
+            context.fillRect(0, index * band + band - 6, size, 4);
+        }
+        speckle(context, size, 6000, 83, () => "rgba(0,0,0,.1)", 1.1);
+    },
+    // Printed circuit: traces that walk in right-angle steps between solder pads, glowing.
+    "circuit": (context, size, colors) => {
+        fill(context, size, color(colors, 0));
+        const random = seeded(89);
+        const cell = size / 16;
+        context.strokeStyle = color(colors, 2);
+        context.lineWidth = 4;
+        context.lineCap = "round";
+        context.shadowColor = color(colors, 1);
+        context.shadowBlur = 8;
+        for (let index = 0; index < 26; index += 1) {
+            let x = Math.floor(random() * 16) * cell;
+            let y = Math.floor(random() * 16) * cell;
+            context.beginPath();
+            context.moveTo(x, y);
+            for (let step = 0; step < 5; step += 1) {
+                if (random() < 0.5)
+                    x += (Math.floor(random() * 5) - 2) * cell;
+                else
+                    y += (Math.floor(random() * 5) - 2) * cell;
+                context.lineTo(x, y);
+            }
+            context.stroke();
+            context.fillStyle = color(colors, 1);
+            context.beginPath();
+            context.arc(x, y, 5, 0, Math.PI * 2);
+            context.fill();
+        }
+        context.shadowBlur = 0;
+        context.fillStyle = color(colors, 1);
+        for (let index = 0; index < 18; index += 1) {
+            context.fillRect(Math.floor(random() * 16) * cell - 5, Math.floor(random() * 16) * cell - 5, 10, 10);
+        }
+    },
 };
 export function createSurfaceTexture(THREE, style) {
     const canvas = document.createElement("canvas");
