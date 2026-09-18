@@ -17,7 +17,7 @@
 // editor's threshold catches it, and the guide that explains it is reported.
 
 import { clampDecorLength, clampDecorScale, decorExtent, findDecor, type DecorDefinition } from "./arcade-room-catalog/decor.mjs";
-import { alignStretchEnd, type AlignGuide } from "./arcade-room-decor-align.mjs";
+import { alignStretchEnd, wallAlong, type AlignGuide } from "./arcade-room-decor-align.mjs";
 import { placeDecorItem, type DecorResult, type RoomPoint } from "./arcade-room-decor-layout.mjs";
 import { ROOM_BOUNDS_DEFAULTS, type FootprintCatalog, type RoomBounds, type RoomDecorItem, type RoomLayout, type WallSide } from "./arcade-room-layout.mjs";
 
@@ -68,19 +68,34 @@ function findItem(layout: RoomLayout, instanceId: string): Readonly<{ item: Room
   return item && definition ? { item, definition } : null;
 }
 
+/** cos/sin with the float noise of a right angle removed, so a square item's axes are exactly square. */
+function exactCos(angle: number): number {
+  const value = Math.cos(angle);
+  return Math.abs(value) < 1e-12 ? 0 : value;
+}
+
+function exactSin(angle: number): number {
+  const value = Math.sin(angle);
+  return Math.abs(value) < 1e-12 ? 0 : value;
+}
+
 export function decorFrame(item: RoomDecorItem, definition: DecorDefinition, room: RoomBounds): DecorFrame {
   const extent = decorExtent(definition, item);
-  const cosine = Math.cos(item.rotationY);
-  const sine = Math.sin(item.rotationY);
+  const cosine = exactCos(item.rotationY);
+  const sine = exactSin(item.rotationY);
   // Local +X and +Z in world space, the same rotation `worldPointFromPlacement` applies.
   const along: RoomPoint = { x: cosine, y: 0, z: -sine };
   const localZ: RoomPoint = { x: sine, y: 0, z: cosine };
   const height = room.height ?? ROOM_BOUNDS_DEFAULTS.height;
   if (item.mount === "wall") {
+    // A spun item's width runs up its slant: the same turn about the wall's normal
+    // that `placeDecorModel` applies, so the handles sit on the ends the player sees.
+    const spinCos = exactCos(item.spin);
+    const spinSin = exactSin(item.spin);
     return {
       centre: { x: item.x, y: item.y, z: item.z },
-      along,
-      across: { x: 0, y: 1, z: 0 },
+      along: { x: along.x * spinCos, y: spinSin, z: along.z * spinCos },
+      across: { x: -along.x * spinSin, y: spinCos, z: -along.z * spinSin },
       normal: localZ,
       halfAlong: extent.width / 2,
       halfAcross: extent.height / 2,
@@ -126,9 +141,10 @@ export function decorHandles(layout: RoomLayout, instanceId: string, room: RoomB
   return [];
 }
 
-/** Which world axis the item's length runs on when it is square to the room, else null. */
-function straightAxis(along: RoomPoint): "x" | "z" | null {
+/** Which world axis the item's length runs on when it is square to the room (up a wall included), else null. */
+function straightAxis(along: RoomPoint): "x" | "y" | "z" | null {
   if (Math.abs(along.x) > 0.999) return "x";
+  if (Math.abs(along.y) > 0.999) return "y";
   if (Math.abs(along.z) > 0.999) return "z";
   return null;
 }
@@ -184,7 +200,7 @@ export function stretchDecorEnd(
   const { item, definition } = found;
   if (!definition.length.enabled) return { valid: false, layout, instanceId, reason: "not-stretchable", guides: [] };
   const frame = decorFrame(item, definition, room);
-  const outward: RoomPoint = { x: frame.along.x * end, y: 0, z: frame.along.z * end };
+  const outward: RoomPoint = { x: frame.along.x * end, y: frame.along.y * end, z: frame.along.z * end };
   const anchor = add(frame.centre, frame.along, -end * frame.halfAlong);
   let requested = dot(sub(point, anchor), outward);
   let guides: readonly AlignGuide[] = [];
@@ -192,7 +208,8 @@ export function stretchDecorEnd(
   if (axis && snapThreshold > 0) {
     const anchorAlong = anchor[axis];
     const freeEnd = anchorAlong + requested * outward[axis];
-    const otherAxis = item.mount === "wall" ? "y" : axis === "x" ? "z" : "x";
+    // The other face axis: up a wall for a level wall item, along the wall for an upright one.
+    const otherAxis = item.mount === "wall" ? (axis === "y" ? wallAlong(item.wall as WallSide) : "y") : axis === "x" ? "z" : "x";
     const acrossCentre = otherAxis === "y" ? item.y : frame.centre[otherAxis];
     const snapped = alignStretchEnd(
       layout, instanceId, item.mount, item.wall as WallSide, axis, freeEnd,

@@ -67,6 +67,8 @@ const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" });
 const NO_TINT = Object.freeze({ enabled: false, default: "" });
 const NO_LENGTH = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 const NO_SCALE = Object.freeze({ enabled: false, min: 1, max: 1 });
+const NO_SPIN = Object.freeze({ enabled: false });
+const SPINS = Object.freeze({ enabled: true });
 const NO_TEXT = Object.freeze({ enabled: false, maxLength: 0 });
 const NO_IMAGE = Object.freeze({ enabled: false });
 /** The most a custom sign may say: one short line, which is all a neon tube can hold. */
@@ -105,6 +107,7 @@ function decor(input) {
         tint: input.tint ? Object.freeze({ enabled: true, default: input.tint }) : NO_TINT,
         length: input.length ? Object.freeze({ enabled: true, ...input.length }) : NO_LENGTH,
         scale: input.scale && !input.length ? Object.freeze({ enabled: true, ...input.scale }) : NO_SCALE,
+        spin: input.spin && input.mounts.includes("wall") ? SPINS : NO_SPIN,
         light: input.light ? Object.freeze({ ...input.light }) : null,
         text: input.text ? Object.freeze({ enabled: true, maxLength: CUSTOM_SIGN_MAX_LENGTH }) : NO_TEXT,
         image: input.image ? Object.freeze({ enabled: true }) : NO_IMAGE,
@@ -126,7 +129,7 @@ function posterTitle(slug) {
 }
 export const DECOR_CATALOG = Object.freeze([
     // — Neon —
-    decor({ slug: "strip", category: "neon", title: "Neon Strip", mounts: ["wall", "ceiling", "floor"], size: { width: 2, height: 0.05, depth: 0.05 }, wallHeight: 2.8, tint: "#ff2d95", length: { min: 0.5, max: 20, default: 2 }, light: NEON_LIGHT, model: { kind: "strip" } }),
+    decor({ slug: "strip", category: "neon", title: "Neon Strip", mounts: ["wall", "ceiling", "floor"], size: { width: 2, height: 0.05, depth: 0.05 }, wallHeight: 2.8, tint: "#ff2d95", length: { min: 0.5, max: 20, default: 2 }, spin: true, light: NEON_LIGHT, model: { kind: "strip" } }),
     decor({ slug: "heart", category: "neon", title: "Neon Heart", mounts: ["wall"], size: { width: 0.7, height: 0.7, depth: 0.06 }, wallHeight: 2.3, tint: "#ff2d95", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "heart" } }),
     decor({ slug: "star", category: "neon", title: "Neon Star", mounts: ["wall"], size: { width: 0.7, height: 0.7, depth: 0.06 }, wallHeight: 2.3, tint: "#ffd33d", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "star" } }),
     decor({ slug: "bolt", category: "neon", title: "Neon Bolt", mounts: ["wall"], size: { width: 0.5, height: 0.9, depth: 0.06 }, wallHeight: 2.3, tint: "#22e5ff", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "bolt" } }),
@@ -333,6 +336,19 @@ export function decorExtent(definition, finish = {}) {
 export function decorFootprint(definition, finish = {}) {
     const extent = decorExtent(definition, finish);
     return { width: extent.width, depth: extent.depth };
+}
+/**
+ * A wall item's spin kept to one turn in [0, 2π), or 0 when the item cannot
+ * spin or the value is nonsense — the same wrap the server applies, so a bar
+ * turned round forty times stores the same angle as one turn.
+ */
+export function clampDecorSpin(definition, spin) {
+    if (!definition.spin.enabled || !Number.isFinite(spin))
+        return 0;
+    const turn = Math.PI * 2;
+    const wrapped = ((spin % turn) + turn) % turn;
+    // A hair under a full turn is the same bar as flat; keep it flat so it compares equal.
+    return turn - wrapped < 1e-9 ? 0 : wrapped;
 }
 /** Clamp a requested length to what the item allows, or 0 when it is not stretchable. */
 export function clampDecorLength(definition, length) {

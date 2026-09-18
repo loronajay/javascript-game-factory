@@ -102,15 +102,15 @@ export const YAM_BOWLING_CABINET = Object.freeze({
     kind: "arcade-cabinet",
     gameSlug: "yam-bowling",
     title: "Yam Bowling",
-    description: "A compact glow-bowling lane with a working approach, full pin deck, ball return, and overhead scoring screen.",
-    launchMode: "cabinet-screen",
+    description: "A compact glow-bowling lane with a working approach, full pin deck, ball return, and a lit marquee over the foul line.",
+    launchMode: "fullscreen",
     dimensions: Object.freeze({ width: 2.35, depth: 6, height: 2.65 }),
     placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
     unlock: Object.freeze({ type: "starter", source: "Yam Bowling lane collection" }),
     interaction: Object.freeze({
         radius: 3.7,
         facingThreshold: 0.35,
-        anchor: Object.freeze({ x: 0, y: 2.093, z: 2.133 }),
+        anchor: Object.freeze({ x: 0, y: 1.02, z: 2.48 }),
     }),
     palette: Object.freeze({
         shell: "#17101f",
@@ -126,7 +126,6 @@ export const YAM_BOWLING_CABINET = Object.freeze({
         Object.freeze({ id: "pins", material: "paint" }),
         Object.freeze({ id: "ball-return", material: "paint" }),
         Object.freeze({ id: "marquee", material: "emissive" }),
-        Object.freeze({ id: "screen", material: "emissive" }),
     ]),
 });
 export const SHARK_HALL_POOL_TABLE = Object.freeze({

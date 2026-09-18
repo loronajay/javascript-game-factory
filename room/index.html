@@ -17,7 +17,10 @@
         <h1 id="roomTitle">My Arcade</h1>
       </div>
       <a id="roomOwnerLink" class="back-link room-owner-link" href="../player/index.html" hidden>View profile</a>
-      <button id="editArcade" class="edit-arcade" type="button" aria-pressed="false" title="Toggle build mode (B)">Edit arcade <kbd>B</kbd></button>
+      <div class="room-header__actions">
+        <button id="fullscreenRoom" class="edit-arcade room-fullscreen" type="button" aria-pressed="false" title="Fill the screen with the arcade (F)">Fullscreen <kbd>F</kbd></button>
+        <button id="editArcade" class="edit-arcade" type="button" aria-pressed="false" title="Toggle build mode (B)">Edit arcade <kbd>B</kbd></button>
+      </div>
     </header>
 
     <section id="startGate" class="start-gate">
@@ -37,7 +40,7 @@
       <span id="jukeboxNowPlayingTitle" class="jukebox-chip__title"></span>
     </div>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span><span class="control-hint__build"><b>B</b> Build</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span><span><b>F</b> Fullscreen</span><span class="control-hint__build"><b>B</b> Build</span>
     </div>
 
     <aside id="roomEditor" class="room-editor" aria-label="Arcade editor" hidden>
@@ -101,7 +104,7 @@
       </div>
       <details class="editor-shortcuts">
         <summary>Keyboard shortcuts</summary>
-        <small><b>1–9</b> cabinets · <b>Arrows</b> nudge · <b>Q / R</b> rotate · <b>H</b> hide / show · <b>Del</b> remove · <b>Ctrl+D</b> duplicate · <b>Drag arrows / corners</b> resize · <b>- / +</b> resize · <b>Alt+drag</b> no snapping · <b>Ctrl+Z</b> undo · <b>Esc</b> deselect · <b>O / F / T</b> views · <b>C</b> centre on selection · <b>B</b> save &amp; close</small>
+        <small><b>1–9</b> cabinets · <b>Arrows</b> nudge · <b>Q / R</b> rotate (a neon strip turns on its wall) · <b>H</b> hide / show · <b>Del</b> remove · <b>Ctrl+D</b> duplicate · <b>Drag arrows / corners</b> resize · <b>- / +</b> resize · <b>Alt+drag</b> no snapping · <b>Ctrl+Z</b> undo · <b>Esc</b> deselect · <b>O / F / T</b> views · <b>C</b> centre on selection · <b>B</b> save &amp; close</small>
       </details>
     </aside>
 

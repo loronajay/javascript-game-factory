@@ -35,8 +35,8 @@ button, a { font: inherit; }
 .eyebrow { color: #8fd7ff; font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
 .back-link { color: #f5fbff; text-decoration: none; border: 1px solid rgba(143, 215, 255, .35); border-radius: 999px; padding: 10px 15px; background: rgba(5, 14, 25, .72); backdrop-filter: blur(10px); }
 .back-link:hover { border-color: #8fd7ff; background: rgba(20, 54, 78, .84); }
+.room-header__actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .edit-arcade {
-  margin-left: auto;
   border: 1px solid rgba(255, 211, 61, .72);
   border-radius: 999px;
   padding: 11px 17px;
@@ -51,6 +51,12 @@ button, a { font: inherit; }
 .edit-arcade:hover,
 .edit-arcade[aria-pressed="true"] { background: #ffd33d; color: #132336; }
 .edit-arcade[hidden] { display: none; }
+/* The room's own fullscreen: the whole page goes up, so the browser chrome leaves and the
+   header/hint overlays stay exactly where they are. Hidden where the API is missing (iPhone). */
+.room-fullscreen { border-color: rgba(143, 215, 255, .55); color: #e8f6ff; }
+.room-fullscreen:hover,
+.room-fullscreen[aria-pressed="true"] { background: #8fd7ff; color: #132336; }
+.room-fullscreen[hidden] { display: none; }
 .room-owner-link { margin-left: auto; }
 .room-owner-link[hidden] { display: none; }
 .is-visiting .control-hint__build { display: none; }

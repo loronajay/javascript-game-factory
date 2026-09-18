@@ -3,7 +3,6 @@
 // catalogue of unrelated physical forms.
 
 import type { CabinetDefinition } from "./arcade-room-cabinet.mjs";
-import { YAM_BOWLING_CABINET_ART } from "./arcade-room-scene.mjs";
 
 type ThreeNamespace = Record<string, any>;
 
@@ -94,19 +93,12 @@ export function createYamBowlingLane(THREE: ThreeNamespace, definition: CabinetD
   addBall(THREE, ballReturn, -0.11, 1.12, definition.palette.trim);
   addBall(THREE, ballReturn, 0.12, 1.3, definition.palette.sky);
 
-  const monitor = box(THREE, attraction, "score-monitor", [1.08, 0.7, 0.12], [0, 1.82, 1.28], shell);
-  monitor.rotation.x = -0.05;
-  const texture = new THREE.TextureLoader().load(YAM_BOWLING_CABINET_ART.keyArt);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.9, 0.50625),
-    new THREE.MeshBasicMaterial({ map: texture }),
-  );
-  screen.name = "screen";
-  screen.position.set(0, 1.82, 1.35);
-  screen.rotation.x = -0.05;
-  attraction.add(screen);
-  box(THREE, attraction, "monitor-post", [0.12, 1.28, 0.12], [0, 1.08, 1.22], metal);
+  // No overhead scoring screen: like the pool table, the lane is a screenless attraction
+  // and stepping up to it boots straight into the fullscreen game. The marquee hangs on
+  // its own posts over the foul line so the lane still reads as a lit attraction.
+  for (const x of [-0.5, 0.5]) {
+    box(THREE, attraction, "marquee-post", [0.08, 2.1, 0.08], [x, 1.05, 1.25], metal);
+  }
   box(THREE, attraction, "marquee", [1.14, 0.1, 0.16], [0, 2.22, 1.25], trim);
 
   for (const x of [-0.45, 0.45]) {

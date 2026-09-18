@@ -1,4 +1,4 @@
-import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl } from "./arcade-room-catalog/decor.mjs";
+import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, clampDecorSpin, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface } from "./arcade-room-catalog/surfaces.mjs";
 import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
 import { DEFAULT_ARCADE_AVATAR_ID, findArcadeAvatar, normalizeArcadeAvatarId } from "./arcade-room-avatar-catalog.mjs";
@@ -53,9 +53,9 @@ const DEFAULT_CABINETS = Object.freeze([
  * face for the 20 m starter room (wall centre −10, thickness 0.24).
  */
 const DEFAULT_DECOR = Object.freeze([
-    Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ff4d91", length: 2.4, scale: 1, text: "", image: "", aspect: 1 }),
-    Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4, scale: 1, text: "", image: "", aspect: 1 }),
-    Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8, scale: 1, text: "", image: "", aspect: 1 }),
+    Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ff4d91", length: 2.4, scale: 1, spin: 0, text: "", image: "", aspect: 1 }),
+    Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4, scale: 1, spin: 0, text: "", image: "", aspect: 1 }),
+    Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8, scale: 1, spin: 0, text: "", image: "", aspect: 1 }),
 ]);
 const STARTER_NEON_INSTANCE_IDS = new Set(DEFAULT_DECOR.map((item) => item.instanceId));
 function rounded(value) {
@@ -333,6 +333,7 @@ export function normalizeDecorItem(value) {
         color: definition.tint.enabled && isHexColor(source.color) ? source.color.toLowerCase() : "",
         length: definition.length.enabled ? clampDecorLength(definition, typeof source.length === "number" ? source.length : 0) : 0,
         scale: clampDecorScale(definition, typeof source.scale === "number" ? source.scale : 1),
+        spin: mount === "wall" ? clampDecorSpin(definition, typeof source.spin === "number" ? source.spin : 0) : 0,
         text: definition.text.enabled ? cleanDecorText(source.text, definition.text.maxLength) : "",
         image,
         aspect: image ? clampDecorAspect(source.aspect) : 1,
@@ -438,6 +439,7 @@ function decorItemsEqual(first, second) {
         && first.color === second.color
         && first.length === second.length
         && first.scale === second.scale
+        && first.spin === second.spin
         && first.text === second.text
         && first.image === second.image
         && first.aspect === second.aspect;

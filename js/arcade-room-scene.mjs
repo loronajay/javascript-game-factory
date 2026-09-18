@@ -27,9 +27,6 @@ export const SUMORAI_CABINET_ART = Object.freeze({
     playerOne: "../games/sumorai/assets/sprites/Player_1/idle.svg",
     playerTwo: "../games/sumorai/assets/sprites/Player_2/idle.svg",
 });
-export const YAM_BOWLING_CABINET_ART = Object.freeze({
-    keyArt: "../grid-previews/yam-bowling.png",
-});
 export const CABINET_MARQUEE_GEOMETRY = Object.freeze({
     birdDuty: Object.freeze({ depth: 0.8, centerZ: 0, artZ: 0.407, bodyFrontZ: 0.28 }),
     loversLost: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
@@ -67,10 +64,8 @@ export const SUMORAI_PLAY_VIEW = Object.freeze({
     screen: Object.freeze({ width: 0.68, height: 0.3825, y: 1.5, z: 0.285 }),
     gameAspect: 16 / 9,
 });
+// Screenless attraction: the lane has no monitor, so the game fills the viewport.
 export const YAM_BOWLING_PLAY_VIEW = Object.freeze({
-    position: Object.freeze({ x: 0, y: 2.093, z: 4.266 }),
-    fov: 35,
-    screen: Object.freeze({ width: 1.395, height: 0.5822, y: 2.093, z: 2.133 }),
     gameAspect: 16 / 9,
 });
 export const SHARK_HALL_PLAY_VIEW = Object.freeze({

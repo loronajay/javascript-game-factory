@@ -35,7 +35,9 @@
 // numbers are bounded, and the client's catalog decides what an id means. A
 // surface id that fails the pattern is stored as "" (client default); a decor
 // row that cannot be made valid is dropped. A decor row also carries `scale`
-// (2026-09-17), the player's resize of a sign, poster, rug or prop. The `decor` key is emitted only
+// (2026-09-17), the player's resize of a sign, poster, rug or prop, and `spin`
+// (2026-09-17), a wall item's turn in its wall's plane (an upright or slanted
+// neon strip), kept to one turn like `rotationY`. The `decor` key is emitted only
 // when the client sent one, because the client seeds its starter neon exactly
 // when the key is ABSENT — a version 2 row with `decor: []` is a room the
 // player deliberately stripped, and must come back stripped.
@@ -166,12 +168,14 @@ function normalizeDecorRow(raw) {
     // A missing or non-positive scale is size 1 — a stored 0 would make the client draw nothing.
     const rawScale = boundedNumber(source.scale, SCALE_LIMIT);
     const scale = rawScale === null || rawScale <= 0 ? 1 : rawScale;
+    // A missing or junk spin is level; the client decides which items may hold one at all.
+    const spin = normalizeRotation(source.spin) ?? 0;
     const text = cleanLine(source.text, TEXT_LIMIT);
     const rawImage = typeof source.image === "string" ? source.image.trim() : "";
     const image = rawImage.length <= IMAGE_URL_LIMIT && IMAGE_URL_PATTERN.test(rawImage) ? rawImage : "";
     const rawAspect = typeof source.aspect === "number" && Number.isFinite(source.aspect) ? source.aspect : 1;
     const aspect = image ? Number(Math.min(ASPECT_LIMITS.max, Math.max(ASPECT_LIMITS.min, rawAspect)).toFixed(3)) : 1;
-    return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length, scale, text, image, aspect };
+    return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length, scale, spin, text, image, aspect };
 }
 /**
  * Coerce any stored or submitted document into a layout.

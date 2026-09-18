@@ -49,6 +49,7 @@ const enterButton = requiredElement<HTMLButtonElement>("#enterShowroom");
 const status = requiredElement<HTMLElement>("#roomStatus");
 const editorPanel = requiredElement<HTMLElement>("#roomEditor");
 const editArcadeButton = requiredElement<HTMLButtonElement>("#editArcade");
+const fullscreenRoomButton = requiredElement<HTMLButtonElement>("#fullscreenRoom");
 const rotateLeftButton = requiredElement<HTMLButtonElement>("#rotateCabinetLeft");
 const rotateRightButton = requiredElement<HTMLButtonElement>("#rotateCabinetRight");
 const resetLayoutButton = requiredElement<HTMLButtonElement>("#resetRoomLayout");
@@ -358,6 +359,27 @@ function openDecor(): void {
   decorOverlay.open(nearbyDecor.definition);
 }
 
+// The whole page goes fullscreen, not the canvas, so the header, hint and editor overlays
+// keep working on top of it. A cabinet's own fullscreen nests inside this one: leaving the
+// game pops back to the fullscreen room rather than out to the browser.
+function isRoomFullscreen(): boolean {
+  return document.fullscreenElement !== null;
+}
+
+function setRoomFullscreen(on: boolean): void {
+  if (on) {
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+  } else if (isRoomFullscreen()) {
+    document.exitFullscreen?.().catch(() => undefined);
+  }
+}
+
+function syncRoomFullscreenButton(): void {
+  const on = isRoomFullscreen();
+  fullscreenRoomButton.setAttribute("aria-pressed", String(on));
+  fullscreenRoomButton.innerHTML = on ? "Exit fullscreen <kbd>F</kbd>" : "Fullscreen <kbd>F</kbd>";
+}
+
 function setPlayFullscreen(on: boolean): void {
   playFullscreen = on;
   playLayer.classList.toggle("is-fullscreen", on);
@@ -438,8 +460,14 @@ function closeCabinet(): void {
 
 leaveButton.addEventListener("click", closeCabinet);
 fullscreenButton.addEventListener("click", () => setPlayFullscreen(!playFullscreen));
+fullscreenRoomButton.hidden = !document.fullscreenEnabled;
+fullscreenRoomButton.addEventListener("click", () => {
+  setRoomFullscreen(!isRoomFullscreen());
+  canvas.focus();
+});
 // The browser's own Esc (or a swipe on a phone) leaves fullscreen without telling us.
 document.addEventListener("fullscreenchange", () => {
+  syncRoomFullscreenButton();
   // Screenless attractions keep the viewport-fill presentation even when the browser's
   // native fullscreen layer is dismissed. Their next Escape leaves the game entirely.
   if (!document.fullscreenElement && playFullscreen && activeCabinet?.definition.launchMode !== "fullscreen") setPlayFullscreen(false);
@@ -462,6 +490,11 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   keys.add(event.code);
+  if (event.code === "KeyF" && !event.repeat && document.fullscreenEnabled) {
+    event.preventDefault();
+    setRoomFullscreen(!isRoomFullscreen());
+    return;
+  }
   if (event.code === "KeyE" && interactionReady) {
     event.preventDefault();
     if (nearbyCabinet) openCabinet();

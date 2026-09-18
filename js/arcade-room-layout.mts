@@ -1,4 +1,4 @@
-import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl, type DecorMount } from "./arcade-room-catalog/decor.mjs";
+import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, clampDecorSpin, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl, type DecorMount } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
 import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
 import { DEFAULT_ARCADE_AVATAR_ID, findArcadeAvatar, normalizeArcadeAvatarId } from "./arcade-room-avatar-catalog.mjs";
@@ -46,6 +46,12 @@ export type RoomDecorItem = Readonly<{
   length: number;
   /** The size multiplier for resizable items; 1 is the catalog size and the only value a non-resizable item holds. */
   scale: number;
+  /**
+   * A wall item's turn in the wall's plane, in radians on one turn: 0 hangs level,
+   * π/2 stands it upright. Only a spinnable item on a wall holds anything but 0;
+   * on the floor or ceiling `rotationY` is the turn.
+   */
+  spin: number;
   /** The player's own words on a custom sign, "" for the catalog placeholder and for every other item. */
   text: string;
   /** The uploaded picture on a custom poster (a platform Cloudinary URL), "" for an empty frame and for every other item. */
@@ -139,9 +145,9 @@ const DEFAULT_CABINETS: readonly RoomLayoutItem[] = Object.freeze([
  * face for the 20 m starter room (wall centre −10, thickness 0.24).
  */
 const DEFAULT_DECOR: readonly RoomDecorItem[] = Object.freeze([
-  Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ff4d91", length: 2.4, scale: 1, text: "", image: "", aspect: 1 }),
-  Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#53d8ff", length: 2.4, scale: 1, text: "", image: "", aspect: 1 }),
-  Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ffd33d", length: 1.8, scale: 1, text: "", image: "", aspect: 1 }),
+  Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ff4d91", length: 2.4, scale: 1, spin: 0, text: "", image: "", aspect: 1 }),
+  Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#53d8ff", length: 2.4, scale: 1, spin: 0, text: "", image: "", aspect: 1 }),
+  Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ffd33d", length: 1.8, scale: 1, spin: 0, text: "", image: "", aspect: 1 }),
 ]);
 const STARTER_NEON_INSTANCE_IDS = new Set(DEFAULT_DECOR.map((item) => item.instanceId));
 
@@ -473,6 +479,7 @@ export function normalizeDecorItem(value: unknown): RoomDecorItem | null {
     color: definition.tint.enabled && isHexColor(source.color) ? source.color.toLowerCase() : "",
     length: definition.length.enabled ? clampDecorLength(definition, typeof source.length === "number" ? source.length : 0) : 0,
     scale: clampDecorScale(definition, typeof source.scale === "number" ? source.scale : 1),
+    spin: mount === "wall" ? clampDecorSpin(definition, typeof source.spin === "number" ? source.spin : 0) : 0,
     text: definition.text.enabled ? cleanDecorText(source.text, definition.text.maxLength) : "",
     image,
     aspect: image ? clampDecorAspect(source.aspect) : 1,
@@ -578,6 +585,7 @@ function decorItemsEqual(first: RoomDecorItem, second: RoomDecorItem): boolean {
     && first.color === second.color
     && first.length === second.length
     && first.scale === second.scale
+    && first.spin === second.spin
     && first.text === second.text
     && first.image === second.image
     && first.aspect === second.aspect;

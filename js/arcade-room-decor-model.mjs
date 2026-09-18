@@ -875,10 +875,15 @@ export function createDecorModel(THREE, definition, item, lit) {
     root.add(centred);
     return root;
 }
-/** Position and orientation from the layout row; the model itself is untouched. */
+/**
+ * Position and orientation from the layout row; the model itself is untouched.
+ * The spin is applied first (Euler XYZ turns about Z before Y), so a wall item
+ * turns in its wall's plane and then faces the room, and its stand-off from
+ * the wall — along that same Z — is unchanged by the turn.
+ */
 export function placeDecorModel(model, item) {
     model.position.set(item.x, item.y, item.z);
-    model.rotation.set(0, item.rotationY, 0);
+    model.rotation.set(0, item.rotationY, item.mount === "wall" ? item.spin : 0);
 }
 /**
  * Breathe the jukebox's bubble tubes while a record plays: `pulse` is 0–1 from the room's

@@ -14,7 +14,7 @@
 // wall face. The editor draws exactly what it is handed and nothing more, so
 // what a player sees is precisely what snapped.
 import { decorExtent, findDecor } from "./arcade-room-catalog/decor.mjs";
-import { nearestWall } from "./arcade-room-decor-layout.mjs";
+import { nearestWall, wallExtent } from "./arcade-room-decor-layout.mjs";
 import { ROOM_BOUNDS_DEFAULTS, rotatedFootprint, } from "./arcade-room-layout.mjs";
 const GUIDE_PAD = 0.3;
 /** How far off a surface a guide is drawn so it is not swallowed by the floor or wall. */
@@ -152,7 +152,8 @@ function wallNeighbours(layout, movingId, wall) {
         const definition = findDecor(item.itemId);
         if (!definition)
             continue;
-        const extent = decorExtent(definition, item);
+        // A spun neighbour lines up by the box it takes on the wall, not its own slanted edges.
+        const extent = wallExtent(definition, item);
         boxes.push({ along: spanOf(item[axis], extent.width), y: spanOf(item.y, extent.height) });
     }
     return boxes;
@@ -209,7 +210,7 @@ export function alignDecorTarget(layout, instanceId, target, room, catalog, thre
         return { target, guides: [] };
     const extent = decorExtent(definition, item);
     if (target.mount === "wall") {
-        const aligned = alignWallPoint(layout, instanceId, target.point, nearestWall(target.point, room), extent, room, threshold);
+        const aligned = alignWallPoint(layout, instanceId, target.point, nearestWall(target.point, room), wallExtent(definition, item), room, threshold);
         return { target: { mount: "wall", point: aligned.point }, guides: aligned.guides };
     }
     const placement = { x: target.point.x, z: target.point.z, rotationY: item.rotationY };
@@ -230,8 +231,9 @@ export function alignCabinetPlacement(layout, instanceId, placement, room, catal
 /**
  * Snap the free end of a stretch to a neighbour's edge or the surface's end.
  * `along` is the axis the item runs on ("x"/"z" on a wall or an axis-aligned
- * floor item; anything else has no straight neighbours to line up with), and
- * `end` is the coordinate the pointer asked for on that axis.
+ * floor item, "y" for an item stood upright on a wall; anything else has no
+ * straight neighbours to line up with), and `end` is the coordinate the
+ * pointer asked for on that axis.
  */
 export function alignStretchEnd(layout, instanceId, mount, wall, along, end, across, room, catalog, threshold) {
     if (threshold <= 0)
@@ -239,13 +241,25 @@ export function alignStretchEnd(layout, instanceId, mount, wall, along, end, acr
     const mine = { lo: end, mid: end, hi: end };
     const candidates = [];
     let toWorld;
-    if (mount === "wall") {
+    if (mount === "wall" && along === "y") {
+        // Upright: the ends catch the floor, the ceiling and the tops and bottoms of neighbours.
+        const { half, height } = wallLimits(wall, room);
+        candidates.push({ value: 0, match: "edge", span: [-half, half] }, { value: height, match: "edge", span: [-half, half] });
+        for (const box of wallNeighbours(layout, instanceId, wall)) {
+            candidates.push({ value: box.y.lo, match: "edge", span: [box.along.lo, box.along.hi] }, { value: box.y.hi, match: "edge", span: [box.along.lo, box.along.hi] });
+        }
+        toWorld = (value, acrossValue) => wallPointToWorld(wall, Math.min(half, Math.max(-half, acrossValue)), value, room);
+    }
+    else if (mount === "wall") {
         const { half, height } = wallLimits(wall, room);
         candidates.push({ value: -half, match: "edge", span: [0, height] }, { value: half, match: "edge", span: [0, height] });
         for (const box of wallNeighbours(layout, instanceId, wall)) {
             candidates.push({ value: box.along.lo, match: "edge", span: [box.y.lo, box.y.hi] }, { value: box.along.hi, match: "edge", span: [box.y.lo, box.y.hi] });
         }
         toWorld = (value, acrossValue) => wallPointToWorld(wall, value, Math.min(height, Math.max(0, acrossValue)), room);
+    }
+    else if (along === "y") {
+        return { end, guides: [] };
     }
     else {
         const limit = along === "x" ? room.width / 2 - room.wallInset : room.depth / 2 - room.wallInset;

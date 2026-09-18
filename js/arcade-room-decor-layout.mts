@@ -11,8 +11,14 @@
 // faces into the room, so it has no free rotation. A ceiling item hangs from
 // the ceiling plane and rotates freely. Rugs and lights never block anything,
 // so they may overlap whatever they like — that is what a rug is for.
+//
+// A WALL ITEM MAY STILL TURN IN THE WALL'S PLANE. A spinnable item (the neon
+// strip) carries a `spin`: 0 hangs level, π/2 stands it upright, anything in
+// between is a slant. It keeps facing the room — `rotationY` is still the
+// wall's — and the room it takes on the wall is its rotated bounding box
+// (`wallExtent`), which is what the edge clamp and the neighbour snaps read.
 
-import { clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorExtent, decorFootprint, findDecor, isDecorImageUrl, type DecorDefinition, type DecorFinish, type DecorMount } from "./arcade-room-catalog/decor.mjs";
+import { clampDecorAspect, clampDecorLength, clampDecorScale, clampDecorSpin, cleanDecorText, decorExtent, decorFootprint, findDecor, isDecorImageUrl, type DecorDefinition, type DecorFinish, type DecorMount } from "./arcade-room-catalog/decor.mjs";
 import {
   ROOM_BOUNDS_DEFAULTS,
   WALL_SIDES,
@@ -66,6 +72,24 @@ function rounded(value: number): number {
 }
 
 /**
+ * The room an item takes on its wall: its extent turned by its spin, as the
+ * axis-aligned box along the wall (`width`) and up it (`height`). A level item
+ * is its own extent; an upright strip is as wide as it is thick and as tall as
+ * it is long.
+ */
+export function wallExtent(definition: DecorDefinition, finish: DecorFinish = {}): Readonly<{ width: number; height: number }> {
+  const { width, height } = decorExtent(definition, finish);
+  const spin = clampDecorSpin(definition, finish.spin ?? 0);
+  if (spin === 0) return { width, height };
+  const cosine = Math.abs(Math.cos(spin));
+  const sine = Math.abs(Math.sin(spin));
+  return {
+    width: Number((width * cosine + height * sine).toFixed(6)),
+    height: Number((width * sine + height * cosine).toFixed(6)),
+  };
+}
+
+/**
  * Pin a wall item to a wall: on the inner face, slid along it within the
  * corners, at a height that keeps the whole item on the wall.
  */
@@ -77,7 +101,7 @@ export function snapToWall(
   finish: DecorFinish = {},
 ): Readonly<{ x: number; y: number; z: number; rotationY: number; wall: WallSide }> {
   const face = wallFace(room);
-  const { width, height } = decorExtent(definition, finish);
+  const { width, height } = wallExtent(definition, finish);
   const halfHeight = height / 2;
   const y = rounded(Math.min(face.height - halfHeight, Math.max(halfHeight, point.y)));
   const alongLimitX = Math.max(0, face.halfWidth - width / 2);
@@ -128,15 +152,16 @@ export function placeDecorItem(
     return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...snapped, mount }) };
   }
 
+  // Off the wall the turn is `rotationY`; a spin only means something on a wall.
   const footprint = decorFootprint(definition, item);
   const clamped = clampPlacementToRoom({ x: target.point.x, z: target.point.z, rotationY: rotation }, room, footprint);
   if (mount === "ceiling") {
-    return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...clamped, y: rounded(face.height), mount, wall: "" }) };
+    return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...clamped, y: rounded(face.height), mount, wall: "", spin: 0 }) };
   }
   if (definition.blocksWalking && placementBlocked(layout, instanceId, clamped, footprint, catalog)) {
     return { valid: false, layout, instanceId, reason: "blocked" };
   }
-  return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...clamped, y: 0, mount, wall: "" }) };
+  return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...clamped, y: 0, mount, wall: "", spin: 0 }) };
 }
 
 export function rotateDecorItem(
@@ -149,11 +174,37 @@ export function rotateDecorItem(
 ): DecorResult {
   const found = findItem(layout, instanceId);
   if (!found) return { valid: false, layout, instanceId, reason: "missing" };
-  const { item } = found;
-  // A wall item always faces the room; rotating it would turn it into the wall.
-  if (item.mount === "wall") return { valid: false, layout, instanceId, reason: "wall" };
+  const { item, definition } = found;
+  // A wall item always faces the room; rotating it would turn it into the wall. A
+  // spinnable one turns in the wall's plane instead.
+  if (item.mount === "wall") {
+    if (!definition.spin.enabled) return { valid: false, layout, instanceId, reason: "wall" };
+    return setDecorSpin(layout, instanceId, item.spin * 180 / Math.PI + direction * snapDegrees, room, catalog);
+  }
   const rotationY = item.rotationY + direction * snapDegrees * Math.PI / 180;
   return placeDecorItem(layout, instanceId, { mount: item.mount, point: item }, room, catalog, rotationY);
+}
+
+/**
+ * Turn a wall item in its wall's plane to `degrees` (0 level, 90 upright) and
+ * re-place it, because an upright strip near the ceiling needs to slide down
+ * to stay on the wall. Refused for an item that cannot spin or is not on a wall.
+ */
+export function setDecorSpin(
+  layout: RoomLayout,
+  instanceId: string,
+  degrees: number,
+  room: RoomBounds,
+  catalog: FootprintCatalog,
+): DecorResult {
+  const found = findItem(layout, instanceId);
+  if (!found) return { valid: false, layout, instanceId, reason: "missing" };
+  if (!found.definition.spin.enabled) return { valid: false, layout, instanceId, reason: "not-spinnable" };
+  if (found.item.mount !== "wall") return { valid: false, layout, instanceId, reason: "not-on-wall" };
+  if (!Number.isFinite(degrees)) return { valid: false, layout, instanceId, reason: "bad-spin" };
+  const spin = clampDecorSpin(found.definition, degrees * Math.PI / 180);
+  const next = replaceDecor(layout, { ...found.item, spin });
+  return placeDecorItem(next, instanceId, { mount: "wall", point: found.item }, room, catalog);
 }
 
 export function setDecorColor(layout: RoomLayout, instanceId: string, color: string): DecorResult {
@@ -289,6 +340,7 @@ export function addDecorItem(
     color: definition.tint.enabled ? definition.tint.default : "",
     length: definition.length.enabled ? definition.length.default : 0,
     scale: 1,
+    spin: 0,
     text: "",
     image: "",
     aspect: 1,
@@ -318,7 +370,7 @@ export function duplicateDecorItem(
   const found = findItem(layout, instanceId);
   if (!found) return { valid: false, layout, instanceId, reason: "missing" };
   const { item, definition } = found;
-  const { width } = decorFootprint(definition, item);
+  const { width } = item.mount === "wall" ? wallExtent(definition, item) : decorFootprint(definition, item);
   const step = width + 0.2;
   const along = item.mount === "wall" && (item.wall === "east" || item.wall === "west")
     ? { x: 0, z: step }
@@ -329,7 +381,7 @@ export function duplicateDecorItem(
   });
   if (!added.valid) return added;
   const copy = added.layout.decor.find((candidate) => candidate.instanceId === added.instanceId)!;
-  const finished = { ...copy, color: item.color, length: item.length, scale: item.scale, text: item.text, image: item.image, aspect: item.aspect, rotationY: item.mount === "wall" ? copy.rotationY : item.rotationY };
+  const finished = { ...copy, color: item.color, length: item.length, scale: item.scale, spin: item.spin, text: item.text, image: item.image, aspect: item.aspect, rotationY: item.mount === "wall" ? copy.rotationY : item.rotationY };
   // The copy was placed at catalog size; re-place it at the original's size so a big sign is not left hanging off the wall.
   const refit = placeDecorItem(replaceDecor(added.layout, finished), finished.instanceId, { mount: finished.mount, point: finished }, room, catalog);
   return refit.valid ? refit : { valid: false, layout, instanceId, reason: refit.reason };

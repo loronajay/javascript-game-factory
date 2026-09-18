@@ -13,6 +13,7 @@ import {
   setDecorImage,
   setDecorLength,
   setDecorScale,
+  setDecorSpin,
   setDecorText,
   type DecorResult,
   type DecorTarget,
@@ -251,6 +252,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     setDecorLength: (instanceId, length, phase) => editDecor(setDecorLength(layout, instanceId, length, room, catalog), "Length changed", phase),
     setDecorScale: (instanceId, scale, phase) => editDecor(setDecorScale(layout, instanceId, scale, room, catalog), "Resized", phase),
     setDecorMount: (instanceId, mount) => remount(instanceId, mount),
+    setDecorSpin: (instanceId, degrees) => commitDecor(setDecorSpin(layout, instanceId, degrees, room, catalog).layout, degrees === 0 ? "Hung level" : degrees === 90 ? "Stood upright" : "Turned"),
     setDecorText: (instanceId, text, phase) => editDecor(setDecorText(layout, instanceId, text, room, catalog), "Words changed", phase),
     uploadDecorImage: (instanceId, file) => { void uploadDecorImage(instanceId, file); },
     clearDecorImage: (instanceId) => commitDecor(setDecorImage(layout, instanceId, "", 1, room, catalog).layout, "Picture removed"),
@@ -479,7 +481,9 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     renderPanel();
     const definition = findDecor(item.itemId);
     const hint = item.mount === "wall"
-      ? "drag it along the wall, arrows to slide and raise"
+      ? definition?.spin.enabled
+        ? "drag it along the wall, arrows to slide and raise, Q/R to turn it on the wall"
+        : "drag it along the wall, arrows to slide and raise"
       : "drag it, arrows to nudge, Q/R to rotate";
     const size = definition?.scale.enabled ? " · drag a corner to resize" : definition?.length.enabled ? " · drag an end arrow to stretch" : "";
     setStatus(`${definition?.title ?? "Item"} selected · ${hint}${size} · hold Alt to skip snapping · Delete to remove.`);
@@ -688,7 +692,9 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       setStatus(result.reason === "wall" ? "Wall items always face the room." : "That spot is blocked.", "error");
       return;
     }
-    commit(result.layout, "Unsaved changes");
+    const turned = result.layout.decor.find((candidate) => candidate.instanceId === item.instanceId);
+    const spun = item.mount === "wall" && turned ? ` · ${Math.round(turned.spin * 180 / Math.PI)}° on the wall` : "";
+    commit(result.layout, `Unsaved changes${spun}`);
   }
 
   function cameraAxes(): { forward: { x: number; z: number }; right: { x: number; z: number } } {

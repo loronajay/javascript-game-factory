@@ -86,6 +86,8 @@ export type PanelActions = Readonly<{
   setDecorLength: (instanceId: string, length: number, phase: EditPhase) => void;
   setDecorScale: (instanceId: string, scale: number, phase: EditPhase) => void;
   setDecorMount: (instanceId: string, mount: DecorMount) => void;
+  /** Turn a spinnable wall item in its wall's plane: 0 hangs it level, 90 stands it upright. */
+  setDecorSpin: (instanceId: string, degrees: number) => void;
   setDecorText: (instanceId: string, text: string, phase: EditPhase) => void;
   /** The player picked a file for a custom poster; the editor uploads it and hangs it. */
   uploadDecorImage: (instanceId: string, file: File) => void;
@@ -135,8 +137,16 @@ function placementLabel(placement: RoomLayoutItem): string {
   return `X ${placement.x.toFixed(1)} · Z ${placement.z.toFixed(1)} · ${degrees}°`;
 }
 
+/** The nearest whole degree of a wall item's spin, on one turn. */
+function spinDegrees(item: RoomDecorItem): number {
+  return Math.round(item.spin * 180 / Math.PI) % 360;
+}
+
 function decorLabel(item: RoomDecorItem): string {
-  if (item.mount === "wall") return `${item.wall} wall · ${item.y.toFixed(1)} m up`;
+  if (item.mount === "wall") {
+    const spin = spinDegrees(item);
+    return `${item.wall} wall · ${item.y.toFixed(1)} m up${spin ? ` · ${spin}°` : ""}`;
+  }
   const degrees = Math.round(item.rotationY * 180 / Math.PI);
   return `${MOUNT_TITLES[item.mount]} · X ${item.x.toFixed(1)} · Z ${item.z.toFixed(1)} · ${degrees}°`;
 }
@@ -173,6 +183,8 @@ type InspectorRefs = Readonly<{
   key: string;
   where: HTMLElement;
   mounts: HTMLElement[];
+  spins: HTMLElement[];
+  spinHint: HTMLElement | null;
   picker: ColorPicker | null;
   lengthLabel: HTMLElement | null;
   lengthInput: HTMLInputElement | null;
@@ -368,6 +380,8 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     heading.append(element("span", "eyebrow", "SELECTED"), element("strong", "", definition.title), where, close);
     const nodes: HTMLElement[] = [heading];
     const mounts: HTMLElement[] = [];
+    const spins: HTMLElement[] = [];
+    let spinHint: HTMLElement | null = null;
     let picker: ColorPicker | null = null;
     let lengthLabel: HTMLElement | null = null;
     let lengthInput: HTMLInputElement | null = null;
@@ -425,6 +439,25 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       nodes.push(row);
     }
 
+    if (definition.spin.enabled) {
+      // Horizontal or vertical is the choice most players want; Q/R steps through the
+      // slants in between, and the readout under the heading names the exact angle.
+      const row = element("div", "inspector__row");
+      row.dataset.spinRow = "true";
+      row.append(element("span", "inspector__label", "Direction"));
+      const group = element("div", "inspector__choices");
+      for (const [degrees, title] of [[0, "Horizontal"], [90, "Vertical"]] as const) {
+        const button = element("button", "inspector__choice", title);
+        button.type = "button";
+        button.dataset.spin = String(degrees);
+        group.append(button);
+        spins.push(button);
+      }
+      spinHint = element("small", "inspector__hint");
+      row.append(group, spinHint);
+      nodes.push(row);
+    }
+
     if (definition.tint.enabled) {
       const row = element("div", "inspector__row");
       row.append(element("span", "inspector__label", "Colour"));
@@ -466,7 +499,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     tools.append(duplicate, remove);
     nodes.push(tools);
     elements.decorInspector.replaceChildren(...nodes);
-    return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, picker, lengthLabel, lengthInput, scaleLabel, scaleInput, textInput, pictureButton, pictureClear, pictureHint };
+    return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, spins, spinHint, picker, lengthLabel, lengthInput, scaleLabel, scaleInput, textInput, pictureButton, pictureClear, pictureHint };
   }
 
   /** Bring the live inspector up to date with the item without touching its nodes. */
@@ -488,6 +521,19 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
             : "JPEG, PNG or WebP up to 10 MB. The frame takes the picture's shape.";
     }
     for (const button of refs.mounts) button.setAttribute("aria-pressed", String(button.dataset.mount === selected.mount));
+    if (refs.spins.length) {
+      const onWall = selected.mount === "wall";
+      const degrees = spinDegrees(selected);
+      for (const button of refs.spins) {
+        button.setAttribute("aria-pressed", String(onWall && Number(button.dataset.spin) === degrees));
+        (button as HTMLButtonElement).disabled = !onWall;
+      }
+      refs.spinHint!.textContent = !onWall
+        ? "On the floor or ceiling, Q / R turn it round instead."
+        : degrees === 0 || degrees === 90
+          ? "Q / R turn it 15° at a time for a slant."
+          : `Slanted ${degrees}° · Q / R turn it 15° at a time.`;
+    }
     refs.picker?.setValue(selected.color || definition.tint.default);
     if (refs.lengthLabel && refs.lengthInput) {
       const length = selected.length || definition.length.default;
@@ -651,6 +697,8 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     if (!selectedId) return;
     const mount = target.closest<HTMLElement>("[data-mount]");
     if (mount?.dataset.mount) actions.setDecorMount(selectedId, mount.dataset.mount as DecorMount);
+    const spin = target.closest<HTMLButtonElement>("[data-spin]");
+    if (spin?.dataset.spin !== undefined && !spin.disabled) actions.setDecorSpin(selectedId, Number(spin.dataset.spin));
   };
   // One hidden file input for the whole panel, living outside the inspector so a rebuild
   // never drops it mid-pick; the browser's own picker is the UI.
