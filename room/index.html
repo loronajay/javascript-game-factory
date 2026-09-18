@@ -60,6 +60,7 @@
         <button type="button" role="tab" data-tab="cabinets" aria-selected="true">Cabinets</button>
         <button type="button" role="tab" data-tab="surfaces" aria-selected="false">Surfaces</button>
         <button type="button" role="tab" data-tab="decor" aria-selected="false">Decor</button>
+        <button type="button" role="tab" data-tab="avatar" aria-selected="false">Avatar</button>
       </div>
 
       <div id="editorTabPanels" class="editor-tab-panels">
@@ -74,6 +75,14 @@
           <div id="decorCategories" class="category-chips" role="group" aria-label="Decor categories"></div>
           <div id="decorCatalog" class="decor-grid" role="group" aria-label="Decor catalog"></div>
           <div id="decorPlaced" class="placed-list" role="group" aria-label="Placed decor"></div>
+        </section>
+        <section data-tab-panel="avatar" class="editor-tab-panel" hidden>
+          <div class="avatar-preview">
+            <canvas id="avatarPreview" aria-label="Selected 3D avatar preview"></canvas>
+            <span class="avatar-preview__hint">Your arcade body</span>
+          </div>
+          <p class="avatar-intro">Choose how other players will see you in the arcade.</p>
+          <div id="avatarPicker" class="avatar-picker" role="group" aria-label="Avatar choices"></div>
         </section>
       </div>
 

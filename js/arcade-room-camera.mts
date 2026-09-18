@@ -84,6 +84,37 @@ export function applyEditorCameraPreset(state: EditorCameraState, preset: Editor
   return { target, ...PRESETS[preset], preset };
 }
 
+/**
+ * The editor view that puts the lens exactly where the walking camera is and
+ * looks exactly where it looks, so pressing Build changes nothing on screen
+ * and the player arranges what they were already standing in front of.
+ *
+ * The walking pose is the player's eye (`x`,`y`,`z`), heading `yaw` (forward is
+ * `(-sin yaw, -cos yaw)`, the editor's convention too) and `pitch` as a rotation
+ * about X, negative looking down. The orbit target is where that gaze meets the
+ * working plane; a level or upward gaze cannot meet it, so it takes the
+ * shallowest orbit the editor allows and looks at the floor ahead instead. A
+ * radius outside the orbit range is clamped, which lifts or drops the lens along
+ * the same line of sight rather than changing what it points at.
+ */
+export function editorCameraFromWalkingPose(
+  walking: Readonly<{ x: number; y: number; z: number; yaw: number; pitch: number }>,
+  room: RoomBounds,
+): EditorCameraState {
+  const pitch = clamp(-walking.pitch, EDITOR_CAMERA_LIMITS.pitch.min, EDITOR_CAMERA_LIMITS.pitch.max);
+  const drop = walking.y - EDITOR_CAMERA_LIMITS.targetHeight;
+  const radius = drop > 0
+    ? clamp(drop / Math.sin(pitch), EDITOR_CAMERA_LIMITS.radius.min, EDITOR_CAMERA_LIMITS.radius.max)
+    : EDITOR_CAMERA_LIMITS.radius.min;
+  const flat = Math.cos(pitch) * radius;
+  const target = clampTarget({
+    x: walking.x - Math.sin(walking.yaw) * flat,
+    y: EDITOR_CAMERA_LIMITS.targetHeight,
+    z: walking.z - Math.cos(walking.yaw) * flat,
+  }, room);
+  return { target, yaw: walking.yaw, pitch, radius, preset: null };
+}
+
 export function orbitEditorCamera(state: EditorCameraState, deltaX: number, deltaY: number): EditorCameraState {
   if (!deltaX && !deltaY) return state;
   return {

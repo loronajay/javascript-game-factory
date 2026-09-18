@@ -2,6 +2,7 @@ import * as THREE_VENDOR from "./vendor/three.module.js";
 import { CABINET_CATALOG, getCabinetFootprint, getCabinetLaunchUrl } from "./arcade-room-cabinet.mjs";
 import { createCabinetRuntime } from "./arcade-room-cabinet-runtime.mjs";
 import { createRoomEditor } from "./arcade-room-editor.mjs";
+import { createArcadeAvatarPreview } from "./arcade-room-avatar-preview.mjs";
 import { canInteractWithCabinet, closeCabinetSession, createCabinetSession, findInteractiveDecor, getCabinetPrompt, openCabinetSession, } from "./arcade-room-interaction.mjs";
 import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
 import { JUKEBOX_ITEM_ID, createRoomJukebox } from "./arcade-room-jukebox.mjs";
@@ -53,6 +54,8 @@ const decorCategories = requiredElement("#decorCategories");
 const decorCatalog = requiredElement("#decorCatalog");
 const decorInspector = requiredElement("#decorInspector");
 const decorPlaced = requiredElement("#decorPlaced");
+const avatarPicker = requiredElement("#avatarPicker");
+const avatarPreviewCanvas = requiredElement("#avatarPreview");
 const viewButtons = requiredElement("#cameraViews");
 const roomTitle = requiredElement("#roomTitle");
 const roomEyebrow = requiredElement("#roomEyebrow");
@@ -152,6 +155,8 @@ const playViews = Object.freeze({
 });
 const cabinetRuntime = createCabinetRuntime(THREE, scene, CABINET_CATALOG);
 cabinetRuntime.sync(loaded.layout);
+const avatarPreview = createArcadeAvatarPreview(THREE, avatarPreviewCanvas);
+avatarPreview.show(loaded.layout.avatarId);
 const cabinetPlayView = (cabinet) => playViews[cabinet.definition.gameSlug] ?? CABINET_PLAY_VIEW;
 const keys = new Set();
 let session = createCabinetSession(CABINET_CATALOG[0].id);
@@ -203,6 +208,7 @@ const roomEditor = createRoomEditor({
     },
     // A picture can only be hung on an account-backed room; otherwise the inspector says to sign in.
     uploadPicture: layoutStore.accountBacked ? (file) => layoutStore.uploadPicture(file) : null,
+    avatarPreview,
     elements: {
         panel: editorPanel,
         editButton: editArcadeButton,
@@ -214,6 +220,7 @@ const roomEditor = createRoomEditor({
         decorCatalog,
         decorInspector,
         decorPlaced,
+        avatarPicker,
         undoButton,
         rotateLeftButton,
         rotateRightButton,
@@ -350,16 +357,19 @@ function openCabinet() {
     const placement = roomEditor.getCabinetPlacement(activeCabinet.instanceId);
     if (!placement)
         return;
+    const launchFullscreen = activeCabinet.definition.launchMode === "fullscreen";
     const playView = cabinetPlayView(activeCabinet);
-    const playPosition = worldPointFromPlacement(placement, playView.position);
-    Object.assign(player, {
-        ...playPosition,
-        y: playView.position.y,
-        yaw: placement.rotationY,
-        pitch: 0,
-    });
-    camera.fov = playView.fov;
-    camera.updateProjectionMatrix();
+    if (!launchFullscreen && playView.position && playView.fov !== undefined) {
+        const playPosition = worldPointFromPlacement(placement, playView.position);
+        Object.assign(player, {
+            ...playPosition,
+            y: playView.position.y,
+            yaw: placement.rotationY,
+            pitch: 0,
+        });
+        camera.fov = playView.fov;
+        camera.updateProjectionMatrix();
+    }
     if (activeCabinet.screen)
         activeCabinet.screen.visible = false;
     document.body.classList.add("is-playing");
@@ -372,6 +382,9 @@ function openCabinet() {
     });
     playLayer.hidden = false;
     playLayer.setAttribute("aria-hidden", "false");
+    fullscreenButton.hidden = launchFullscreen;
+    if (launchFullscreen)
+        setPlayFullscreen(true);
     prompt.classList.remove("is-visible");
 }
 function closeCabinet() {
@@ -384,6 +397,7 @@ function closeCabinet() {
     gameFrame.src = "about:blank";
     playLayer.hidden = true;
     playLayer.setAttribute("aria-hidden", "true");
+    fullscreenButton.hidden = false;
     document.body.classList.remove("is-playing");
     if (activeCabinet?.screen)
         activeCabinet.screen.visible = true;
@@ -402,7 +416,9 @@ leaveButton.addEventListener("click", closeCabinet);
 fullscreenButton.addEventListener("click", () => setPlayFullscreen(!playFullscreen));
 // The browser's own Esc (or a swipe on a phone) leaves fullscreen without telling us.
 document.addEventListener("fullscreenchange", () => {
-    if (!document.fullscreenElement && playFullscreen)
+    // Screenless attractions keep the viewport-fill presentation even when the browser's
+    // native fullscreen layer is dismissed. Their next Escape leaves the game entirely.
+    if (!document.fullscreenElement && playFullscreen && activeCabinet?.definition.launchMode !== "fullscreen")
         setPlayFullscreen(false);
 });
 gameFrame.addEventListener("load", () => {
@@ -414,7 +430,9 @@ window.addEventListener("keydown", (event) => {
         return;
     if (playing) {
         if (event.code === "Escape") {
-            if (playFullscreen)
+            if (activeCabinet?.definition.launchMode === "fullscreen")
+                closeCabinet();
+            else if (playFullscreen)
                 setPlayFullscreen(false);
             else
                 closeCabinet();
@@ -525,10 +543,25 @@ function resize() {
 function positionGameOnCabinetScreen() {
     if (!playing || !activeCabinet)
         return;
+    const playView = cabinetPlayView(activeCabinet);
+    if (activeCabinet.definition.launchMode === "fullscreen" || playFullscreen) {
+        const fitted = playScreenRect({
+            fullscreen: true,
+            viewport: { width: playLayer.clientWidth, height: playLayer.clientHeight },
+            projected: { left: 0, top: 0, width: playLayer.clientWidth, height: playLayer.clientHeight },
+            aspect: playView.gameAspect,
+        });
+        gameScreen.style.left = `${fitted.left}px`;
+        gameScreen.style.top = `${fitted.top}px`;
+        gameScreen.style.width = `${fitted.width}px`;
+        gameScreen.style.height = `${fitted.height}px`;
+        return;
+    }
     const placement = roomEditor.getCabinetPlacement(activeCabinet.instanceId);
     if (!placement)
         return;
-    const playView = cabinetPlayView(activeCabinet);
+    if (!playView.screen)
+        return;
     const { width, height, y, z } = playView.screen;
     const corners = [
         { x: -width / 2, y: y + height / 2 },

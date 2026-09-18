@@ -90,6 +90,13 @@ const IMAGE_URL_LIMIT = 400;
 const ASPECT_LIMITS = { min: 0.25, max: 4 };
 /** `<game-slug>.<track-slug>` — the namespace every jukebox track id lives in. */
 const TRACK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const DEFAULT_AVATAR_ID = "avatar.hero-m";
+const AVATAR_IDS = new Set([
+  "avatar.hero-f", "avatar.hero-m",
+  "avatar.ogre-heavy", "avatar.ogre-light", "avatar.ogre-mage", "avatar.ogre",
+  "avatar.skeleton-heavy", "avatar.skeleton-light", "avatar.skeleton-mage", "avatar.skeleton-reaper",
+  "avatar.villager-f", "avatar.villager-m",
+]);
 
 function cleanText(value: any, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -126,7 +133,7 @@ function surfaceIdPattern(kind: string): RegExp {
 export function defaultArcadeRoomGarage(): any {
   // Missing rows predate removable cabinet instances. Version 2 tells the client
   // to seed its starter floor; only an explicitly saved v3 document may stay empty.
-  return { version: 2, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, music: { defaultTrackId: "" }, items: [] };
+  return { version: 2, avatarId: DEFAULT_AVATAR_ID, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, music: { defaultTrackId: "" }, items: [] };
 }
 
 function normalizeMusic(value: any): Record<string, string> {
@@ -206,7 +213,9 @@ export function normalizeArcadeRoomGarage(value: any): any {
   }
 
   const version = input.version === LAYOUT_VERSION ? LAYOUT_VERSION : 2;
-  const garage: any = { version, surfaces, music, items };
+  const submittedAvatarId = cleanText(input.avatarId, 80);
+  const avatarId = AVATAR_IDS.has(submittedAvatarId) ? submittedAvatarId : DEFAULT_AVATAR_ID;
+  const garage: any = { version, avatarId, surfaces, music, items };
   if (Array.isArray(input.decor)) {
     const decor: any[] = [];
     for (const raw of input.decor.slice(0, MAX_DECOR)) {

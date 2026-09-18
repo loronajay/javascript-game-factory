@@ -1,6 +1,7 @@
 import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface } from "./arcade-room-catalog/surfaces.mjs";
 import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
+import { DEFAULT_ARCADE_AVATAR_ID, findArcadeAvatar, normalizeArcadeAvatarId } from "./arcade-room-avatar-catalog.mjs";
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
 export const WALL_SIDES = Object.freeze(["north", "south", "east", "west"]);
 export const ROOM_BOUNDS_DEFAULTS = Object.freeze({ height: 4.8, wallThickness: 0.24 });
@@ -78,6 +79,7 @@ export function defaultRoomMusic() {
 export function createDefaultRoomLayout() {
     return {
         version: 3,
+        avatarId: DEFAULT_ARCADE_AVATAR_ID,
         surfaces: defaultRoomSurfaces(),
         music: defaultRoomMusic(),
         items: DEFAULT_CABINETS.map((item) => ({ ...item })),
@@ -269,6 +271,15 @@ export function setRoomDefaultTrack(layout, trackId) {
         return { valid: true, layout };
     return { valid: true, layout: { ...layout, music: { defaultTrackId: trackId } } };
 }
+/** Pick the account's 3D arcade body. Unknown catalog ids are never stored. */
+export function setRoomAvatar(layout, avatarId) {
+    const avatar = findArcadeAvatar(avatarId);
+    if (!avatar)
+        return { valid: false, layout };
+    if (layout.avatarId === avatar.id)
+        return { valid: true, layout };
+    return { valid: true, layout: { ...layout, avatarId: avatar.id } };
+}
 function isStoredItem(value) {
     if (!value || typeof value !== "object")
         return false;
@@ -398,6 +409,7 @@ export function normalizeRoomLayout(value) {
     }
     return {
         version: 3,
+        avatarId: normalizeArcadeAvatarId(source.avatarId),
         surfaces: normalizeSurfaces(source.surfaces),
         music: normalizeMusic(source.music),
         items: [...storedItems, ...starterAdditions],
@@ -433,6 +445,8 @@ function decorItemsEqual(first, second) {
 /** True when both layouts place the same things in the same spots with the same finishes. */
 export function roomLayoutsEqual(first, second) {
     if (first.items.length !== second.items.length || first.decor.length !== second.decor.length)
+        return false;
+    if (first.avatarId !== second.avatarId)
         return false;
     if (SURFACE_KINDS.some((kind) => first.surfaces[kind] !== second.surfaces[kind]))
         return false;

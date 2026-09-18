@@ -9,6 +9,7 @@ export type CabinetDefinition = Readonly<{
   gameSlug: string;
   title: string;
   description: string;
+  launchMode: "cabinet-screen" | "fullscreen";
   dimensions: Readonly<{ width: number; depth: number; height: number }>;
   placement: Readonly<{ surface: "floor"; snapDegrees: number; clearance: number }>;
   unlock: Readonly<{ type: "starter" | "achievement" | "purchase"; source: string }>;
@@ -33,6 +34,7 @@ export const BIRD_DUTY_CABINET: CabinetDefinition = Object.freeze({
   gameSlug: "bird-duty",
   title: "Bird Duty",
   description: "A sky-blue upright cabinet with a wire-perched bird topper and splat-yellow controls.",
+  launchMode: "cabinet-screen",
   dimensions: Object.freeze({ width: 0.86, depth: 0.92, height: 2.22 }),
   placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
   unlock: Object.freeze({ type: "starter", source: "Bird Duty cabinet collection" }),
@@ -66,6 +68,7 @@ export const LOVERS_LOST_CABINET: CabinetDefinition = Object.freeze({
   gameSlug: "lovers-lost",
   title: "Lovers Lost",
   description: "A cosmic-purple twin-player cabinet with split controls, reunion-heart lighting, and mirrored runner art.",
+  launchMode: "cabinet-screen",
   dimensions: Object.freeze({ width: 0.92, depth: 0.98, height: 2.3 }),
   placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
   unlock: Object.freeze({ type: "starter", source: "Lovers Lost cabinet collection" }),
@@ -99,6 +102,7 @@ export const SUMORAI_CABINET: CabinetDefinition = Object.freeze({
   gameSlug: "sumorai",
   title: "Sumorai",
   description: "A black-and-crimson two-player cabinet with moonlit forest art, dueling controls, and an enso blade topper.",
+  launchMode: "cabinet-screen",
   dimensions: Object.freeze({ width: 0.92, depth: 0.98, height: 2.3 }),
   placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
   unlock: Object.freeze({ type: "starter", source: "Sumorai cabinet collection" }),
@@ -132,6 +136,7 @@ export const YAM_BOWLING_CABINET: CabinetDefinition = Object.freeze({
   gameSlug: "yam-bowling",
   title: "Yam Bowling",
   description: "A compact glow-bowling lane with a working approach, full pin deck, ball return, and overhead scoring screen.",
+  launchMode: "cabinet-screen",
   dimensions: Object.freeze({ width: 2.35, depth: 6, height: 2.65 }),
   placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
   unlock: Object.freeze({ type: "starter", source: "Yam Bowling lane collection" }),
@@ -163,14 +168,15 @@ export const SHARK_HALL_POOL_TABLE: CabinetDefinition = Object.freeze({
   kind: "arcade-cabinet",
   gameSlug: "shark-hall",
   title: "Shark Hall",
-  description: "A tournament-size walnut pool table with navy cloth, a full rack, brass details, and its own hanging billiard light.",
-  dimensions: Object.freeze({ width: 3.12, depth: 1.82, height: 2.42 }),
+  description: "A tournament-size walnut pool table with navy cloth, a full rack, brass details, and neon-lit edges.",
+  launchMode: "fullscreen",
+  dimensions: Object.freeze({ width: 3.12, depth: 1.82, height: 1.02 }),
   placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
   unlock: Object.freeze({ type: "starter", source: "Shark Hall table collection" }),
   interaction: Object.freeze({
     radius: 2.25,
     facingThreshold: 0.32,
-    anchor: Object.freeze({ x: 0, y: 0.92, z: 0.98 }),
+    anchor: Object.freeze({ x: 0, y: 0.92, z: 1.02 }),
   }),
   palette: Object.freeze({
     shell: "#2b160e",
@@ -186,8 +192,7 @@ export const SHARK_HALL_POOL_TABLE: CabinetDefinition = Object.freeze({
     Object.freeze({ id: "pockets", material: "metal" }),
     Object.freeze({ id: "balls", material: "paint" }),
     Object.freeze({ id: "cues", material: "paint" }),
-    Object.freeze({ id: "score-display", material: "emissive" }),
-    Object.freeze({ id: "table-light", material: "metal" }),
+    Object.freeze({ id: "edge-lighting", material: "emissive" }),
   ]),
 });
 

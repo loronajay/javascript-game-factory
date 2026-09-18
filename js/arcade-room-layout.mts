@@ -1,6 +1,7 @@
 import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl, type DecorMount } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
 import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
+import { DEFAULT_ARCADE_AVATAR_ID, findArcadeAvatar, normalizeArcadeAvatarId } from "./arcade-room-avatar-catalog.mjs";
 
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
 
@@ -64,6 +65,8 @@ export type RoomMusic = Readonly<{ defaultTrackId: string }>;
 
 export type RoomLayout = Readonly<{
   version: 3;
+  /** Platform presentation reused by this room and, later, live visitor presence. */
+  avatarId: string;
   surfaces: RoomSurfaces;
   music: RoomMusic;
   items: readonly RoomLayoutItem[];
@@ -167,6 +170,7 @@ export function defaultRoomMusic(): RoomMusic {
 export function createDefaultRoomLayout(): RoomLayout {
   return {
     version: 3,
+    avatarId: DEFAULT_ARCADE_AVATAR_ID,
     surfaces: defaultRoomSurfaces(),
     music: defaultRoomMusic(),
     items: DEFAULT_CABINETS.map((item) => ({ ...item })),
@@ -411,6 +415,14 @@ export function setRoomDefaultTrack(layout: RoomLayout, trackId: string): Readon
   return { valid: true, layout: { ...layout, music: { defaultTrackId: trackId } } };
 }
 
+/** Pick the account's 3D arcade body. Unknown catalog ids are never stored. */
+export function setRoomAvatar(layout: RoomLayout, avatarId: string): Readonly<{ valid: boolean; layout: RoomLayout }> {
+  const avatar = findArcadeAvatar(avatarId);
+  if (!avatar) return { valid: false, layout };
+  if (layout.avatarId === avatar.id) return { valid: true, layout };
+  return { valid: true, layout: { ...layout, avatarId: avatar.id } };
+}
+
 function isStoredItem(value: unknown): value is RoomLayoutItem {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<RoomLayoutItem>;
@@ -502,7 +514,7 @@ function normalizeSurfaces(value: unknown): RoomSurfaces {
  */
 export function normalizeRoomLayout(value: unknown): RoomLayout {
   if (!value || typeof value !== "object") return createDefaultRoomLayout();
-  const source = value as { version?: unknown; items?: unknown; decor?: unknown; surfaces?: unknown; music?: unknown };
+  const source = value as { version?: unknown; avatarId?: unknown; items?: unknown; decor?: unknown; surfaces?: unknown; music?: unknown };
   if ((source.version !== 1 && source.version !== 2 && source.version !== 3) || !Array.isArray(source.items) || !source.items.every(isStoredItem)) {
     return createDefaultRoomLayout();
   }
@@ -537,6 +549,7 @@ export function normalizeRoomLayout(value: unknown): RoomLayout {
 
   return {
     version: 3,
+    avatarId: normalizeArcadeAvatarId(source.avatarId),
     surfaces: normalizeSurfaces(source.surfaces),
     music: normalizeMusic(source.music),
     items: [...storedItems, ...starterAdditions],
@@ -573,6 +586,7 @@ function decorItemsEqual(first: RoomDecorItem, second: RoomDecorItem): boolean {
 /** True when both layouts place the same things in the same spots with the same finishes. */
 export function roomLayoutsEqual(first: RoomLayout, second: RoomLayout): boolean {
   if (first.items.length !== second.items.length || first.decor.length !== second.decor.length) return false;
+  if (first.avatarId !== second.avatarId) return false;
   if (SURFACE_KINDS.some((kind) => first.surfaces[kind] !== second.surfaces[kind])) return false;
   if (first.music.defaultTrackId !== second.music.defaultTrackId) return false;
   const itemsEqual = first.items.every((item, index) => {

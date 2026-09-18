@@ -24,7 +24,8 @@
 import { createColorPicker } from "./arcade-room-color-picker.mjs";
 import { DECOR_CATEGORIES, DECOR_CATEGORY_TITLES, NEON_TINTS, decorByCategory, decorCardImage, decorExtent, findDecor, } from "./arcade-room-catalog/decor.mjs";
 import { SURFACE_CATALOG, SURFACE_KINDS, surfaceGroups } from "./arcade-room-catalog/surfaces.mjs";
-export const EDITOR_TABS = Object.freeze(["cabinets", "surfaces", "decor"]);
+import { ARCADE_AVATAR_CATALOG } from "./arcade-room-avatar-catalog.mjs";
+export const EDITOR_TABS = Object.freeze(["cabinets", "surfaces", "decor", "avatar"]);
 const SURFACE_TITLES = Object.freeze({
     floor: "Floor",
     wall: "Walls",
@@ -140,6 +141,20 @@ export function createEditorPanel(elements, actions, options = {}) {
             return row;
         });
         elements.cabinetList.replaceChildren(catalogTitle, catalog, placedTitle, ...rows);
+    }
+    function renderAvatarPicker(state) {
+        const cards = ARCADE_AVATAR_CATALOG.map((avatar) => {
+            const card = element("button", "avatar-card");
+            card.type = "button";
+            card.dataset.avatarId = avatar.id;
+            card.dataset.family = avatar.family;
+            card.setAttribute("aria-pressed", String(state.layout.avatarId === avatar.id));
+            const badge = element("span", "avatar-card__figure", avatar.title.slice(0, 1));
+            const label = element("span", "avatar-card__name", avatar.title);
+            card.append(badge, label);
+            return card;
+        });
+        elements.avatarPicker.replaceChildren(...cards);
     }
     function buildSurfacePicker(state) {
         elements.surfacePicker.replaceChildren(...SURFACE_KINDS.map((kind) => {
@@ -425,6 +440,7 @@ export function createEditorPanel(elements, actions, options = {}) {
         renderDecorCatalog(state);
         renderDecorInspector(state);
         renderDecorPlaced(state);
+        renderAvatarPicker(state);
     }
     elements.tabs.addEventListener("click", (event) => {
         const button = event.target.closest("[data-tab]");
@@ -462,6 +478,11 @@ export function createEditorPanel(elements, actions, options = {}) {
         const swatch = event.target.closest("[data-surface-id]");
         if (swatch && !swatch.disabled)
             actions.setSurface(swatch.dataset.surfaceKind, swatch.dataset.surfaceId);
+    });
+    elements.avatarPicker.addEventListener("click", (event) => {
+        const card = event.target.closest("[data-avatar-id]");
+        if (card?.dataset.avatarId)
+            actions.setAvatar(card.dataset.avatarId);
     });
     elements.decorCategories.addEventListener("click", (event) => {
         const chip = event.target.closest("[data-category]");

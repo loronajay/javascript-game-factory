@@ -1,7 +1,6 @@
 // Shark Hall is a room-scale attraction, so its physical model stays separate
 // from the upright cabinet builder. The proportions mirror Shark Hall's 9-foot
 // table while the presentation is deliberately self-contained for the arcade.
-import { SHARK_HALL_CABINET_ART } from "./arcade-room-scene.mjs";
 const PLAYING_LENGTH = 2.54;
 const PLAYING_WIDTH = 1.27;
 const HALF_LENGTH = PLAYING_LENGTH / 2;
@@ -45,44 +44,32 @@ function addBall(THREE, parent, name, x, z, color) {
     ball.castShadow = true;
     parent.add(ball);
 }
-function addCue(THREE, parent, x, y, z, angle) {
+function addCue(THREE, parent, name, x, y, z, angle) {
     const cue = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.024, 1.32, 10), material(THREE, "#d8aa67", 0.34));
+    cue.name = name;
     cue.position.set(x, y, z);
     cue.rotation.z = Math.PI / 2;
     cue.rotation.y = angle;
     cue.castShadow = true;
     parent.add(cue);
 }
-function addPoolLight(THREE, root, brass) {
-    const lightGroup = new THREE.Group();
-    lightGroup.name = "table-light";
-    root.add(lightGroup);
-    box(THREE, lightGroup, "light-bar", [1.72, 0.075, 0.075], [0, 2.22, 0], brass);
-    for (const x of [-0.56, 0.56]) {
-        box(THREE, lightGroup, "light-chain", [0.022, 0.2, 0.022], [x, 2.32, 0], brass);
-        const shade = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.24, 24, 1, true), material(THREE, "#173c35", 0.42, 0.18));
-        shade.position.set(x, 2.08, 0);
-        shade.rotation.x = Math.PI;
-        shade.castShadow = true;
-        lightGroup.add(shade);
-        const glow = new THREE.PointLight(0xffdf9a, 1.55, 3.4, 2);
-        glow.position.set(x, 1.96, 0);
-        lightGroup.add(glow);
+function addEdgeLighting(THREE, root, color) {
+    const neon = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 3.4,
+        roughness: 0.22,
+        metalness: 0.08,
+    });
+    box(THREE, root, "neon-strip-front", [2.82, 0.035, 0.035], [0, 0.73, 0.878], neon);
+    box(THREE, root, "neon-strip-back", [2.82, 0.035, 0.035], [0, 0.73, -0.878], neon);
+    box(THREE, root, "neon-strip-left", [0.035, 0.035, 1.52], [-1.538, 0.73, 0], neon);
+    box(THREE, root, "neon-strip-right", [0.035, 0.035, 1.52], [1.538, 0.73, 0], neon);
+    for (const [x, z] of [[-0.88, 0.91], [0.88, 0.91], [-0.88, -0.91], [0.88, -0.91]]) {
+        const glow = new THREE.PointLight(color, 0.72, 2.25, 2);
+        glow.position.set(x, 0.67, z);
+        root.add(glow);
     }
-}
-function addScoreDisplay(THREE, root, shell, brass) {
-    for (const x of [-0.58, 0.58]) {
-        box(THREE, root, "score-post", [0.045, 0.62, 0.045], [x, 1.1, -0.72], brass);
-    }
-    box(THREE, root, "score-display", [1.5, 0.88, 0.12], [0, 1.42, -0.72], shell);
-    box(THREE, root, "score-trim-top", [1.56, 0.045, 0.15], [0, 1.875, -0.72], brass);
-    box(THREE, root, "score-trim-bottom", [1.56, 0.045, 0.15], [0, 0.965, -0.72], brass);
-    const texture = new THREE.TextureLoader().load(SHARK_HALL_CABINET_ART.keyArt);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.32, 0.7425), new THREE.MeshBasicMaterial({ map: texture }));
-    screen.name = "screen";
-    screen.position.set(0, 1.42, -0.654);
-    root.add(screen);
 }
 export function createSharkHallPoolTable(THREE, definition) {
     const root = new THREE.Group();
@@ -121,8 +108,8 @@ export function createSharkHallPoolTable(THREE, definition) {
     }
     addBall(THREE, root, "cue-ball", -0.72, 0, "#f6f1df");
     SHARK_HALL_RACK.forEach((ball, index) => addBall(THREE, root, `rack-ball-${index + 1}`, ball.x, ball.z, ball.color));
-    addCue(THREE, root, -0.62, 0.59, 0.875, 0.04);
-    addCue(THREE, root, 0.68, 0.52, 0.878, -0.03);
+    addCue(THREE, root, "cue-front", -0.08, 0.985, 0.78, 0.025);
+    addCue(THREE, root, "cue-back", 0.12, 0.985, -0.78, -0.035);
     const fin = new THREE.Shape();
     fin.moveTo(-0.16, -0.07);
     fin.quadraticCurveTo(0.02, 0.18, 0.2, -0.07);
@@ -130,7 +117,6 @@ export function createSharkHallPoolTable(THREE, definition) {
     const emblem = new THREE.Mesh(new THREE.ShapeGeometry(fin, 12), new THREE.MeshBasicMaterial({ color: definition.palette.trim }));
     emblem.position.set(0, 0.69, 0.868);
     root.add(emblem);
-    addScoreDisplay(THREE, root, walnut, brass);
-    addPoolLight(THREE, root, brass);
+    addEdgeLighting(THREE, root, definition.palette.trim);
     return root;
 }

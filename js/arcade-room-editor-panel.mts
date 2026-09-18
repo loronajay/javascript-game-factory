@@ -39,9 +39,10 @@ import {
 import { SURFACE_CATALOG, SURFACE_KINDS, surfaceGroups, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
 import type { RoomInventory } from "./arcade-room-catalog/inventory.mjs";
 import type { RoomDecorItem, RoomLayout, RoomLayoutItem } from "./arcade-room-layout.mjs";
+import { ARCADE_AVATAR_CATALOG } from "./arcade-room-avatar-catalog.mjs";
 
-export type EditorTab = "cabinets" | "surfaces" | "decor";
-export const EDITOR_TABS: readonly EditorTab[] = Object.freeze(["cabinets", "surfaces", "decor"]);
+export type EditorTab = "cabinets" | "surfaces" | "decor" | "avatar";
+export const EDITOR_TABS: readonly EditorTab[] = Object.freeze(["cabinets", "surfaces", "decor", "avatar"]);
 
 export type EditorSelection = Readonly<{ kind: "cabinet" | "decor"; instanceId: string }> | null;
 
@@ -72,6 +73,7 @@ export type PanelActions = Readonly<{
   duplicateCabinet: (instanceId: string) => void;
   removeCabinet: (instanceId: string) => void;
   setSurface: (kind: SurfaceKind, id: string) => void;
+  setAvatar: (avatarId: string) => void;
   setDecorCategory: (category: DecorCategory) => void;
   addDecor: (itemId: string) => void;
   selectDecor: (instanceId: string) => void;
@@ -105,6 +107,7 @@ export type PanelElements = Readonly<{
   decorCatalog: HTMLElement;
   decorInspector: HTMLElement;
   decorPlaced: HTMLElement;
+  avatarPicker: HTMLElement;
 }>;
 
 export type EditorPanel = Readonly<{
@@ -249,6 +252,21 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       return row;
     });
     elements.cabinetList.replaceChildren(catalogTitle, catalog, placedTitle, ...rows);
+  }
+
+  function renderAvatarPicker(state: PanelState): void {
+    const cards = ARCADE_AVATAR_CATALOG.map((avatar) => {
+      const card = element("button", "avatar-card");
+      card.type = "button";
+      card.dataset.avatarId = avatar.id;
+      card.dataset.family = avatar.family;
+      card.setAttribute("aria-pressed", String(state.layout.avatarId === avatar.id));
+      const badge = element("span", "avatar-card__figure", avatar.title.slice(0, 1));
+      const label = element("span", "avatar-card__name", avatar.title);
+      card.append(badge, label);
+      return card;
+    });
+    elements.avatarPicker.replaceChildren(...cards);
   }
 
   function buildSurfacePicker(state: PanelState): void {
@@ -545,6 +563,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     renderDecorCatalog(state);
     renderDecorInspector(state);
     renderDecorPlaced(state);
+    renderAvatarPicker(state);
   }
 
   elements.tabs.addEventListener("click", (event) => {
@@ -580,6 +599,10 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
   elements.surfacePicker.addEventListener("click", (event) => {
     const swatch = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-surface-id]");
     if (swatch && !swatch.disabled) actions.setSurface(swatch.dataset.surfaceKind as SurfaceKind, swatch.dataset.surfaceId!);
+  });
+  elements.avatarPicker.addEventListener("click", (event) => {
+    const card = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-avatar-id]");
+    if (card?.dataset.avatarId) actions.setAvatar(card.dataset.avatarId);
   });
   elements.decorCategories.addEventListener("click", (event) => {
     const chip = (event.target as HTMLElement).closest<HTMLElement>("[data-category]");

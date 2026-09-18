@@ -276,12 +276,29 @@ button, a { font: inherit; }
 }
 
 /* — Build-mode tabs — */
-.editor-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 14px; padding: 4px; border-radius: 10px; background: rgba(0,0,0,.28); }
+.editor-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 14px; padding: 4px; border-radius: 10px; background: rgba(0,0,0,.28); }
 .editor-tabs button { padding: 8px 0; border: 0; border-radius: 7px; background: transparent; color: #9fb2c2; font: 800 11px/1 ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .editor-tabs button:hover { color: #fff; }
 .editor-tabs button[aria-selected="true"] { background: rgba(112, 232, 255, .18); color: #fff; box-shadow: inset 0 0 0 1px rgba(112, 232, 255, .5); }
 .editor-tab-panels { flex: 1 1 auto; min-height: 120px; margin: 12px -8px 0; padding: 0 8px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(112,232,255,.35) transparent; }
 .editor-tab-panel[hidden] { display: none; }
+
+/* — Avatar — */
+.avatar-preview { position: relative; height: 250px; overflow: hidden; border: 1px solid rgba(112,232,255,.28); border-radius: 14px; background: radial-gradient(circle at 50% 62%, rgba(112,232,255,.2), transparent 42%), linear-gradient(180deg, #111a28, #080b12); }
+.avatar-preview::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: 18px; height: 12px; border-radius: 50%; background: rgba(112,232,255,.22); filter: blur(7px); }
+.avatar-preview canvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
+.avatar-preview canvas[data-state="loading"] { opacity: .35; }
+.avatar-preview__hint { position: absolute; z-index: 2; right: 10px; bottom: 9px; color: #70e8ff; font: 800 8px/1 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.avatar-intro { margin: 10px 2px; color: #9fb2c2; font-size: 12px; line-height: 1.4; }
+.avatar-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.avatar-card { display: grid; gap: 5px; min-width: 0; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.04); color: #dbe8f1; cursor: pointer; }
+.avatar-card:hover { border-color: #70e8ff; background: rgba(112,232,255,.1); }
+.avatar-card[aria-pressed="true"] { border-color: #ffd33d; box-shadow: 0 0 0 1px #ffd33d; background: rgba(255,211,61,.09); color: #fff; }
+.avatar-card__figure { display: grid; place-items: center; height: 48px; border-radius: 7px; background: linear-gradient(145deg, #2b5570, #111925); color: #8feeff; font: 900 19px/1 "Arial Black", sans-serif; }
+.avatar-card[data-family="ogre"] .avatar-card__figure { background: linear-gradient(145deg, #48633d, #172218); color: #c9f29d; }
+.avatar-card[data-family="skeleton"] .avatar-card__figure { background: linear-gradient(145deg, #5a526c, #17141e); color: #ece5ff; }
+.avatar-card[data-family="villager"] .avatar-card__figure { background: linear-gradient(145deg, #755340, #251812); color: #ffd2ad; }
+.avatar-card__name { overflow: hidden; color: inherit; font: 800 9px/1.15 ui-monospace, monospace; text-overflow: ellipsis; white-space: nowrap; }
 
 /* — Surfaces — */
 .surface-section + .surface-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }

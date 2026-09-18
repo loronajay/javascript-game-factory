@@ -35,6 +35,7 @@ import {
   removeCabinetItem,
   rotatePlacement,
   setItemHidden,
+  setRoomAvatar,
   setRoomDefaultTrack,
   setRoomSurface,
   updateItemPlacement,
@@ -51,6 +52,7 @@ import {
   applyEditorCameraPreset,
   createEditorCamera,
   editorCutawayWalls,
+  editorCameraFromWalkingPose,
   editorCameraPose,
   editorViewOffset,
   focusEditorCamera,
@@ -63,6 +65,7 @@ import {
   type EditorCameraState,
 } from "./arcade-room-camera.mjs";
 import type { RoomShell } from "./arcade-room-shell.mjs";
+import type { ArcadeAvatarPreview } from "./arcade-room-avatar-preview.mjs";
 
 type ThreeNamespace = Record<string, any>;
 
@@ -114,6 +117,7 @@ type RoomEditorOptions = Readonly<{
    * offering a button that fails.
    */
   uploadPicture: ((file: File) => Promise<RoomEditorUploadResult>) | null;
+  avatarPreview: ArcadeAvatarPreview;
   elements: RoomEditorElements;
   /** Lets the page refuse build mode while something else (a running cabinet) owns the screen. */
   canEnter: () => boolean;
@@ -157,7 +161,7 @@ const SNAP_RANGE_M = Object.freeze({ min: 0.06, max: 0.3 });
 const WHEEL_GESTURE_MS = 350;
 
 export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
-  const { THREE, scene, camera, canvas, shell, decor, cabinetRuntime, inventory, cabinets, room, initialLayout, persist, uploadPicture, elements, canEnter, onEditingChange } = options;
+  const { THREE, scene, camera, canvas, shell, decor, cabinetRuntime, inventory, cabinets, room, initialLayout, persist, uploadPicture, avatarPreview, elements, canEnter, onEditingChange } = options;
   const catalog = Object.fromEntries(cabinets.map((entry) => [entry.cabinet.id, entry.footprint]));
   const roomHeight = room.height ?? ROOM_BOUNDS_DEFAULTS.height;
   let layout = initialLayout;
@@ -225,6 +229,12 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     duplicateCabinet: (instanceId) => duplicateCabinet(instanceId),
     removeCabinet: (instanceId) => removeCabinet(instanceId),
     setSurface: (kind, id) => setSurface(kind, id),
+    setAvatar: (avatarId) => {
+      const result = setRoomAvatar(layout, avatarId);
+      if (!result.valid) return;
+      avatarPreview.show(avatarId);
+      commit(result.layout, "Avatar changed · unsaved");
+    },
     setDecorCategory: (category) => { decorCategory = category; renderPanel(); },
     addDecor: (itemId) => addDecor(itemId),
     selectDecor: (instanceId) => { selectDecor(instanceId); focusSelection(); },
@@ -296,6 +306,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
 
   function renderPanel(): void {
     panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory, canUpload: uploadPicture !== null, uploadingInstanceId });
+    if (tab === "avatar") avatarPreview.show(layout.avatarId);
     elements.undoButton.disabled = undoStack.length === 0;
   }
 
@@ -963,7 +974,15 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     // The lens may stand well outside the room now; the walking camera's far plane would clip the far wall.
     walkingFar = camera.far;
     camera.far = Math.max(walkingFar, EDITOR_CAMERA_LIMITS.radius.max + Math.hypot(room.width, room.depth) + 4);
-    setView("overview", true);
+    // Build from where the player stands and looks: the walking camera's pose (YXZ rotation, so
+    // `x` is pitch and `y` is yaw) becomes the orbit, and nothing on screen jumps. O still resets to the overview.
+    cancelTransition();
+    view = editorCameraFromWalkingPose({
+      x: camera.position.x, y: camera.position.y, z: camera.position.z,
+      yaw: camera.rotation.y, pitch: camera.rotation.x,
+    }, room);
+    applyViewCamera();
+    renderViewButtons();
     setStatus("Drag anything to move it · drag the floor to orbit · right-drag to pan · scroll to zoom · C to centre on the selection.");
     renderScene();
     renderPanel();
