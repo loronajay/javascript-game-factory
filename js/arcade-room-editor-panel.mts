@@ -17,6 +17,13 @@
 // arrows, corner grips — `arcade-room-decor-resize.mts`) are how a player
 // resizes; the inspector shows the exact number and takes a typed one.
 //
+// THE INSPECTOR IS ITS OWN CARD, NOT A ROW OF THE CATALOG. It floats on the
+// far side of the room from the catalog drawer, so picking a colour never
+// scrolls the catalog away and a long catalog never pushes the controls out
+// of sight. A selected cabinet gets one too (where it stands, hide, copy,
+// remove); the rotate tools stay on the bottom bar because they act on
+// whichever kind is selected.
+//
 // WORDS AND PICTURES ARE SET HERE. A custom sign gets a text field (every
 // keystroke previews, leaving the field commits) and a custom poster gets a
 // file chooser; the upload itself is the editor's business, the panel only
@@ -98,6 +105,11 @@ export type PanelActions = Readonly<{
 export type PanelOptions = Readonly<{
   /** A picture of the catalog item for its card, or null to fall back to a tinted chip. */
   thumbnail?: (definition: DecorDefinition) => string | null;
+  /**
+   * A portrait of the avatar for its card. Returns the picture when it is already
+   * rendered; otherwise null now and `onReady` later, because the model has to load first.
+   */
+  avatarThumbnail?: (avatarId: string, onReady: (url: string) => void) => string | null;
 }>;
 
 export type PanelElements = Readonly<{
@@ -110,6 +122,10 @@ export type PanelElements = Readonly<{
   decorInspector: HTMLElement;
   decorPlaced: HTMLElement;
   avatarPicker: HTMLElement;
+  /** The caption under the live avatar preview: the chosen body's name. */
+  avatarCaption?: HTMLElement;
+  /** The catalog drawer the tab panels live in; the active tab's button collapses and reopens it. */
+  drawer?: HTMLElement;
 }>;
 
 export type EditorPanel = Readonly<{
@@ -124,6 +140,8 @@ const SURFACE_TITLES: Readonly<Record<SurfaceKind, string>> = Object.freeze({
 });
 
 const MOUNT_TITLES: Readonly<Record<DecorMount, string>> = Object.freeze({ floor: "Floor", wall: "Wall", ceiling: "Ceiling" });
+
+const AVATAR_FAMILY_TITLES: Readonly<Record<string, string>> = Object.freeze({ hero: "Hero", ogre: "Ogre", skeleton: "Skeleton", villager: "Villager" });
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -199,7 +217,13 @@ type InspectorRefs = Readonly<{
 export function createEditorPanel(elements: PanelElements, actions: PanelActions, options: PanelOptions = {}): EditorPanel {
   let lastCatalogCategory: DecorCategory | null = null;
   let surfacesBuilt = false;
+  // Which finish the surfaces tab is showing. Panel-local: it is a way of looking at the
+  // catalog, not a fact about the room, so the editor never hears about it.
+  let surfaceKind: SurfaceKind = "floor";
+  let avatarsBuilt = false;
   let inspector: InspectorRefs | null = null;
+  // The cabinet inspector has no live controls, so it is simply rebuilt when this key changes.
+  let cabinetInspectorKey = "";
 
   function renderTabs(state: PanelState): void {
     for (const button of elements.tabs.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
@@ -252,40 +276,68 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       toggle.dataset.toggleInstanceId = placement.instanceId;
       toggle.setAttribute("aria-pressed", String(!placement.hidden));
       toggle.title = placement.hidden ? "Put this cabinet back on the floor (H)" : "Take this cabinet off the floor (H)";
-      const duplicate = element("button", "cabinet-list__toggle", "Copy");
-      duplicate.type = "button";
-      duplicate.dataset.duplicateCabinet = placement.instanceId;
-      duplicate.title = "Duplicate this cabinet (Ctrl+D)";
-      const remove = element("button", "placed-list__remove", "×");
-      remove.type = "button";
-      remove.dataset.removeCabinet = placement.instanceId;
-      remove.title = "Remove this cabinet (Delete)";
-      row.append(button, toggle, duplicate, remove);
+      // Duplicate and Remove live on the inspector; the row only carries the one thing
+      // worth seeing at a glance across the whole list, whether the cabinet is on the floor.
+      row.append(button, toggle);
       return row;
     });
     elements.cabinetList.replaceChildren(catalogTitle, catalog, placedTitle, ...rows);
   }
 
-  function renderAvatarPicker(state: PanelState): void {
+  function buildAvatarPicker(): void {
     const cards = ARCADE_AVATAR_CATALOG.map((avatar) => {
       const card = element("button", "avatar-card");
       card.type = "button";
       card.dataset.avatarId = avatar.id;
       card.dataset.family = avatar.family;
-      card.setAttribute("aria-pressed", String(state.layout.avatarId === avatar.id));
-      const badge = element("span", "avatar-card__figure", avatar.title.slice(0, 1));
+      card.title = `Wear ${avatar.title}`;
+      const figure = element("span", "avatar-card__figure");
+      // The portrait arrives when its model has loaded; until then the family's initial
+      // holds the space so the grid never jumps.
+      figure.textContent = avatar.title.slice(0, 1);
+      const paint = (url: string): void => {
+        const image = element("img");
+        image.src = url;
+        image.alt = "";
+        image.decoding = "async";
+        figure.replaceChildren(image);
+        figure.dataset.picture = "true";
+      };
+      const picture = options.avatarThumbnail?.(avatar.id, paint) ?? null;
+      if (picture) paint(picture);
       const label = element("span", "avatar-card__name", avatar.title);
-      card.append(badge, label);
+      const meta = element("small", "avatar-card__meta", AVATAR_FAMILY_TITLES[avatar.family] ?? avatar.family);
+      card.append(figure, label, meta);
       return card;
     });
     elements.avatarPicker.replaceChildren(...cards);
+    avatarsBuilt = true;
+  }
+
+  function renderAvatarPicker(state: PanelState): void {
+    if (!avatarsBuilt) buildAvatarPicker();
+    for (const card of elements.avatarPicker.querySelectorAll<HTMLButtonElement>("[data-avatar-id]")) {
+      card.setAttribute("aria-pressed", String(card.dataset.avatarId === state.layout.avatarId));
+    }
+    if (elements.avatarCaption) {
+      const chosen = ARCADE_AVATAR_CATALOG.find((avatar) => avatar.id === state.layout.avatarId);
+      elements.avatarCaption.textContent = chosen ? chosen.title : "";
+    }
   }
 
   function buildSurfacePicker(state: PanelState): void {
-    elements.surfacePicker.replaceChildren(...SURFACE_KINDS.map((kind) => {
+    // One finish at a time: Floor / Walls / Ceiling / Trim as chips, the way the decor
+    // catalog is split by category, instead of 148 swatches in one scroll.
+    const chips = element("div", "category-chips");
+    for (const kind of SURFACE_KINDS) {
+      const chip = element("button", "category-chip", SURFACE_TITLES[kind]);
+      chip.type = "button";
+      chip.dataset.surfaceChip = kind;
+      chips.append(chip);
+    }
+    elements.surfacePicker.replaceChildren(chips, ...SURFACE_KINDS.map((kind) => {
       const section = element("section", "surface-section");
       section.dataset.surfaceKind = kind;
-      section.append(element("h3", "surface-section__title", SURFACE_TITLES[kind]));
       for (const group of surfaceGroups(kind)) {
         section.append(element("span", "surface-section__group", group));
         const grid = element("div", "swatch-grid");
@@ -309,8 +361,18 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     surfacesBuilt = true;
   }
 
+  function showSurfaceKind(): void {
+    for (const chip of elements.surfacePicker.querySelectorAll<HTMLElement>("[data-surface-chip]")) {
+      chip.setAttribute("aria-pressed", String(chip.dataset.surfaceChip === surfaceKind));
+    }
+    for (const section of elements.surfacePicker.querySelectorAll<HTMLElement>("section[data-surface-kind]")) {
+      section.hidden = section.dataset.surfaceKind !== surfaceKind;
+    }
+  }
+
   function renderSurfaces(state: PanelState): void {
     if (!surfacesBuilt) buildSurfacePicker(state);
+    showSurfaceKind();
     for (const swatch of elements.surfacePicker.querySelectorAll<HTMLButtonElement>("[data-surface-id]")) {
       const kind = swatch.dataset.surfaceKind as SurfaceKind;
       swatch.setAttribute("aria-pressed", String(state.layout.surfaces[kind] === swatch.dataset.surfaceId));
@@ -546,7 +608,60 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     }
   }
 
-  function renderDecorInspector(state: PanelState): void {
+  /** A selected cabinet's card: what it is, where it stands, and the three things to do with it. */
+  function renderCabinetInspector(placement: RoomLayoutItem, state: PanelState): void {
+    const entry = state.cabinets.find((cabinet) => cabinet.id === placement.cabinetId);
+    const index = state.layout.items.findIndex((item) => item.instanceId === placement.instanceId);
+    const key = `cabinet|${placement.instanceId}|${placement.hidden}|${placementLabel(placement)}`;
+    if (cabinetInspectorKey === key) return;
+    cabinetInspectorKey = key;
+    const heading = element("div", "inspector__heading");
+    const close = element("button", "inspector__close", "×");
+    close.type = "button";
+    close.dataset.clearSelection = "true";
+    close.title = "Deselect (Esc)";
+    close.setAttribute("aria-label", "Deselect");
+    heading.append(
+      element("span", "eyebrow", `CABINET ${index + 1}`),
+      element("strong", "", entry?.title ?? placement.cabinetId),
+      element("small", "", placement.hidden ? "Hidden · off the floor" : placementLabel(placement)),
+      close,
+    );
+    const figure = element("div", "inspector__figure");
+    const image = element("img");
+    image.src = `../grid-previews/${entry?.gameSlug ?? "bird-duty"}.png`;
+    image.alt = "";
+    figure.append(image);
+    const tools = element("div", "inspector__tools inspector__tools--three");
+    const toggle = element("button", "inspector__tool", placement.hidden ? "Show" : "Hide");
+    toggle.type = "button";
+    toggle.dataset.toggleInstanceId = placement.instanceId;
+    toggle.title = placement.hidden ? "Put this cabinet back on the floor (H)" : "Take this cabinet off the floor (H)";
+    const duplicate = element("button", "inspector__tool", "Duplicate");
+    duplicate.type = "button";
+    duplicate.dataset.duplicateCabinet = placement.instanceId;
+    duplicate.title = "Duplicate this cabinet (Ctrl+D)";
+    const remove = element("button", "inspector__tool inspector__tool--danger", "Remove");
+    remove.type = "button";
+    remove.dataset.removeCabinet = placement.instanceId;
+    remove.title = "Remove this cabinet (Delete)";
+    tools.append(toggle, duplicate, remove);
+    const hint = element("small", "inspector__hint", "Drag it in the room · arrows nudge · Q / R rotate.");
+    elements.decorInspector.replaceChildren(heading, figure, tools, hint);
+  }
+
+  function renderInspector(state: PanelState): void {
+    const cabinet = state.selection?.kind === "cabinet"
+      ? state.layout.items.find((item) => item.instanceId === state.selection!.instanceId)
+      : undefined;
+    if (cabinet) {
+      inspector = null;
+      elements.decorInspector.hidden = false;
+      elements.decorInspector.dataset.kind = "cabinet";
+      renderCabinetInspector(cabinet, state);
+      return;
+    }
+    cabinetInspectorKey = "";
     const selected = state.selection?.kind === "decor"
       ? state.layout.decor.find((item) => item.instanceId === state.selection!.instanceId)
       : undefined;
@@ -554,16 +669,15 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     if (!selected || !definition) {
       inspector = null;
       elements.decorInspector.hidden = true;
+      delete elements.decorInspector.dataset.kind;
       elements.decorInspector.replaceChildren();
       return;
     }
     elements.decorInspector.hidden = false;
+    elements.decorInspector.dataset.kind = "decor";
     const key = `${selected.instanceId}|${selected.itemId}`;
     if (!inspector || inspector.key !== key) {
       inspector = buildDecorInspector(selected, definition);
-      // The inspector heads a scrolling column the catalog lives in; a card clicked far down
-      // that column must not leave the new item's controls out of sight above it.
-      elements.decorInspector.scrollIntoView({ block: "start" });
     }
     updateDecorInspector(inspector, selected, definition, state);
   }
@@ -607,7 +721,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     renderSurfaces(state);
     renderDecorCategories(state);
     renderDecorCatalog(state);
-    renderDecorInspector(state);
+    renderInspector(state);
     renderDecorPlaced(state);
     renderAvatarPicker(state);
   }
@@ -615,7 +729,20 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
   elements.tabs.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLElement>("[data-tab]");
     const tab = button?.dataset.tab;
-    if (tab && (EDITOR_TABS as readonly string[]).includes(tab)) actions.selectTab(tab as EditorTab);
+    if (!button || !tab || !(EDITOR_TABS as readonly string[]).includes(tab)) return;
+    // The active tab's button is the drawer's handle: press it to tuck the catalog away and
+    // see the whole room, press it again to bring the catalog back. Any other tab reopens it.
+    const drawer = elements.drawer;
+    if (drawer && button.getAttribute("aria-selected") === "true") {
+      drawer.hidden = !drawer.hidden;
+      elements.tabs.dataset.collapsed = String(drawer.hidden);
+      return;
+    }
+    if (drawer) {
+      drawer.hidden = false;
+      elements.tabs.dataset.collapsed = "false";
+    }
+    actions.selectTab(tab as EditorTab);
   });
   elements.cabinetList.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;
@@ -643,6 +770,12 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     if (button?.dataset.instanceId) actions.selectCabinet(button.dataset.instanceId);
   });
   elements.surfacePicker.addEventListener("click", (event) => {
+    const chip = (event.target as HTMLElement).closest<HTMLElement>("[data-surface-chip]");
+    if (chip?.dataset.surfaceChip) {
+      surfaceKind = chip.dataset.surfaceChip as SurfaceKind;
+      showSurfaceKind();
+      return;
+    }
     const swatch = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-surface-id]");
     if (swatch && !swatch.disabled) actions.setSurface(swatch.dataset.surfaceKind as SurfaceKind, swatch.dataset.surfaceId!);
   });
@@ -666,6 +799,21 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     }
     if (target.closest("[data-clear-selection]")) {
       actions.clearSelection();
+      return;
+    }
+    const cabinetToggle = target.closest<HTMLElement>("[data-toggle-instance-id]");
+    if (cabinetToggle?.dataset.toggleInstanceId) {
+      actions.toggleCabinetHidden(cabinetToggle.dataset.toggleInstanceId);
+      return;
+    }
+    const cabinetDuplicate = target.closest<HTMLElement>("[data-duplicate-cabinet]");
+    if (cabinetDuplicate?.dataset.duplicateCabinet) {
+      actions.duplicateCabinet(cabinetDuplicate.dataset.duplicateCabinet);
+      return;
+    }
+    const cabinetRemove = target.closest<HTMLElement>("[data-remove-cabinet]");
+    if (cabinetRemove?.dataset.removeCabinet) {
+      actions.removeCabinet(cabinetRemove.dataset.removeCabinet);
       return;
     }
     const remove = target.closest<HTMLElement>("[data-remove-decor]");

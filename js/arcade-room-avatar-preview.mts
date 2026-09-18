@@ -17,7 +17,7 @@ export function createArcadeAvatarPreview(THREE: ThreeNamespace, canvas: HTMLCan
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(28, 1, 0.01, 30);
-  camera.position.set(0, 1.15, 4.3);
+  camera.position.set(0, 1.1, 4.8);
   camera.lookAt(0, 1, 0);
   scene.add(new THREE.HemisphereLight(0xdff7ff, 0x161122, 2.3));
   const key = new THREE.DirectionalLight(0xffdfb5, 3.2);
@@ -42,7 +42,7 @@ export function createArcadeAvatarPreview(THREE: ThreeNamespace, canvas: HTMLCan
   function fitModel(model: any): void {
     const initial = new THREE.Box3().setFromObject(model);
     const size = initial.getSize(new THREE.Vector3());
-    const scale = size.y > 0 ? 2.2 / size.y : 1;
+    const scale = size.y > 0 ? 2.0 / size.y : 1;
     model.scale.setScalar(scale);
     const fitted = new THREE.Box3().setFromObject(model);
     const centre = fitted.getCenter(new THREE.Vector3());

@@ -3,6 +3,7 @@ import { addDecorItem, duplicateDecorItem, nearestWall, placeDecorItem, removeDe
 import { alignCabinetPlacement, alignDecorTarget } from "./arcade-room-decor-align.mjs";
 import { decorFrame, decorHandles, scaleDecorCorner, stretchDecorEnd } from "./arcade-room-decor-resize.mjs";
 import { createDecorThumbnails } from "./arcade-room-decor-thumbnails.mjs";
+import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import { createEditorPanel } from "./arcade-room-editor-panel.mjs";
 import { ROOM_BOUNDS_DEFAULTS, addCabinetItem, createDefaultRoomLayout, duplicateCabinetItem, floorObstacles, roomLayoutsEqual, removeStarterNeon, removeCabinetItem, rotatePlacement, setItemHidden, setRoomAvatar, setRoomDefaultTrack, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
@@ -45,6 +46,7 @@ export function createRoomEditor(options) {
     let previewFrame = 0;
     let wheelGestureTimer;
     const thumbnails = createDecorThumbnails(THREE);
+    const avatarThumbnails = createAvatarThumbnails(THREE);
     // Which camera gesture the current pointer owns: orbit on a left-drag over empty floor,
     // pan on a right/middle-drag or a Shift+left-drag anywhere. Decided on pointerdown.
     let cameraGesture = "none";
@@ -122,7 +124,7 @@ export function createRoomEditor(options) {
         setDecorText: (instanceId, text, phase) => editDecor(setDecorText(layout, instanceId, text, room, catalog), "Words changed", phase),
         uploadDecorImage: (instanceId, file) => { void uploadDecorImage(instanceId, file); },
         clearDecorImage: (instanceId) => commitDecor(setDecorImage(layout, instanceId, "", 1, room, catalog).layout, "Picture removed"),
-    }, { thumbnail: (definition) => thumbnails.get(definition) });
+    }, { thumbnail: (definition) => thumbnails.get(definition), avatarThumbnail: (avatarId, onReady) => avatarThumbnails.get(avatarId, onReady) });
     function selectedCabinet() {
         return selection?.kind === "cabinet" ? layout.items.find((item) => item.instanceId === selection.instanceId) : undefined;
     }
@@ -620,10 +622,10 @@ export function createRoomEditor(options) {
         applyViewOffset();
     }
     /**
-     * Centre the projection on the strip of canvas the panel leaves free, so the
-     * orbit target - what every gesture is about - is in the middle of what the
-     * player can see and not under the panel. Re-read each time because the panel
-     * and the canvas both resize.
+     * Centre the projection on the widest strip of canvas the build chrome leaves
+     * free, so the orbit target - what every gesture is about - is in the middle of
+     * what the player can see and not under the drawer or the inspector. Re-read
+     * each time because those blocks and the canvas all resize.
      */
     function applyViewOffset() {
         const width = canvas.clientWidth;
@@ -631,10 +633,14 @@ export function createRoomEditor(options) {
         if (!width || !height)
             return;
         const canvasRect = canvas.getBoundingClientRect();
-        const panelRect = elements.panel.hidden ? null : elements.panel.getBoundingClientRect();
-        const offset = editorViewOffset({ width, height }, panelRect
-            ? { left: panelRect.left - canvasRect.left, top: panelRect.top - canvasRect.top, width: panelRect.width, height: panelRect.height }
-            : null);
+        const blocks = elements.panel.hidden
+            ? []
+            : [elements.tabs, elements.drawer, elements.decorInspector]
+                .filter((block) => !block.hidden && block.offsetParent !== null)
+                .map((block) => block.getBoundingClientRect())
+                .filter((rect) => rect.width > 0 && rect.height > 0)
+                .map((rect) => ({ left: rect.left - canvasRect.left, top: rect.top - canvasRect.top, width: rect.width, height: rect.height }));
+        const offset = editorViewOffset({ width, height }, blocks);
         if (offset.x || offset.y)
             camera.setViewOffset(width, height, offset.x, offset.y, width, height);
         else
@@ -1055,7 +1061,8 @@ export function createRoomEditor(options) {
         const observer = new ResizeObserver(() => { if (editing)
             applyViewOffset(); });
         observer.observe(canvas);
-        observer.observe(elements.panel);
+        observer.observe(elements.drawer);
+        observer.observe(elements.decorInspector);
     }
     canvas.addEventListener("pointerup", endPointer);
     canvas.addEventListener("pointercancel", endPointer);

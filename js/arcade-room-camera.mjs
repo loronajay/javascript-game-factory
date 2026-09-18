@@ -236,16 +236,32 @@ export function editorCutawayWalls(state, room) {
 }
 /**
  * How far to shift the projection centre so it lands in the middle of the part of
- * the canvas the build panel leaves free, in CSS pixels. Without this the orbit
- * target — the thing every gesture is about — sits under the panel. A panel
- * that covers most of the width (a phone) leaves no strip worth centring on, so
- * the offset is zero there rather than shoving the view off the edge.
+ * the canvas the build chrome leaves free, in CSS pixels. Without this the orbit
+ * target — the thing every gesture is about — sits under a panel. The chrome is
+ * several blocks (the catalog drawer on one side, the inspector on the other), so
+ * this takes every one of them and centres on the widest clear strip between
+ * them. A strip narrower than 40% of the canvas (a phone) is not worth centring
+ * on, so the offset is zero there rather than shoving the view off the edge.
  */
-export function editorViewOffset(canvas, panel) {
-    if (!panel || canvas.width <= 0)
+export function editorViewOffset(canvas, panels) {
+    if (!panels || canvas.width <= 0)
         return { x: 0, y: 0 };
-    const freeWidth = clamp(panel.left, 0, canvas.width);
-    if (freeWidth / canvas.width < 0.4 || freeWidth >= canvas.width)
+    const blocks = (Array.isArray(panels) ? panels : [panels]);
+    const spans = blocks
+        .map((panel) => [clamp(panel.left, 0, canvas.width), clamp(panel.left + panel.width, 0, canvas.width)])
+        .filter(([start, end]) => end > start)
+        .sort((a, b) => a[0] - b[0]);
+    let cursor = 0;
+    let best = [0, 0];
+    for (const [start, end] of spans) {
+        if (start > cursor && start - cursor > best[1] - best[0])
+            best = [cursor, start];
+        cursor = Math.max(cursor, end);
+    }
+    if (canvas.width - cursor > best[1] - best[0])
+        best = [cursor, canvas.width];
+    const freeWidth = best[1] - best[0];
+    if (freeWidth <= 0 || freeWidth / canvas.width < 0.4 || freeWidth >= canvas.width)
         return { x: 0, y: 0 };
-    return { x: (canvas.width - freeWidth) / 2, y: 0 };
+    return { x: canvas.width / 2 - (best[0] + best[1]) / 2, y: 0 };
 }

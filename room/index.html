@@ -44,68 +44,99 @@
     </div>
 
     <aside id="roomEditor" class="room-editor" aria-label="Arcade editor" hidden>
-      <div class="room-editor__heading">
-        <span class="eyebrow">BUILD MODE</span>
-        <h2>Build your arcade</h2>
-        <p>Click anything to move it · drag the floor to orbit · right-drag to pan · scroll to zoom.</p>
-      </div>
+      <header class="editor-topbar">
+        <div class="editor-topbar__brand">
+          <span class="eyebrow">BUILD MODE</span>
+          <strong>Build your arcade</strong>
+        </div>
+        <div id="cameraViews" class="camera-views" role="group" aria-label="Camera view">
+          <button type="button" data-view="overview" aria-pressed="true" title="Overview (O)">Overview</button>
+          <button type="button" data-view="front" aria-pressed="false" title="Front (F)">Front</button>
+          <button type="button" data-view="left" aria-pressed="false">Left</button>
+          <button type="button" data-view="right" aria-pressed="false">Right</button>
+          <button type="button" data-view="back" aria-pressed="false">Back</button>
+          <button type="button" data-view="top" aria-pressed="false" title="Top-down (T)">Top</button>
+        </div>
+        <div class="editor-topbar__actions">
+          <button id="undoRoomEdit" class="editor-action editor-action--quiet" type="button" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
+          <button id="resetRoomLayout" class="editor-action editor-action--quiet" type="button" title="Put every cabinet back on the starter floor">Reset</button>
+          <button id="saveRoomLayout" class="editor-action" type="button">Save layout</button>
+          <button id="finishEditing" class="editor-action editor-action--primary" type="button" title="Save and walk the room (B)">Done <kbd>B</kbd></button>
+        </div>
+      </header>
 
-      <div id="cameraViews" class="camera-views" role="group" aria-label="Camera view">
-        <button type="button" data-view="overview" aria-pressed="true" title="Overview (O)">Overview</button>
-        <button type="button" data-view="front" aria-pressed="false" title="Front (F)">Front</button>
-        <button type="button" data-view="left" aria-pressed="false">Left</button>
-        <button type="button" data-view="right" aria-pressed="false">Right</button>
-        <button type="button" data-view="back" aria-pressed="false">Back</button>
-        <button type="button" data-view="top" aria-pressed="false" title="Top-down (T)">Top</button>
-      </div>
+      <nav id="editorTabs" class="editor-rail" role="tablist" aria-label="Editor sections" data-collapsed="false">
+        <button type="button" role="tab" data-tab="cabinets" aria-selected="true" title="Cabinets">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12l1 5v13H5V8l1-5Zm1.5 6v5h9V9h-9ZM9 17h6" /></svg>
+          <span>Cabinets</span>
+        </button>
+        <button type="button" role="tab" data-tab="surfaces" aria-selected="false" title="Floor, walls, ceiling and trim">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h11v5H4zM15 6h4v4h-7v3M12 13h3v8h-3z" /></svg>
+          <span>Surfaces</span>
+        </button>
+        <button type="button" role="tab" data-tab="decor" aria-selected="false" title="Neon, signs, furniture and props">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M5.6 6.6l2.1 2.1M18.4 6.6l-2.1 2.1M3 13h3M18 13h3M8 19h8M9 16h6l1.5-4a4.5 4.5 0 1 0-9 0z" /></svg>
+          <span>Decor</span>
+        </button>
+        <button type="button" role="tab" data-tab="avatar" aria-selected="false" title="Your arcade body">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+          <span>Avatar</span>
+        </button>
+      </nav>
 
-      <div id="editorTabs" class="editor-tabs" role="tablist" aria-label="Editor sections">
-        <button type="button" role="tab" data-tab="cabinets" aria-selected="true">Cabinets</button>
-        <button type="button" role="tab" data-tab="surfaces" aria-selected="false">Surfaces</button>
-        <button type="button" role="tab" data-tab="decor" aria-selected="false">Decor</button>
-        <button type="button" role="tab" data-tab="avatar" aria-selected="false">Avatar</button>
-      </div>
+      <section id="editorDrawer" class="editor-drawer">
+        <div id="editorTabPanels" class="editor-tab-panels">
+          <section data-tab-panel="cabinets" class="editor-tab-panel">
+            <header class="drawer-head">
+              <h2>Cabinets</h2>
+              <p>Add a game to the floor, then click it in the room to drag it into place.</p>
+            </header>
+            <div id="cabinetList" class="cabinet-list" role="group" aria-label="Cabinets"></div>
+          </section>
+          <section data-tab-panel="surfaces" class="editor-tab-panel" hidden>
+            <header class="drawer-head">
+              <h2>Surfaces</h2>
+              <p>Pick a finish for the floor, the walls, the ceiling and the trim.</p>
+            </header>
+            <div id="surfacePicker" class="surface-picker" role="group" aria-label="Room finishes"></div>
+          </section>
+          <section data-tab-panel="decor" class="editor-tab-panel" hidden>
+            <header class="drawer-head">
+              <h2>Decor</h2>
+              <p>Click a card to place it, then drag it around the room. Arrows and grips on the item resize it.</p>
+            </header>
+            <div id="decorCategories" class="category-chips" role="group" aria-label="Decor categories"></div>
+            <div id="decorCatalog" class="decor-grid" role="group" aria-label="Decor catalog"></div>
+            <div id="decorPlaced" class="placed-list" role="group" aria-label="Placed decor"></div>
+          </section>
+          <section data-tab-panel="avatar" class="editor-tab-panel" hidden>
+            <header class="drawer-head">
+              <h2>Avatar</h2>
+              <p>Choose how other players see you in the arcade.</p>
+            </header>
+            <div class="avatar-preview">
+              <canvas id="avatarPreview" aria-label="Selected 3D avatar preview"></canvas>
+              <span class="avatar-preview__hint">Your arcade body</span>
+              <span id="avatarCaption" class="avatar-preview__caption"></span>
+            </div>
+            <div id="avatarPicker" class="avatar-picker" role="group" aria-label="Avatar choices"></div>
+          </section>
+        </div>
+      </section>
 
-      <div id="editorTabPanels" class="editor-tab-panels">
-        <section data-tab-panel="cabinets" class="editor-tab-panel">
-          <div id="cabinetList" class="cabinet-list" role="group" aria-label="Cabinets"></div>
-        </section>
-        <section data-tab-panel="surfaces" class="editor-tab-panel" hidden>
-          <div id="surfacePicker" class="surface-picker" role="group" aria-label="Room finishes"></div>
-        </section>
-        <section data-tab-panel="decor" class="editor-tab-panel" hidden>
-          <div id="decorInspector" class="inspector" hidden></div>
-          <div id="decorCategories" class="category-chips" role="group" aria-label="Decor categories"></div>
-          <div id="decorCatalog" class="decor-grid" role="group" aria-label="Decor catalog"></div>
-          <div id="decorPlaced" class="placed-list" role="group" aria-label="Placed decor"></div>
-        </section>
-        <section data-tab-panel="avatar" class="editor-tab-panel" hidden>
-          <div class="avatar-preview">
-            <canvas id="avatarPreview" aria-label="Selected 3D avatar preview"></canvas>
-            <span class="avatar-preview__hint">Your arcade body</span>
-          </div>
-          <p class="avatar-intro">Choose how other players will see you in the arcade.</p>
-          <div id="avatarPicker" class="avatar-picker" role="group" aria-label="Avatar choices"></div>
-        </section>
-      </div>
+      <div id="decorInspector" class="inspector editor-inspector" aria-label="Selected item" hidden></div>
 
-      <div class="editor-tools" aria-label="Rotate and undo">
-        <button id="rotateCabinetLeft" type="button" title="Rotate left (Q)">↶ <span>Rotate</span></button>
-        <button id="rotateCabinetRight" type="button" title="Rotate right (R)">↷ <span>Rotate</span></button>
-        <button id="undoRoomEdit" type="button" title="Undo (Ctrl+Z)" disabled>↩ <span>Undo</span></button>
-      </div>
-
-      <p id="editorStatus" class="editor-status" aria-live="polite">Drag a cabinet to move it.</p>
-
-      <div class="editor-actions">
-        <button id="resetRoomLayout" class="editor-action editor-action--quiet" type="button">Reset</button>
-        <button id="saveRoomLayout" class="editor-action" type="button">Save layout</button>
-        <button id="finishEditing" class="editor-action editor-action--primary" type="button">Done</button>
-      </div>
-      <details class="editor-shortcuts">
-        <summary>Keyboard shortcuts</summary>
-        <small><b>1–9</b> cabinets · <b>Arrows</b> nudge · <b>Q / R</b> rotate (a neon strip turns on its wall) · <b>H</b> hide / show · <b>Del</b> remove · <b>Ctrl+D</b> duplicate · <b>Drag arrows / corners</b> resize · <b>- / +</b> resize · <b>Alt+drag</b> no snapping · <b>Ctrl+Z</b> undo · <b>Esc</b> deselect · <b>O / F / T</b> views · <b>C</b> centre on selection · <b>B</b> save &amp; close</small>
-      </details>
+      <footer class="editor-bottombar">
+        <div class="editor-tools" aria-label="Rotate the selection">
+          <button id="rotateCabinetLeft" type="button" title="Rotate left (Q)">↶ <span>Rotate</span></button>
+          <button id="rotateCabinetRight" type="button" title="Rotate right (R)">↷ <span>Rotate</span></button>
+        </div>
+        <p id="editorStatus" class="editor-status" aria-live="polite">Drag a cabinet to move it.</p>
+        <details class="editor-shortcuts">
+          <summary>Shortcuts</summary>
+          <small><b>1–9</b> cabinets · <b>Arrows</b> nudge · <b>Q / R</b> rotate (a neon strip turns on its wall) · <b>H</b> hide / show · <b>Del</b> remove · <b>Ctrl+D</b> duplicate · <b>Drag arrows / corners</b> resize · <b>- / +</b> resize · <b>Alt+drag</b> no snapping · <b>Ctrl+Z</b> undo · <b>Esc</b> deselect · <b>O / F / T</b> views · <b>C</b> centre on selection · <b>B</b> save &amp; close</small>
+        </details>
+      </footer>
     </aside>
 
     <section id="cabinetPlayLayer" class="play-layer" aria-hidden="true" hidden>

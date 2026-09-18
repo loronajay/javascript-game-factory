@@ -67,6 +67,8 @@ const decorInspector = requiredElement<HTMLElement>("#decorInspector");
 const decorPlaced = requiredElement<HTMLElement>("#decorPlaced");
 const avatarPicker = requiredElement<HTMLElement>("#avatarPicker");
 const avatarPreviewCanvas = requiredElement<HTMLCanvasElement>("#avatarPreview");
+const avatarCaption = requiredElement<HTMLElement>("#avatarCaption");
+const editorDrawer = requiredElement<HTMLElement>("#editorDrawer");
 const viewButtons = requiredElement<HTMLElement>("#cameraViews");
 const roomTitle = requiredElement<HTMLElement>("#roomTitle");
 const roomEyebrow = requiredElement<HTMLElement>("#roomEyebrow");
@@ -247,6 +249,8 @@ const roomEditor = createRoomEditor({
     decorInspector,
     decorPlaced,
     avatarPicker,
+    avatarCaption,
+    drawer: editorDrawer,
     undoButton,
     rotateLeftButton,
     rotateRightButton,

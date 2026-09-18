@@ -57,6 +57,8 @@ const decorInspector = requiredElement("#decorInspector");
 const decorPlaced = requiredElement("#decorPlaced");
 const avatarPicker = requiredElement("#avatarPicker");
 const avatarPreviewCanvas = requiredElement("#avatarPreview");
+const avatarCaption = requiredElement("#avatarCaption");
+const editorDrawer = requiredElement("#editorDrawer");
 const viewButtons = requiredElement("#cameraViews");
 const roomTitle = requiredElement("#roomTitle");
 const roomEyebrow = requiredElement("#roomEyebrow");
@@ -222,6 +224,8 @@ const roomEditor = createRoomEditor({
         decorInspector,
         decorPlaced,
         avatarPicker,
+        avatarCaption,
+        drawer: editorDrawer,
         undoButton,
         rotateLeftButton,
         rotateRightButton,
