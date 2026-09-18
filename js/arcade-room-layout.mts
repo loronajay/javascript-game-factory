@@ -114,6 +114,14 @@ const DEFAULT_CABINETS: readonly RoomLayoutItem[] = Object.freeze([
     rotationY: 0,
     hidden: false,
   }),
+  Object.freeze({
+    instanceId: "shark-hall-1",
+    cabinetId: "cabinet.shark-hall.pool-table",
+    x: 0,
+    z: 2.8,
+    rotationY: 0,
+    hidden: false,
+  }),
 ]);
 
 /**

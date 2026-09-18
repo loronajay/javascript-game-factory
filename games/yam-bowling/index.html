@@ -6,6 +6,11 @@
     <meta name="theme-color" content="#08090d" />
     <meta name="description" content="Yam Bowling — a character-driven arcade bowling game." />
     <title>Yam Bowling</title>
+    <script>
+      if (new URLSearchParams(window.location.search).has("cabinet")) {
+        document.documentElement.classList.add("cabinet-mode");
+      }
+    </script>
     <!-- Load order is the cascade: base first, mobile-landscape last (it overrides). -->
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/title.css" />

@@ -125,11 +125,44 @@ export const YAM_BOWLING_CABINET = Object.freeze({
         Object.freeze({ id: "screen", material: "emissive" }),
     ]),
 });
+export const SHARK_HALL_POOL_TABLE = Object.freeze({
+    id: "cabinet.shark-hall.pool-table",
+    kind: "arcade-cabinet",
+    gameSlug: "shark-hall",
+    title: "Shark Hall",
+    description: "A tournament-size walnut pool table with navy cloth, a full rack, brass details, and its own hanging billiard light.",
+    dimensions: Object.freeze({ width: 3.12, depth: 1.82, height: 2.42 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+    unlock: Object.freeze({ type: "starter", source: "Shark Hall table collection" }),
+    interaction: Object.freeze({
+        radius: 2.25,
+        facingThreshold: 0.32,
+        anchor: Object.freeze({ x: 0, y: 0.92, z: 0.98 }),
+    }),
+    palette: Object.freeze({
+        shell: "#2b160e",
+        trim: "#d0a253",
+        sky: "#162d49",
+        grass: "#234663",
+        warning: "#f2dd9b",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "table", material: "paint" }),
+        Object.freeze({ id: "felt", material: "paint" }),
+        Object.freeze({ id: "rails", material: "paint" }),
+        Object.freeze({ id: "pockets", material: "metal" }),
+        Object.freeze({ id: "balls", material: "paint" }),
+        Object.freeze({ id: "cues", material: "paint" }),
+        Object.freeze({ id: "score-display", material: "emissive" }),
+        Object.freeze({ id: "table-light", material: "metal" }),
+    ]),
+});
 export const CABINET_CATALOG = Object.freeze([
     BIRD_DUTY_CABINET,
     LOVERS_LOST_CABINET,
     SUMORAI_CABINET,
     YAM_BOWLING_CABINET,
+    SHARK_HALL_POOL_TABLE,
 ]);
 export function getCabinetFootprint(definition) {
     const padding = definition.placement.clearance * 2;

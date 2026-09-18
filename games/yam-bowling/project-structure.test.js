@@ -497,6 +497,18 @@ test("the title screen provides a return link to the arcade", () => {
   assert.match(css, /\.arcade-link\s*\{[^}]*z-index:\s*\d+/s);
 });
 
+test("cabinet mode compacts the title menu for the projected screen", () => {
+  const html = read("index.html");
+  const css = readStyles();
+
+  assert.match(html, /URLSearchParams\(window\.location\.search\)\.has\(["']cabinet["']\)/);
+  assert.match(html, /document\.documentElement\.classList\.add\(["']cabinet-mode["']\)/);
+  assert.match(css, /html\.cabinet-mode\s+\.arcade-link\s*\{[^}]*display:\s*none/s);
+  assert.match(css, /html\.cabinet-mode\s+\.title-actions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s);
+  assert.match(css, /html\.cabinet-mode\s+\.title-actions\s+\.button\s*\{[^}]*min-width:\s*0/s);
+  assert.match(css, /html\.cabinet-mode\s+\.title-tagline[^}]*display:\s*none/s);
+});
+
 test("the signed-in player profile composes server loadout, room art, and progression", () => {
   const html = read("index.html");
   const game = read("game.js");

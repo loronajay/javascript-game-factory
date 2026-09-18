@@ -35,6 +35,10 @@ export const YAM_BOWLING_CABINET_ART = Object.freeze({
   keyArt: "../grid-previews/yam-bowling.png",
 });
 
+export const SHARK_HALL_CABINET_ART = Object.freeze({
+  keyArt: "../grid-previews/shark-hall.png",
+});
+
 export const CABINET_MARQUEE_GEOMETRY = Object.freeze({
   birdDuty: Object.freeze({ depth: 0.8, centerZ: 0, artZ: 0.407, bodyFrontZ: 0.28 }),
   loversLost: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
@@ -81,5 +85,12 @@ export const YAM_BOWLING_PLAY_VIEW = Object.freeze({
   position: Object.freeze({ x: 0, y: 2.093, z: 4.266 }),
   fov: 35,
   screen: Object.freeze({ width: 1.395, height: 0.5822, y: 2.093, z: 2.133 }),
+  gameAspect: 16 / 9,
+});
+
+export const SHARK_HALL_PLAY_VIEW = Object.freeze({
+  position: Object.freeze({ x: 0, y: 1.42, z: 2.32 }),
+  fov: 38,
+  screen: Object.freeze({ width: 1.32, height: 0.7425, y: 1.42, z: -0.654 }),
   gameAspect: 16 / 9,
 });
