@@ -70,6 +70,10 @@ export function createUploadService(config = {}) {
                     ok: true,
                     assetId: result.public_id,
                     url: result.secure_url,
+                    // The stored picture's pixel size (after the width limit), so a caller that frames
+                    // it — the arcade room's posters — can take its shape without loading it first.
+                    width: Number.isFinite(result.width) ? Number(result.width) : 0,
+                    height: Number.isFinite(result.height) ? Number(result.height) : 0,
                 };
             }
             catch {

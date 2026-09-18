@@ -2,13 +2,13 @@
 //
 // `sync(layout)` is the whole API: it adds models for new rows, removes
 // models for rows that are gone, rebuilds a model whose finish changed
-// (item, colour, length, scale, mount, or whether it gets a light) and repositions
+// (item, colour, length, scale, words, picture, mount, or whether it gets a light) and repositions
 // the rest in place. The editor calls it after every layout change and never
 // touches a decor mesh itself.
 import { MAX_LIT_DECOR, findDecor } from "./arcade-room-catalog/decor.mjs";
 import { createDecorModel, disposeDecorModel, placeDecorModel } from "./arcade-room-decor-model.mjs";
 function signatureOf(item, lit) {
-    return `${item.itemId}|${item.color}|${item.length}|${item.scale}|${item.mount}|${lit ? "lit" : "dark"}`;
+    return `${item.itemId}|${item.color}|${item.length}|${item.scale}|${item.text}|${item.image}|${item.aspect}|${item.mount}|${lit ? "lit" : "dark"}`;
 }
 /** Which rows get a real light: the first `MAX_LIT_DECOR` lit-capable items in layout order. */
 export function litInstanceIds(layout) {

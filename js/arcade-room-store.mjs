@@ -119,11 +119,27 @@ export function createRoomLayoutStore(options = {}) {
             return { ok: false, target: "account", error: cleanText(result?.error) || "save_failed" };
         return { ok: true, target: "account", error: "" };
     }
+    async function uploadPicture(file) {
+        const failed = (error) => ({ ok: false, url: "", width: 0, height: 0, error });
+        if (!accountBacked || typeof api?.uploadRoomPoster !== "function")
+            return failed("sign_in_required");
+        const result = await api.uploadRoomPoster(file).catch(() => null);
+        if (!result || typeof result.url !== "string" || !result.url)
+            return failed(cleanText(result?.uploadError) || "upload_failed");
+        return {
+            ok: true,
+            url: result.url,
+            width: Number.isFinite(result.width) ? Number(result.width) : 0,
+            height: Number.isFinite(result.height) ? Number(result.height) : 0,
+            error: "",
+        };
+    }
     return Object.freeze({
         mode: visiting ? "visitor" : "owner",
         accountBacked,
         ownerPlayerId,
         load: visiting ? loadVisit : loadOwn,
         save,
+        uploadPicture,
     });
 }

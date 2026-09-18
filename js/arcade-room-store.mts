@@ -53,6 +53,7 @@ export type RoomStoreApi = Readonly<{
   saveGameGarage: (slug: string, garage: unknown) => Promise<any>;
   fetchGamePublicLoadout: (slug: string, playerId: string) => Promise<any>;
   loadPlayerProfile: (playerId: string) => Promise<any>;
+  uploadRoomPoster?: (file: File | Blob) => Promise<any>;
 }>;
 
 export type RoomLoadResult = Readonly<{
@@ -69,6 +70,16 @@ export type RoomSaveResult = Readonly<{
   error: string;
 }>;
 
+export type RoomUploadResult = Readonly<{
+  ok: boolean;
+  /** The platform URL the poster row stores, and the picture's pixel size for its shape. */
+  url: string;
+  width: number;
+  height: number;
+  /** `sign_in_required`, `unsupported_file_type`, `file_too_large`, or `upload_failed`. */
+  error: string;
+}>;
+
 export type RoomLayoutStore = Readonly<{
   mode: RoomStoreMode;
   /** True when saves reach the account, i.e. signed in AND the API is configured. */
@@ -77,6 +88,13 @@ export type RoomLayoutStore = Readonly<{
   ownerPlayerId: string;
   load: () => Promise<RoomLoadResult>;
   save: (layout: RoomLayout) => Promise<RoomSaveResult>;
+  /**
+   * Send a picture up for a custom poster. Only an account-backed owner can:
+   * a picture lives on the platform, not on this device, and a visitor has no
+   * business hanging one. The layout is not touched — the editor decides
+   * where the URL goes.
+   */
+  uploadPicture: (file: File | Blob) => Promise<RoomUploadResult>;
 }>;
 
 function cleanText(value: unknown): string {
@@ -176,11 +194,26 @@ export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayou
     return { ok: true, target: "account", error: "" };
   }
 
+  async function uploadPicture(file: File | Blob): Promise<RoomUploadResult> {
+    const failed = (error: string): RoomUploadResult => ({ ok: false, url: "", width: 0, height: 0, error });
+    if (!accountBacked || typeof api?.uploadRoomPoster !== "function") return failed("sign_in_required");
+    const result = await api.uploadRoomPoster(file).catch(() => null);
+    if (!result || typeof result.url !== "string" || !result.url) return failed(cleanText(result?.uploadError) || "upload_failed");
+    return {
+      ok: true,
+      url: result.url,
+      width: Number.isFinite(result.width) ? Number(result.width) : 0,
+      height: Number.isFinite(result.height) ? Number(result.height) : 0,
+      error: "",
+    };
+  }
+
   return Object.freeze({
     mode: visiting ? "visitor" : "owner",
     accountBacked,
     ownerPlayerId,
     load: visiting ? loadVisit : loadOwn,
     save,
+    uploadPicture,
   });
 }

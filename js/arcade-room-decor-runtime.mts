@@ -2,7 +2,7 @@
 //
 // `sync(layout)` is the whole API: it adds models for new rows, removes
 // models for rows that are gone, rebuilds a model whose finish changed
-// (item, colour, length, scale, mount, or whether it gets a light) and repositions
+// (item, colour, length, scale, words, picture, mount, or whether it gets a light) and repositions
 // the rest in place. The editor calls it after every layout change and never
 // touches a decor mesh itself.
 
@@ -22,7 +22,7 @@ export type DecorRuntime = Readonly<{
 }>;
 
 function signatureOf(item: RoomDecorItem, lit: boolean): string {
-  return `${item.itemId}|${item.color}|${item.length}|${item.scale}|${item.mount}|${lit ? "lit" : "dark"}`;
+  return `${item.itemId}|${item.color}|${item.length}|${item.scale}|${item.text}|${item.image}|${item.aspect}|${item.mount}|${lit ? "lit" : "dark"}`;
 }
 
 /** Which rows get a real light: the first `MAX_LIT_DECOR` lit-capable items in layout order. */

@@ -207,9 +207,18 @@ export function getCabinetFootprint(definition: CabinetDefinition): { width: num
   };
 }
 
-export function getCabinetLaunchUrl(definition: CabinetDefinition, roomHref: string): string {
+export function getCabinetLaunchUrl(
+  definition: CabinetDefinition,
+  roomHref: string,
+  shared?: Readonly<{ roomId: string; cabinetInstanceId: string }>,
+): string {
   const url = new URL(`../games/${encodeURIComponent(definition.gameSlug)}/index.html`, roomHref);
   url.searchParams.set("cabinet", "1");
+  if (shared?.roomId && shared.cabinetInstanceId) {
+    url.searchParams.set("arcadeRoomId", shared.roomId);
+    url.searchParams.set("cabinetInstanceId", shared.cabinetInstanceId);
+    url.searchParams.set("arcadeSession", `${shared.roomId}:${shared.cabinetInstanceId}`);
+  }
   return url.toString();
 }
 

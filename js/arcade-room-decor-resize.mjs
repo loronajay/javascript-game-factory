@@ -37,7 +37,7 @@ function findItem(layout, instanceId) {
     return item && definition ? { item, definition } : null;
 }
 export function decorFrame(item, definition, room) {
-    const extent = decorExtent(definition, item.length, item.scale);
+    const extent = decorExtent(definition, item);
     const cosine = Math.cos(item.rotationY);
     const sine = Math.sin(item.rotationY);
     // Local +X and +Z in world space, the same rotation `worldPointFromPlacement` applies.
@@ -196,7 +196,7 @@ export function scaleDecorCorner(layout, instanceId, u, v, point, room, catalog)
     if (!definition.scale.enabled)
         return { valid: false, layout, instanceId, reason: "not-scalable", guides: [] };
     const frame = decorFrame(item, definition, room);
-    const base = decorExtent(definition, item.length, 1);
+    const base = decorExtent(definition, { ...item, scale: 1 });
     const baseAcross = item.mount === "wall" ? base.height : base.depth;
     const anchor = add(add(frame.centre, frame.along, -u * frame.halfAlong), frame.across, -v * frame.halfAcross);
     // The full diagonal at scale 1, from the anchor to the dragged corner.

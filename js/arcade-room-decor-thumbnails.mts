@@ -37,6 +37,9 @@ export function thumbnailItem(definition: DecorDefinition): RoomDecorItem {
     color: definition.tint.enabled ? definition.tint.default : "",
     length: definition.length.enabled ? definition.length.default : 0,
     scale: 1,
+    text: "",
+    image: "",
+    aspect: 1,
   };
 }
 

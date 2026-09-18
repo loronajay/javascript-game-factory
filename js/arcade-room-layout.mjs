@@ -1,4 +1,4 @@
-import { DECOR_MOUNTS, clampDecorLength, clampDecorScale, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
+import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface } from "./arcade-room-catalog/surfaces.mjs";
 import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
@@ -52,9 +52,9 @@ const DEFAULT_CABINETS = Object.freeze([
  * face for the 20 m starter room (wall centre −10, thickness 0.24).
  */
 const DEFAULT_DECOR = Object.freeze([
-    Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ff4d91", length: 2.4, scale: 1 }),
-    Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4, scale: 1 }),
-    Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8, scale: 1 }),
+    Object.freeze({ instanceId: "neon-strip-1", itemId: "decor.neon.strip", x: -3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ff4d91", length: 2.4, scale: 1, text: "", image: "", aspect: 1 }),
+    Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4, scale: 1, text: "", image: "", aspect: 1 }),
+    Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8, scale: 1, text: "", image: "", aspect: 1 }),
 ]);
 const STARTER_NEON_INSTANCE_IDS = new Set(DEFAULT_DECOR.map((item) => item.instanceId));
 function rounded(value) {
@@ -77,7 +77,7 @@ export function defaultRoomMusic() {
 }
 export function createDefaultRoomLayout() {
     return {
-        version: 2,
+        version: 3,
         surfaces: defaultRoomSurfaces(),
         music: defaultRoomMusic(),
         items: DEFAULT_CABINETS.map((item) => ({ ...item })),
@@ -144,7 +144,7 @@ export function floorObstacles(layout, catalog) {
         const definition = findDecor(item.itemId);
         if (!definition || !definition.blocksWalking)
             continue;
-        obstacles.push({ instanceId: item.instanceId, x: item.x, z: item.z, rotationY: item.rotationY, footprint: decorFootprint(definition, item.length, item.scale) });
+        obstacles.push({ instanceId: item.instanceId, x: item.x, z: item.z, rotationY: item.rotationY, footprint: decorFootprint(definition, item) });
     }
     return obstacles;
 }
@@ -170,6 +170,58 @@ export function updateItemPlacement(layout, instanceId, placement, room, catalog
                 : candidate),
         },
     };
+}
+function cabinetInstanceSlug(cabinetId) {
+    return cabinetId.split(".")[1] || "cabinet";
+}
+/** Lowest available `<game-slug>-<n>` id across cabinets and decor. */
+export function nextCabinetInstanceId(layout, cabinetId) {
+    const slug = cabinetInstanceSlug(cabinetId);
+    const taken = new Set([...layout.items.map((item) => item.instanceId), ...layout.decor.map((item) => item.instanceId)]);
+    let n = 1;
+    while (taken.has(`${slug}-${n}`))
+        n += 1;
+    return `${slug}-${n}`;
+}
+const CABINET_SEARCH_OFFSETS = Object.freeze([
+    { x: 0, z: 0 },
+    ...[1, 2, 3, 4, 5, 6, 7, 8].flatMap((ring) => [
+        { x: ring, z: 0 }, { x: -ring, z: 0 }, { x: 0, z: ring }, { x: 0, z: -ring },
+        { x: ring, z: ring }, { x: -ring, z: ring }, { x: ring, z: -ring }, { x: -ring, z: -ring },
+    ]),
+]);
+/** Add another instance of any cabinet definition at the nearest open floor spot. */
+export function addCabinetItem(layout, cabinetId, room, catalog, preferred = { x: 0, z: 0, rotationY: 0 }) {
+    const footprint = catalog[cabinetId];
+    const instanceId = nextCabinetInstanceId(layout, cabinetId);
+    if (!footprint)
+        return { valid: false, layout, instanceId, reason: "unknown-cabinet" };
+    const seed = { instanceId, cabinetId, ...preferred, hidden: false };
+    const withSeed = { ...layout, items: [...layout.items, seed] };
+    for (const offset of CABINET_SEARCH_OFFSETS) {
+        const placement = { x: preferred.x + offset.x, z: preferred.z + offset.z, rotationY: preferred.rotationY };
+        const placed = updateItemPlacement(withSeed, instanceId, placement, room, catalog);
+        if (placed.valid)
+            return { valid: true, layout: placed.layout, instanceId, reason: "" };
+    }
+    return { valid: false, layout, instanceId, reason: "no-room" };
+}
+export function duplicateCabinetItem(layout, instanceId, room, catalog) {
+    const source = layout.items.find((item) => item.instanceId === instanceId);
+    if (!source)
+        return { valid: false, layout, instanceId, reason: "missing" };
+    const footprint = catalog[source.cabinetId];
+    if (!footprint)
+        return { valid: false, layout, instanceId, reason: "unknown-cabinet" };
+    return addCabinetItem(layout, source.cabinetId, room, catalog, {
+        x: source.x + rotatedFootprint(source, footprint).width + 0.2,
+        z: source.z,
+        rotationY: source.rotationY,
+    });
+}
+export function removeCabinetItem(layout, instanceId) {
+    const items = layout.items.filter((item) => item.instanceId !== instanceId);
+    return items.length === layout.items.length ? layout : { ...layout, items };
 }
 /**
  * Take a cabinet off the floor or put it back.
@@ -237,6 +289,8 @@ export function isHexColor(value) {
  * Coerce one stored decor row, or drop it. An unknown item id is dropped (the
  * catalog entry it named is gone); a mount the item does not support falls back
  * to its first mount; a bad colour, length or scale falls back to the catalog default.
+ * Words and a picture are kept only on an item built to carry them, and a picture
+ * only from where the platform's uploads live — anything else is an empty frame.
  */
 export function normalizeDecorItem(value) {
     if (!value || typeof value !== "object")
@@ -255,6 +309,7 @@ export function normalizeDecorItem(value) {
     const wall = mount === "wall" && WALL_SIDES.includes(source.wall) ? source.wall : "";
     if (mount === "wall" && !wall)
         return null;
+    const image = definition.image.enabled && isDecorImageUrl(source.image) ? source.image : "";
     return {
         instanceId: source.instanceId,
         itemId: source.itemId,
@@ -267,6 +322,9 @@ export function normalizeDecorItem(value) {
         color: definition.tint.enabled && isHexColor(source.color) ? source.color.toLowerCase() : "",
         length: definition.length.enabled ? clampDecorLength(definition, typeof source.length === "number" ? source.length : 0) : 0,
         scale: clampDecorScale(definition, typeof source.scale === "number" ? source.scale : 1),
+        text: definition.text.enabled ? cleanDecorText(source.text, definition.text.maxLength) : "",
+        image,
+        aspect: image ? clampDecorAspect(source.aspect) : 1,
     };
 }
 /** A stale id — a record that left the catalog — comes back as none rather than as a broken room. */
@@ -305,7 +363,7 @@ export function normalizeRoomLayout(value) {
     if (!value || typeof value !== "object")
         return createDefaultRoomLayout();
     const source = value;
-    if ((source.version !== 1 && source.version !== 2) || !Array.isArray(source.items) || !source.items.every(isStoredItem)) {
+    if ((source.version !== 1 && source.version !== 2 && source.version !== 3) || !Array.isArray(source.items) || !source.items.every(isStoredItem)) {
         return createDefaultRoomLayout();
     }
     const instanceIds = new Set(source.items.map((item) => item.instanceId));
@@ -320,7 +378,7 @@ export function normalizeRoomLayout(value) {
         hidden: item.hidden === true,
     }));
     const storedCabinetIds = new Set(storedItems.map((item) => item.cabinetId));
-    const starterAdditions = DEFAULT_CABINETS
+    const starterAdditions = source.version === 3 ? [] : DEFAULT_CABINETS
         .filter((item) => !storedCabinetIds.has(item.cabinetId))
         .map((item) => ({ ...item }));
     let decor;
@@ -339,7 +397,7 @@ export function normalizeRoomLayout(value) {
         decor = DEFAULT_DECOR.map((item) => ({ ...item }));
     }
     return {
-        version: 2,
+        version: 3,
         surfaces: normalizeSurfaces(source.surfaces),
         music: normalizeMusic(source.music),
         items: [...storedItems, ...starterAdditions],
@@ -367,7 +425,10 @@ function decorItemsEqual(first, second) {
         && first.wall === second.wall
         && first.color === second.color
         && first.length === second.length
-        && first.scale === second.scale;
+        && first.scale === second.scale
+        && first.text === second.text
+        && first.image === second.image
+        && first.aspect === second.aspect;
 }
 /** True when both layouts place the same things in the same spots with the same finishes. */
 export function roomLayoutsEqual(first, second) {

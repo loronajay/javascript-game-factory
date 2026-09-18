@@ -834,7 +834,7 @@ export function createApp(options = {}) {
                 }
             }
             // Upload routes
-            if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background" || pathname === "/upload/music")) {
+            if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background" || pathname === "/upload/music" || pathname === "/upload/poster")) {
                 if (!authClaims?.playerId) {
                     writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
                     return;
@@ -861,8 +861,11 @@ export function createApp(options = {}) {
                 }
                 const isAvatar = pathname === "/upload/avatar";
                 const isBackground = pathname === "/upload/background";
-                const folder = isAvatar ? "uploads/avatars" : isBackground ? "uploads/backgrounds" : "uploads/player-photos";
-                const maxWidth = isAvatar ? 800 : isBackground ? 1920 : 1200;
+                // A poster is a picture on a wall in the player's arcade room: its own folder, and its
+                // pixel size in the reply so the room can shape the frame before the picture loads.
+                const isPoster = pathname === "/upload/poster";
+                const folder = isAvatar ? "uploads/avatars" : isBackground ? "uploads/backgrounds" : isPoster ? "uploads/room-posters" : "uploads/player-photos";
+                const maxWidth = isAvatar ? 800 : isBackground ? 1920 : isPoster ? 1600 : 1200;
                 const result = await uploadService.uploadImage(multipart.buffer, {
                     folder,
                     maxWidth,
@@ -871,6 +874,10 @@ export function createApp(options = {}) {
                 if (!result.ok) {
                     const statusCode = result.error === "unsupported_file_type" ? 415 : 500;
                     writeJson(res, statusCode, { status: "error", error: result.error, timestamp }, requestOrigin);
+                    return;
+                }
+                if (isPoster) {
+                    writeJson(res, 200, { assetId: result.assetId, url: result.url, width: result.width ?? 0, height: result.height ?? 0 }, requestOrigin);
                     return;
                 }
                 writeJson(res, 200, { assetId: result.assetId, url: result.url }, requestOrigin);

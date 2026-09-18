@@ -1,9 +1,9 @@
 import * as THREE_VENDOR from "./vendor/three.module.js";
 import { CABINET_CATALOG, getCabinetFootprint, getCabinetLaunchUrl } from "./arcade-room-cabinet.mjs";
+import { createCabinetRuntime } from "./arcade-room-cabinet-runtime.mjs";
 import { createRoomEditor } from "./arcade-room-editor.mjs";
 import { canInteractWithCabinet, closeCabinetSession, createCabinetSession, findInteractiveDecor, getCabinetPrompt, openCabinetSession, } from "./arcade-room-interaction.mjs";
 import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
-import { createCabinetModel } from "./arcade-room-model.mjs";
 import { JUKEBOX_ITEM_ID, createRoomJukebox } from "./arcade-room-jukebox.mjs";
 import { pulseJukeboxGlow } from "./arcade-room-decor-model.mjs";
 import { createRoomInventory } from "./arcade-room-catalog/inventory.mjs";
@@ -150,23 +150,9 @@ const playViews = Object.freeze({
     "yam-bowling": YAM_BOWLING_PLAY_VIEW,
     "shark-hall": SHARK_HALL_PLAY_VIEW,
 });
-const cabinets = CABINET_CATALOG.map((definition) => {
-    const model = createCabinetModel(THREE, definition);
-    scene.add(model);
-    return {
-        definition,
-        model,
-        screen: model.getObjectByName("screen"),
-        footprint: getCabinetFootprint(definition),
-        playView: playViews[definition.gameSlug] ?? CABINET_PLAY_VIEW,
-    };
-});
-// Each cabinet carries its own marquee glow so the light moves with it.
-for (const cabinet of cabinets) {
-    const glow = new THREE.PointLight(cabinet.definition.palette.trim, 2.4, 5.2, 2);
-    glow.position.set(0, 2.08, 0.65);
-    cabinet.model.add(glow);
-}
+const cabinetRuntime = createCabinetRuntime(THREE, scene, CABINET_CATALOG);
+cabinetRuntime.sync(loaded.layout);
+const cabinetPlayView = (cabinet) => playViews[cabinet.definition.gameSlug] ?? CABINET_PLAY_VIEW;
 const keys = new Set();
 let session = createCabinetSession(CABINET_CATALOG[0].id);
 let interactionReady = false;
@@ -186,11 +172,11 @@ const roomEditor = createRoomEditor({
     canvas,
     shell,
     decor: decorRuntime,
+    cabinetRuntime,
     inventory,
-    cabinets: cabinets.map((cabinet) => ({
-        model: cabinet.model,
-        cabinet: cabinet.definition,
-        footprint: cabinet.footprint,
+    cabinets: CABINET_CATALOG.map((cabinet) => ({
+        cabinet,
+        footprint: getCabinetFootprint(cabinet),
     })),
     room: {
         width: PLAYER_ROOM_SHELL.width,
@@ -215,6 +201,8 @@ const roomEditor = createRoomEditor({
             return { ok: false, message: "Kept on this device, but the account save failed. Try again in a moment." };
         return { ok: false, message: "This browser could not save the layout." };
     },
+    // A picture can only be hung on an account-backed room; otherwise the inspector says to sign in.
+    uploadPicture: layoutStore.accountBacked ? (file) => layoutStore.uploadPicture(file) : null,
     elements: {
         panel: editorPanel,
         editButton: editArcadeButton,
@@ -269,8 +257,8 @@ function forwardVector() {
 function updateInteraction() {
     nearbyCabinet = null;
     let nearestDistance = Infinity;
-    for (const cabinet of cabinets) {
-        const placement = roomEditor.getCabinetPlacement(cabinet.definition.id);
+    for (const cabinet of cabinetRuntime.instances()) {
+        const placement = roomEditor.getCabinetPlacement(cabinet.instanceId);
         if (!placement)
             continue;
         const cabinetForward = worldPointFromPlacement(placement, { x: 0, z: 1 });
@@ -359,17 +347,18 @@ function openCabinet() {
     playing = true;
     jukebox.suspend();
     prePlayView = { ...player, fov: camera.fov };
-    const placement = roomEditor.getCabinetPlacement(activeCabinet.definition.id);
+    const placement = roomEditor.getCabinetPlacement(activeCabinet.instanceId);
     if (!placement)
         return;
-    const playPosition = worldPointFromPlacement(placement, activeCabinet.playView.position);
+    const playView = cabinetPlayView(activeCabinet);
+    const playPosition = worldPointFromPlacement(placement, playView.position);
     Object.assign(player, {
         ...playPosition,
-        y: activeCabinet.playView.position.y,
+        y: playView.position.y,
         yaw: placement.rotationY,
         pitch: 0,
     });
-    camera.fov = activeCabinet.playView.fov;
+    camera.fov = playView.fov;
     camera.updateProjectionMatrix();
     if (activeCabinet.screen)
         activeCabinet.screen.visible = false;
@@ -377,7 +366,10 @@ function openCabinet() {
     document.body.style.setProperty("--active-cabinet-accent", activeCabinet.definition.palette.trim);
     document.exitPointerLock?.();
     gameFrame.title = `${activeCabinet.definition.title} arcade game`;
-    gameFrame.src = getCabinetLaunchUrl(activeCabinet.definition, location.href);
+    gameFrame.src = getCabinetLaunchUrl(activeCabinet.definition, location.href, {
+        roomId: layoutStore.ownerPlayerId || "local-arcade",
+        cabinetInstanceId: activeCabinet.instanceId,
+    });
     playLayer.hidden = false;
     playLayer.setAttribute("aria-hidden", "false");
     prompt.classList.remove("is-visible");
@@ -533,10 +525,11 @@ function resize() {
 function positionGameOnCabinetScreen() {
     if (!playing || !activeCabinet)
         return;
-    const placement = roomEditor.getCabinetPlacement(activeCabinet.definition.id);
+    const placement = roomEditor.getCabinetPlacement(activeCabinet.instanceId);
     if (!placement)
         return;
-    const { width, height, y, z } = activeCabinet.playView.screen;
+    const playView = cabinetPlayView(activeCabinet);
+    const { width, height, y, z } = playView.screen;
     const corners = [
         { x: -width / 2, y: y + height / 2 },
         { x: width / 2, y: y + height / 2 },
@@ -556,7 +549,7 @@ function positionGameOnCabinetScreen() {
         fullscreen: playFullscreen,
         viewport: { width: playLayer.clientWidth, height: playLayer.clientHeight },
         projected: { left, top, width: right - left, height: bottom - top },
-        aspect: activeCabinet.playView.gameAspect,
+        aspect: playView.gameAspect,
     });
     gameScreen.style.left = `${fitted.left}px`;
     gameScreen.style.top = `${fitted.top}px`;

@@ -13,7 +13,15 @@
 // new prop is a catalog row and a small builder, never an asset. Posters are
 // the one place an image is used, and it is the game's own grid preview, which
 // is how a player hangs any cabinet on the grid on their wall without anyone
-// drawing a poster.
+// drawing a poster. The previews are SQUARE, so the poster frame is too — a
+// portrait frame would stretch them.
+//
+// SOME DECOR IS THE PLAYER'S OWN. A definition with `text.enabled` is a sign
+// whose words the player types (the model's `text` is only the placeholder), and
+// one with `image.enabled` is a poster whose picture the player uploads. Both
+// live on the layout row (`text`, `image`, `aspect`) rather than in the catalog,
+// which is why `decorExtent` takes the row's finish and not just its size: a
+// sign is as wide as its words and a picture keeps its own shape.
 //
 // SOME DECOR IS INTERACTIVE. An `interaction` names a page the player opens by
 // walking up and pressing E, with the same reach rules a cabinet has; the room
@@ -93,6 +101,10 @@ export type DecorDefinition = Readonly<{
   /** Resizable items multiply their whole `size` by the stored scale; 1 is the catalog size. */
   scale: Readonly<{ enabled: boolean; min: number; max: number }>;
   light: Readonly<{ intensity: number; distance: number }> | null;
+  /** The player writes the words; the model's `text` is the placeholder shown until they do. */
+  text: Readonly<{ enabled: boolean; maxLength: number }>;
+  /** The player supplies the picture; the model's `image` is empty until they do. */
+  image: Readonly<{ enabled: boolean }>;
   model: DecorModelSpec;
   /** A page the player can open from the room by walking up to the item, or null for plain decor. */
   interaction: DecorInteraction | null;
@@ -115,6 +127,20 @@ const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" } as cons
 const NO_TINT = Object.freeze({ enabled: false, default: "" });
 const NO_LENGTH = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 const NO_SCALE = Object.freeze({ enabled: false, min: 1, max: 1 });
+const NO_TEXT = Object.freeze({ enabled: false, maxLength: 0 });
+const NO_IMAGE = Object.freeze({ enabled: false });
+
+/** The most a custom sign may say: one short line, which is all a neon tube can hold. */
+export const CUSTOM_SIGN_MAX_LENGTH = 24;
+/** A custom picture's width ÷ height is kept within this, so a banner or a strip still reads as a poster. */
+export const DECOR_ASPECT_LIMITS = Object.freeze({ min: 0.25, max: 4 });
+/**
+ * Where a custom poster's picture may come from: the platform's own Cloudinary
+ * account, which is where `/upload/poster` puts it. A row naming anything else
+ * is drawn without a picture — a visitor's browser must never be sent to fetch
+ * an arbitrary URL because a room owner wrote one into their layout.
+ */
+export const DECOR_IMAGE_URL_PATTERN = /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\/[A-Za-z0-9_./-]+$/;
 
 /**
  * How far each kind of item may be resized. Flat things on a wall or floor
@@ -142,6 +168,8 @@ type DecorInput = Readonly<{
   length?: Readonly<{ min: number; max: number; default: number }>;
   scale?: Readonly<{ min: number; max: number }>;
   light?: Readonly<{ intensity: number; distance: number }>;
+  text?: boolean;
+  image?: boolean;
   model: DecorModelSpec;
   interaction?: DecorInteraction;
 }>;
@@ -159,6 +187,8 @@ function decor(input: DecorInput): DecorDefinition {
     length: input.length ? Object.freeze({ enabled: true, ...input.length }) : NO_LENGTH,
     scale: input.scale && !input.length ? Object.freeze({ enabled: true, ...input.scale }) : NO_SCALE,
     light: input.light ? Object.freeze({ ...input.light }) : null,
+    text: input.text ? Object.freeze({ enabled: true, maxLength: CUSTOM_SIGN_MAX_LENGTH }) : NO_TEXT,
+    image: input.image ? Object.freeze({ enabled: true }) : NO_IMAGE,
     model: Object.freeze({ ...input.model }) as DecorModelSpec,
     interaction: input.interaction ? Object.freeze({ ...input.interaction }) : null,
     unlock: STARTER,
@@ -190,6 +220,10 @@ export const DECOR_CATALOG: readonly DecorDefinition[] = Object.freeze([
   decor({ slug: "ring", category: "neon", title: "Neon Ring", mounts: ["wall"], size: { width: 0.9, height: 0.9, depth: 0.06 }, wallHeight: 2.3, tint: "#22e5ff", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "circle" } }),
 
   // — Signs —
+  // The player's own words, in either face. The catalog text is the placeholder; the
+  // sign grows to fit whatever they type (see `customSignWidth`).
+  decor({ slug: "custom-block", category: "sign", title: "Your Words (Block)", mounts: ["wall"], size: { width: 2.1, height: 0.5, depth: 0.06 }, wallHeight: 2.6, tint: "#22e5ff", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, text: true, model: { kind: "text-sign", text: "YOUR WORDS", font: "block" } }),
+  decor({ slug: "custom-script", category: "sign", title: "Your Words (Script)", mounts: ["wall"], size: { width: 1.9, height: 0.7, depth: 0.06 }, wallHeight: 2.5, tint: "#ff2d95", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, text: true, model: { kind: "text-sign", text: "your words", font: "script" } }),
   decor({ slug: "open", category: "sign", title: "OPEN", mounts: ["wall"], size: { width: 1.2, height: 0.5, depth: 0.06 }, wallHeight: 2.6, tint: "#ff3b3b", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "text-sign", text: "OPEN", font: "block" } }),
   decor({ slug: "arcade", category: "sign", title: "ARCADE", mounts: ["wall"], size: { width: 2.4, height: 0.6, depth: 0.06 }, wallHeight: 3.2, tint: "#ff2d95", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "text-sign", text: "ARCADE", font: "block" } }),
   decor({ slug: "play", category: "sign", title: "PLAY", mounts: ["wall"], size: { width: 1.3, height: 0.6, depth: 0.06 }, wallHeight: 2.6, tint: "#22e5ff", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "text-sign", text: "PLAY", font: "script" } }),
@@ -199,13 +233,17 @@ export const DECOR_CATALOG: readonly DecorDefinition[] = Object.freeze([
   decor({ slug: "good-vibes", category: "sign", title: "good vibes", mounts: ["wall"], size: { width: 1.8, height: 0.7, depth: 0.06 }, wallHeight: 2.5, tint: "#ff2d95", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "text-sign", text: "good vibes", font: "script" } }),
   decor({ slug: "no-quarters", category: "sign", title: "no quarters", mounts: ["wall"], size: { width: 1.8, height: 0.7, depth: 0.06 }, wallHeight: 2.5, tint: "#a35bff", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "text-sign", text: "no quarters", font: "script" } }),
 
-  // — Posters (one per grid cabinet) —
+  // — Posters —
+  // The player's own picture first: an empty frame until one is uploaded, which then
+  // keeps the picture's shape inside this square (a wide photo is a wide poster).
+  decor({ slug: "custom", category: "poster", title: "Your Picture", mounts: ["wall"], size: { width: 1.0, height: 1.0, depth: 0.03 }, wallHeight: 1.75, scale: SCALE_RANGES.poster, image: true, model: { kind: "poster", image: "", frame: "#111318" } }),
+  // One per grid cabinet: a square frame, because the grid previews are square.
   ...POSTER_GAME_SLUGS.map((slug) => decor({
     slug,
     category: "poster",
     title: `${posterTitle(slug)} Poster`,
     mounts: ["wall"],
-    size: { width: 0.9, height: 1.2, depth: 0.03 },
+    size: { width: 0.9, height: 0.9, depth: 0.03 },
     wallHeight: 1.75,
     scale: SCALE_RANGES.poster,
     model: { kind: "poster", image: `../grid-previews/${slug}.png`, frame: "#111318" },
@@ -322,21 +360,84 @@ export function interactiveDecor(): readonly DecorDefinition[] {
  * preview, the calendar's cover. Null for everything else, which is rendered from its model.
  */
 export function decorCardImage(definition: DecorDefinition): string | null {
-  if (definition.model.kind === "poster") return definition.model.image;
+  if (definition.model.kind === "poster") return definition.model.image || null;
   if (definition.model.kind === "calendar") return definition.model.cover;
   return null;
 }
 
-/** The item's full extent once its stored length and scale are applied. A stretched length is absolute; scale multiplies everything. */
-export function decorExtent(definition: DecorDefinition, length = 0, scale = 1): Readonly<{ width: number; height: number; depth: number }> {
-  const factor = definition.scale.enabled && scale > 0 ? scale : 1;
-  const width = definition.length.enabled && length > 0 ? length : definition.size.width * factor;
-  return { width, height: definition.size.height * factor, depth: definition.size.depth * factor };
+/**
+ * The finish a layout row gives an item: how it was stretched or scaled, and —
+ * for the player's own signs and posters — what it says or shows. A
+ * `RoomDecorItem` is one of these; so is a catalog default.
+ */
+export type DecorFinish = Readonly<{ length?: number; scale?: number; text?: string; aspect?: number }>;
+
+/** One line, printable, trimmed and capped — what a custom sign may say. */
+export function cleanDecorText(value: unknown, maxLength = CUSTOM_SIGN_MAX_LENGTH): string {
+  if (typeof value !== "string") return "";
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-/** The item's footprint on the floor once its stored length and scale are applied. */
-export function decorFootprint(definition: DecorDefinition, length = 0, scale = 1): Readonly<{ width: number; depth: number }> {
-  const extent = decorExtent(definition, length, scale);
+/** True for a picture URL a poster may carry. */
+export function isDecorImageUrl(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 400 && DECOR_IMAGE_URL_PATTERN.test(value);
+}
+
+/** Keep a picture's width ÷ height within what a poster frame can hold; 1 for anything that is not a number. */
+export function clampDecorAspect(aspect: unknown): number {
+  if (typeof aspect !== "number" || !Number.isFinite(aspect) || aspect <= 0) return 1;
+  return Number(Math.min(DECOR_ASPECT_LIMITS.max, Math.max(DECOR_ASPECT_LIMITS.min, aspect)).toFixed(3));
+}
+
+/**
+ * How wide a sign has to be to say `text` at `height`: a per-glyph estimate of
+ * the faces `drawNeonText` uses, with a margin either side. An estimate rather
+ * than a measurement because this layer has no canvas; the drawer still fits
+ * the words to whatever box it is given, so a miss is a little padding, never
+ * a clipped word.
+ */
+export function customSignWidth(text: string, font: "block" | "script", height: number): number {
+  const glyph = font === "script" ? 0.4 : 0.5;
+  const glyphs = Math.max(1, text.length);
+  const width = height * (0.5 + glyph * glyphs);
+  return Number(Math.min(8, Math.max(0.6, width)).toFixed(3));
+}
+
+/** The words a sign shows: the row's own, or the catalog placeholder when it has none. */
+export function decorSignText(definition: DecorDefinition, finish: DecorFinish): string {
+  if (definition.model.kind !== "text-sign") return "";
+  return (definition.text.enabled && finish.text) || definition.model.text;
+}
+
+/**
+ * The item's full extent once its finish is applied. A stretched length is
+ * absolute; scale multiplies everything; a custom sign is as wide as its
+ * words; a custom poster keeps its picture's shape inside the catalog square.
+ */
+export function decorExtent(definition: DecorDefinition, finish: DecorFinish = {}): Readonly<{ width: number; height: number; depth: number }> {
+  const length = finish.length ?? 0;
+  const scale = finish.scale ?? 1;
+  const factor = definition.scale.enabled && scale > 0 ? scale : 1;
+  let width = definition.size.width;
+  let height = definition.size.height;
+  if (definition.text.enabled && definition.model.kind === "text-sign") {
+    width = customSignWidth(decorSignText(definition, finish), definition.model.font, height);
+  } else if (definition.image.enabled) {
+    const aspect = clampDecorAspect(finish.aspect ?? 1);
+    width = definition.size.width * Math.min(1, aspect);
+    height = definition.size.height * Math.min(1, 1 / aspect);
+  }
+  return {
+    width: definition.length.enabled && length > 0 ? length : width * factor,
+    height: height * factor,
+    depth: definition.size.depth * factor,
+  };
+}
+
+/** The item's footprint on the floor once its finish is applied. */
+export function decorFootprint(definition: DecorDefinition, finish: DecorFinish = {}): Readonly<{ width: number; depth: number }> {
+  const extent = decorExtent(definition, finish);
   return { width: extent.width, depth: extent.depth };
 }
 

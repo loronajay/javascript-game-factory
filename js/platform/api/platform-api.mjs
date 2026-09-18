@@ -351,6 +351,33 @@ export function createPlatformApiClient(options = {}) {
                 return null;
             }
         },
+        /**
+         * A picture for a poster in the player's arcade room. Its own endpoint rather than
+         * `/upload/photo` so it lands in its own folder and comes back with its pixel size,
+         * which is what lets the room give the frame the picture's shape before it loads.
+         */
+        async uploadRoomPoster(file) {
+            if (!fetchImpl || !baseUrl || !file)
+                return null;
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+                const response = await fetchImpl(`${baseUrl}/upload/poster`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: buildAuthHeaders(),
+                    body: formData,
+                });
+                if (!response?.ok) {
+                    const body = await readJsonResponse(response).catch(() => null);
+                    return { uploadError: body?.error || String(response?.status ?? "failed") };
+                }
+                return await readJsonResponse(response);
+            }
+            catch {
+                return null;
+            }
+        },
         async listPlayerPhotos(playerId, { visibility } = {}) {
             if (!fetchImpl || !baseUrl || !playerId)
                 return [];

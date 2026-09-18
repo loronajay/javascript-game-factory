@@ -16,6 +16,11 @@
 // SIZE IS SET IN THE ROOM, NOT HERE. The handles on the selected item (end
 // arrows, corner grips — `arcade-room-decor-resize.mts`) are how a player
 // resizes; the inspector shows the exact number and takes a typed one.
+//
+// WORDS AND PICTURES ARE SET HERE. A custom sign gets a text field (every
+// keystroke previews, leaving the field commits) and a custom poster gets a
+// file chooser; the upload itself is the editor's business, the panel only
+// hands the file over and shows the state it is told.
 
 import type { CabinetDefinition } from "./arcade-room-cabinet.mjs";
 import { createColorPicker, type ColorPicker } from "./arcade-room-color-picker.mjs";
@@ -47,6 +52,10 @@ export type PanelState = Readonly<{
   cabinets: readonly CabinetDefinition[];
   inventory: RoomInventory;
   decorCategory: DecorCategory;
+  /** Whether a picture can be uploaded at all: signed in against a configured API. */
+  canUpload: boolean;
+  /** The custom poster whose picture is on its way up, or "" when none is. */
+  uploadingInstanceId: string;
 }>;
 
 /**
@@ -57,8 +66,11 @@ export type EditPhase = "preview" | "commit";
 
 export type PanelActions = Readonly<{
   selectTab: (tab: EditorTab) => void;
+  addCabinet: (cabinetId: string) => void;
   selectCabinet: (instanceId: string) => void;
   toggleCabinetHidden: (instanceId: string) => void;
+  duplicateCabinet: (instanceId: string) => void;
+  removeCabinet: (instanceId: string) => void;
   setSurface: (kind: SurfaceKind, id: string) => void;
   setDecorCategory: (category: DecorCategory) => void;
   addDecor: (itemId: string) => void;
@@ -72,6 +84,11 @@ export type PanelActions = Readonly<{
   setDecorLength: (instanceId: string, length: number, phase: EditPhase) => void;
   setDecorScale: (instanceId: string, scale: number, phase: EditPhase) => void;
   setDecorMount: (instanceId: string, mount: DecorMount) => void;
+  setDecorText: (instanceId: string, text: string, phase: EditPhase) => void;
+  /** The player picked a file for a custom poster; the editor uploads it and hangs it. */
+  uploadDecorImage: (instanceId: string, file: File) => void;
+  /** Take the picture out of a custom poster, leaving the empty frame. */
+  clearDecorImage: (instanceId: string) => void;
 }>;
 
 export type PanelOptions = Readonly<{
@@ -145,7 +162,7 @@ function decorIcon(definition: DecorDefinition, thumbnail: PanelOptions["thumbna
 
 /** "0.6 × 0.8 m" for the inspector's size readouts. */
 function extentLabel(definition: DecorDefinition, item: RoomDecorItem): string {
-  const extent = decorExtent(definition, item.length, item.scale);
+  const extent = decorExtent(definition, item);
   return `${extent.width.toFixed(1)} × ${extent.height.toFixed(1)} m`;
 }
 
@@ -158,6 +175,10 @@ type InspectorRefs = Readonly<{
   lengthInput: HTMLInputElement | null;
   scaleLabel: HTMLElement | null;
   scaleInput: HTMLInputElement | null;
+  textInput: HTMLInputElement | null;
+  pictureButton: HTMLButtonElement | null;
+  pictureClear: HTMLButtonElement | null;
+  pictureHint: HTMLElement | null;
 }>;
 
 export function createEditorPanel(elements: PanelElements, actions: PanelActions, options: PanelOptions = {}): EditorPanel {
@@ -175,7 +196,21 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
   }
 
   function renderCabinetList(state: PanelState): void {
-    elements.cabinetList.replaceChildren(...state.layout.items.map((placement, index) => {
+    const catalogTitle = element("span", "surface-section__group", "ADD A CABINET");
+    const catalog = element("div", "cabinet-catalog");
+    for (const definition of state.cabinets) {
+      const add = element("button", "decor-card");
+      add.type = "button";
+      add.dataset.addCabinet = definition.id;
+      add.title = `Add another ${definition.title}`;
+      const image = element("img");
+      image.src = `../grid-previews/${definition.gameSlug}.png`;
+      image.alt = "";
+      add.append(image, element("span", "decor-card__title", definition.title), element("small", "decor-card__meta", "Add to floor"));
+      catalog.append(add);
+    }
+    const placedTitle = element("span", "surface-section__group", `PLACED · ${state.layout.items.length}`);
+    const rows = state.layout.items.map((placement, index) => {
       const entry = state.cabinets.find((cabinet) => cabinet.id === placement.cabinetId);
       const selected = state.selection?.kind === "cabinet" && state.selection.instanceId === placement.instanceId;
       const row = element("div", "cabinet-list__row");
@@ -202,9 +237,18 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       toggle.dataset.toggleInstanceId = placement.instanceId;
       toggle.setAttribute("aria-pressed", String(!placement.hidden));
       toggle.title = placement.hidden ? "Put this cabinet back on the floor (H)" : "Take this cabinet off the floor (H)";
-      row.append(button, toggle);
+      const duplicate = element("button", "cabinet-list__toggle", "Copy");
+      duplicate.type = "button";
+      duplicate.dataset.duplicateCabinet = placement.instanceId;
+      duplicate.title = "Duplicate this cabinet (Ctrl+D)";
+      const remove = element("button", "placed-list__remove", "×");
+      remove.type = "button";
+      remove.dataset.removeCabinet = placement.instanceId;
+      remove.title = "Remove this cabinet (Delete)";
+      row.append(button, toggle, duplicate, remove);
       return row;
-    }));
+    });
+    elements.cabinetList.replaceChildren(catalogTitle, catalog, placedTitle, ...rows);
   }
 
   function buildSurfacePicker(state: PanelState): void {
@@ -311,6 +355,42 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     let lengthInput: HTMLInputElement | null = null;
     let scaleLabel: HTMLElement | null = null;
     let scaleInput: HTMLInputElement | null = null;
+    let textInput: HTMLInputElement | null = null;
+    let pictureButton: HTMLButtonElement | null = null;
+    let pictureClear: HTMLButtonElement | null = null;
+    let pictureHint: HTMLElement | null = null;
+
+    if (definition.text.enabled) {
+      const row = element("div", "inspector__row");
+      row.append(element("span", "inspector__label", "Words"));
+      textInput = element("input", "inspector__text");
+      textInput.type = "text";
+      textInput.maxLength = definition.text.maxLength;
+      textInput.placeholder = definition.model.kind === "text-sign" ? definition.model.text : "";
+      textInput.value = selected.text;
+      textInput.autocomplete = "off";
+      textInput.spellcheck = false;
+      textInput.dataset.text = "true";
+      textInput.setAttribute("aria-label", "Words on the sign");
+      row.append(textInput, element("small", "inspector__hint", `One line, up to ${definition.text.maxLength} characters. The sign grows to fit.`));
+      nodes.push(row);
+    }
+
+    if (definition.image.enabled) {
+      const row = element("div", "inspector__row");
+      row.append(element("span", "inspector__label", "Picture"));
+      const tools = element("div", "inspector__tools");
+      pictureButton = element("button", "inspector__tool", "Choose picture…");
+      pictureButton.type = "button";
+      pictureButton.dataset.choosePicture = selected.instanceId;
+      pictureClear = element("button", "inspector__tool", "Remove picture");
+      pictureClear.type = "button";
+      pictureClear.dataset.clearPicture = selected.instanceId;
+      tools.append(pictureButton, pictureClear);
+      pictureHint = element("small", "inspector__hint");
+      row.append(tools, pictureHint);
+      nodes.push(row);
+    }
 
     if (definition.mounts.length > 1) {
       const row = element("div", "inspector__row");
@@ -368,12 +448,27 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     tools.append(duplicate, remove);
     nodes.push(tools);
     elements.decorInspector.replaceChildren(...nodes);
-    return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, picker, lengthLabel, lengthInput, scaleLabel, scaleInput };
+    return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, picker, lengthLabel, lengthInput, scaleLabel, scaleInput, textInput, pictureButton, pictureClear, pictureHint };
   }
 
   /** Bring the live inspector up to date with the item without touching its nodes. */
-  function updateDecorInspector(refs: InspectorRefs, selected: RoomDecorItem, definition: DecorDefinition): void {
+  function updateDecorInspector(refs: InspectorRefs, selected: RoomDecorItem, definition: DecorDefinition, state: PanelState): void {
     refs.where.textContent = decorLabel(selected);
+    if (refs.textInput && document.activeElement !== refs.textInput) refs.textInput.value = selected.text;
+    if (refs.pictureButton && refs.pictureClear && refs.pictureHint) {
+      const uploading = state.uploadingInstanceId === selected.instanceId;
+      refs.pictureButton.disabled = !state.canUpload || uploading;
+      refs.pictureButton.textContent = uploading ? "Uploading…" : selected.image ? "Change picture…" : "Choose picture…";
+      refs.pictureClear.hidden = !selected.image;
+      refs.pictureClear.disabled = uploading;
+      refs.pictureHint.textContent = !state.canUpload
+        ? "Sign in to upload a picture for this frame."
+        : uploading
+          ? "Sending your picture to the platform…"
+          : selected.image
+            ? `JPEG, PNG or WebP up to 10 MB. Shape ${selected.aspect >= 1 ? `${selected.aspect.toFixed(2)} : 1` : `1 : ${(1 / selected.aspect).toFixed(2)}`}.`
+            : "JPEG, PNG or WebP up to 10 MB. The frame takes the picture's shape.";
+    }
     for (const button of refs.mounts) button.setAttribute("aria-pressed", String(button.dataset.mount === selected.mount));
     refs.picker?.setValue(selected.color || definition.tint.default);
     if (refs.lengthLabel && refs.lengthInput) {
@@ -406,7 +501,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       // that column must not leave the new item's controls out of sight above it.
       elements.decorInspector.scrollIntoView({ block: "start" });
     }
-    updateDecorInspector(inspector, selected, definition);
+    updateDecorInspector(inspector, selected, definition, state);
   }
 
   function renderDecorPlaced(state: PanelState): void {
@@ -421,7 +516,8 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       const dot = element("span", "placed-list__dot");
       dot.style.setProperty("--tint", item.color || definition?.tint.default || "#8fa3b8");
       const text = element("div");
-      text.append(element("strong", "", definition?.title ?? item.itemId), element("small", "", decorLabel(item)));
+      const name = definition?.text.enabled && item.text ? `${definition.title} · “${item.text}”` : definition?.title ?? item.itemId;
+      text.append(element("strong", "", name), element("small", "", decorLabel(item)));
       button.append(dot, text);
       const remove = element("button", "placed-list__remove", "×");
       remove.type = "button";
@@ -458,6 +554,21 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
   });
   elements.cabinetList.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;
+    const add = target.closest<HTMLElement>("[data-add-cabinet]");
+    if (add?.dataset.addCabinet) {
+      actions.addCabinet(add.dataset.addCabinet);
+      return;
+    }
+    const remove = target.closest<HTMLElement>("[data-remove-cabinet]");
+    if (remove?.dataset.removeCabinet) {
+      actions.removeCabinet(remove.dataset.removeCabinet);
+      return;
+    }
+    const duplicate = target.closest<HTMLElement>("[data-duplicate-cabinet]");
+    if (duplicate?.dataset.duplicateCabinet) {
+      actions.duplicateCabinet(duplicate.dataset.duplicateCabinet);
+      return;
+    }
     const toggle = target.closest<HTMLElement>("[data-toggle-instance-id]");
     if (toggle?.dataset.toggleInstanceId) {
       actions.toggleCabinetHidden(toggle.dataset.toggleInstanceId);
@@ -503,11 +614,40 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
       actions.selectDecor(select.dataset.decorInstanceId);
       return;
     }
+    const choose = target.closest<HTMLButtonElement>("[data-choose-picture]");
+    if (choose?.dataset.choosePicture && !choose.disabled) {
+      pickPicture(choose.dataset.choosePicture);
+      return;
+    }
+    const clear = target.closest<HTMLElement>("[data-clear-picture]");
+    if (clear?.dataset.clearPicture) {
+      actions.clearDecorImage(clear.dataset.clearPicture);
+      return;
+    }
     const selectedId = elements.decorInspector.querySelector<HTMLElement>("[data-duplicate-decor]")?.dataset.duplicateDecor;
     if (!selectedId) return;
     const mount = target.closest<HTMLElement>("[data-mount]");
     if (mount?.dataset.mount) actions.setDecorMount(selectedId, mount.dataset.mount as DecorMount);
   };
+  // One hidden file input for the whole panel, living outside the inspector so a rebuild
+  // never drops it mid-pick; the browser's own picker is the UI.
+  const fileInput = element("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/jpeg,image/png,image/webp";
+  fileInput.hidden = true;
+  let pickingFor = "";
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    const instanceId = pickingFor;
+    pickingFor = "";
+    fileInput.value = "";
+    if (file && instanceId) actions.uploadDecorImage(instanceId, file);
+  });
+  elements.tabPanels.append(fileInput);
+  function pickPicture(instanceId: string): void {
+    pickingFor = instanceId;
+    fileInput.click();
+  }
   elements.decorInspector.addEventListener("click", inspectorClick);
   elements.decorPlaced.addEventListener("click", inspectorClick);
   // A number field fires `input` on every keystroke or spinner step and `change` when it is left.
@@ -520,8 +660,14 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     if (target.dataset.length) actions.setDecorLength(selectedId, value, phase);
     if (target.dataset.scale) actions.setDecorScale(selectedId, value, phase);
   };
-  elements.decorInspector.addEventListener("input", (event) => numberEdit(event, "preview"));
-  elements.decorInspector.addEventListener("change", (event) => numberEdit(event, "commit"));
+  const textEdit = (event: Event, phase: EditPhase): void => {
+    const target = event.target;
+    const selectedId = elements.decorInspector.querySelector<HTMLElement>("[data-duplicate-decor]")?.dataset.duplicateDecor;
+    if (!selectedId || !(target instanceof HTMLInputElement) || !target.dataset.text) return;
+    actions.setDecorText(selectedId, target.value, phase);
+  };
+  elements.decorInspector.addEventListener("input", (event) => { numberEdit(event, "preview"); textEdit(event, "preview"); });
+  elements.decorInspector.addEventListener("change", (event) => { numberEdit(event, "commit"); textEdit(event, "commit"); });
 
   return Object.freeze({ render });
 }

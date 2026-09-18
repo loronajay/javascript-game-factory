@@ -40,6 +40,16 @@
 // when the key is ABSENT — a version 2 row with `decor: []` is a room the
 // player deliberately stripped, and must come back stripped.
 //
+// A DECOR ROW MAY CARRY THE PLAYER'S OWN WORDS OR PICTURE (2026-09-17). `text`
+// is a custom sign's line, kept as printable text capped at 24; `image` is a
+// custom poster's picture and is accepted ONLY as a URL under this platform's
+// Cloudinary upload path, because every visitor's browser fetches whatever is
+// stored here — an arbitrary URL would let one player point everyone who walks
+// into their room at any host they like. `aspect` (width ÷ height) travels
+// with the picture so the client can shape the frame before it loads, and is
+// meaningless (stored as 1) without one. The client's catalog decides which
+// items honour these; here they are shape-checked and passed through.
+//
 // `music.defaultTrackId` (2026-09-17) is the house record: the jukebox track
 // the room starts playing for anyone who walks in. Same policy again — it is
 // checked for SHAPE (`<game-slug>.<track-slug>`), and the client's jukebox
@@ -48,7 +58,7 @@
 
 export const ARCADE_ROOM_GAME_SLUG = "arcade-room";
 
-const LAYOUT_VERSION = 2;
+const LAYOUT_VERSION = 3;
 /** Plenty for a room that seats two cabinets today; a bound, not a plan. */
 const MAX_ITEMS = 32;
 /** A wall of neon strips and a floor of props; a bound, not a plan. */
@@ -71,11 +81,25 @@ const SURFACE_KINDS = ["floor", "wall", "ceiling", "trim"] as const;
 const DECOR_MOUNTS = new Set(["floor", "wall", "ceiling"]);
 const WALL_SIDES = new Set(["north", "south", "east", "west"]);
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
+/** A custom sign's line: one short line of neon. */
+const TEXT_LIMIT = 24;
+/** A poster picture: this platform's Cloudinary uploads and nothing else. */
+const IMAGE_URL_PATTERN = /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/image\/upload\/[A-Za-z0-9_./-]+$/;
+const IMAGE_URL_LIMIT = 400;
+/** Width ÷ height of a poster picture; outside this it is a banner, not a poster. */
+const ASPECT_LIMITS = { min: 0.25, max: 4 };
 /** `<game-slug>.<track-slug>` — the namespace every jukebox track id lives in. */
 const TRACK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function cleanText(value: any, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+/** Printable single-line text: control characters become spaces, runs of space collapse. */
+function cleanLine(value: any, maxLength: number): string {
+  if (typeof value !== "string") return "";
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
 function boundedNumber(value: any, limit: number): number | null {
@@ -100,7 +124,9 @@ function surfaceIdPattern(kind: string): RegExp {
 }
 
 export function defaultArcadeRoomGarage(): any {
-  return { version: LAYOUT_VERSION, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, music: { defaultTrackId: "" }, items: [] };
+  // Missing rows predate removable cabinet instances. Version 2 tells the client
+  // to seed its starter floor; only an explicitly saved v3 document may stay empty.
+  return { version: 2, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, music: { defaultTrackId: "" }, items: [] };
 }
 
 function normalizeMusic(value: any): Record<string, string> {
@@ -139,7 +165,12 @@ function normalizeDecorRow(raw: any): any | null {
   // A missing or non-positive scale is size 1 — a stored 0 would make the client draw nothing.
   const rawScale = boundedNumber(source.scale, SCALE_LIMIT);
   const scale = rawScale === null || rawScale <= 0 ? 1 : rawScale;
-  return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length, scale };
+  const text = cleanLine(source.text, TEXT_LIMIT);
+  const rawImage = typeof source.image === "string" ? source.image.trim() : "";
+  const image = rawImage.length <= IMAGE_URL_LIMIT && IMAGE_URL_PATTERN.test(rawImage) ? rawImage : "";
+  const rawAspect = typeof source.aspect === "number" && Number.isFinite(source.aspect) ? source.aspect : 1;
+  const aspect = image ? Number(Math.min(ASPECT_LIMITS.max, Math.max(ASPECT_LIMITS.min, rawAspect)).toFixed(3)) : 1;
+  return { instanceId, itemId, x, y, z, rotationY, mount, wall, color, length, scale, text, image, aspect };
 }
 
 /**
@@ -174,7 +205,8 @@ export function normalizeArcadeRoomGarage(value: any): any {
     items.push({ instanceId, cabinetId, x, z, rotationY, hidden: source.hidden === true });
   }
 
-  const garage: any = { version: LAYOUT_VERSION, surfaces, music, items };
+  const version = input.version === LAYOUT_VERSION ? LAYOUT_VERSION : 2;
+  const garage: any = { version, surfaces, music, items };
   if (Array.isArray(input.decor)) {
     const decor: any[] = [];
     for (const raw of input.decor.slice(0, MAX_DECOR)) {

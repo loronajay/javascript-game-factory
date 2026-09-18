@@ -171,9 +171,14 @@ export function getCabinetFootprint(definition) {
         depth: Number((definition.dimensions.depth + padding).toFixed(3)),
     };
 }
-export function getCabinetLaunchUrl(definition, roomHref) {
+export function getCabinetLaunchUrl(definition, roomHref, shared) {
     const url = new URL(`../games/${encodeURIComponent(definition.gameSlug)}/index.html`, roomHref);
     url.searchParams.set("cabinet", "1");
+    if (shared?.roomId && shared.cabinetInstanceId) {
+        url.searchParams.set("arcadeRoomId", shared.roomId);
+        url.searchParams.set("cabinetInstanceId", shared.cabinetInstanceId);
+        url.searchParams.set("arcadeSession", `${shared.roomId}:${shared.cabinetInstanceId}`);
+    }
     return url.toString();
 }
 export function validateCabinetDefinition(definition) {

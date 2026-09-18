@@ -10,7 +10,7 @@
 // to know which layout row a click landed on.
 
 import type { DecorDefinition, DecorModelSpec, DecorMount } from "./arcade-room-catalog/decor.mjs";
-import { decorExtent } from "./arcade-room-catalog/decor.mjs";
+import { decorExtent, decorSignText } from "./arcade-room-catalog/decor.mjs";
 import type { RoomDecorItem } from "./arcade-room-layout.mjs";
 import { drawNeonShape, drawNeonText } from "./arcade-room-neon-art.mjs";
 
@@ -517,7 +517,9 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
   },
   "text-sign": (THREE, group, size, color, spec: { text: string; font: "block" | "script" }) => {
     box(THREE, group, [size.width, size.height, size.depth * 0.3], [0, 0, -size.depth * 0.3], standard(THREE, "#0b0d12", 0.6, 0.3), false);
-    canvasPlane(THREE, group, size.width, size.height, [1024, Math.round(1024 * size.height / size.width)], (context, w, h) => {
+    // Pixels follow the height, not the width, so a long custom line is as crisp as a short word.
+    const pixelHeight = 320;
+    canvasPlane(THREE, group, size.width, size.height, [Math.min(4096, Math.round(pixelHeight * size.width / size.height)), pixelHeight], (context, w, h) => {
       drawNeonText(context, w, h, spec.text, spec.font, color);
     }, [0, 0, size.depth * 0.2]);
   },
@@ -527,12 +529,37 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
       drawNeonShape(context, w, h, spec.shape, color, 18);
     }, [0, 0, size.depth * 0.2]);
   },
+  // The frame is the item's extent, which already has the picture's shape (`decorExtent`),
+  // so the print fills it edge to edge without stretching. No picture yet — a custom poster
+  // waiting for an upload — draws an empty mount with a hint instead.
   "poster": (THREE, group, size, _color, spec: { image: string; frame: string }) => {
     box(THREE, group, [size.width, size.height, size.depth], [0, 0, 0], standard(THREE, spec.frame, 0.5, 0.2), false);
+    const printWidth = size.width - 0.08;
+    const printHeight = size.height - 0.08;
+    if (!spec.image) {
+      canvasPlane(THREE, group, printWidth, printHeight, [512, Math.round(512 * printHeight / printWidth)], (context, w, h) => {
+        context.fillStyle = "#1c2230";
+        context.fillRect(0, 0, w, h);
+        context.setLineDash([18, 12]);
+        context.lineWidth = 6;
+        context.strokeStyle = "rgba(255,255,255,.35)";
+        context.strokeRect(24, 24, w - 48, h - 48);
+        context.setLineDash([]);
+        context.fillStyle = "rgba(255,255,255,.7)";
+        context.font = `800 ${Math.round(Math.min(w, h) * 0.09)}px ui-monospace, monospace`;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("YOUR PICTURE", w / 2, h / 2 - Math.min(w, h) * 0.05);
+        context.font = `600 ${Math.round(Math.min(w, h) * 0.055)}px ui-monospace, monospace`;
+        context.fillStyle = "rgba(255,255,255,.45)";
+        context.fillText("choose one in the inspector", w / 2, h / 2 + Math.min(w, h) * 0.06);
+      }, [0, 0, size.depth / 2 + 0.002], false);
+      return;
+    }
     const texture = new THREE.TextureLoader().load(spec.image);
     texture.colorSpace = THREE.SRGBColorSpace;
     const print = new THREE.Mesh(
-      new THREE.PlaneGeometry(size.width - 0.08, size.height - 0.08),
+      new THREE.PlaneGeometry(printWidth, printHeight),
       new THREE.MeshBasicMaterial({ map: texture }),
     );
     print.position.set(0, 0, size.depth / 2 + 0.002);
@@ -834,21 +861,32 @@ function lightOffset(definition: DecorDefinition, mount: DecorMount, size: Size)
   return [0, size.height * 0.4, size.depth / 2 + 0.1];
 }
 
+/**
+ * The spec a builder gets: the catalog's, with the row's own words or picture
+ * written over it for the items built to carry them. Builders never read the row.
+ */
+function modelSpecFor(definition: DecorDefinition, item: RoomDecorItem): DecorModelSpec {
+  const spec = definition.model;
+  if (spec.kind === "text-sign" && definition.text.enabled) return { ...spec, text: decorSignText(definition, item) };
+  if (spec.kind === "poster" && definition.image.enabled) return { ...spec, image: item.image };
+  return spec;
+}
+
 export function createDecorModel(THREE: ThreeNamespace, definition: DecorDefinition, item: RoomDecorItem, lit: boolean): any {
   const root = new THREE.Group();
   root.name = item.instanceId;
   root.userData = { decorInstanceId: item.instanceId, decorItemId: item.itemId };
   // The builder always works at catalog size (a stretched strip's length included) and
   // the group is scaled, so every builder's hard-coded thicknesses grow with the item.
-  const base: Size = decorExtent(definition, item.length, 1);
-  const size: Size = decorExtent(definition, item.length, item.scale);
+  const base: Size = decorExtent(definition, { ...item, scale: 1 });
+  const size: Size = decorExtent(definition, item);
   const factor = definition.scale.enabled ? size.height / base.height : 1;
   const color = item.color || definition.tint.default || "#ffffff";
   const centred = new THREE.Group();
   const offset = mountOffset(item.mount, size);
   centred.position.set(offset.x, offset.y, offset.z);
   centred.scale.setScalar(factor);
-  BUILDERS[definition.model.kind](THREE, centred, base, color, definition.model);
+  BUILDERS[definition.model.kind](THREE, centred, base, color, modelSpecFor(definition, item));
   if (definition.light && lit) {
     const light = new THREE.PointLight(color, definition.light.intensity, definition.light.distance * Math.sqrt(factor), 2);
     light.position.set(...lightOffset(definition, item.mount, base));

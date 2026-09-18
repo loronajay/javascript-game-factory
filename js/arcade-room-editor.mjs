@@ -1,11 +1,11 @@
 import { findDecor } from "./arcade-room-catalog/decor.mjs";
-import { addDecorItem, duplicateDecorItem, nearestWall, placeDecorItem, removeDecorItem, rotateDecorItem, setDecorColor, setDecorLength, setDecorScale, } from "./arcade-room-decor-layout.mjs";
+import { addDecorItem, duplicateDecorItem, nearestWall, placeDecorItem, removeDecorItem, rotateDecorItem, setDecorColor, setDecorImage, setDecorLength, setDecorScale, setDecorText, } from "./arcade-room-decor-layout.mjs";
 import { alignCabinetPlacement, alignDecorTarget } from "./arcade-room-decor-align.mjs";
 import { decorFrame, decorHandles, scaleDecorCorner, stretchDecorEnd } from "./arcade-room-decor-resize.mjs";
 import { createDecorThumbnails } from "./arcade-room-decor-thumbnails.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import { createEditorPanel } from "./arcade-room-editor-panel.mjs";
-import { ROOM_BOUNDS_DEFAULTS, createDefaultRoomLayout, floorObstacles, roomLayoutsEqual, removeStarterNeon, rotatePlacement, setItemHidden, setRoomDefaultTrack, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
+import { ROOM_BOUNDS_DEFAULTS, addCabinetItem, createDefaultRoomLayout, duplicateCabinetItem, floorObstacles, roomLayoutsEqual, removeStarterNeon, removeCabinetItem, rotatePlacement, setItemHidden, setRoomDefaultTrack, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
 import { EDITOR_CAMERA_LIMITS, EDITOR_CAMERA_PRESETS, applyEditorCameraPreset, createEditorCamera, editorCutawayWalls, editorCameraPose, editorViewOffset, focusEditorCamera, interpolateEditorCamera, orbitEditorCamera, panEditorCamera, panEditorCameraToAnchor, zoomEditorCamera, } from "./arcade-room-camera.mjs";
 /**
  * Key that flips build mode on and off. It has to be a key rather than only a button because pointer
@@ -26,7 +26,7 @@ const SNAP_RANGE_M = Object.freeze({ min: 0.06, max: 0.3 });
 /** How long after the last resize wheel notch the gesture closes and becomes one undo step. */
 const WHEEL_GESTURE_MS = 350;
 export function createRoomEditor(options) {
-    const { THREE, scene, camera, canvas, shell, decor, inventory, cabinets, room, initialLayout, persist, elements, canEnter, onEditingChange } = options;
+    const { THREE, scene, camera, canvas, shell, decor, cabinetRuntime, inventory, cabinets, room, initialLayout, persist, uploadPicture, elements, canEnter, onEditingChange } = options;
     const catalog = Object.fromEntries(cabinets.map((entry) => [entry.cabinet.id, entry.footprint]));
     const roomHeight = room.height ?? ROOM_BOUNDS_DEFAULTS.height;
     let layout = initialLayout;
@@ -36,6 +36,8 @@ export function createRoomEditor(options) {
     let editing = false;
     let dragging = false;
     let saving = false;
+    // The custom poster whose picture is on its way up; one at a time keeps the story simple.
+    let uploadingInstanceId = "";
     const undoStack = [];
     // A colour or slider drag is one gesture: the layout before it is pushed once, every
     // preview replaces the working layout without a panel re-render, and the commit closes it.
@@ -69,7 +71,7 @@ export function createRoomEditor(options) {
     // the point under the hand is the one that stays put.
     const targetPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), EDITOR_CAMERA_LIMITS.targetHeight);
     const planeHit = new THREE.Vector3();
-    const selectionBox = new THREE.BoxHelper(cabinets[0]?.model, 0x70e8ff);
+    const selectionBox = new THREE.BoxHelper(cabinetRuntime.instances()[0]?.model, 0x70e8ff);
     selectionBox.material.depthTest = false;
     selectionBox.material.transparent = true;
     selectionBox.material.opacity = 0.9;
@@ -83,10 +85,13 @@ export function createRoomEditor(options) {
     const handlePlane = new THREE.Plane();
     const panel = createEditorPanel(elements, {
         selectTab: (next) => { tab = next; renderPanel(); },
+        addCabinet: (cabinetId) => addCabinet(cabinetId),
         // Picking from the list is "show me that one": the view goes to it. A click in
         // the scene selects without moving, because a drag may be starting.
         selectCabinet: (instanceId) => { selectCabinet(instanceId); focusSelection(); },
         toggleCabinetHidden: (instanceId) => toggleHidden(instanceId),
+        duplicateCabinet: (instanceId) => duplicateCabinet(instanceId),
+        removeCabinet: (instanceId) => removeCabinet(instanceId),
         setSurface: (kind, id) => setSurface(kind, id),
         setDecorCategory: (category) => { decorCategory = category; renderPanel(); },
         addDecor: (itemId) => addDecor(itemId),
@@ -106,6 +111,9 @@ export function createRoomEditor(options) {
         setDecorLength: (instanceId, length, phase) => editDecor(setDecorLength(layout, instanceId, length, room, catalog), "Length changed", phase),
         setDecorScale: (instanceId, scale, phase) => editDecor(setDecorScale(layout, instanceId, scale, room, catalog), "Resized", phase),
         setDecorMount: (instanceId, mount) => remount(instanceId, mount),
+        setDecorText: (instanceId, text, phase) => editDecor(setDecorText(layout, instanceId, text, room, catalog), "Words changed", phase),
+        uploadDecorImage: (instanceId, file) => { void uploadDecorImage(instanceId, file); },
+        clearDecorImage: (instanceId) => commitDecor(setDecorImage(layout, instanceId, "", 1, room, catalog).layout, "Picture removed"),
     }, { thumbnail: (definition) => thumbnails.get(definition) });
     function selectedCabinet() {
         return selection?.kind === "cabinet" ? layout.items.find((item) => item.instanceId === selection.instanceId) : undefined;
@@ -119,20 +127,13 @@ export function createRoomEditor(options) {
     function selectedModel() {
         const cabinet = selectedCabinet();
         if (cabinet)
-            return cabinet.hidden ? undefined : cabinetEntry(cabinet.cabinetId)?.model;
+            return cabinet.hidden ? undefined : cabinetRuntime.modelFor(cabinet.instanceId);
         const item = selectedDecor();
         return item ? decor.modelFor(item.instanceId) : undefined;
     }
     /** Push the scene into step with the layout: cabinet poses, decor meshes, surfaces, the selection box. */
     function renderScene() {
-        for (const placement of layout.items) {
-            const entry = cabinetEntry(placement.cabinetId);
-            if (!entry)
-                continue;
-            entry.model.position.set(placement.x, 0, placement.z);
-            entry.model.rotation.y = placement.rotationY;
-            entry.model.visible = !placement.hidden;
-        }
+        cabinetRuntime.sync(layout);
         decor.sync(layout);
         shell.applySurfaces(layout.surfaces);
         const model = selectedModel();
@@ -160,7 +161,7 @@ export function createRoomEditor(options) {
         return Math.min(SNAP_RANGE_M.max, Math.max(SNAP_RANGE_M.min, view.radius * SNAP_SCREEN_FRACTION));
     }
     function renderPanel() {
-        panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory });
+        panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory, canUpload: uploadPicture !== null, uploadingInstanceId });
         elements.undoButton.disabled = undoStack.length === 0;
     }
     function setStatus(message, state = "ready") {
@@ -243,6 +244,43 @@ export function createRoomEditor(options) {
             return;
         }
         commitDecor(result.layout, message);
+    }
+    /**
+     * Hang a picked file in a custom poster: up to the platform, then onto the
+     * wall as one undo step with the frame reshaped to the picture. The layout
+     * is untouched until the upload lands, so a failure costs nothing but time.
+     */
+    async function uploadDecorImage(instanceId, file) {
+        if (!uploadPicture || uploadingInstanceId)
+            return;
+        uploadingInstanceId = instanceId;
+        renderPanel();
+        setStatus("Uploading your picture…", "saving");
+        let result;
+        try {
+            result = await uploadPicture(file);
+        }
+        catch {
+            result = { ok: false, url: "", width: 0, height: 0, error: "upload_failed" };
+        }
+        uploadingInstanceId = "";
+        if (!result.ok) {
+            renderPanel();
+            setStatus(result.error === "unsupported_file_type"
+                ? "That file is not a JPEG, PNG or WebP."
+                : result.error === "file_too_large"
+                    ? "That picture is over 10 MB."
+                    : "The upload did not go through. Try again in a moment.", "error");
+            return;
+        }
+        const aspect = result.width > 0 && result.height > 0 ? result.width / result.height : 1;
+        const placed = setDecorImage(layout, instanceId, result.url, aspect, room, catalog);
+        if (!placed.valid) {
+            renderPanel();
+            setStatus(placed.reason === "missing" ? "That frame is no longer in the room." : "That picture's shape does not fit where the frame hangs · move it first.", "error");
+            return;
+        }
+        commit(placed.layout, "Picture hung · unsaved");
     }
     /** Resize or stretch the selected item by a step, from a key or a wheel notch. */
     function resizeSelected(direction, phase) {
@@ -378,6 +416,36 @@ export function createRoomEditor(options) {
         }
         selection = { kind: "decor", instanceId: result.instanceId };
         commit(result.layout, `${definition.title} added · drag it into place · unsaved`);
+    }
+    function addCabinet(cabinetId) {
+        const definition = cabinetEntry(cabinetId)?.cabinet;
+        if (!definition)
+            return;
+        const result = addCabinetItem(layout, cabinetId, room, catalog, { x: view.target.x, z: view.target.z, rotationY: 0 });
+        if (!result.valid) {
+            setStatus(`No room for another ${definition.title} near here.`, "error");
+            return;
+        }
+        selection = { kind: "cabinet", instanceId: result.instanceId };
+        commit(result.layout, `${definition.title} added · drag it into place · unsaved`);
+    }
+    function duplicateCabinet(instanceId) {
+        const result = duplicateCabinetItem(layout, instanceId, room, catalog);
+        if (!result.valid) {
+            setStatus("No room beside it for another cabinet.", "error");
+            return;
+        }
+        selection = { kind: "cabinet", instanceId: result.instanceId };
+        commit(result.layout, "Cabinet copied · unsaved");
+    }
+    function removeCabinet(instanceId) {
+        const item = layout.items.find((candidate) => candidate.instanceId === instanceId);
+        if (!item)
+            return;
+        const title = cabinetEntry(item.cabinetId)?.cabinet.title ?? "Cabinet";
+        if (selection?.kind === "cabinet" && selection.instanceId === instanceId)
+            selection = null;
+        commit(removeCabinetItem(layout, instanceId), `${title} removed · unsaved`);
     }
     function removeDecor(instanceId) {
         const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
@@ -650,11 +718,11 @@ export function createRoomEditor(options) {
     }
     function hitCabinet(event) {
         updatePointer(event);
-        const models = cabinets.map((entry) => entry.model);
+        const models = cabinetRuntime.instances().map((entry) => entry.model).filter((model) => model.visible);
         const hit = raycaster.intersectObjects(models, true)[0]?.object;
         const root = hit && rootOf(hit, models);
-        const entry = root && cabinets.find((candidate) => candidate.model === root);
-        return entry && layout.items.find((candidate) => candidate.cabinetId === entry.cabinet.id && !candidate.hidden);
+        const instanceId = root?.userData?.cabinetInstanceId;
+        return instanceId ? layout.items.find((candidate) => candidate.instanceId === instanceId && !candidate.hidden) : undefined;
     }
     function hitDecor(event) {
         updatePointer(event);
@@ -988,8 +1056,11 @@ export function createRoomEditor(options) {
         }
         if ((event.ctrlKey || event.metaKey) && event.code === "KeyD") {
             event.preventDefault();
+            const cabinet = selectedCabinet();
             const item = selectedDecor();
-            if (item)
+            if (cabinet)
+                duplicateCabinet(cabinet.instanceId);
+            else if (item)
                 duplicateDecor(item.instanceId);
             return;
         }
@@ -1006,9 +1077,13 @@ export function createRoomEditor(options) {
             KeyT: () => setView("top"),
             KeyO: () => setView("overview"),
             KeyC: () => focusSelection(),
-            Delete: () => { const item = selectedDecor(); if (item)
+            Delete: () => { const cabinet = selectedCabinet(); const item = selectedDecor(); if (cabinet)
+                removeCabinet(cabinet.instanceId);
+            else if (item)
                 removeDecor(item.instanceId); },
-            Backspace: () => { const item = selectedDecor(); if (item)
+            Backspace: () => { const cabinet = selectedCabinet(); const item = selectedDecor(); if (cabinet)
+                removeCabinet(cabinet.instanceId);
+            else if (item)
                 removeDecor(item.instanceId); },
             Minus: () => resizeSelected(-1, "commit"),
             NumpadSubtract: () => resizeSelected(-1, "commit"),
@@ -1050,7 +1125,7 @@ export function createRoomEditor(options) {
         setDefaultTrack,
         // Hidden cabinets have no placement as far as the room is concerned: nothing to
         // walk into, nothing to play, nothing to prompt for.
-        getCabinetPlacement: (cabinetId) => layout.items.find((item) => item.cabinetId === cabinetId && !item.hidden),
+        getCabinetPlacement: (instanceId) => layout.items.find((item) => item.instanceId === instanceId && !item.hidden),
         getFloorObstacles: () => floorObstacles(layout, catalog),
     };
 }

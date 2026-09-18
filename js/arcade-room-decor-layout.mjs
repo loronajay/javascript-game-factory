@@ -11,7 +11,7 @@
 // faces into the room, so it has no free rotation. A ceiling item hangs from
 // the ceiling plane and rotates freely. Rugs and lights never block anything,
 // so they may overlap whatever they like — that is what a rug is for.
-import { clampDecorLength, clampDecorScale, decorExtent, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
+import { clampDecorAspect, clampDecorLength, clampDecorScale, cleanDecorText, decorExtent, decorFootprint, findDecor, isDecorImageUrl } from "./arcade-room-catalog/decor.mjs";
 import { ROOM_BOUNDS_DEFAULTS, WALL_SIDES, clampPlacementToRoom, placementBlocked, } from "./arcade-room-layout.mjs";
 /** How much of the wall's centre-to-face half thickness plus a hair, so an item hangs on the face not in it. */
 function wallFace(room) {
@@ -49,9 +49,9 @@ function rounded(value) {
  * Pin a wall item to a wall: on the inner face, slid along it within the
  * corners, at a height that keeps the whole item on the wall.
  */
-export function snapToWall(point, wall, room, definition, length, scale = 1) {
+export function snapToWall(point, wall, room, definition, finish = {}) {
     const face = wallFace(room);
-    const { width, height } = decorExtent(definition, length, scale);
+    const { width, height } = decorExtent(definition, finish);
     const halfHeight = height / 2;
     const y = rounded(Math.min(face.height - halfHeight, Math.max(halfHeight, point.y)));
     const alongLimitX = Math.max(0, face.halfWidth - width / 2);
@@ -88,10 +88,10 @@ export function placeDecorItem(layout, instanceId, target, room, catalog, rotati
     const face = wallFace(room);
     if (mount === "wall") {
         const wall = nearestWall(target.point, room);
-        const snapped = snapToWall(target.point, wall, room, definition, item.length, item.scale);
+        const snapped = snapToWall(target.point, wall, room, definition, item);
         return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...snapped, mount }) };
     }
-    const footprint = decorFootprint(definition, item.length, item.scale);
+    const footprint = decorFootprint(definition, item);
     const clamped = clampPlacementToRoom({ x: target.point.x, z: target.point.z, rotationY: rotation }, room, footprint);
     if (mount === "ceiling") {
         return { valid: true, instanceId, reason: "", layout: replaceDecor(layout, { ...item, ...clamped, y: rounded(face.height), mount, wall: "" }) };
@@ -145,6 +145,38 @@ export function setDecorScale(layout, instanceId, scale, room, catalog) {
     const placed = placeDecorItem(next, instanceId, { mount: found.item.mount, point: found.item }, room, catalog);
     return placed.valid ? placed : { valid: false, layout, instanceId, reason: placed.reason };
 }
+/**
+ * Put the player's words on a custom sign and re-place it, because a longer
+ * line is a wider sign and it may now hang off the end of the wall. An item
+ * not built to carry words is refused; empty words are the catalog placeholder.
+ */
+export function setDecorText(layout, instanceId, text, room, catalog) {
+    const found = findItem(layout, instanceId);
+    if (!found)
+        return { valid: false, layout, instanceId, reason: "missing" };
+    if (!found.definition.text.enabled)
+        return { valid: false, layout, instanceId, reason: "not-text" };
+    const next = replaceDecor(layout, { ...found.item, text: cleanDecorText(text, found.definition.text.maxLength) });
+    const placed = placeDecorItem(next, instanceId, { mount: found.item.mount, point: found.item }, room, catalog);
+    return placed.valid ? placed : { valid: false, layout, instanceId, reason: placed.reason };
+}
+/**
+ * Hang an uploaded picture in a custom poster. The frame takes the picture's
+ * shape, so the item is re-placed for the same reason as a resize. Only a
+ * platform upload URL is accepted; "" empties the frame.
+ */
+export function setDecorImage(layout, instanceId, image, aspect, room, catalog) {
+    const found = findItem(layout, instanceId);
+    if (!found)
+        return { valid: false, layout, instanceId, reason: "missing" };
+    if (!found.definition.image.enabled)
+        return { valid: false, layout, instanceId, reason: "not-picture" };
+    if (image !== "" && !isDecorImageUrl(image))
+        return { valid: false, layout, instanceId, reason: "bad-image" };
+    const next = replaceDecor(layout, { ...found.item, image, aspect: image ? clampDecorAspect(aspect) : 1 });
+    const placed = placeDecorItem(next, instanceId, { mount: found.item.mount, point: found.item }, room, catalog);
+    return placed.valid ? placed : { valid: false, layout, instanceId, reason: placed.reason };
+}
 export function removeDecorItem(layout, instanceId) {
     return { ...layout, decor: layout.decor.filter((item) => item.instanceId !== instanceId) };
 }
@@ -187,6 +219,9 @@ export function addDecorItem(layout, definition, room, catalog, at) {
         color: definition.tint.enabled ? definition.tint.default : "",
         length: definition.length.enabled ? definition.length.default : 0,
         scale: 1,
+        text: "",
+        image: "",
+        aspect: 1,
     };
     const withSeed = { ...layout, decor: [...layout.decor, seed] };
     const base = at?.point ?? (mount === "wall" ? { x: 0, y: definition.wallHeight, z: -face.halfDepth }
@@ -207,7 +242,7 @@ export function duplicateDecorItem(layout, instanceId, room, catalog) {
     if (!found)
         return { valid: false, layout, instanceId, reason: "missing" };
     const { item, definition } = found;
-    const { width } = decorFootprint(definition, item.length, item.scale);
+    const { width } = decorFootprint(definition, item);
     const step = width + 0.2;
     const along = item.mount === "wall" && (item.wall === "east" || item.wall === "west")
         ? { x: 0, z: step }
@@ -219,7 +254,7 @@ export function duplicateDecorItem(layout, instanceId, room, catalog) {
     if (!added.valid)
         return added;
     const copy = added.layout.decor.find((candidate) => candidate.instanceId === added.instanceId);
-    const finished = { ...copy, color: item.color, length: item.length, scale: item.scale, rotationY: item.mount === "wall" ? copy.rotationY : item.rotationY };
+    const finished = { ...copy, color: item.color, length: item.length, scale: item.scale, text: item.text, image: item.image, aspect: item.aspect, rotationY: item.mount === "wall" ? copy.rotationY : item.rotationY };
     // The copy was placed at catalog size; re-place it at the original's size so a big sign is not left hanging off the wall.
     const refit = placeDecorItem(replaceDecor(added.layout, finished), finished.instanceId, { mount: finished.mount, point: finished }, room, catalog);
     return refit.valid ? refit : { valid: false, layout, instanceId, reason: refit.reason };

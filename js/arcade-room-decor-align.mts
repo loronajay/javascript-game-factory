@@ -101,7 +101,7 @@ function neighbourBoxes(layout: RoomLayout, movingId: string, mount: "floor" | "
     if (item.mount !== mount || item.instanceId === movingId) continue;
     const definition = findDecor(item.itemId);
     if (!definition) continue;
-    const extent = decorExtent(definition, item.length, item.scale);
+    const extent = decorExtent(definition, item);
     boxes.push(boxOf(item, { width: extent.width, depth: extent.depth }));
   }
   return boxes;
@@ -192,7 +192,7 @@ function wallNeighbours(layout: RoomLayout, movingId: string, wall: WallSide): W
     if (item.mount !== "wall" || item.wall !== wall || item.instanceId === movingId) continue;
     const definition = findDecor(item.itemId);
     if (!definition) continue;
-    const extent = decorExtent(definition, item.length, item.scale);
+    const extent = decorExtent(definition, item);
     boxes.push({ along: spanOf(item[axis], extent.width), y: spanOf(item.y, extent.height) });
   }
   return boxes;
@@ -262,7 +262,7 @@ export function alignDecorTarget(
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && findDecor(item.itemId);
   if (!item || !definition || threshold <= 0) return { target, guides: [] };
-  const extent = decorExtent(definition, item.length, item.scale);
+  const extent = decorExtent(definition, item);
   if (target.mount === "wall") {
     const aligned = alignWallPoint(layout, instanceId, target.point, nearestWall(target.point, room), extent, room, threshold);
     return { target: { mount: "wall", point: aligned.point }, guides: aligned.guides };

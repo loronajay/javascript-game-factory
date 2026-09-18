@@ -25,6 +25,9 @@ export function thumbnailItem(definition) {
         color: definition.tint.enabled ? definition.tint.default : "",
         length: definition.length.enabled ? definition.length.default : 0,
         scale: 1,
+        text: "",
+        image: "",
+        aspect: 1,
     };
 }
 export function createDecorThumbnails(THREE) {
