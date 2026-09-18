@@ -2,6 +2,7 @@ import type { CabinetDefinition } from "./arcade-room-cabinet.mjs";
 import { createYamBowlingLane } from "./arcade-room-yam-bowling-model.mjs";
 import { createSharkHallPoolTable } from "./arcade-room-shark-hall-model.mjs";
 import { createBattleshitsCabinet } from "./arcade-room-battleshits-model.mjs";
+import { createCockpitSwarmCabinet } from "./arcade-room-cockpit-swarm-model.mjs";
 import { createPuckdUpAirHockeyTable } from "./arcade-room-puckd-up-model.mjs";
 import { createMiniHoopsCarnivalCabinet } from "./arcade-room-mini-hoops-model.mjs";
 import {
@@ -661,5 +662,6 @@ export function createCabinetModel(THREE: ThreeNamespace, definition: CabinetDef
   if (definition.gameSlug === "shark-hall") return createSharkHallPoolTable(THREE, definition);
   if (definition.gameSlug === "puckd-up") return createPuckdUpAirHockeyTable(THREE, definition);
   if (definition.gameSlug === "mini-hoops") return createMiniHoopsCarnivalCabinet(THREE, definition);
+  if (definition.gameSlug === "cockpit-swarm") return createCockpitSwarmCabinet(THREE, definition);
   throw new Error(`No 3D cabinet model is registered for ${definition.gameSlug}`);
 }

@@ -5,9 +5,16 @@
 // (the same twelve the build-mode picker offers), scaled to a standing height,
 // a name tag floating over its head, and a mixer playing idle / walk / run off
 // the clips the pack ships with. Poses arrive ten times a second and a body
-// drawn straight onto each one would stutter, so a body eases toward its
-// latest pose instead and the walk clip follows the flag the sender set. An
-// emote plays its clip once and returns to idle.
+// drawn straight onto each one would stutter, so a body eases toward a target
+// that `arcade-room-visitor-motion.mts` runs forward from the latest pose, and
+// the gait follows the sender's measured speed. An emote plays its clip once
+// and returns to idle.
+//
+// Movement is not an event. The roster is handed in on every `update` and each
+// body reads its member's latest pose from it there; `sync` only reconciles who
+// has a body at all. (The first version read poses off a member reference taken
+// at sync time, so bodies stood still until somebody joined, left or waved and
+// then teleported — the "super jumpy" room.)
 //
 // The GLBs are skinned and cloning a skinned mesh needs SkeletonUtils, which the
 // vendored three does not ship; a body simply loads its own copy (the browser's
@@ -20,6 +27,7 @@
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { findArcadeAvatar, DEFAULT_ARCADE_AVATAR_ID } from "./arcade-room-avatar-catalog.mjs";
 import { findVisitorInReach } from "./arcade-room-interaction.mjs";
+import { createRemoteMotion, type RemoteMotion } from "./arcade-room-visitor-motion.mjs";
 import type { RemoteMember } from "./arcade-room-presence.mjs";
 
 type ThreeNamespace = Record<string, any>;
@@ -28,7 +36,7 @@ type ThreeNamespace = Record<string, any>;
 export const VISITOR_HEIGHT = 1.78;
 /** How long an emote clip is allowed to run before the body returns to idle. */
 export const EMOTE_SECONDS = 2.2;
-/** A remote pose is caught up at this fraction per second: quick enough to track a sprint, smooth enough not to snap. */
+/** The target is caught up at this rate per second: quick enough to track a sprint, smooth enough not to snap. */
 const POSITION_EASE = 11;
 const YAW_EASE = 12;
 
@@ -46,13 +54,14 @@ type VisitorBody = {
   emoteSeenAt: number;
   loadToken: number;
   avatarId: string;
+  motion: RemoteMotion;
 };
 
 export type RoomVisitors = Readonly<{
   /** Reconcile bodies with the roster: new members get bodies, departed ones lose them. */
   sync: (members: readonly RemoteMember[]) => void;
-  /** Ease every body toward its pose and advance its animation. */
-  update: (dt: number, now: number) => void;
+  /** Every frame: take the roster's latest poses, ease every body toward them and advance its animation. */
+  update: (dt: number, now: number, members: readonly RemoteMember[]) => void;
   /** The member the local player could wave at: in reach and roughly in front. */
   nearest: (viewer: Readonly<{ x: number; z: number; forward: Readonly<{ x: number; z: number }> }>) => RemoteMember | null;
   setVisible: (visible: boolean) => void;
@@ -137,7 +146,10 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
     const token = ++body.loadToken;
     loader.load(definition.assetUrl, (gltf: any) => {
       if (token !== body.loadToken || !bodies.has(body.member.clientId)) return;
-      if (body.model) body.group.remove(body.model);
+      if (body.model) {
+        body.group.remove(body.model);
+        body.mixer?.stopAllAction?.();
+      }
       body.model = gltf.scene;
       fitModel(body.model);
       body.model.traverse((node: any) => {
@@ -190,7 +202,9 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
       emoteSeenAt: member.emoteAt,
       loadToken: 0,
       avatarId: member.avatarId,
+      motion: createRemoteMotion(),
     };
+    body.motion.observe(member.pose, member.poseAt);
     paintTag(body);
     loadModel(body);
     return body;
@@ -214,8 +228,9 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
       }
       body.member = member;
       if (member.avatarId !== body.avatarId) {
+        // The old body keeps standing until the new one is in; only a body that never had one shows the capsule.
         body.avatarId = member.avatarId;
-        body.placeholder.visible = true;
+        body.placeholder.visible = !body.model;
         loadModel(body);
       }
       paintTag(body);
@@ -227,14 +242,23 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
     }
   }
 
-  function update(dt: number, now: number): void {
+  function update(dt: number, now: number, members: readonly RemoteMember[]): void {
+    sync(members);
     const ease = 1 - Math.exp(-POSITION_EASE * dt);
     const yawEase = 1 - Math.exp(-YAW_EASE * dt);
     for (const body of bodies.values()) {
       const { pose } = body.member;
       const group = body.group;
-      group.position.x += (pose.x - group.position.x) * ease;
-      group.position.z += (pose.z - group.position.z) * ease;
+      body.motion.observe(pose, body.member.poseAt);
+      if (body.motion.shouldSnap(group.position)) {
+        // Too far to have walked: a rejoin or a respawn. Appear there rather than glide through the cabinets.
+        group.position.x = pose.x;
+        group.position.z = pose.z;
+        group.rotation.y = pose.yaw + Math.PI;
+      }
+      const target = body.motion.target(now);
+      group.position.x += (target.x - group.position.x) * ease;
+      group.position.z += (target.z - group.position.z) * ease;
       const targetYaw = pose.yaw + Math.PI;
       let delta = targetYaw - group.rotation.y;
       delta = Math.atan2(Math.sin(delta), Math.cos(delta));
@@ -246,10 +270,13 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
         if (body.clips.emote) play(body, body.clips.emote, true);
       }
       if (body.mixer) {
+        const gait = body.motion.gait();
         if (body.emoteUntil > now && body.clips.emote) {
           // Let the emote finish.
-        } else if (pose.moving) {
-          play(body, body.clips.run && Math.hypot(pose.x - group.position.x, pose.z - group.position.z) > 0.35 ? body.clips.run : body.clips.walk ?? body.clips.idle);
+        } else if (gait === "run") {
+          play(body, body.clips.run ?? body.clips.walk ?? body.clips.idle);
+        } else if (gait === "walk") {
+          play(body, body.clips.walk ?? body.clips.idle);
         } else {
           play(body, body.clips.idle);
         }

@@ -17,7 +17,14 @@
 // roster is cleared meanwhile (a body that stays standing after its socket is
 // gone is a ghost, not a guest). Poses are throttled to `poseIntervalMs` and
 // sent only when they change, with a keepalive so a still player is still known
-// to be there.
+// to be there. The keepalive runs on its own timer rather than the frame loop,
+// because a hidden tab stops animating but is still standing in the room.
+//
+// Every page load mints one `sessionId` that rides on every join. The server
+// uses it to recognise a reconnect: the same player and session arriving on a
+// new socket replaces the stale member instead of standing beside it, so a
+// network blip never leaves a clone behind. Two tabs are two sessions and are
+// allowed to coexist.
 import { resolveFactoryNetworkUrl } from "./platform/api/factory-network-url.mjs";
 const POSE_EPSILON = 0.005;
 const YAW_EPSILON = 0.01;
@@ -66,11 +73,20 @@ function normalizeMember(value, now) {
 function defaultSocketFactory(url) {
     return new WebSocket(url);
 }
+function mintSessionId() {
+    const cryptoLike = globalThis.crypto;
+    if (cryptoLike?.randomUUID)
+        return cryptoLike.randomUUID();
+    return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 export function createRoomPresence(options) {
     const roomId = cleanText(options.roomId);
     const now = options.now ?? (() => Date.now());
     const setTimer = options.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
     const clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle));
+    const setRepeating = options.setRepeating ?? ((fn, ms) => setInterval(fn, ms));
+    const clearRepeating = options.clearRepeating ?? ((handle) => clearInterval(handle));
+    const sessionId = cleanText(options.sessionId) || mintSessionId();
     const socketFactory = options.socketFactory ?? defaultSocketFactory;
     const url = options.url ?? resolveFactoryNetworkUrl();
     const poseIntervalMs = options.poseIntervalMs ?? 100;
@@ -84,6 +100,7 @@ export function createRoomPresence(options) {
     let wanted = false;
     let reconnectHandle = null;
     let reconnectAttempts = 0;
+    let keepaliveHandle = null;
     const roster = new Map();
     const listeners = new Set();
     let lastSentPose = null;
@@ -117,6 +134,7 @@ export function createRoomPresence(options) {
             socket.send(JSON.stringify({
                 type: "arcade_room_join",
                 roomId,
+                sessionId,
                 identity: { playerId: identity.playerId, displayName: identity.displayName, avatarId: identity.avatarId },
                 pose: pendingPose ?? lastSentPose ?? normalizePresencePose(null),
             }));
@@ -130,6 +148,32 @@ export function createRoomPresence(options) {
             return;
         roster.clear();
         notify();
+    }
+    /** Resend the standing pose when nothing else has gone out lately, frame loop or not. */
+    function keepalive() {
+        if (status !== "online")
+            return;
+        const at = now();
+        if (at - lastSentAt < keepaliveMs)
+            return;
+        const pose = pendingPose ?? lastSentPose;
+        if (!pose)
+            return;
+        if (send({ type: "arcade_room_pose", ...pose })) {
+            lastSentPose = pose;
+            lastSentAt = at;
+        }
+    }
+    function startKeepalive() {
+        if (keepaliveHandle !== null)
+            return;
+        keepaliveHandle = setRepeating(keepalive, keepaliveMs);
+    }
+    function stopKeepalive() {
+        if (keepaliveHandle === null)
+            return;
+        clearRepeating(keepaliveHandle);
+        keepaliveHandle = null;
     }
     function scheduleReconnect() {
         if (!wanted || reconnectHandle !== null)
@@ -179,6 +223,7 @@ export function createRoomPresence(options) {
             socket = null;
             selfClientId = "";
             lastSentPose = null;
+            stopKeepalive();
             clearRoster();
             setStatus(wanted ? "offline" : "idle");
             scheduleReconnect();
@@ -207,6 +252,7 @@ export function createRoomPresence(options) {
                 lastSentPose = pendingPose ?? lastSentPose;
                 lastSentAt = at;
                 status = "online";
+                startKeepalive();
                 notify();
                 return;
             }
@@ -229,11 +275,11 @@ export function createRoomPresence(options) {
                 const member = roster.get(cleanText(event.clientId));
                 if (!member)
                     return;
-                roster.set(member.clientId, Object.freeze({
-                    ...member,
-                    pose: normalizePresencePose(event, member.pose),
-                    poseAt: now(),
-                }));
+                const pose = normalizePresencePose(event, member.pose);
+                roster.set(member.clientId, Object.freeze({ ...member, pose, poseAt: now() }));
+                // Movement is read off the roster every frame; only what they are DOING is worth an event.
+                if (pose.activity !== member.pose.activity)
+                    notify();
                 return;
             }
             case "arcade_room_emote": {
@@ -245,10 +291,15 @@ export function createRoomPresence(options) {
                 return;
             }
             case "error": {
-                if (String(event.code) === "ROOM_FULL") {
+                const code = String(event.code);
+                if (code === "ROOM_FULL") {
                     wanted = false;
                     setStatus("full");
                     socket?.close();
+                }
+                else if (code === "NOT_IN_ROOM" && status === "online") {
+                    // The server forgot us (a stale sweep while the tab slept); walk back in.
+                    sendJoin();
                 }
                 return;
             }
@@ -271,6 +322,7 @@ export function createRoomPresence(options) {
         const current = socket;
         socket = null;
         selfClientId = "";
+        stopKeepalive();
         if (current) {
             try {
                 current.send(JSON.stringify({ type: "arcade_room_leave" }));
@@ -319,6 +371,7 @@ export function createRoomPresence(options) {
         members: () => [...roster.values()],
         status: () => status,
         clientId: () => selfClientId,
+        sessionId: () => sessionId,
         onChange: (listener) => {
             listeners.add(listener);
             return () => { listeners.delete(listener); };

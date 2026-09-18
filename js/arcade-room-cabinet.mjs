@@ -260,6 +260,41 @@ export const MINI_HOOPS_CABINET = Object.freeze({
         Object.freeze({ id: "edge-lighting", material: "emissive" }),
     ]),
 });
+export const COCKPIT_SWARM_CABINET = Object.freeze({
+    id: "cabinet.cockpit-swarm.twin-seat",
+    kind: "arcade-cabinet",
+    gameSlug: "cockpit-swarm",
+    title: "Cockpit Swarm",
+    description: "A two-seat environmental starfighter cabinet with an oversized panoramic screen, paired flight controls, and a neon-lit cockpit shell.",
+    launchMode: "cabinet-screen",
+    dimensions: Object.freeze({ width: 2.42, depth: 2.75, height: 2.48 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.08 }),
+    unlock: Object.freeze({ type: "starter", source: "Cockpit Swarm cabinet collection" }),
+    interaction: Object.freeze({
+        radius: 2.35,
+        facingThreshold: 0.32,
+        anchor: Object.freeze({ x: 0, y: 1.2, z: 1.46 }),
+    }),
+    palette: Object.freeze({
+        shell: "#090b24",
+        trim: "#34f7ff",
+        sky: "#2439a8",
+        grass: "#9c35ff",
+        warning: "#ff632e",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "shell", material: "paint" }),
+        Object.freeze({ id: "side-art-left", material: "decal" }),
+        Object.freeze({ id: "side-art-right", material: "decal" }),
+        Object.freeze({ id: "marquee", material: "emissive" }),
+        Object.freeze({ id: "screen", material: "emissive" }),
+        Object.freeze({ id: "seat-left", material: "paint" }),
+        Object.freeze({ id: "seat-right", material: "paint" }),
+        Object.freeze({ id: "control-left", material: "metal" }),
+        Object.freeze({ id: "control-right", material: "metal" }),
+        Object.freeze({ id: "cockpit-lighting", material: "emissive" }),
+    ]),
+});
 export const CABINET_CATALOG = Object.freeze([
     BIRD_DUTY_CABINET,
     LOVERS_LOST_CABINET,
@@ -269,6 +304,7 @@ export const CABINET_CATALOG = Object.freeze([
     SHARK_HALL_POOL_TABLE,
     PUCK_D_UP_AIR_HOCKEY,
     MINI_HOOPS_CABINET,
+    COCKPIT_SWARM_CABINET,
 ]);
 export function getCabinetFootprint(definition) {
     const padding = definition.placement.clearance * 2;

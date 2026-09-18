@@ -15,7 +15,7 @@ import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
-import { BATTLESHITS_PLAY_VIEW, CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
+import { BATTLESHITS_PLAY_VIEW, CABINET_PLAY_VIEW, COCKPIT_SWARM_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
@@ -103,7 +103,7 @@ function applyRoomIdentity() {
     roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
     ownerLink.hidden = true;
     if (!layoutStore.accountBacked) {
-        startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, the Yam Bowling lane, the Shark Hall pool table, Puck'd Up air hockey, or the Mini Hoops carnival machine, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
+        startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, Cockpit Swarm's twin-seat machine, the Yam Bowling lane, the Shark Hall pool table, Puck'd Up air hockey, or the Mini Hoops carnival machine, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
     }
 }
 applyRoomIdentity();
@@ -162,6 +162,7 @@ const playViews = Object.freeze({
     "battleshits": BATTLESHITS_PLAY_VIEW,
     "yam-bowling": YAM_BOWLING_PLAY_VIEW,
     "shark-hall": SHARK_HALL_PLAY_VIEW,
+    "cockpit-swarm": COCKPIT_SWARM_PLAY_VIEW,
 });
 const cabinetRuntime = createCabinetRuntime(THREE, scene, CABINET_CATALOG);
 cabinetRuntime.sync(loaded.layout);
@@ -306,8 +307,9 @@ presence.onChange(() => {
     visitors.sync(presence.members());
     renderVisitorsChip();
 });
-presence.connect();
 window.addEventListener("pagehide", () => presence.disconnect());
+// A page restored from the back/forward cache comes back with the socket it left with: closed.
+window.addEventListener("pageshow", () => presence.connect());
 if (visiting) {
     // A guest's body is on their own layout, which a visit never loads.
     void layoutStore.loadSelfAvatarId().then((avatarId) => {
@@ -330,7 +332,13 @@ function publishPresence() {
         activity: playing && activeCabinet ? activeCabinet.definition.title : roomEditor.isEditing() ? "building" : "",
     });
 }
+// The join carries this pose, so the others see the spawn point and not the origin.
+publishPresence();
+presence.connect();
 let lastWaveAt = 0;
+/** The prompt shows the wave went out until this time; the waver has no body of their own to see it on. */
+let waveFeedbackUntil = 0;
+let waveFeedbackText = "";
 function waveAtVisitor() {
     if (!nearbyVisitor || playing || decorOverlay.isOpen() || roomEditor.isEditing())
         return;
@@ -339,6 +347,9 @@ function waveAtVisitor() {
         return;
     lastWaveAt = now;
     presence.emote("wave");
+    waveFeedbackText = `👋 You waved at ${nearbyVisitor.displayName}`;
+    waveFeedbackUntil = now + 1400;
+    prompt.textContent = waveFeedbackText;
     status.textContent = `You waved at ${nearbyVisitor.displayName}`;
 }
 function applyCamera() {
@@ -375,16 +386,19 @@ function updateInteraction() {
     // A person comes last: the room's things are what E is for, a wave is the courtesy on top.
     nearbyVisitor = nearbyCabinet || nearbyDecor ? null : visitors.nearest({ x: player.x, z: player.z, forward: forwardVector() });
     interactionReady = Boolean(nearbyCabinet || nearbyDecor || nearbyVisitor);
+    const waving = performance.now() < waveFeedbackUntil;
     prompt.textContent = !roomEntered
         ? ""
-        : nearbyCabinet
-            ? getCabinetPrompt(true, nearbyCabinet.definition.title)
-            : nearbyDecor
-                ? nearbyDecor.definition.interaction?.prompt ?? ""
-                : nearbyVisitor
-                    ? getVisitorPrompt(nearbyVisitor.displayName)
-                    : "";
-    prompt.classList.toggle("is-visible", interactionReady && !playing && !decorOverlay.isOpen());
+        : waving
+            ? waveFeedbackText
+            : nearbyCabinet
+                ? getCabinetPrompt(true, nearbyCabinet.definition.title)
+                : nearbyDecor
+                    ? nearbyDecor.definition.interaction?.prompt ?? ""
+                    : nearbyVisitor
+                        ? getVisitorPrompt(nearbyVisitor.displayName)
+                        : "";
+    prompt.classList.toggle("is-visible", (interactionReady || waving) && !playing && !decorOverlay.isOpen());
 }
 // Interactive decor opens its page over the room; the walk resumes where it left off.
 const decorOverlay = createDecorOverlay({
@@ -737,7 +751,7 @@ function frame(now) {
         jukebox.update(player, roomEditor.getLayout().decor);
         accumulator -= TICK_SECONDS;
     }
-    visitors.update(frameSeconds, now);
+    visitors.update(frameSeconds, now, presence.members());
     const jukeboxPulse = jukebox.pulse(now);
     for (const instanceId of jukebox.emitterInstanceIds(roomEditor.getLayout().decor)) {
         pulseJukeboxGlow(decorRuntime.modelFor(instanceId), jukeboxPulse);

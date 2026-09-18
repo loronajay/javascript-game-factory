@@ -70,6 +70,14 @@ const DEFAULT_CABINETS = Object.freeze([
         rotationY: 0,
         hidden: false,
     }),
+    Object.freeze({
+        instanceId: "cockpit-swarm-1",
+        cabinetId: "cabinet.cockpit-swarm.twin-seat",
+        x: -6.3,
+        z: -2.8,
+        rotationY: 0,
+        hidden: false,
+    }),
 ]);
 /**
  * The three neon bars the room shipped with, now ordinary decor on the north

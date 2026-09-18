@@ -1,6 +1,7 @@
 import { createYamBowlingLane } from "./arcade-room-yam-bowling-model.mjs";
 import { createSharkHallPoolTable } from "./arcade-room-shark-hall-model.mjs";
 import { createBattleshitsCabinet } from "./arcade-room-battleshits-model.mjs";
+import { createCockpitSwarmCabinet } from "./arcade-room-cockpit-swarm-model.mjs";
 import { createPuckdUpAirHockeyTable } from "./arcade-room-puckd-up-model.mjs";
 import { createMiniHoopsCarnivalCabinet } from "./arcade-room-mini-hoops-model.mjs";
 import { BIRD_DUTY_CABINET_ART, CABINET_MARQUEE_GEOMETRY, CABINET_CONTROL_SURFACE, LOVERS_LOST_CABINET_ART, SUMORAI_CABINET_ART, } from "./arcade-room-scene.mjs";
@@ -576,5 +577,7 @@ export function createCabinetModel(THREE, definition) {
         return createPuckdUpAirHockeyTable(THREE, definition);
     if (definition.gameSlug === "mini-hoops")
         return createMiniHoopsCarnivalCabinet(THREE, definition);
+    if (definition.gameSlug === "cockpit-swarm")
+        return createCockpitSwarmCabinet(THREE, definition);
     throw new Error(`No 3D cabinet model is registered for ${definition.gameSlug}`);
 }

@@ -44,6 +44,7 @@ dev/
 !js/tests/
 js/tests/*
 !js/tests/arcade-room-puckd-up-model.test.mjs
+!js/tests/arcade-room-cockpit-swarm-model.test.mjs
 !js/tests/readme-freshness.test.mjs
 # Session durability is a production deploy invariant, not a local-only harness.
 !js/tests/arcade-session-nav.test.mjs
