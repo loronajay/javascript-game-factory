@@ -52,6 +52,12 @@
 // meaningless (stored as 1) without one. The client's catalog decides which
 // items honour these; here they are shape-checked and passed through.
 //
+// `surfaceColors` (2026-09-18) is the player's paint over each finish: per
+// kind, up to four hex colours or "" (the catalog colour) matched slot for slot
+// to the finish's own colours. Same policy: shape-checked here, meaning decided
+// by the client's catalog. Like `decor`, the key is emitted only when the client
+// sent one, so rows from before it existed come back exactly as they were.
+//
 // `music.defaultTrackId` (2026-09-17) is the house record: the jukebox track
 // the room starts playing for anyone who walks in. Same policy again — it is
 // checked for SHAPE (`<game-slug>.<track-slug>`), and the client's jukebox
@@ -83,6 +89,8 @@ const SURFACE_KINDS = ["floor", "wall", "ceiling", "trim"] as const;
 const DECOR_MOUNTS = new Set(["floor", "wall", "ceiling"]);
 const WALL_SIDES = new Set(["north", "south", "east", "west"]);
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
+/** The most colour slots any surface pattern reads. */
+const SURFACE_COLOR_SLOTS = 4;
 /** A custom sign's line: one short line of neon. */
 const TEXT_LIMIT = 24;
 /** A poster picture: this platform's Cloudinary uploads and nothing else. */
@@ -154,6 +162,18 @@ function normalizeSurfaces(value: any): Record<string, string> {
   return surfaces;
 }
 
+function normalizeSurfaceColors(value: any): Record<string, string[]> {
+  const source = value && typeof value === "object" ? value : {};
+  const colors: Record<string, string[]> = {};
+  for (const kind of SURFACE_KINDS) {
+    const list = Array.isArray(source[kind]) ? source[kind].slice(0, SURFACE_COLOR_SLOTS) : [];
+    const slots = list.map((raw: any) => (typeof raw === "string" && HEX_COLOR.test(raw.toLowerCase()) ? raw.toLowerCase() : ""));
+    while (slots.length && slots[slots.length - 1] === "") slots.pop();
+    colors[kind] = slots;
+  }
+  return colors;
+}
+
 function normalizeDecorRow(raw: any): any | null {
   const source = raw && typeof raw === "object" ? raw : {};
   const instanceId = cleanText(source.instanceId, 40);
@@ -220,6 +240,7 @@ export function normalizeArcadeRoomGarage(value: any): any {
   const submittedAvatarId = cleanText(input.avatarId, 80);
   const avatarId = AVATAR_IDS.has(submittedAvatarId) ? submittedAvatarId : DEFAULT_AVATAR_ID;
   const garage: any = { version, avatarId, surfaces, music, items };
+  if (input.surfaceColors && typeof input.surfaceColors === "object") garage.surfaceColors = normalizeSurfaceColors(input.surfaceColors);
   if (Array.isArray(input.decor)) {
     const decor: any[] = [];
     for (const raw of input.decor.slice(0, MAX_DECOR)) {

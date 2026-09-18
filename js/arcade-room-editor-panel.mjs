@@ -29,8 +29,8 @@
 // file chooser; the upload itself is the editor's business, the panel only
 // hands the file over and shows the state it is told.
 import { createColorPicker } from "./arcade-room-color-picker.mjs";
-import { DECOR_CATEGORIES, DECOR_CATEGORY_TITLES, NEON_TINTS, decorByCategory, decorCardImage, decorExtent, findDecor, } from "./arcade-room-catalog/decor.mjs";
-import { SURFACE_CATALOG, SURFACE_KINDS, surfaceGroups } from "./arcade-room-catalog/surfaces.mjs";
+import { DECOR_CATEGORIES, DECOR_CATEGORY_TITLES, NEON_TINTS, decorByCategory, decorCardImage, decorExtent, decorSignText, findDecor, } from "./arcade-room-catalog/decor.mjs";
+import { SURFACE_CATALOG, SURFACE_KINDS, findSurface, resolveSurfaceStyle, surfaceGroups } from "./arcade-room-catalog/surfaces.mjs";
 import { ARCADE_AVATAR_CATALOG } from "./arcade-room-avatar-catalog.mjs";
 export const EDITOR_TABS = Object.freeze(["cabinets", "surfaces", "decor", "avatar"]);
 const SURFACE_TITLES = Object.freeze({
@@ -99,6 +99,8 @@ export function createEditorPanel(elements, actions, options = {}) {
     // Which finish the surfaces tab is showing. Panel-local: it is a way of looking at the
     // catalog, not a fact about the room, so the editor never hears about it.
     let surfaceKind = "floor";
+    let paint = null;
+    const paintSlot = { floor: 0, wall: 0, ceiling: 0, trim: 0 };
     let avatarsBuilt = false;
     let inspector = null;
     // The cabinet inspector has no live controls, so it is simply rebuilt when this key changes.
@@ -210,6 +212,10 @@ export function createEditorPanel(elements, actions, options = {}) {
         elements.surfacePicker.replaceChildren(chips, ...SURFACE_KINDS.map((kind) => {
             const section = element("section", "surface-section");
             section.dataset.surfaceKind = kind;
+            // The paint block leads the section: the finish in use and its colours, before the shelf of alternatives.
+            const paintBlock = element("div", "surface-paint");
+            paintBlock.dataset.surfacePaint = kind;
+            section.append(paintBlock);
             for (const group of surfaceGroups(kind)) {
                 section.append(element("span", "surface-section__group", group));
                 const grid = element("div", "swatch-grid");
@@ -232,6 +238,57 @@ export function createEditorPanel(elements, actions, options = {}) {
         }));
         surfacesBuilt = true;
     }
+    const SLOT_NAMES = ["Base", "Accent", "Third", "Fourth"];
+    /**
+     * The paint block for one kind: a chip per colour slot of the chosen finish, the
+     * picker for the chip that is pressed, and a way back to the catalog colours.
+     */
+    function renderSurfacePaint(state, kind) {
+        const block = elements.surfacePicker.querySelector(`[data-surface-paint="${kind}"]`);
+        const definition = findSurface(kind, state.layout.surfaces[kind]);
+        if (!block || !definition)
+            return;
+        const slots = definition.style.colors.length;
+        const key = `${kind}|${definition.id}|${slots}`;
+        if (paintSlot[kind] >= slots)
+            paintSlot[kind] = 0;
+        if (!paint || paint.key !== key || !block.contains(paint.picker.element)) {
+            if (paint?.picker.isActive())
+                return;
+            const title = element("span", "surface-section__group", `COLOURS · ${definition.title.toUpperCase()}`);
+            const chips = element("div", "surface-paint__slots");
+            const slotButtons = [];
+            for (let index = 0; index < slots; index += 1) {
+                const chip = element("button", "surface-paint__slot");
+                chip.type = "button";
+                chip.dataset.paintSlot = String(index);
+                chip.dataset.paintKind = kind;
+                chip.append(element("span", "surface-paint__chip"), element("span", "surface-paint__name", SLOT_NAMES[index] ?? `Colour ${index + 1}`));
+                chips.append(chip);
+                slotButtons.push(chip);
+            }
+            const picker = createColorPicker({
+                presets: NEON_TINTS,
+                onPreview: (hex) => actions.setSurfaceColor(kind, paintSlot[kind], hex, "preview"),
+                onCommit: (hex) => actions.setSurfaceColor(kind, paintSlot[kind], hex, "commit"),
+            });
+            const reset = element("button", "inspector__tool surface-paint__reset", "Catalog colours");
+            reset.type = "button";
+            reset.dataset.paintReset = kind;
+            reset.title = "Put this finish back in the colours it came with";
+            const hint = element("small", "inspector__hint", slots > 1 ? "Pick a slot, then a colour. Every finish is painted from its own colours, so any pattern can be any colour." : "One colour makes this finish. Pick any colour for it.");
+            block.replaceChildren(title, chips, picker.element, reset, hint);
+            paint = { key, kind, slots: slotButtons, picker, reset };
+        }
+        const resolved = resolveSurfaceStyle(definition, state.layout.surfaceColors[kind]).colors;
+        for (const [index, chip] of paint.slots.entries()) {
+            chip.style.setProperty("--swatch", resolved[index] ?? "#888888");
+            chip.setAttribute("aria-pressed", String(index === paintSlot[kind]));
+            chip.title = `${SLOT_NAMES[index] ?? `Colour ${index + 1}`} · ${resolved[index]}`;
+        }
+        paint.picker.setValue(resolved[paintSlot[kind]] ?? "#888888");
+        paint.reset.hidden = state.layout.surfaceColors[kind].length === 0;
+    }
     function showSurfaceKind() {
         for (const chip of elements.surfacePicker.querySelectorAll("[data-surface-chip]")) {
             chip.setAttribute("aria-pressed", String(chip.dataset.surfaceChip === surfaceKind));
@@ -248,6 +305,7 @@ export function createEditorPanel(elements, actions, options = {}) {
             const kind = swatch.dataset.surfaceKind;
             swatch.setAttribute("aria-pressed", String(state.layout.surfaces[kind] === swatch.dataset.surfaceId));
         }
+        renderSurfacePaint(state, surfaceKind);
     }
     function renderDecorCategories(state) {
         elements.decorCategories.replaceChildren(...DECOR_CATEGORIES.map((category) => {
@@ -327,7 +385,7 @@ export function createEditorPanel(elements, actions, options = {}) {
             textInput = element("input", "inspector__text");
             textInput.type = "text";
             textInput.maxLength = definition.text.maxLength;
-            textInput.placeholder = definition.model.kind === "text-sign" ? definition.model.text : "";
+            textInput.placeholder = decorSignText(definition, {});
             textInput.value = selected.text;
             textInput.autocomplete = "off";
             textInput.spellcheck = false;
@@ -570,7 +628,9 @@ export function createEditorPanel(elements, actions, options = {}) {
         clearStarter.title = `Remove ${starterCount} starter neon ${starterCount === 1 ? "bar" : "bars"}`;
         elements.decorPlaced.replaceChildren(title, clearStarter, ...rows);
     }
+    let lastState = null;
     function render(state) {
+        lastState = state;
         renderTabs(state);
         renderCabinetList(state);
         renderSurfaces(state);
@@ -630,11 +690,26 @@ export function createEditorPanel(elements, actions, options = {}) {
         if (chip?.dataset.surfaceChip) {
             surfaceKind = chip.dataset.surfaceChip;
             showSurfaceKind();
+            if (lastState)
+                renderSurfacePaint(lastState, surfaceKind);
             return;
         }
         const swatch = event.target.closest("[data-surface-id]");
-        if (swatch && !swatch.disabled)
+        if (swatch && !swatch.disabled) {
             actions.setSurface(swatch.dataset.surfaceKind, swatch.dataset.surfaceId);
+            return;
+        }
+        const slot = event.target.closest("[data-paint-slot]");
+        if (slot) {
+            const kind = slot.dataset.paintKind;
+            paintSlot[kind] = Number(slot.dataset.paintSlot);
+            if (lastState)
+                renderSurfacePaint(lastState, kind);
+            return;
+        }
+        const reset = event.target.closest("[data-paint-reset]");
+        if (reset)
+            actions.resetSurfaceColors(reset.dataset.paintReset);
     });
     elements.avatarPicker.addEventListener("click", (event) => {
         const card = event.target.closest("[data-avatar-id]");

@@ -15,7 +15,7 @@ import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
-import { BATTLESHITS_PLAY_VIEW, CABINET_PLAY_VIEW, COCKPIT_SWARM_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
+import { BATTLESHITS_PLAY_VIEW, BUILD_BUDDY_PLAY_VIEW, CABINET_PLAY_VIEW, COCKPIT_SWARM_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
@@ -103,7 +103,7 @@ function applyRoomIdentity() {
     roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
     ownerLink.hidden = true;
     if (!layoutStore.accountBacked) {
-        startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, Cockpit Swarm's twin-seat machine, the Yam Bowling lane, the Shark Hall pool table, Puck'd Up air hockey, or the Mini Hoops carnival machine, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
+        startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, Build Buddy, Cockpit Swarm's twin-seat machine, the Yam Bowling lane, the Shark Hall pool table, Puck'd Up air hockey, or the Mini Hoops carnival machine, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
     }
 }
 applyRoomIdentity();
@@ -163,6 +163,7 @@ const playViews = Object.freeze({
     "yam-bowling": YAM_BOWLING_PLAY_VIEW,
     "shark-hall": SHARK_HALL_PLAY_VIEW,
     "cockpit-swarm": COCKPIT_SWARM_PLAY_VIEW,
+    "build-buddy": BUILD_BUDDY_PLAY_VIEW,
 });
 const cabinetRuntime = createCabinetRuntime(THREE, scene, CABINET_CATALOG);
 cabinetRuntime.sync(loaded.layout);

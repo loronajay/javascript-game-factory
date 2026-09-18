@@ -5,10 +5,10 @@
 // meshes and `applySurfaces` swaps their finishes from the catalog, which is
 // what lets a floor swatch in build mode change the room under the cursor.
 
-import { findSurface, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
+import { findSurface, resolveSurfaceStyle, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
 import { applySurfaceMaterial, createSurfaceMaterial } from "./arcade-room-surfaces.mjs";
 import { DEFAULT_SURFACE_IDS } from "./arcade-room-catalog/surfaces.mjs";
-import type { RoomSurfaces, WallSide } from "./arcade-room-layout.mjs";
+import type { RoomSurfaceColors, RoomSurfaces, WallSide } from "./arcade-room-layout.mjs";
 
 type ThreeNamespace = Record<string, any>;
 
@@ -20,7 +20,8 @@ export type RoomShell = Readonly<{
   walls: Readonly<Record<WallSide, any>>;
   /** The four wall meshes in one array for raycasting. */
   wallMeshes: readonly any[];
-  applySurfaces: (surfaces: RoomSurfaces) => void;
+  /** Re-dress whatever changed: a finish by id, and the player's paint over it (see `RoomSurfaceColors`). */
+  applySurfaces: (surfaces: RoomSurfaces, colors?: RoomSurfaceColors) => void;
   /** Ghost the walls the build camera stands outside of; an empty list restores the closed room. */
   setCutawayWalls: (hidden: readonly WallSide[]) => void;
 }>;
@@ -30,7 +31,7 @@ export function createRoomShell(THREE: ThreeNamespace, scene: any, dimensions: R
   const halfWidth = width / 2;
   const halfDepth = depth / 2;
   const wallY = height / 2;
-  const styleFor = (kind: SurfaceKind, id: string) => (findSurface(kind, id) ?? findSurface(kind, DEFAULT_SURFACE_IDS[kind])!).style;
+  const styleFor = (kind: SurfaceKind, id: string, colors: readonly string[] = []) => resolveSurfaceStyle(findSurface(kind, id) ?? findSurface(kind, DEFAULT_SURFACE_IDS[kind])!, colors);
 
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(width, depth, 20, 20),
@@ -116,24 +117,38 @@ export function createRoomShell(THREE: ThreeNamespace, scene: any, dimensions: R
     for (const side of Object.keys(walls) as WallSide[]) applyGhost(side);
   }
 
-  let current: RoomSurfaces = { ...DEFAULT_SURFACE_IDS };
+  // What each face is dressed in right now — the finish id plus its paint — so a
+  // re-dress only redraws the faces that changed.
+  const NO_COLORS: RoomSurfaceColors = Object.freeze({ floor: [], wall: [], ceiling: [], trim: [] });
+  const dressing = (kind: SurfaceKind, surfaces: RoomSurfaces, colors: RoomSurfaceColors): string => `${surfaces[kind]}|${colors[kind].join(",")}`;
+  const current: Record<SurfaceKind, string> = {
+    floor: dressing("floor", DEFAULT_SURFACE_IDS, NO_COLORS),
+    wall: dressing("wall", DEFAULT_SURFACE_IDS, NO_COLORS),
+    ceiling: dressing("ceiling", DEFAULT_SURFACE_IDS, NO_COLORS),
+    trim: dressing("trim", DEFAULT_SURFACE_IDS, NO_COLORS),
+  };
 
-  function applySurfaces(surfaces: RoomSurfaces): void {
-    if (surfaces.floor !== current.floor) applySurfaceMaterial(THREE, floor, styleFor("floor", surfaces.floor), { u: width, v: depth });
-    if (surfaces.wall !== current.wall) {
-      const style = styleFor("wall", surfaces.wall);
+  function applySurfaces(surfaces: RoomSurfaces, colors: RoomSurfaceColors = NO_COLORS): void {
+    const changed = (kind: SurfaceKind): boolean => {
+      const next = dressing(kind, surfaces, colors);
+      if (next === current[kind]) return false;
+      current[kind] = next;
+      return true;
+    };
+    if (changed("floor")) applySurfaceMaterial(THREE, floor, styleFor("floor", surfaces.floor, colors.floor), { u: width, v: depth });
+    if (changed("wall")) {
+      const style = styleFor("wall", surfaces.wall, colors.wall);
       for (const wall of [walls.north, walls.south]) applySurfaceMaterial(THREE, wall, style, { u: width, v: height });
       for (const wall of [walls.east, walls.west]) applySurfaceMaterial(THREE, wall, style, { u: depth, v: height });
       for (const side of Object.keys(walls) as WallSide[]) applyGhost(side);
     }
-    if (surfaces.ceiling !== current.ceiling) applySurfaceMaterial(THREE, ceiling, styleFor("ceiling", surfaces.ceiling), { u: width, v: depth });
-    if (surfaces.trim !== current.trim) {
-      const material = createSurfaceMaterial(THREE, styleFor("trim", surfaces.trim), { u: 1, v: 1 });
+    if (changed("ceiling")) applySurfaceMaterial(THREE, ceiling, styleFor("ceiling", surfaces.ceiling, colors.ceiling), { u: width, v: depth });
+    if (changed("trim")) {
+      const material = createSurfaceMaterial(THREE, styleFor("trim", surfaces.trim, colors.trim), { u: 1, v: 1 });
       const previous = trimMeshes[0]?.material;
       for (const mesh of trimMeshes) mesh.material = material;
       previous?.dispose?.();
     }
-    current = { ...surfaces };
   }
 
   return Object.freeze({

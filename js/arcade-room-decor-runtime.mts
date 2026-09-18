@@ -6,7 +6,7 @@
 // the rest in place. The editor calls it after every layout change and never
 // touches a decor mesh itself.
 
-import { MAX_LIT_DECOR, findDecor } from "./arcade-room-catalog/decor.mjs";
+import { MAX_DECOR_LIGHTS, MAX_LIT_DECOR, decorLightCount, findDecor } from "./arcade-room-catalog/decor.mjs";
 import { createDecorModel, disposeDecorModel, placeDecorModel } from "./arcade-room-decor-model.mjs";
 import type { RoomDecorItem, RoomLayout } from "./arcade-room-layout.mjs";
 
@@ -21,38 +21,57 @@ export type DecorRuntime = Readonly<{
   modelFor: (instanceId: string) => any | undefined;
 }>;
 
-function signatureOf(item: RoomDecorItem, lit: boolean): string {
-  return `${item.itemId}|${item.color}|${item.length}|${item.scale}|${item.text}|${item.image}|${item.aspect}|${item.mount}|${lit ? "lit" : "dark"}`;
+function signatureOf(item: RoomDecorItem, lights: number): string {
+  return `${item.itemId}|${item.color}|${item.length}|${item.scale}|${item.text}|${item.image}|${item.aspect}|${item.mount}|lights:${lights}`;
 }
 
-/** Which rows get a real light: the first `MAX_LIT_DECOR` lit-capable items in layout order. */
-export function litInstanceIds(layout: RoomLayout): Set<string> {
-  const lit = new Set<string>();
+/**
+ * How many light sources each row gets: lit-capable items in layout order, each
+ * asking for `decorLightCount` (one per few metres of length), until either the
+ * item cap or the room's light budget runs out. An item the budget cannot fully
+ * serve gets what is left rather than nothing, so the last strip in still lights
+ * up, only more sparsely; rows past the budget keep their glow and get no light.
+ */
+export function decorLightAllocation(layout: RoomLayout): Map<string, number> {
+  const allocation = new Map<string, number>();
+  let items = 0;
+  let lights = 0;
   for (const item of layout.decor) {
-    if (lit.size >= MAX_LIT_DECOR) break;
-    if (findDecor(item.itemId)?.light) lit.add(item.instanceId);
+    if (items >= MAX_LIT_DECOR || lights >= MAX_DECOR_LIGHTS) break;
+    const definition = findDecor(item.itemId);
+    if (!definition?.light) continue;
+    const count = Math.min(decorLightCount(definition, item), MAX_DECOR_LIGHTS - lights);
+    allocation.set(item.instanceId, count);
+    items += 1;
+    lights += count;
   }
-  return lit;
+  return allocation;
+}
+
+/** Kept for callers that only ask which rows are lit at all. */
+export function litInstanceIds(layout: RoomLayout): Set<string> {
+  return new Set(decorLightAllocation(layout).keys());
 }
 
 export function createDecorRuntime(THREE: ThreeNamespace, scene: any): DecorRuntime {
   const entries = new Map<string, DecorEntry>();
 
   function sync(layout: RoomLayout): void {
-    const lit = litInstanceIds(layout);
+    const allocation = decorLightAllocation(layout);
     const keep = new Set<string>();
     for (const item of layout.decor) {
       const definition = findDecor(item.itemId);
       if (!definition) continue;
       keep.add(item.instanceId);
-      const signature = signatureOf(item, lit.has(item.instanceId));
+      const lights = allocation.get(item.instanceId) ?? 0;
+      const signature = signatureOf(item, lights);
       let entry = entries.get(item.instanceId);
       if (entry && entry.signature !== signature) {
         disposeDecorModel(entry.model);
         entry = undefined;
       }
       if (!entry) {
-        const model = createDecorModel(THREE, definition, item, lit.has(item.instanceId));
+        const model = createDecorModel(THREE, definition, item, lights);
         scene.add(model);
         entry = { model, signature };
         entries.set(item.instanceId, entry);

@@ -78,11 +78,16 @@ test("Cockpit Swarm is a presentation-grade twin-seat environmental cabinet", ()
     height: 2.48,
     screenWidth: 1.88,
     screenHeight: 1.0575,
+    rearPanelZ: 1.27,
+    seatZ: 0.48,
+    entryGapDepth: 1.08,
   });
   for (const required of [
     "shell", "screen", "screen-bezel", "marquee", "seat-left", "seat-right",
-    "control-left", "control-right", "side-art-left", "side-art-right", "rear-platform",
+    "control-left", "control-right", "side-art-left", "side-art-right", "rear-art",
+    "rear-seat-panel", "side-wing-left", "side-wing-right", "rear-platform",
   ]) assert.ok(names.includes(required), `missing ${required}`);
+  assert.equal(names.some((name) => name.startsWith("side-pod-")), false, "full-depth side walls block side entry");
 
   assert.equal(names.filter((name) => name.startsWith("seat-harness-")).length, 4);
   assert.equal(names.filter((name) => name.startsWith("flight-stick-")).length, 2);
@@ -93,4 +98,16 @@ test("Cockpit Swarm is a presentation-grade twin-seat environmental cabinet", ()
   const rightSeat = nodes.find((node) => node.name === "seat-right");
   assert.ok(leftSeat.position.x < 0);
   assert.ok(rightSeat.position.x > 0);
+
+  const leftSeatBack = nodes.find((node) => node.name === "seat-back-left");
+  const leftControl = nodes.find((node) => node.name === "control-left");
+  const rearArt = nodes.find((node) => node.name === "rear-art");
+  assert.ok(leftSeatBack.position.z > 0, "seat back belongs behind the occupant, away from the screen");
+  assert.ok(leftControl.position.z < leftSeat.position.z, "controls belong between the seats and screen");
+  assert.ok(rearArt.position.z > leftSeat.position.z, "rear art panel belongs behind the seats");
+
+  for (const side of ["left", "right"]) {
+    const wing = nodes.find((node) => node.name === `side-wing-${side}`);
+    assert.ok(wing.args[0].args[2] < 0.8, `${side} art wing must stay short enough to preserve side entry`);
+  }
 });

@@ -10,7 +10,7 @@
 
 import { decorCardImage, type DecorDefinition } from "./arcade-room-catalog/decor.mjs";
 import type { RoomDecorItem } from "./arcade-room-layout.mjs";
-import { createDecorModel, disposeDecorModel } from "./arcade-room-decor-model.mjs";
+import { createDecorModel, decorModelBounds, disposeDecorModel } from "./arcade-room-decor-model.mjs";
 
 type ThreeNamespace = Record<string, any>;
 
@@ -80,7 +80,7 @@ export function createDecorThumbnails(THREE: ThreeNamespace): DecorThumbnails {
     if (!ensureRenderer()) return null;
     const model = createDecorModel(THREE, definition, thumbnailItem(definition), false);
     scene.add(model);
-    const bounds = new THREE.Box3().setFromObject(model);
+    const bounds = decorModelBounds(THREE, model);
     const centre = bounds.getCenter(new THREE.Vector3());
     const extent = bounds.getSize(new THREE.Vector3());
     const radius = Math.max(extent.x, extent.y, extent.z, 0.05) / 2;

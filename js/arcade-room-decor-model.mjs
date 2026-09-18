@@ -8,55 +8,10 @@
 //
 // `userData.decorInstanceId` on the root is what the editor's raycast reads
 // to know which layout row a click landed on.
-import { decorExtent, decorSignText } from "./arcade-room-catalog/decor.mjs";
+import { decorExtent, decorLightOffsets, decorSignText } from "./arcade-room-catalog/decor.mjs";
 import { drawNeonShape, drawNeonText } from "./arcade-room-neon-art.mjs";
-function standard(THREE, color, roughness = 0.6, metalness = 0.1) {
-    return new THREE.MeshStandardMaterial({ color, roughness, metalness });
-}
-function glow(THREE, color, intensity = 2.4) {
-    return new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensity, roughness: 0.3 });
-}
-function box(THREE, group, size, position, material, shadow = true) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-    mesh.position.set(...position);
-    mesh.castShadow = shadow;
-    mesh.receiveShadow = shadow;
-    group.add(mesh);
-    return mesh;
-}
-function cylinder(THREE, group, radiusTop, radiusBottom, height, position, material, segments = 16) {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), material);
-    mesh.position.set(...position);
-    mesh.castShadow = true;
-    group.add(mesh);
-    return mesh;
-}
-function sphere(THREE, group, radius, position, material) {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 18, 14), material);
-    mesh.position.set(...position);
-    mesh.castShadow = true;
-    group.add(mesh);
-    return mesh;
-}
-function canvasPlane(THREE, group, width, height, pixels, draw, position, transparent = true) {
-    const canvas = document.createElement("canvas");
-    canvas.width = pixels[0];
-    canvas.height = pixels[1];
-    const context = canvas.getContext("2d");
-    if (!context)
-        throw new Error("Canvas 2D is required to draw decor");
-    draw(context, pixels[0], pixels[1]);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: texture, transparent, side: THREE.DoubleSide }));
-    mesh.position.set(...position);
-    group.add(mesh);
-    return mesh;
-}
-function withAlpha(hex, alpha) {
-    const value = Number.parseInt(hex.slice(1), 16);
-    return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
-}
+import { box, canvasPlane, cylinder, glow, lighten, sphere, standard, withAlpha } from "./arcade-room-decor-primitives.mjs";
+import { buildHangingSign, buildMarquee, ceilingLightBuilder, ceilingPropBuilder, extraPropBuilder, extraWallBuilder } from "./arcade-room-decor-props.mjs";
 function rugPattern(context, w, h, color, pattern, round) {
     if (round) {
         context.beginPath();
@@ -553,10 +508,91 @@ function buildPopcornCart(THREE, group, size, color) {
     const grip = cylinder(THREE, group, 0.018, 0.018, w * 0.72 + 0.03, [0, counterY - 0.1 + handleLength * 0.6, -d / 2 - handleLength * 0.7], standard(THREE, "#3b2a1c", 0.8, 0), 10);
     grip.rotation.z = Math.PI / 2;
 }
+/**
+ * The soft wash a lit tube throws on the surface it is mounted to: a plane the
+ * length of the tube carrying a gradient that peaks under the glass and fades
+ * out across `spread`, with the two ends feathered. Additive and depth-silent,
+ * so it brightens whatever is behind it and never occludes. It is what makes a
+ * ten-metre strip glow along all ten metres rather than around one point light,
+ * and it is tagged `glowHalo` so bounds and picking can leave it out.
+ */
+function glowWash(THREE, group, length, spread, color, strength) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 64;
+    const context = canvas.getContext("2d");
+    if (!context)
+        throw new Error("Canvas 2D is required to draw decor");
+    const across = context.createLinearGradient(0, 0, 0, canvas.height);
+    across.addColorStop(0, withAlpha(color, 0));
+    across.addColorStop(0.5, withAlpha(color, strength));
+    across.addColorStop(1, withAlpha(color, 0));
+    context.fillStyle = across;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    // Feather the ends so a strip never ends in a hard edge of light.
+    const feather = Math.min(0.45, 0.35 / Math.max(0.5, length));
+    const along = context.createLinearGradient(0, 0, canvas.width, 0);
+    along.addColorStop(0, "rgba(0,0,0,0)");
+    along.addColorStop(feather, "rgba(0,0,0,1)");
+    along.addColorStop(1 - feather, "rgba(0,0,0,1)");
+    along.addColorStop(1, "rgba(0,0,0,0)");
+    context.globalCompositeOperation = "destination-in";
+    context.fillStyle = along;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(length + spread * 0.5, spread), new THREE.MeshBasicMaterial({ map: texture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    mesh.userData.glowHalo = true;
+    mesh.renderOrder = 2;
+    group.add(mesh);
+    return mesh;
+}
+/**
+ * A neon strip: a glass tube on a dark channel with a cap at each end, a
+ * white-hot core inside the coloured glass, and a glow wash on whatever it is
+ * mounted to. The tube runs along X; the wash lies on the mount face — the
+ * wall behind a wall strip, the floor under a floor strip, the ceiling above a
+ * ceiling one — which is the only thing the builder needs the mount for.
+ */
+function buildNeonStrip(THREE, group, size, color, mount) {
+    const w = size.width;
+    const radius = size.height / 2;
+    const channel = standard(THREE, "#1a1d24", 0.5, 0.4);
+    const cap = standard(THREE, "#2b2f38", 0.35, 0.7);
+    // The channel: a shallow rail the tube clips into, sat against the mount face.
+    box(THREE, group, [w, size.height * 0.5, size.depth * 0.6], [0, 0, -size.depth * 0.2], channel, false);
+    // The glass: coloured, self-lit, round — and a thinner white-hot filament inside it,
+    // which is what makes real neon read as light rather than as a painted bar.
+    const glass = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.2, roughness: 0.2, transparent: true, opacity: 0.85 });
+    const tube = cylinder(THREE, group, radius, radius, w - radius * 2, [0, 0, 0], glass, 14);
+    tube.rotation.z = Math.PI / 2;
+    tube.castShadow = false;
+    const core = cylinder(THREE, group, radius * 0.45, radius * 0.45, w - radius * 2.2, [0, 0, 0], glow(THREE, lighten(color, 0.6), 3.2), 8);
+    core.rotation.z = Math.PI / 2;
+    core.castShadow = false;
+    for (const sign of [-1, 1]) {
+        const end = cylinder(THREE, group, radius * 1.3, radius * 1.3, radius * 1.6, [sign * (w / 2 - radius * 0.8), 0, 0], cap, 12);
+        end.rotation.z = Math.PI / 2;
+        end.castShadow = false;
+    }
+    // The wash on the mount face, a hair proud of it so it never z-fights.
+    const spread = 0.42;
+    const wash = glowWash(THREE, group, w, spread, color, 0.62);
+    if (mount === "wall") {
+        wash.position.set(0, 0, -size.depth / 2 + 0.004);
+    }
+    else if (mount === "ceiling") {
+        wash.position.set(0, size.height / 2 - 0.004, 0);
+        wash.rotation.x = Math.PI / 2;
+    }
+    else {
+        wash.position.set(0, -size.height / 2 + 0.004, 0);
+        wash.rotation.x = -Math.PI / 2;
+    }
+}
 const BUILDERS = {
-    "strip": (THREE, group, size, color) => {
-        box(THREE, group, [size.width, size.height * 0.7, size.depth * 0.7], [0, 0, -size.depth * 0.1], standard(THREE, "#1a1d24", 0.5, 0.4), false);
-        box(THREE, group, [size.width, size.height, size.depth], [0, 0, 0], glow(THREE, color, 2.6), false);
+    "strip": (THREE, group, size, color, spec) => {
+        buildNeonStrip(THREE, group, size, color, spec.mount);
     },
     "text-sign": (THREE, group, size, color, spec) => {
         box(THREE, group, [size.width, size.height, size.depth * 0.3], [0, 0, -size.depth * 0.3], standard(THREE, "#0b0d12", 0.6, 0.3), false);
@@ -648,7 +684,11 @@ const BUILDERS = {
     "ceiling-light": (THREE, group, size, color, spec) => {
         const top = size.height / 2;
         const dark = standard(THREE, "#1a1d24", 0.45, 0.6);
-        if (spec.style === "spot") {
+        const extra = ceilingLightBuilder(spec.style);
+        if (extra) {
+            extra(THREE, group, size, color);
+        }
+        else if (spec.style === "spot") {
             cylinder(THREE, group, size.width / 2, size.width / 2, size.height, [0, 0, 0], dark);
             const lens = cylinder(THREE, group, size.width * 0.36, size.width * 0.36, 0.02, [0, -top + 0.005, 0], glow(THREE, color, 2));
             lens.castShadow = false;
@@ -785,8 +825,13 @@ const BUILDERS = {
                 tweeter.rotation.x = Math.PI / 2;
                 break;
             }
-            default:
-                box(THREE, group, [w, h, d], [0, 0, 0], tint);
+            default: {
+                const extra = extraPropBuilder(spec.prop);
+                if (extra)
+                    extra(THREE, group, size, color);
+                else
+                    box(THREE, group, [w, h, d], [0, 0, 0], tint);
+            }
         }
     },
     "wall-prop": (THREE, group, size, color, spec) => {
@@ -874,9 +919,27 @@ const BUILDERS = {
                 }
                 break;
             }
-            default:
-                box(THREE, group, [w, h, d], [0, 0, 0], tint);
+            default: {
+                const extra = extraWallBuilder(spec.prop);
+                if (extra)
+                    extra(THREE, group, size, color);
+                else
+                    box(THREE, group, [w, h, d], [0, 0, 0], tint);
+            }
         }
+    },
+    "marquee": (THREE, group, size, color, spec) => {
+        buildMarquee(THREE, group, size, color, spec.text);
+    },
+    "hanging-sign": (THREE, group, size, color, spec) => {
+        buildHangingSign(THREE, group, size, color, spec.text);
+    },
+    "ceiling-prop": (THREE, group, size, color, spec) => {
+        const build = ceilingPropBuilder(spec.prop);
+        if (build)
+            build(THREE, group, size, color);
+        else
+            box(THREE, group, [size.width, size.height, size.depth], [0, 0, 0], standard(THREE, color, 0.55, 0.12));
     },
 };
 /** Where the centred model sits relative to the stored point, per mount. */
@@ -889,12 +952,19 @@ export function mountOffset(mount, size) {
 }
 /** Where a lit item's light source goes, in the centred frame: just off the emitting face. */
 function lightOffset(definition, mount, size) {
+    // A source sat hard against its surface burns a spot into it; standing it off a little
+    // lets the falloff spread, which is what a tube's wash looks like.
+    if (definition.model.kind === "strip") {
+        if (mount === "wall")
+            return [0, 0, size.depth / 2 + 0.38];
+        if (mount === "ceiling")
+            return [0, -size.height / 2 - 0.38, 0];
+        return [0, size.height / 2 + 0.34, 0];
+    }
     if (mount === "wall")
         return [0, 0, size.depth / 2 + 0.18];
     if (mount === "ceiling")
         return [0, -size.height / 2 - 0.2, 0];
-    if (definition.model.kind === "strip")
-        return [0, size.height / 2 + 0.15, 0];
     // The counter glows on both long faces, so its light hangs over the top rather than off a front.
     if (definition.model.kind === "prop" && definition.model.prop === "counter")
         return [0, size.height / 2 + 0.2, 0];
@@ -906,13 +976,20 @@ function lightOffset(definition, mount, size) {
  */
 function modelSpecFor(definition, item) {
     const spec = definition.model;
-    if (spec.kind === "text-sign" && definition.text.enabled)
+    if (spec.kind === "strip")
+        return { ...spec, mount: item.mount };
+    if ((spec.kind === "text-sign" || spec.kind === "marquee" || spec.kind === "hanging-sign") && definition.text.enabled)
         return { ...spec, text: decorSignText(definition, item) };
     if (spec.kind === "poster" && definition.image.enabled)
         return { ...spec, image: item.image };
     return spec;
 }
-export function createDecorModel(THREE, definition, item, lit) {
+/**
+ * Build the model for one layout row. `lights` is how many point lights it
+ * gets (0 for glow only), spread evenly along its length so a long strip is
+ * lit end to end — see `decorLightAllocation`.
+ */
+export function createDecorModel(THREE, definition, item, lights) {
     const root = new THREE.Group();
     root.name = item.instanceId;
     root.userData = { decorInstanceId: item.instanceId, decorItemId: item.itemId };
@@ -927,10 +1004,17 @@ export function createDecorModel(THREE, definition, item, lit) {
     centred.position.set(offset.x, offset.y, offset.z);
     centred.scale.setScalar(factor);
     BUILDERS[definition.model.kind](THREE, centred, base, color, modelSpecFor(definition, item));
-    if (definition.light && lit) {
-        const light = new THREE.PointLight(color, definition.light.intensity, definition.light.distance * Math.sqrt(factor), 2);
-        light.position.set(...lightOffset(definition, item.mount, base));
-        centred.add(light);
+    const lightCount = typeof lights === "boolean" ? (lights ? 1 : 0) : Math.max(0, Math.floor(lights));
+    if (definition.light && lightCount > 0) {
+        const [x, y, z] = lightOffset(definition, item.mount, base);
+        // Several sources share the item's reach; each is a little dimmer than one alone would be so a
+        // long bar is even rather than louder, and never dimmer than half of one.
+        const share = Math.max(0.5, 1 / Math.sqrt(lightCount));
+        for (const offset of decorLightOffsets(lightCount, base.width)) {
+            const light = new THREE.PointLight(color, definition.light.intensity * share, definition.light.distance * Math.sqrt(factor), 2);
+            light.position.set(x + offset, y, z);
+            centred.add(light);
+        }
     }
     root.add(centred);
     return root;
@@ -957,6 +1041,28 @@ export function pulseJukeboxGlow(model, pulse) {
         if (object.userData?.jukeboxGlow && object.material)
             object.material.emissiveIntensity = intensity;
     });
+}
+/**
+ * The model's bounds without its glow washes: what a selection outline or a
+ * thumbnail frames. A wash is light on the wall, not the item, and would
+ * otherwise draw a box half a metre taller than a five-centimetre tube.
+ */
+export function decorModelBounds(THREE, model, target = new THREE.Box3()) {
+    target.makeEmpty();
+    model.updateWorldMatrix(true, true);
+    const scratch = new THREE.Box3();
+    model.traverse((object) => {
+        if (!object.isMesh || object.userData?.glowHalo)
+            return;
+        const geometry = object.geometry;
+        if (!geometry)
+            return;
+        if (!geometry.boundingBox)
+            geometry.computeBoundingBox();
+        scratch.copy(geometry.boundingBox).applyMatrix4(object.matrixWorld);
+        target.union(scratch);
+    });
+    return target;
 }
 export function disposeDecorModel(model) {
     model.traverse((object) => {

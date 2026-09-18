@@ -164,6 +164,40 @@ export const BATTLESHITS_CABINET: CabinetDefinition = Object.freeze({
   ]),
 });
 
+export const BUILD_BUDDY_CABINET: CabinetDefinition = Object.freeze({
+  id: "cabinet.build-buddy.standard",
+  kind: "arcade-cabinet",
+  gameSlug: "build-buddy",
+  title: "Build Buddy",
+  description: "A navy-and-safety-yellow co-op cabinet with runner controls, a builder trackball, holographic trim, and the full construction crew on its side panels.",
+  launchMode: "cabinet-screen",
+  dimensions: Object.freeze({ width: 0.92, depth: 0.98, height: 2.3 }),
+  placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+  unlock: Object.freeze({ type: "starter", source: "Build Buddy cabinet collection" }),
+  interaction: Object.freeze({
+    radius: 1.62,
+    facingThreshold: 0.42,
+    anchor: Object.freeze({ x: 0, y: 1.2, z: 0.51 }),
+  }),
+  palette: Object.freeze({
+    shell: "#07172d",
+    trim: "#22d8ff",
+    sky: "#124c83",
+    grass: "#f5b84b",
+    warning: "#ff7a1a",
+  }),
+  parts: Object.freeze([
+    Object.freeze({ id: "shell", material: "paint" }),
+    Object.freeze({ id: "side-art-left", material: "decal" }),
+    Object.freeze({ id: "side-art-right", material: "decal" }),
+    Object.freeze({ id: "marquee", material: "emissive" }),
+    Object.freeze({ id: "screen", material: "emissive" }),
+    Object.freeze({ id: "control-deck", material: "paint" }),
+    Object.freeze({ id: "coin-door", material: "metal" }),
+    Object.freeze({ id: "topper", material: "paint" }),
+  ]),
+});
+
 export const YAM_BOWLING_CABINET: CabinetDefinition = Object.freeze({
   id: "cabinet.yam-bowling.lane",
   kind: "arcade-cabinet",
@@ -343,6 +377,7 @@ export const CABINET_CATALOG: readonly CabinetDefinition[] = Object.freeze([
   SHARK_HALL_POOL_TABLE,
   PUCK_D_UP_AIR_HOCKEY,
   MINI_HOOPS_CABINET,
+  BUILD_BUDDY_CABINET,
   COCKPIT_SWARM_CABINET,
 ]);
 

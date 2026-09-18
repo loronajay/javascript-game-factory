@@ -158,7 +158,7 @@ export function jukeboxGain(distance, range = JUKEBOX_RANGE) {
 /** The one decor item that picks records. */
 export const JUKEBOX_ITEM_ID = "decor.prop.jukebox";
 /** Decor that relays whatever the jukebox is playing; a speaker never plays on its own. */
-export const SPEAKER_ITEM_IDS = Object.freeze(["decor.prop.speaker-stack", "decor.wall.speaker"]);
+export const SPEAKER_ITEM_IDS = Object.freeze(["decor.prop.speaker-stack", "decor.wall.speaker", "decor.ceiling.speaker"]);
 export function isJukeboxEmitter(itemId) {
     return itemId === JUKEBOX_ITEM_ID || SPEAKER_ITEM_IDS.includes(itemId);
 }

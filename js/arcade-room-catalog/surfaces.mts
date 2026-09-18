@@ -290,6 +290,56 @@ export function allSurfaceIds(): string[] {
   return SURFACE_KINDS.flatMap((kind) => SURFACE_CATALOG[kind].map((entry) => entry.id));
 }
 
+/** A colour a player may paint a surface slot: six-digit lowercase hex, the same shape a decor tint takes. */
+export const SURFACE_COLOR_PATTERN = /^#[0-9a-f]{6}$/;
+/** The most colour slots any pattern reads; a definition's `colors` length says how many it has. */
+export const SURFACE_COLOR_SLOTS_MAX = 4;
+
+export function isSurfaceColor(value: unknown): value is string {
+  return typeof value === "string" && SURFACE_COLOR_PATTERN.test(value);
+}
+
+/**
+ * The player's colours for one surface, as a list matched slot for slot to
+ * the definition's `colors`: a hex where they changed one, "" where the
+ * catalog colour stands. Anything that is not a hex is the catalog colour,
+ * slots the pattern does not have are dropped, and trailing empties are
+ * trimmed — so an untouched surface is `[]` and compares equal to one that
+ * was recoloured and put back.
+ */
+export function normalizeSurfaceColors(definition: SurfaceDefinition | undefined, value: unknown): string[] {
+  const source = Array.isArray(value) ? value : [];
+  const slots = definition ? definition.style.colors.length : 0;
+  const colors: string[] = [];
+  for (let index = 0; index < Math.min(slots, source.length, SURFACE_COLOR_SLOTS_MAX); index += 1) {
+    const raw = source[index];
+    colors.push(typeof raw === "string" && SURFACE_COLOR_PATTERN.test(raw.toLowerCase()) ? raw.toLowerCase() : "");
+  }
+  while (colors.length && colors[colors.length - 1] === "") colors.pop();
+  return colors;
+}
+
+/** `hex` moved most of the way to black: the glow a self-lit surface keeps under a recolour. */
+function dim(hex: string, keep: number): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const channel = (shift: number): string => Math.round(((value >> shift) & 255) * keep).toString(16).padStart(2, "0");
+  return `#${channel(16)}${channel(8)}${channel(0)}`;
+}
+
+/**
+ * The style the renderer draws: the catalog's, with the player's colours
+ * written over it slot by slot. A self-lit surface's glow follows its accent
+ * (slot 1), so a cyan neon grid painted pink glows pink and not cyan.
+ */
+export function resolveSurfaceStyle(definition: SurfaceDefinition, colors: readonly string[] = []): SurfaceStyle {
+  const overrides = normalizeSurfaceColors(definition, colors);
+  if (overrides.length === 0) return definition.style;
+  const resolved = definition.style.colors.map((base, index) => overrides[index] || base);
+  const style: SurfaceStyle = { ...definition.style, colors: Object.freeze(resolved) };
+  if (definition.style.emissive && overrides[1]) return { ...style, emissive: dim(overrides[1], 0.28) };
+  return style;
+}
+
 /** The picker's groups for one kind, in catalog order. */
 export function surfaceGroups(kind: SurfaceKind): readonly string[] {
   const seen: string[] = [];

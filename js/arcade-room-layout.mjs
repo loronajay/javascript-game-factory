@@ -1,5 +1,5 @@
 import { DECOR_MOUNTS, clampDecorAspect, clampDecorLength, clampDecorScale, clampDecorSpin, cleanDecorText, decorFootprint, findDecor, isDecorImageUrl } from "./arcade-room-catalog/decor.mjs";
-import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface } from "./arcade-room-catalog/surfaces.mjs";
+import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface, isSurfaceColor, normalizeSurfaceColors, resolveSurfaceStyle } from "./arcade-room-catalog/surfaces.mjs";
 import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
 import { DEFAULT_ARCADE_AVATAR_ID, findArcadeAvatar, normalizeArcadeAvatarId } from "./arcade-room-avatar-catalog.mjs";
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
@@ -78,6 +78,14 @@ const DEFAULT_CABINETS = Object.freeze([
         rotationY: 0,
         hidden: false,
     }),
+    Object.freeze({
+        instanceId: "build-buddy-1",
+        cabinetId: "cabinet.build-buddy.standard",
+        x: -4.35,
+        z: -2.8,
+        rotationY: 0,
+        hidden: false,
+    }),
 ]);
 /**
  * The three neon bars the room shipped with, now ordinary decor on the north
@@ -105,6 +113,9 @@ export function rotatedFootprint(placement, footprint) {
 export function defaultRoomSurfaces() {
     return { ...DEFAULT_SURFACE_IDS };
 }
+export function defaultRoomSurfaceColors() {
+    return { floor: [], wall: [], ceiling: [], trim: [] };
+}
 export function defaultRoomMusic() {
     return { defaultTrackId: "" };
 }
@@ -113,6 +124,7 @@ export function createDefaultRoomLayout() {
         version: 3,
         avatarId: DEFAULT_ARCADE_AVATAR_ID,
         surfaces: defaultRoomSurfaces(),
+        surfaceColors: defaultRoomSurfaceColors(),
         music: defaultRoomMusic(),
         items: DEFAULT_CABINETS.map((item) => ({ ...item })),
         decor: DEFAULT_DECOR.map((item) => ({ ...item })),
@@ -287,13 +299,46 @@ export function setItemHidden(layout, instanceId, hidden, room, catalog) {
     }
     return { valid: false, layout };
 }
-/** Swap one surface. Unknown ids are refused rather than stored. */
+/** Swap one surface. Unknown ids are refused rather than stored; a new finish starts in its catalog colours. */
 export function setRoomSurface(layout, kind, id) {
     if (!findSurface(kind, id))
         return { valid: false, layout };
     if (layout.surfaces[kind] === id)
         return { valid: true, layout };
-    return { valid: true, layout: { ...layout, surfaces: { ...layout.surfaces, [kind]: id } } };
+    return { valid: true, layout: { ...layout, surfaces: { ...layout.surfaces, [kind]: id }, surfaceColors: { ...layout.surfaceColors, [kind]: [] } } };
+}
+/**
+ * Paint one colour slot of a surface. A slot the finish does not have, or a
+ * value that is not a hex colour, is refused rather than stored; painting a
+ * slot back to the catalog colour clears it so the room compares equal to one
+ * never painted.
+ */
+export function setRoomSurfaceColor(layout, kind, slot, hex) {
+    const definition = findSurface(kind, layout.surfaces[kind]);
+    if (!definition || !Number.isInteger(slot) || slot < 0 || slot >= definition.style.colors.length)
+        return { valid: false, layout };
+    const color = typeof hex === "string" ? hex.toLowerCase() : "";
+    if (!isSurfaceColor(color))
+        return { valid: false, layout };
+    const next = [...layout.surfaceColors[kind]];
+    while (next.length <= slot)
+        next.push("");
+    next[slot] = color === definition.style.colors[slot] ? "" : color;
+    const colors = normalizeSurfaceColors(definition, next);
+    if (colors.length === layout.surfaceColors[kind].length && colors.every((value, index) => value === layout.surfaceColors[kind][index]))
+        return { valid: true, layout };
+    return { valid: true, layout: { ...layout, surfaceColors: { ...layout.surfaceColors, [kind]: colors } } };
+}
+/** Put one surface back in its catalog colours. */
+export function resetRoomSurfaceColors(layout, kind) {
+    if (layout.surfaceColors[kind].length === 0)
+        return layout;
+    return { ...layout, surfaceColors: { ...layout.surfaceColors, [kind]: [] } };
+}
+/** The colours one surface is drawn in: the catalog's with the player's paint over them. */
+export function roomSurfaceStyle(layout, kind) {
+    const definition = findSurface(kind, layout.surfaces[kind]) ?? findSurface(kind, DEFAULT_SURFACE_IDS[kind]);
+    return resolveSurfaceStyle(definition, layout.surfaceColors[kind]);
 }
 /** Pick the house record, or "" for none. A track the jukebox does not carry is refused rather than stored. */
 export function setRoomDefaultTrack(layout, trackId) {
@@ -377,6 +422,13 @@ function normalizeMusic(value) {
     const trackId = typeof source.defaultTrackId === "string" && findJukeboxTrack(source.defaultTrackId) ? source.defaultTrackId : "";
     return { defaultTrackId: trackId };
 }
+function normalizeSurfaceColorMap(surfaces, value) {
+    const source = (value && typeof value === "object" ? value : {});
+    const colors = defaultRoomSurfaceColors();
+    for (const kind of SURFACE_KINDS)
+        colors[kind] = normalizeSurfaceColors(findSurface(kind, surfaces[kind]), source[kind]);
+    return colors;
+}
 function normalizeSurfaces(value) {
     const source = (value && typeof value === "object" ? value : {});
     const surfaces = defaultRoomSurfaces();
@@ -440,10 +492,12 @@ export function normalizeRoomLayout(value) {
     else {
         decor = DEFAULT_DECOR.map((item) => ({ ...item }));
     }
+    const surfaces = normalizeSurfaces(source.surfaces);
     return {
         version: 3,
         avatarId: normalizeArcadeAvatarId(source.avatarId),
-        surfaces: normalizeSurfaces(source.surfaces),
+        surfaces,
+        surfaceColors: normalizeSurfaceColorMap(surfaces, source.surfaceColors),
         music: normalizeMusic(source.music),
         items: [...storedItems, ...starterAdditions],
         decor,
@@ -483,6 +537,9 @@ export function roomLayoutsEqual(first, second) {
     if (first.avatarId !== second.avatarId)
         return false;
     if (SURFACE_KINDS.some((kind) => first.surfaces[kind] !== second.surfaces[kind]))
+        return false;
+    if (SURFACE_KINDS.some((kind) => first.surfaceColors[kind].length !== second.surfaceColors[kind].length
+        || first.surfaceColors[kind].some((color, index) => color !== second.surfaceColors[kind][index])))
         return false;
     if (first.music.defaultTrackId !== second.music.defaultTrackId)
         return false;

@@ -2,11 +2,12 @@ import { findDecor } from "./arcade-room-catalog/decor.mjs";
 import { addDecorItem, duplicateDecorItem, nearestWall, placeDecorItem, removeDecorItem, rotateDecorItem, setDecorColor, setDecorImage, setDecorLength, setDecorScale, setDecorSpin, setDecorText, } from "./arcade-room-decor-layout.mjs";
 import { alignCabinetPlacement, alignDecorTarget } from "./arcade-room-decor-align.mjs";
 import { decorFrame, decorHandles, scaleDecorCorner, stretchDecorEnd } from "./arcade-room-decor-resize.mjs";
+import { decorModelBounds } from "./arcade-room-decor-model.mjs";
 import { createDecorThumbnails } from "./arcade-room-decor-thumbnails.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import { createEditorPanel } from "./arcade-room-editor-panel.mjs";
-import { ROOM_BOUNDS_DEFAULTS, addCabinetItem, createDefaultRoomLayout, duplicateCabinetItem, floorObstacles, roomLayoutsEqual, removeStarterNeon, removeCabinetItem, rotatePlacement, setItemHidden, setRoomAvatar, setRoomDefaultTrack, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
+import { ROOM_BOUNDS_DEFAULTS, addCabinetItem, createDefaultRoomLayout, duplicateCabinetItem, floorObstacles, roomLayoutsEqual, removeStarterNeon, removeCabinetItem, rotatePlacement, setItemHidden, setRoomAvatar, setRoomDefaultTrack, setRoomSurface, setRoomSurfaceColor, resetRoomSurfaceColors, updateItemPlacement, } from "./arcade-room-layout.mjs";
 import { EDITOR_CAMERA_LIMITS, EDITOR_CAMERA_PRESETS, applyEditorCameraPreset, createEditorCamera, editorCutawayWalls, editorCameraFromWalkingPose, editorCameraPose, editorViewOffset, focusEditorCamera, interpolateEditorCamera, orbitEditorCamera, panEditorCamera, panEditorCameraToAnchor, zoomEditorCamera, } from "./arcade-room-camera.mjs";
 /**
  * Key that flips build mode on and off. It has to be a key rather than only a button because pointer
@@ -73,7 +74,10 @@ export function createRoomEditor(options) {
     // the point under the hand is the one that stays put.
     const targetPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), EDITOR_CAMERA_LIMITS.targetHeight);
     const planeHit = new THREE.Vector3();
-    const selectionBox = new THREE.BoxHelper(cabinetRuntime.instances()[0]?.model, 0x70e8ff);
+    // The outline is drawn from a box this editor fills itself, so a decor item's glow wash
+    // (light on the wall, not the item) can be left out of it.
+    const selectionBounds = new THREE.Box3();
+    const selectionBox = new THREE.Box3Helper(selectionBounds, 0x70e8ff);
     selectionBox.material.depthTest = false;
     selectionBox.material.transparent = true;
     selectionBox.material.opacity = 0.9;
@@ -95,6 +99,12 @@ export function createRoomEditor(options) {
         duplicateCabinet: (instanceId) => duplicateCabinet(instanceId),
         removeCabinet: (instanceId) => removeCabinet(instanceId),
         setSurface: (kind, id) => setSurface(kind, id),
+        setSurfaceColor: (kind, slot, hex, phase) => editDecor({ ...setRoomSurfaceColor(layout, kind, slot, hex), instanceId: "", reason: "" }, `${SURFACE_LABELS[kind]} painted`, phase),
+        resetSurfaceColors: (kind) => {
+            const next = resetRoomSurfaceColors(layout, kind);
+            if (next !== layout)
+                commit(next, `${SURFACE_LABELS[kind]} back to catalog colours · unsaved`);
+        },
         setAvatar: (avatarId) => {
             const result = setRoomAvatar(layout, avatarId);
             if (!result.valid)
@@ -145,10 +155,10 @@ export function createRoomEditor(options) {
     function renderScene() {
         cabinetRuntime.sync(layout);
         decor.sync(layout);
-        shell.applySurfaces(layout.surfaces);
+        shell.applySurfaces(layout.surfaces, layout.surfaceColors);
         const model = selectedModel();
         if (model)
-            selectionBox.setFromObject(model);
+            decorModelBounds(THREE, model, selectionBounds);
         selectionBox.visible = editing && Boolean(model);
         refreshHandles();
     }
@@ -392,6 +402,7 @@ export function createRoomEditor(options) {
         commit(result.layout, trackId ? "House record set · unsaved" : "House record cleared · unsaved");
         await storeLayout();
     }
+    const SURFACE_LABELS = Object.freeze({ floor: "Floor", wall: "Walls", ceiling: "Ceiling", trim: "Trim" });
     function setSurface(kind, id) {
         if (!inventory.owns(id)) {
             setStatus("You do not own that finish yet.", "error");

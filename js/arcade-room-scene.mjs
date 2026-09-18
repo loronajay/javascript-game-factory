@@ -36,11 +36,17 @@ export const COCKPIT_SWARM_CABINET_ART = Object.freeze({
     keyArt: "../grid-previews/cockpit-swarm.png",
     sideArt: "../room/assets/cabinets/cockpit-swarm-side-panel.png",
 });
+export const BUILD_BUDDY_CABINET_ART = Object.freeze({
+    keyArt: "../grid-previews/build-buddy.png",
+    crewArt: "../games/build-buddy/assets/art/menu-custom-crew.png",
+    sideArt: "../room/assets/cabinets/build-buddy-side-panel.png",
+});
 export const CABINET_MARQUEE_GEOMETRY = Object.freeze({
     birdDuty: Object.freeze({ depth: 0.8, centerZ: 0, artZ: 0.407, bodyFrontZ: 0.28 }),
     loversLost: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
     sumorai: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
     battleshits: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
+    buildBuddy: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
 });
 export const CABINET_CONTROL_SURFACE = Object.freeze({
     tiltRadians: -0.105,
@@ -84,6 +90,12 @@ export const COCKPIT_SWARM_PLAY_VIEW = Object.freeze({
     position: Object.freeze({ x: 0, y: 1.34, z: 0.72 }),
     fov: 58,
     screen: Object.freeze({ width: 1.88, height: 1.0575, y: 1.68, z: -1.235 }),
+    gameAspect: 16 / 9,
+});
+export const BUILD_BUDDY_PLAY_VIEW = Object.freeze({
+    position: Object.freeze({ x: 0, y: 1.49, z: 1.52 }),
+    fov: 34,
+    screen: Object.freeze({ width: 0.68, height: 0.3825, y: 1.5, z: 0.285 }),
     gameAspect: 16 / 9,
 });
 // Screenless attraction: the lane has no monitor, so the game fills the viewport.

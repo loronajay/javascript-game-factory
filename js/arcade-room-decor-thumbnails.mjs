@@ -8,7 +8,7 @@
 // built on demand so only the open category pays, and the panel stays free of
 // THREE: it is handed a `(definition) => url | null` and nothing else.
 import { decorCardImage } from "./arcade-room-catalog/decor.mjs";
-import { createDecorModel, disposeDecorModel } from "./arcade-room-decor-model.mjs";
+import { createDecorModel, decorModelBounds, disposeDecorModel } from "./arcade-room-decor-model.mjs";
 export const THUMBNAIL_SIZE = Object.freeze({ width: 176, height: 128 });
 /** The layout row a thumbnail is rendered from: catalog defaults, first mount, size 1. */
 export function thumbnailItem(definition) {
@@ -69,7 +69,7 @@ export function createDecorThumbnails(THREE) {
             return null;
         const model = createDecorModel(THREE, definition, thumbnailItem(definition), false);
         scene.add(model);
-        const bounds = new THREE.Box3().setFromObject(model);
+        const bounds = decorModelBounds(THREE, model);
         const centre = bounds.getCenter(new THREE.Vector3());
         const extent = bounds.getSize(new THREE.Vector3());
         const radius = Math.max(extent.x, extent.y, extent.z, 0.05) / 2;

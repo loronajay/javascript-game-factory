@@ -327,6 +327,18 @@ button, a { font: inherit; }
 .inspector__text::placeholder { color: #6f8398; }
 .inspector__tool[hidden] { display: none; }
 
+/* — Surface paint: the chosen finish's colour slots under its swatches, and the picker for the pressed one — */
+.surface-paint { display: grid; gap: 6px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.surface-paint:empty { display: none; }
+.surface-paint__slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.surface-paint__slot { display: grid; gap: 3px; justify-items: center; min-width: 52px; padding: 4px 6px 5px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.04); color: #b8cada; cursor: pointer; }
+.surface-paint__slot:hover { border-color: rgba(112, 232, 255, .6); color: #fff; }
+.surface-paint__slot[aria-pressed="true"] { border-color: #ffd33d; box-shadow: 0 0 0 1px #ffd33d; color: #fff; }
+.surface-paint__chip { display: block; width: 34px; height: 22px; border-radius: 5px; background: var(--swatch); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.surface-paint__name { font: 700 9px/1 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.surface-paint__reset { width: max-content; padding: 6px 10px; font: 800 10px ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.surface-paint__reset[hidden] { display: none; }
+
 /* — Colour picker: an inline pad + hue strip, never a popup that a re-render can close — */
 .color-picker { display: grid; gap: 8px; --picker-hue: 0; --picker-color: #ff2d95; }
 .color-picker__pad,
