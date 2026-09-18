@@ -19,7 +19,7 @@ import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
-import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SUMORAI_PLAY_VIEW } from "./arcade-room-scene.mjs";
+import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
 
 const THREE: any = THREE_VENDOR;
@@ -103,7 +103,7 @@ function applyRoomIdentity(): void {
   roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
   ownerLink.hidden = true;
   if (!layoutStore.accountBacked) {
-    startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, or Sumorai, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
+    startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, or the Yam Bowling lane, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
   }
 }
 applyRoomIdentity();
@@ -180,6 +180,7 @@ const playViews: Readonly<Record<string, CabinetPlayView>> = Object.freeze({
   "bird-duty": CABINET_PLAY_VIEW,
   "lovers-lost": LOVERS_LOST_PLAY_VIEW,
   "sumorai": SUMORAI_PLAY_VIEW,
+  "yam-bowling": YAM_BOWLING_PLAY_VIEW,
 });
 
 const cabinets: CabinetRuntime[] = CABINET_CATALOG.map((definition) => {

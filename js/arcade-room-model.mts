@@ -1,4 +1,5 @@
 import type { CabinetDefinition } from "./arcade-room-cabinet.mjs";
+import { createYamBowlingLane } from "./arcade-room-yam-bowling-model.mjs";
 import {
   BIRD_DUTY_CABINET_ART,
   CABINET_MARQUEE_GEOMETRY,
@@ -651,5 +652,6 @@ export function createCabinetModel(THREE: ThreeNamespace, definition: CabinetDef
   if (definition.gameSlug === "bird-duty") return createBirdDutyCabinet(THREE, definition);
   if (definition.gameSlug === "lovers-lost") return createLoversLostCabinet(THREE, definition);
   if (definition.gameSlug === "sumorai") return createSumoraiCabinet(THREE, definition);
+  if (definition.gameSlug === "yam-bowling") return createYamBowlingLane(THREE, definition);
   throw new Error(`No 3D cabinet model is registered for ${definition.gameSlug}`);
 }

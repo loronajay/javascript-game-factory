@@ -94,10 +94,42 @@ export const SUMORAI_CABINET = Object.freeze({
         Object.freeze({ id: "topper", material: "emissive" }),
     ]),
 });
+export const YAM_BOWLING_CABINET = Object.freeze({
+    id: "cabinet.yam-bowling.lane",
+    kind: "arcade-cabinet",
+    gameSlug: "yam-bowling",
+    title: "Yam Bowling",
+    description: "A compact glow-bowling lane with a working approach, full pin deck, ball return, and overhead scoring screen.",
+    dimensions: Object.freeze({ width: 2.35, depth: 6, height: 2.65 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+    unlock: Object.freeze({ type: "starter", source: "Yam Bowling lane collection" }),
+    interaction: Object.freeze({
+        radius: 3.7,
+        facingThreshold: 0.35,
+        anchor: Object.freeze({ x: 0, y: 2.093, z: 2.133 }),
+    }),
+    palette: Object.freeze({
+        shell: "#17101f",
+        trim: "#e03622",
+        sky: "#322052",
+        grass: "#d9a85f",
+        warning: "#ffd76a",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "lane", material: "paint" }),
+        Object.freeze({ id: "gutters", material: "metal" }),
+        Object.freeze({ id: "pin-deck", material: "paint" }),
+        Object.freeze({ id: "pins", material: "paint" }),
+        Object.freeze({ id: "ball-return", material: "paint" }),
+        Object.freeze({ id: "marquee", material: "emissive" }),
+        Object.freeze({ id: "screen", material: "emissive" }),
+    ]),
+});
 export const CABINET_CATALOG = Object.freeze([
     BIRD_DUTY_CABINET,
     LOVERS_LOST_CABINET,
     SUMORAI_CABINET,
+    YAM_BOWLING_CABINET,
 ]);
 export function getCabinetFootprint(definition) {
     const padding = definition.placement.clearance * 2;

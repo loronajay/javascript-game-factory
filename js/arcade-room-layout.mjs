@@ -29,6 +29,14 @@ const DEFAULT_CABINETS = Object.freeze([
         rotationY: 0,
         hidden: false,
     }),
+    Object.freeze({
+        instanceId: "yam-bowling-1",
+        cabinetId: "cabinet.yam-bowling.lane",
+        x: 4.1,
+        z: -1.7,
+        rotationY: 0,
+        hidden: false,
+    }),
 ]);
 /**
  * The three neon bars the room shipped with, now ordinary decor on the north
