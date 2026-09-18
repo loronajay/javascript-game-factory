@@ -4,6 +4,15 @@
 function material(THREE, color, roughness = 0.6, metalness = 0.08) {
     return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
+function glow(THREE, color, intensity = 1.2) {
+    return new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: intensity,
+        roughness: 0.5,
+        metalness: 0,
+    });
+}
 function box(THREE, parent, name, size, position, surface) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), surface);
     mesh.name = name;
@@ -29,12 +38,18 @@ function addPin(THREE, parent, name, x, z) {
     pin.position.set(x, 0.12, z);
     parent.add(pin);
 }
-function addBall(THREE, parent, x, z, color) {
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 12), material(THREE, color, 0.22, 0.18));
-    ball.position.set(x, 0.52, z);
+function addBall(THREE, parent, x, y, z, color) {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.095, 18, 12), material(THREE, color, 0.22, 0.18));
+    ball.position.set(x, y, z);
     ball.castShadow = true;
     parent.add(ball);
 }
+// Lane geometry, in attraction units (before the room scale is applied). The lane runs
+// down -z: pins at the far end under the masking hood, the foul line at FOUL_Z, and the
+// wider approach in front of it where the player stands.
+const FOUL_Z = 0.78;
+const LANE_FAR_Z = -1.78;
+const APPROACH_NEAR_Z = 1.86;
 export function createYamBowlingLane(THREE, definition) {
     const root = new THREE.Group();
     root.name = definition.id;
@@ -43,46 +58,90 @@ export function createYamBowlingLane(THREE, definition) {
     attraction.scale.set(1.55, 1.15, 1.58);
     root.add(attraction);
     const shell = material(THREE, definition.palette.shell, 0.48, 0.2);
-    const trim = material(THREE, definition.palette.trim, 0.34, 0.22);
+    const trim = glow(THREE, definition.palette.trim, 0.9);
     const wood = material(THREE, definition.palette.grass, 0.42, 0.04);
     const darkWood = material(THREE, "#8d542c", 0.52, 0.03);
     const metal = material(THREE, "#33404f", 0.28, 0.72);
+    const gutterMetal = material(THREE, "#1c232c", 0.32, 0.7);
     const pinDeck = material(THREE, "#e8d8b5", 0.4, 0.03);
-    box(THREE, attraction, "lane", [1.12, 0.1, 3.45], [0, 0.09, -0.12], wood);
-    box(THREE, attraction, "pin-deck", [1.12, 0.08, 0.58], [0, 0.15, -1.56], pinDeck);
-    box(THREE, attraction, "gutter-left", [0.17, 0.12, 3.52], [-0.65, 0.08, -0.12], metal);
-    box(THREE, attraction, "gutter-right", [0.17, 0.12, 3.52], [0.65, 0.08, -0.12], metal);
-    box(THREE, attraction, "backstop", [1.5, 0.88, 0.18], [0, 0.54, -1.81], shell);
-    box(THREE, attraction, "backstop-glow", [1.28, 0.08, 0.035], [0, 0.86, -1.705], trim);
+    const laneLight = material(THREE, "#f1c98a", 0.4, 0.04);
+    const curtain = material(THREE, definition.palette.sky, 0.7, 0);
+    const deckGlow = glow(THREE, definition.palette.warning, 0.7);
+    // Bed: lane boards from the foul line to the pin deck, sitting in a shallow plinth so the
+    // whole attraction reads as one built piece rather than planks floating on the floor.
+    const laneLength = FOUL_Z - LANE_FAR_Z;
+    const laneCenterZ = (FOUL_Z + LANE_FAR_Z) / 2;
+    const backZ = LANE_FAR_Z - 0.22;
+    box(THREE, attraction, "plinth", [1.6, 0.06, APPROACH_NEAR_Z - backZ], [0, 0.03, (APPROACH_NEAR_Z + backZ) / 2], shell);
+    box(THREE, attraction, "lane", [1.12, 0.07, laneLength], [0, 0.095, laneCenterZ], wood);
+    box(THREE, attraction, "pin-deck", [1.12, 0.075, 0.6], [0, 0.0975, -1.5], pinDeck);
+    for (const side of [-1, 1]) {
+        const gutterName = side < 0 ? "gutter-left" : "gutter-right";
+        box(THREE, attraction, gutterName, [0.18, 0.09, laneLength + 0.02], [side * 0.65, 0.085, laneCenterZ], gutterMetal);
+        // Capping rails keep the balls off the floor and give the lane a finished edge.
+        box(THREE, attraction, "cap-rail", [0.06, 0.13, laneLength + 0.02], [side * 0.77, 0.125, laneCenterZ], shell);
+    }
+    // Lane markings: the seven target arrows and the foul line, laid flat on the boards.
+    for (let index = 0; index < 7; index += 1) {
+        const x = (index - 3) * 0.13;
+        const z = 0.12 - Math.abs(index - 3) * 0.06;
+        box(THREE, attraction, "lane-arrow", [0.05, 0.006, 0.09], [x, 0.133, z], laneLight);
+    }
+    box(THREE, attraction, "foul-line", [1.12, 0.006, 0.025], [0, 0.133, FOUL_Z], shell);
+    // Approach: a wider darker deck in front of the foul line where the player stands.
+    box(THREE, attraction, "approach", [1.46, 0.07, APPROACH_NEAR_Z - FOUL_Z], [0, 0.095, (APPROACH_NEAR_Z + FOUL_Z) / 2], darkWood);
+    for (const x of [-0.45, 0.45]) {
+        box(THREE, attraction, "foul-light", [0.26, 0.02, 0.03], [x, 0.14, FOUL_Z + 0.05], trim);
+    }
     const pinRows = [
-        [[0, -1.37]],
-        [[-0.09, -1.45], [0.09, -1.45]],
-        [[-0.18, -1.53], [0, -1.53], [0.18, -1.53]],
-        [[-0.27, -1.61], [-0.09, -1.61], [0.09, -1.61], [0.27, -1.61]],
+        [[0, -1.32]],
+        [[-0.09, -1.4], [0.09, -1.4]],
+        [[-0.18, -1.48], [0, -1.48], [0.18, -1.48]],
+        [[-0.27, -1.56], [-0.09, -1.56], [0.09, -1.56], [0.27, -1.56]],
     ];
     let pinNumber = 1;
     for (const row of pinRows) {
         for (const [x, z] of row)
             addPin(THREE, attraction, `pin-${pinNumber++}`, x, z);
     }
+    // Masking hood over the pin deck: the pins sit in a lit alcove under a hood whose front
+    // carries the lane's neon marquee, the way a real house masks the pinsetter. This is the
+    // whole lit signage — nothing hangs over the approach, so the view down the lane is open.
+    const hood = new THREE.Group();
+    hood.name = "pinsetter-hood";
+    attraction.add(hood);
+    box(THREE, hood, "backstop", [1.6, 0.92, 0.2], [0, 0.49, LANE_FAR_Z - 0.12], shell);
+    box(THREE, hood, "backstop-curtain", [1.12, 0.62, 0.02], [0, 0.4, LANE_FAR_Z - 0.01], curtain);
+    for (const side of [-1, 1]) {
+        box(THREE, hood, side < 0 ? "hood-side-left" : "hood-side-right", [0.06, 0.92, 0.5], [side * 0.77, 0.49, LANE_FAR_Z + 0.15], shell);
+    }
+    box(THREE, hood, "hood-top", [1.6, 0.34, 0.82], [0, 0.78, LANE_FAR_Z + 0.31], shell);
+    box(THREE, hood, "marquee-frame", [1.46, 0.28, 0.015], [0, 0.78, LANE_FAR_Z + 0.72], metal);
+    const marquee = box(THREE, hood, "marquee", [1.38, 0.2, 0.02], [0, 0.78, LANE_FAR_Z + 0.73], trim);
+    marquee.castShadow = false;
+    // A warm strip under the hood lights the pins from above.
+    const deckLight = box(THREE, hood, "deck-light", [1.0, 0.02, 0.06], [0, 0.6, LANE_FAR_Z + 0.42], deckGlow);
+    deckLight.castShadow = false;
+    // Ball return: a low rack tucked against the left cap rail at the approach, well below
+    // eye level and off the boards, so it never blocks the view down the lane.
     const ballReturn = new THREE.Group();
     ballReturn.name = "ball-return";
     attraction.add(ballReturn);
-    box(THREE, ballReturn, "return-base", [0.48, 0.5, 0.9], [0, 0.25, 1.22], shell);
-    box(THREE, ballReturn, "return-rail-left", [0.08, 0.08, 0.72], [-0.2, 0.48, 1.16], metal);
-    box(THREE, ballReturn, "return-rail-right", [0.08, 0.08, 0.72], [0.2, 0.48, 1.16], metal);
-    addBall(THREE, ballReturn, -0.11, 1.12, definition.palette.trim);
-    addBall(THREE, ballReturn, 0.12, 1.3, definition.palette.sky);
-    // No overhead scoring screen: like the pool table, the lane is a screenless attraction
-    // and stepping up to it boots straight into the fullscreen game. The marquee hangs on
-    // its own posts over the foul line so the lane still reads as a lit attraction.
-    for (const x of [-0.5, 0.5]) {
-        box(THREE, attraction, "marquee-post", [0.08, 2.1, 0.08], [x, 1.05, 1.25], metal);
+    const rackX = -0.56;
+    const rackZ = FOUL_Z + 0.5;
+    box(THREE, ballReturn, "return-base", [0.3, 0.16, 0.82], [rackX, 0.21, rackZ], shell);
+    box(THREE, ballReturn, "return-hood", [0.3, 0.14, 0.22], [rackX, 0.36, rackZ - 0.3], shell);
+    box(THREE, ballReturn, "return-hood-glow", [0.26, 0.02, 0.02], [rackX, 0.43, rackZ - 0.19], trim);
+    for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.58, 8), metal);
+        rail.name = side < 0 ? "return-rail-left" : "return-rail-right";
+        rail.rotation.x = Math.PI / 2;
+        rail.position.set(rackX + side * 0.075, 0.3, rackZ + 0.1);
+        rail.castShadow = true;
+        ballReturn.add(rail);
     }
-    box(THREE, attraction, "marquee", [1.14, 0.1, 0.16], [0, 2.22, 1.25], trim);
-    for (const x of [-0.45, 0.45]) {
-        box(THREE, attraction, "foul-light", [0.3, 0.025, 0.035], [x, 0.18, 0.85], trim);
-    }
-    box(THREE, attraction, "approach", [1.46, 0.045, 0.62], [0, 0.035, 1.57], darkWood);
+    addBall(THREE, ballReturn, rackX, 0.385, rackZ - 0.05, definition.palette.trim);
+    addBall(THREE, ballReturn, rackX, 0.385, rackZ + 0.16, definition.palette.sky);
+    addBall(THREE, ballReturn, rackX, 0.385, rackZ + 0.37, "#2d8ad9");
     return root;
 }
