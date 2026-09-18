@@ -88,11 +88,12 @@ test("Cockpit Swarm is a presentation-grade twin-seat environmental cabinet", ()
     "rear-seat-panel", "side-wing-left", "side-wing-right", "rear-platform",
   ]) assert.ok(names.includes(required), `missing ${required}`);
   assert.equal(names.some((name) => name.startsWith("side-pod-")), false, "full-depth side walls block side entry");
+  assert.equal(names.some((name) => name.startsWith("canopy-rib-")), false, "side openings must stay clear of floating canopy bars");
 
   assert.equal(names.filter((name) => name.startsWith("seat-harness-")).length, 4);
   assert.equal(names.filter((name) => name.startsWith("flight-stick-")).length, 2);
   assert.ok(names.filter((name) => name.startsWith("cockpit-light-")).length >= 8);
-  assert.ok(nodes.length >= 75, `expected a presentation-grade model, got ${nodes.length} nodes`);
+  assert.ok(nodes.length >= 70, `expected a presentation-grade model, got ${nodes.length} nodes`);
 
   const leftSeat = nodes.find((node) => node.name === "seat-left");
   const rightSeat = nodes.find((node) => node.name === "seat-right");

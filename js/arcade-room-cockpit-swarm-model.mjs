@@ -172,13 +172,7 @@ export function createCockpitSwarmCabinet(THREE, definition) {
     addSeat(THREE, root, "right", 0.5, shell, cushion, metal, orange);
     addControlStation(THREE, root, "left", -0.5, shell, metal, cyan, orange);
     addControlStation(THREE, root, "right", 0.5, shell, metal, cyan, orange);
-    // Ribbed canopy, center divider, and lit deck echo the shipped cockpit dashboard.
-    for (const side of [-1, 1]) {
-        for (let index = 0; index < 4; index += 1) {
-            const rib = box(THREE, root, `canopy-rib-${side}-${index + 1}`, [0.075, 1.38, 0.075], [side * (0.75 + index * 0.12), 1.55, 0.25 - index * 0.28], metal);
-            rib.rotation.x = -0.22;
-        }
-    }
+    // Keep both side openings visually clear; the divider and lit deck carry the cockpit framing.
     box(THREE, root, "cockpit-divider", [0.1, 1.16, 1.42], [0, 0.75, 0.1], shell);
     for (let index = 0; index < 10; index += 1) {
         const x = -0.94 + index * 0.209;
