@@ -1,7 +1,7 @@
 import {
   nextActionForSide,
   processAction, resolveContactAction,
-  startJump, summarizeObstacleOutcome,
+  startJump, applyCrouchHeld, summarizeObstacleOutcome,
 } from './game-tick.js';
 import { sanitizeResolvedOutcome } from './lane-snapshot.js';
 
@@ -44,13 +44,8 @@ export function createLaneInputHandler(inp, renderer, sounds) {
       if (enteringHeldCrouch) { anim.actionTick = 0; sounds.play('crouch'); }
     }
 
-    if (side === 'boy') {
-      const wasJumping = crouchHeld && gs.boy.state === 'jumping';
-      gs = { ...gs, boy: { ...gs.boy, state: crouchHeld ? 'crouching' : (gs.boy.state === 'crouching' ? 'running' : gs.boy.state), ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null } : {}) } };
-    } else {
-      const wasJumping = crouchHeld && gs.girl.state === 'jumping';
-      gs = { ...gs, girl: { ...gs.girl, state: crouchHeld ? 'crouching' : (gs.girl.state === 'crouching' ? 'running' : gs.girl.state), ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null } : {}) } };
-    }
+    if (side === 'boy') gs = { ...gs, boy:  applyCrouchHeld(gs.boy,  crouchHeld) };
+    else                gs = { ...gs, girl: applyCrouchHeld(gs.girl, crouchHeld) };
 
     const action = crouchHeld ? null : nextActionForSide(inp, side);
     if (action) {

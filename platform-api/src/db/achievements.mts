@@ -1,0 +1,175 @@
+// Player achievements: the collection rows (migration 048) and the two
+// operations on them — submit a run, read a player's collection.
+//
+// What an achievement IS lives in services/achievement-catalog; this module
+// owns the rows. Same split as game-loadouts / run-records.
+//
+// ## Submission
+//
+//   1. The game's `normalizeRun` validates the body (or the whole request is
+//      refused — nothing is written for an implausible run).
+//   2. If this run_id was already recorded for the player, the stored verdict
+//      is returned as-is: a retried request hears the same unlock list and
+//      nothing is re-evaluated. This is what keeps a client-side toast from
+//      replaying and any downstream fan-out from firing twice.
+//   3. Otherwise the detector runs against the player's current collection,
+//      the new ids are inserted with `on conflict do nothing`, and ONLY ids
+//      whose insert returned a row are reported as newly unlocked. Two tabs
+//      finishing at once cannot both be told they earned the same thing.
+//
+// The run summary itself is never stored (see the migration note).
+
+import {
+  evaluateAchievementRun,
+  getAchievementGame,
+  listAchievementGames,
+  presentAchievement,
+} from "../services/achievement-catalog.mjs";
+
+function cleanText(value: unknown, maxLength = 120): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function toIso(value: any): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+async function readOwned(pool: any, playerId: string, gameSlug: string): Promise<Map<string, string>> {
+  const res = await pool.query(
+    `select achievement_id, unlocked_at from player_achievements where player_id = $1 and game_slug = $2`,
+    [playerId, gameSlug],
+  );
+  return new Map<string, string>((res.rows || []).map((row: any) => [row.achievement_id, toIso(row.unlocked_at) || ""]));
+}
+
+function summarize(game: any, owned: Map<string, string>): any {
+  const achievements = game.definitions.map((definition: any) => presentAchievement(definition, owned.get(definition.id) || null));
+  return {
+    gameSlug: game.gameSlug,
+    title: game.title,
+    unlocked: achievements.filter((entry: any) => entry.unlocked).length,
+    total: achievements.length,
+    achievements,
+  };
+}
+
+/**
+ * Submits one run. Returns `{ unlocked, owned, progress }` where `unlocked`
+ * are the definitions this submission earned (masked never — the player just
+ * earned them), `owned` is every id now held, and `progress` the per-game
+ * count. `{ error }` for a refused body; null for a failed write.
+ */
+export async function submitAchievementRun(pool: any, params: any = {}): Promise<any> {
+  const gameSlug = cleanText(params.gameSlug, 60).toLowerCase();
+  const playerId = cleanText(params.playerId, 120);
+  const game = getAchievementGame(gameSlug);
+  if (!pool || !playerId || !game) return null;
+
+  const normalized = game.normalizeRun(params.run);
+  if (!normalized.ok) return { error: normalized.error };
+  const run: any = normalized.run;
+  const runId = cleanText(run.runId, 80);
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // Serialize concurrent submissions for the same player+game: two runs
+    // finishing at once (two tabs, a retry racing its original) must not both
+    // evaluate against the same pre-state and both claim a cumulative unlock.
+    await client.query(`select pg_advisory_xact_lock(hashtext($1))`, [`achievements:${playerId}:${gameSlug}`]);
+
+    const prior = await client.query(
+      `select unlocked_ids from game_achievement_runs where player_id = $1 and game_slug = $2 and run_id = $3`,
+      [playerId, gameSlug, runId],
+    );
+    const owned = await readOwned(client, playerId, gameSlug);
+    let unlockedIds: string[];
+
+    if (prior.rows?.length) {
+      // Retry: replay the recorded verdict, evaluate nothing.
+      unlockedIds = Array.isArray(prior.rows[0].unlocked_ids) ? prior.rows[0].unlocked_ids.filter((id: any) => typeof id === "string") : [];
+    } else {
+      const earned = evaluateAchievementRun(game, run, owned.keys());
+      unlockedIds = [];
+      for (const id of earned) {
+        const inserted = await client.query(
+          `insert into player_achievements (player_id, game_slug, achievement_id, run_id, unlocked_at)
+           values ($1, $2, $3, $4, now())
+           on conflict (player_id, game_slug, achievement_id) do nothing
+           returning unlocked_at`,
+          [playerId, gameSlug, id, runId],
+        );
+        if (inserted.rows?.length) {
+          unlockedIds.push(id);
+          owned.set(id, toIso(inserted.rows[0].unlocked_at) || new Date().toISOString());
+        }
+      }
+      await client.query(
+        `insert into game_achievement_runs (player_id, game_slug, run_id, unlocked_ids, submitted_at)
+         values ($1, $2, $3, $4::jsonb, now())
+         on conflict (player_id, game_slug, run_id) do nothing`,
+        [playerId, gameSlug, runId, JSON.stringify(unlockedIds)],
+      );
+    }
+    await client.query("commit");
+
+    const unlocked = unlockedIds
+      .map((id) => game.definitions.find((definition) => definition.id === id))
+      .filter(Boolean)
+      .map((definition: any) => presentAchievement(definition, owned.get(definition.id) || new Date().toISOString()));
+    const summary = summarize(game, owned);
+    return {
+      runId,
+      unlocked,
+      owned: [...owned.keys()],
+      progress: { gameSlug: game.gameSlug, title: game.title, unlocked: summary.unlocked, total: summary.total },
+    };
+  } catch (err: any) {
+    try { await client.query("rollback"); } catch { /* connection already gone */ }
+    process.stderr.write(`[achievements] submitAchievementRun error: ${err?.message || err}\n`);
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * A player's collection: every registered game, its definitions (secrets
+ * masked while locked) and the player's unlock dates. Public — a trophy case
+ * is for showing. `gameSlug` narrows to one game.
+ */
+export async function getPlayerAchievements(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const onlySlug = cleanText(params.gameSlug, 60).toLowerCase();
+  if (!pool || !playerId) return null;
+  if (onlySlug && !getAchievementGame(onlySlug)) return null;
+
+  try {
+    const res = await pool.query(
+      onlySlug
+        ? `select game_slug, achievement_id, unlocked_at from player_achievements where player_id = $1 and game_slug = $2`
+        : `select game_slug, achievement_id, unlocked_at from player_achievements where player_id = $1`,
+      onlySlug ? [playerId, onlySlug] : [playerId],
+    );
+    const ownedByGame = new Map<string, Map<string, string>>();
+    for (const row of res.rows || []) {
+      if (!ownedByGame.has(row.game_slug)) ownedByGame.set(row.game_slug, new Map());
+      ownedByGame.get(row.game_slug)!.set(row.achievement_id, toIso(row.unlocked_at) || "");
+    }
+    const games = listAchievementGames()
+      .filter((entry) => !onlySlug || entry.gameSlug === onlySlug)
+      .map((entry) => summarize(getAchievementGame(entry.gameSlug), ownedByGame.get(entry.gameSlug) || new Map()));
+    return {
+      playerId,
+      unlocked: games.reduce((sum, game) => sum + game.unlocked, 0),
+      total: games.reduce((sum, game) => sum + game.total, 0),
+      games,
+    };
+  } catch (err: any) {
+    process.stderr.write(`[achievements] getPlayerAchievements error: ${err?.message || err}\n`);
+    return null;
+  }
+}

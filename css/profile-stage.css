@@ -194,8 +194,11 @@
   right: clamp(16px, 4vw, 36px);
   z-index: 10;
   display: flex;
+  /* Stacked, not a row: the session nav owns the top band's width, and a row
+     of two or more chips runs under it at common desktop widths. */
+  flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
 }
 
 .me-stage__chips:empty,

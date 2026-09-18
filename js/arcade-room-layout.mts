@@ -1,5 +1,6 @@
 import { DECOR_MOUNTS, clampDecorLength, clampDecorScale, decorFootprint, findDecor, type DecorMount } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface, type SurfaceKind } from "./arcade-room-catalog/surfaces.mjs";
+import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
 
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
 
@@ -48,9 +49,17 @@ export type RoomDecorItem = Readonly<{
 
 export type RoomSurfaces = Readonly<Record<SurfaceKind, string>>;
 
+/**
+ * The room's music. `defaultTrackId` is the house record — the jukebox track
+ * that starts playing for anyone who walks in, through every jukebox and
+ * speaker on the floor — or "" for a quiet room until somebody picks a record.
+ */
+export type RoomMusic = Readonly<{ defaultTrackId: string }>;
+
 export type RoomLayout = Readonly<{
   version: 2;
   surfaces: RoomSurfaces;
+  music: RoomMusic;
   items: readonly RoomLayoutItem[];
   decor: readonly RoomDecorItem[];
 }>;
@@ -109,12 +118,14 @@ const DEFAULT_DECOR: readonly RoomDecorItem[] = Object.freeze([
   Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#53d8ff", length: 2.4, scale: 1 }),
   Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall" as const, wall: "north" as const, color: "#ffd33d", length: 1.8, scale: 1 }),
 ]);
+const STARTER_NEON_INSTANCE_IDS = new Set(DEFAULT_DECOR.map((item) => item.instanceId));
 
 function rounded(value: number): number {
   return Number(value.toFixed(4));
 }
 
-function rotatedFootprint(placement: RoomPlacement, footprint: ItemFootprint): ItemFootprint {
+/** The axis-aligned box a footprint covers once its rotation is applied. */
+export function rotatedFootprint(placement: RoomPlacement, footprint: ItemFootprint): ItemFootprint {
   const cosine = Math.abs(Math.cos(placement.rotationY));
   const sine = Math.abs(Math.sin(placement.rotationY));
   return {
@@ -127,13 +138,24 @@ export function defaultRoomSurfaces(): Record<SurfaceKind, string> {
   return { ...DEFAULT_SURFACE_IDS };
 }
 
+export function defaultRoomMusic(): RoomMusic {
+  return { defaultTrackId: "" };
+}
+
 export function createDefaultRoomLayout(): RoomLayout {
   return {
     version: 2,
     surfaces: defaultRoomSurfaces(),
+    music: defaultRoomMusic(),
     items: DEFAULT_CABINETS.map((item) => ({ ...item })),
     decor: DEFAULT_DECOR.map((item) => ({ ...item })),
   };
+}
+
+/** Take down only the three neon strips shipped with the starter room. */
+export function removeStarterNeon(layout: RoomLayout): RoomLayout {
+  const decor = layout.decor.filter((item) => !STARTER_NEON_INSTANCE_IDS.has(item.instanceId));
+  return decor.length === layout.decor.length ? layout : { ...layout, decor };
 }
 
 export function clampPlacementToRoom(
@@ -289,6 +311,13 @@ export function setRoomSurface(layout: RoomLayout, kind: SurfaceKind, id: string
   return { valid: true, layout: { ...layout, surfaces: { ...layout.surfaces, [kind]: id } } };
 }
 
+/** Pick the house record, or "" for none. A track the jukebox does not carry is refused rather than stored. */
+export function setRoomDefaultTrack(layout: RoomLayout, trackId: string): Readonly<{ valid: boolean; layout: RoomLayout }> {
+  if (trackId !== "" && !findJukeboxTrack(trackId)) return { valid: false, layout };
+  if (layout.music.defaultTrackId === trackId) return { valid: true, layout };
+  return { valid: true, layout: { ...layout, music: { defaultTrackId: trackId } } };
+}
+
 function isStoredItem(value: unknown): value is RoomLayoutItem {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<RoomLayoutItem>;
@@ -339,6 +368,13 @@ export function normalizeDecorItem(value: unknown): RoomDecorItem | null {
   };
 }
 
+/** A stale id — a record that left the catalog — comes back as none rather than as a broken room. */
+function normalizeMusic(value: unknown): RoomMusic {
+  const source = (value && typeof value === "object" ? value : {}) as Partial<RoomMusic>;
+  const trackId = typeof source.defaultTrackId === "string" && findJukeboxTrack(source.defaultTrackId) ? source.defaultTrackId : "";
+  return { defaultTrackId: trackId };
+}
+
 function normalizeSurfaces(value: unknown): RoomSurfaces {
   const source = (value && typeof value === "object" ? value : {}) as Partial<Record<SurfaceKind, unknown>>;
   const surfaces: Record<SurfaceKind, string> = defaultRoomSurfaces();
@@ -367,7 +403,7 @@ function normalizeSurfaces(value: unknown): RoomSurfaces {
  */
 export function normalizeRoomLayout(value: unknown): RoomLayout {
   if (!value || typeof value !== "object") return createDefaultRoomLayout();
-  const source = value as { version?: unknown; items?: unknown; decor?: unknown; surfaces?: unknown };
+  const source = value as { version?: unknown; items?: unknown; decor?: unknown; surfaces?: unknown; music?: unknown };
   if ((source.version !== 1 && source.version !== 2) || !Array.isArray(source.items) || !source.items.every(isStoredItem)) {
     return createDefaultRoomLayout();
   }
@@ -403,6 +439,7 @@ export function normalizeRoomLayout(value: unknown): RoomLayout {
   return {
     version: 2,
     surfaces: normalizeSurfaces(source.surfaces),
+    music: normalizeMusic(source.music),
     items: [...storedItems, ...starterAdditions],
     decor,
   };
@@ -435,6 +472,7 @@ function decorItemsEqual(first: RoomDecorItem, second: RoomDecorItem): boolean {
 export function roomLayoutsEqual(first: RoomLayout, second: RoomLayout): boolean {
   if (first.items.length !== second.items.length || first.decor.length !== second.decor.length) return false;
   if (SURFACE_KINDS.some((kind) => first.surfaces[kind] !== second.surfaces[kind])) return false;
+  if (first.music.defaultTrackId !== second.music.defaultTrackId) return false;
   const itemsEqual = first.items.every((item, index) => {
     const other = second.items[index];
     return other !== undefined

@@ -181,7 +181,7 @@ function posterTitle(slug: string): string {
 
 export const DECOR_CATALOG: readonly DecorDefinition[] = Object.freeze([
   // — Neon —
-  decor({ slug: "strip", category: "neon", title: "Neon Strip", mounts: ["wall", "ceiling", "floor"], size: { width: 2, height: 0.05, depth: 0.05 }, wallHeight: 2.8, tint: "#ff2d95", length: { min: 0.5, max: 8, default: 2 }, light: NEON_LIGHT, model: { kind: "strip" } }),
+  decor({ slug: "strip", category: "neon", title: "Neon Strip", mounts: ["wall", "ceiling", "floor"], size: { width: 2, height: 0.05, depth: 0.05 }, wallHeight: 2.8, tint: "#ff2d95", length: { min: 0.5, max: 20, default: 2 }, light: NEON_LIGHT, model: { kind: "strip" } }),
   decor({ slug: "heart", category: "neon", title: "Neon Heart", mounts: ["wall"], size: { width: 0.7, height: 0.7, depth: 0.06 }, wallHeight: 2.3, tint: "#ff2d95", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "heart" } }),
   decor({ slug: "star", category: "neon", title: "Neon Star", mounts: ["wall"], size: { width: 0.7, height: 0.7, depth: 0.06 }, wallHeight: 2.3, tint: "#ffd33d", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "star" } }),
   decor({ slug: "bolt", category: "neon", title: "Neon Bolt", mounts: ["wall"], size: { width: 0.5, height: 0.9, depth: 0.06 }, wallHeight: 2.3, tint: "#22e5ff", light: SIGN_LIGHT, scale: SCALE_RANGES.sign, model: { kind: "shape-sign", shape: "bolt" } }),
@@ -213,7 +213,7 @@ export const DECOR_CATALOG: readonly DecorDefinition[] = Object.freeze([
 
   // — Rugs (flat, walkable) —
   decor({ slug: "round", category: "rug", title: "Round Rug", mounts: ["floor"], size: { width: 2.2, height: 0.02, depth: 2.2 }, tint: "#7a1626", scale: SCALE_RANGES.rug, model: { kind: "rug", shape: "round", pattern: "border" } }),
-  decor({ slug: "runner", category: "rug", title: "Runner", mounts: ["floor"], size: { width: 3.6, height: 0.02, depth: 1.1 }, tint: "#14555c", length: { min: 1.5, max: 10, default: 3.6 }, model: { kind: "rug", shape: "rect", pattern: "stripes" } }),
+  decor({ slug: "runner", category: "rug", title: "Runner", mounts: ["floor"], size: { width: 3.6, height: 0.02, depth: 1.1 }, tint: "#14555c", length: { min: 1.5, max: 20, default: 3.6 }, model: { kind: "rug", shape: "rect", pattern: "stripes" } }),
   decor({ slug: "area", category: "rug", title: "Area Rug", mounts: ["floor"], size: { width: 3.2, height: 0.02, depth: 2.4 }, tint: "#3f1f5c", scale: SCALE_RANGES.rug, model: { kind: "rug", shape: "rect", pattern: "border" } }),
   decor({ slug: "checker", category: "rug", title: "Checker Mat", mounts: ["floor"], size: { width: 2.4, height: 0.02, depth: 2.4 }, tint: "#e9e4d6", scale: SCALE_RANGES.rug, model: { kind: "rug", shape: "rect", pattern: "checker" } }),
 

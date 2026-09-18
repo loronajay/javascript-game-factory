@@ -452,6 +452,72 @@ h2 { font-size: 26px; font-weight: 700; }
   }
 }
 
+/* The 3D cabinet projects the game into a roughly 660x370 iframe. At that size
+   the generic <=720px mobile rule is also active, but its 44px touch targets and
+   scrolling card are wrong for physical cabinet controls. Keep this mode explicit
+   so the standalone and touch layouts retain their normal presentation. */
+html.cabinet-mode .back-link {
+  display: none;
+}
+
+html.cabinet-mode .menu-card {
+  gap: 8px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100dvh - 12px);
+  overflow-y: auto;
+  padding: 10px 14px;
+}
+
+html.cabinet-mode .btn,
+html.cabinet-mode .side-btn,
+html.cabinet-mode .diff-btn,
+html.cabinet-mode .cpu-round-btn,
+html.cabinet-mode .cpu-layout-btn,
+html.cabinet-mode .round-btn,
+html.cabinet-mode .layout-btn,
+html.cabinet-mode .side-card {
+  min-height: 0;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+html.cabinet-mode #screen-menu {
+  align-items: flex-end;
+  padding: 0 10px 8px;
+}
+
+html.cabinet-mode #screen-menu .menu-card {
+  width: min(460px, calc(100vw - 20px));
+  max-height: none;
+  gap: 4px;
+  overflow: visible;
+  padding: 8px 10px;
+  transform: none;
+}
+
+html.cabinet-mode #screen-menu .tagline {
+  display: none;
+}
+
+html.cabinet-mode #screen-menu .menu-player-name {
+  min-height: 12px;
+  font-size: 10px;
+}
+
+html.cabinet-mode #screen-menu .menu-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  margin-top: 0;
+}
+
+html.cabinet-mode #screen-menu .menu-actions .btn:last-child {
+  grid-column: 1 / -1;
+  width: calc(50% - 3px);
+  justify-self: center;
+}
+
 /* ── Online lobby ─────────────────────────────────────────────────────────── */
 
 /* Lobby phase wrapper: hidden by default via HTML [hidden] attribute */

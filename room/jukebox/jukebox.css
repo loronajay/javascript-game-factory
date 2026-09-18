@@ -78,6 +78,23 @@
 
 .jukebox__hint { margin: 0; text-align: center; font-size: 13px; color: #9fb2c2; }
 
+.jukebox__house {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 8px 12px; border-radius: 10px;
+  border: 1px dashed rgba(255, 176, 112, .35); background: rgba(255, 122, 26, .06);
+  font-size: 13px;
+}
+.jukebox__house-label { flex: 1 1 200px; min-width: 0; color: #d8b89a; }
+.jukebox__house-label strong { color: #ffb070; }
+.jukebox__house button {
+  font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 176, 112, .5); background: rgba(255, 255, 255, .06); color: #ffe6cf;
+}
+.jukebox__house button:hover:not(:disabled) { background: rgba(255, 255, 255, .14); }
+.jukebox__house button:disabled { opacity: .35; cursor: default; }
+.jukebox-record__house { font-size: 10px; letter-spacing: .14em; font-weight: 800; color: #ffb070; }
+
 .jukebox__list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -122,6 +139,8 @@
 .jukebox-record__index { font-variant-numeric: tabular-nums; font-size: 12px; color: #8fa3b8; }
 .jukebox-record__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jukebox-record__mark { width: 10px; height: 10px; border-radius: 50%; background: transparent; }
+.jukebox-record__house { display: none; }
+.jukebox-record.is-house .jukebox-record__house { display: inline; }
 .jukebox-record.is-playing .jukebox-record__mark { background: #7dff4d; box-shadow: 0 0 10px #7dff4d; }
 .jukebox-record.is-current:not(.is-playing) .jukebox-record__mark { background: #ffb070; }
 

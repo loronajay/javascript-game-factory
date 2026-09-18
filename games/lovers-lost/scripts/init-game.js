@@ -18,6 +18,8 @@ import { createMobileNameInputBridge } from './mobile-name-input.js';
 import { createSounds } from './sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './online.js';
 import { updatePersonalBest } from './personal-best.js';
+import { buildRunResult, createRunId, GAME_SLUG } from './run-telemetry.js';
+import { createAchievementReporter } from '../../../js/platform/achievements/achievements.mjs';
 import { publishLoversLostRunActivity } from '../../../js/platform/activity/activity.mjs';
 import { loadFactoryProfile } from '../../../js/platform/identity/factory-profile.mjs';
 import { createOnlineIdentityPayload } from '../../../js/platform/identity/match-identity.mjs';
@@ -45,6 +47,11 @@ function _initWithAssets(images, emoteImages) {
   const canvas       = document.getElementById('gameCanvas');
   const renderer     = createRenderer(canvas, images, emoteImages);
   const inp          = createInput();
+  // Platform achievements: the run is filed with the account after each run
+  // and the platform toast shows whatever the server says was earned. The
+  // cabinet keeps no unlock state; signed-out play files nothing.
+  const achievements = createAchievementReporter();
+  let   currentRunId = '';
 
   const search   = window.location && window.location.search;
   const debugObstacleType = debugObstacleTypeFromSearch(search);
@@ -146,6 +153,7 @@ function _initWithAssets(images, emoteImages) {
   function startPlaying() {
     sounds.stop('run-success'); sounds.stop('run-failed');
     gs = { ...createGameState('local', Date.now() >>> 0, { debugObstacleType }), phase: 'playing' };
+    currentRunId = createRunId(gs.seed, Date.now());
     boyAnim = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
     inp.tick();
@@ -164,6 +172,7 @@ function _initWithAssets(images, emoteImages) {
       [obsKey]:     [],
       [boostKey]:   [],
     };
+    currentRunId = createRunId(gs.seed, Date.now());
     soloMode = true;
     soloSide = side;
     boyAnim  = { state: 'running', actionTick: 0 };
@@ -176,6 +185,7 @@ function _initWithAssets(images, emoteImages) {
     onlineCountdown = null; onlineSnapshotSeq = 0;
     remoteLaneSeq.boy = -1; remoteLaneSeq.girl = -1;
     gs = { ...createGameState('online', seed, { debugObstacleType }), phase: 'playing' };
+    currentRunId = createRunId(gs.seed, Date.now());
     boyAnim = { state: 'running', actionTick: 0 };
     girlAnim = { state: 'running', actionTick: 0 };
     inp.tick();
@@ -309,6 +319,11 @@ function _initWithAssets(images, emoteImages) {
               sessionId: gs.mode === 'online' ? `lovers-lost:${onlineRoomCode || 'online'}:${gs.seed ?? 0}` : '',
             });
             if (soloMode) soloPbResult = updatePersonalBest(storage, soloSide, gs.runSummary);
+            achievements.reportRun(GAME_SLUG, buildRunResult(gs, {
+              runId: currentRunId,
+              soloSide: soloMode ? soloSide : null,
+              onlineSide,
+            }));
           }
           if (gs.phase === 'reunion') sounds.play('run-success');
           if (gs.phase === 'gameover') sounds.play('run-failed');

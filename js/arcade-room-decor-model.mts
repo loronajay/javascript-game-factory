@@ -214,6 +214,302 @@ function buildJukebox(THREE: ThreeNamespace, group: any, size: Size, color: stri
   box(THREE, group, [w, 0.035, 0.03], [0, bottom + h * 0.08, d / 2 + 0.005], chrome, false);
 }
 
+/**
+ * A claw machine: a cabinet with a control deck and prize chute, a glass case
+ * on chrome posts full of plush balls with the claw hanging over them from its
+ * gantry, and a lit marquee ringed with bulbs. Front is +Z; the tint is the
+ * cabinet body and the marquee glow.
+ */
+function buildClawMachine(THREE: ThreeNamespace, group: any, size: Size, color: string): void {
+  const w = size.width;
+  const h = size.height;
+  const d = size.depth;
+  const bottom = -h / 2;
+  const body = standard(THREE, color, 0.5, 0.15);
+  const dark = standard(THREE, "#1a1d24", 0.5, 0.35);
+  const chrome = standard(THREE, "#d8dde4", 0.2, 0.9);
+  const glass = new THREE.MeshStandardMaterial({ color: "#bfe6ff", transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.1, side: THREE.DoubleSide });
+  const baseH = h * 0.36;
+  const caseH = h * 0.46;
+  const headH = h * 0.14;
+  const caseBottom = bottom + baseH;
+  const caseTop = caseBottom + caseH;
+  const front = d / 2;
+
+  // Base cabinet on a dark kick plate.
+  box(THREE, group, [w, h * 0.04, d], [0, bottom + h * 0.02, 0], dark);
+  box(THREE, group, [w, baseH - h * 0.04, d], [0, bottom + h * 0.04 + (baseH - h * 0.04) / 2, 0], body);
+  // Prize chute: a dark opening with a chrome flap, lower left of the front.
+  box(THREE, group, [w * 0.36, h * 0.15, 0.02], [-w * 0.22, bottom + h * 0.13, front + 0.01], chrome, false);
+  box(THREE, group, [w * 0.32, h * 0.11, 0.012], [-w * 0.22, bottom + h * 0.125, front + 0.024], standard(THREE, "#07090d", 0.95), false);
+  // Coin slot and a return cup on the right.
+  box(THREE, group, [0.06, 0.1, 0.012], [w * 0.3, bottom + h * 0.28, front + 0.006], chrome, false);
+  box(THREE, group, [0.08, 0.05, 0.03], [w * 0.3, bottom + h * 0.2, front + 0.015], dark, false);
+  // Control deck: a slanted panel on the front lip of the base with a joystick and a big button.
+  const deckDepth = d * 0.34;
+  const deck = box(THREE, group, [w * 0.92, 0.05, deckDepth], [0, caseBottom - 0.01, front - deckDepth / 2], dark);
+  deck.rotation.x = 0.28;
+  const deckY = caseBottom + 0.02;
+  const deckZ = front - deckDepth * 0.5;
+  cylinder(THREE, group, 0.012, 0.014, 0.13, [w * 0.16, deckY + 0.06, deckZ], chrome, 8);
+  sphere(THREE, group, 0.032, [w * 0.16, deckY + 0.13, deckZ], standard(THREE, "#ff3b3b", 0.35, 0.1));
+  cylinder(THREE, group, 0.04, 0.04, 0.022, [-w * 0.16, deckY + 0.008, deckZ], glow(THREE, color, 1.4), 18);
+  cylinder(THREE, group, 0.048, 0.048, 0.012, [-w * 0.16, deckY, deckZ], chrome, 18);
+
+  // The glass case: four chrome posts and a pane on each side, over a lit back panel.
+  for (const x of [-w / 2 + 0.03, w / 2 - 0.03]) {
+    for (const z of [-d / 2 + 0.03, d / 2 - 0.03]) {
+      box(THREE, group, [0.05, caseH, 0.05], [x, caseBottom + caseH / 2, z], chrome);
+    }
+  }
+  for (const z of [-d / 2 + 0.02, d / 2 - 0.02]) {
+    const pane = box(THREE, group, [w - 0.1, caseH - 0.02, 0.01], [0, caseBottom + caseH / 2, z], glass, false);
+    pane.castShadow = false;
+  }
+  for (const x of [-w / 2 + 0.02, w / 2 - 0.02]) {
+    const pane = box(THREE, group, [0.01, caseH - 0.02, d - 0.1], [x, caseBottom + caseH / 2, 0], glass, false);
+    pane.castShadow = false;
+  }
+  canvasPlane(THREE, group, w - 0.14, caseH - 0.04, [256, 256], (context, cw, ch) => {
+    const gradient = context.createLinearGradient(0, 0, 0, ch);
+    gradient.addColorStop(0, "#1b1030");
+    gradient.addColorStop(1, "#0a0714");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, cw, ch);
+    context.fillStyle = withAlpha(color, 0.55);
+    for (let index = 0; index < 28; index += 1) {
+      const x = ((index * 97) % cw);
+      const y = ((index * 61 + 17) % ch);
+      const r = 2 + (index % 3);
+      context.beginPath();
+      context.arc(x, y, r, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.strokeStyle = withAlpha(color, 0.35);
+    context.lineWidth = 3;
+    context.strokeRect(10, 10, cw - 20, ch - 20);
+  }, [0, caseBottom + caseH / 2, -d / 2 + 0.06], false);
+  // A tray of plush prizes: a packed lower layer and a few tumbled on top.
+  const plush = ["#ff5caf", "#ffd33d", "#7dff4d", "#22e5ff", "#a35bff", "#ff7a1a", "#f4f8ff"];
+  const radius = Math.min(w, d) * 0.085;
+  let index = 0;
+  for (let row = -1; row <= 1; row += 1) {
+    for (let column = -1; column <= 1; column += 1) {
+      const jitter = ((index * 7) % 5 - 2) * 0.01;
+      sphere(THREE, group, radius, [column * radius * 2.05 + jitter, caseBottom + radius + 0.02, row * radius * 2.05 - jitter], standard(THREE, plush[index % plush.length]!, 0.9, 0));
+      index += 1;
+    }
+  }
+  for (const [x, z] of [[-radius, -radius * 0.6], [radius * 1.1, radius * 0.4], [0, radius * 1.4], [-radius * 0.4, radius * 1.9]] as const) {
+    sphere(THREE, group, radius * 0.95, [x, caseBottom + radius * 2.6, z], standard(THREE, plush[index % plush.length]!, 0.9, 0));
+    index += 1;
+  }
+  // The gantry: two rails, a crossbar, the carriage, and the claw on its cable.
+  const railY = caseTop - 0.06;
+  for (const x of [-w * 0.3, w * 0.3]) box(THREE, group, [0.03, 0.03, d - 0.16], [x, railY, 0], chrome, false);
+  const carriageZ = d * 0.12;
+  box(THREE, group, [w * 0.6 + 0.06, 0.03, 0.03], [0, railY, carriageZ], chrome, false);
+  box(THREE, group, [0.13, 0.09, 0.13], [0.05, railY - 0.06, carriageZ], dark, false);
+  const cableLength = caseH * 0.36;
+  cylinder(THREE, group, 0.005, 0.005, cableLength, [0.05, railY - 0.1 - cableLength / 2, carriageZ], chrome, 6);
+  const hubY = railY - 0.1 - cableLength;
+  sphere(THREE, group, 0.032, [0.05, hubY, carriageZ], chrome);
+  for (let prong = 0; prong < 3; prong += 1) {
+    const angle = prong * Math.PI * 2 / 3;
+    const finger = cylinder(THREE, group, 0.007, 0.01, 0.13, [0.05 + Math.cos(angle) * 0.04, hubY - 0.06, carriageZ + Math.sin(angle) * 0.04], chrome, 6);
+    finger.rotation.set(Math.sin(angle) * 0.55, 0, -Math.cos(angle) * 0.55);
+  }
+
+  // The marquee: body-coloured header with a lit sign and a ring of bulbs.
+  box(THREE, group, [w, headH, d], [0, caseTop + headH / 2, 0], body);
+  canvasPlane(THREE, group, w * 0.9, headH * 0.68, [512, 128], (context, cw, ch) => {
+    context.fillStyle = "#0b0d14";
+    context.fillRect(0, 0, cw, ch);
+    context.font = "900 78px 'Arial Black', Impact, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.shadowColor = color;
+    context.shadowBlur = 28;
+    context.fillStyle = color;
+    context.fillText("CLAW", cw / 2, ch / 2 + 4);
+    context.shadowBlur = 0;
+    context.fillStyle = "#fff6fb";
+    context.font = "900 66px 'Arial Black', Impact, sans-serif";
+    context.fillText("CLAW", cw / 2, ch / 2 + 4);
+  }, [0, caseTop + headH / 2, front + 0.006], false);
+  box(THREE, group, [w * 0.9, headH * 0.68, 0.01], [0, caseTop + headH / 2, front - 0.001], glow(THREE, color, 0.5), false);
+  const bulbs = 9;
+  for (let bulb = 0; bulb < bulbs; bulb += 1) {
+    const x = (bulb - (bulbs - 1) / 2) * (w * 0.9 / (bulbs - 1));
+    sphere(THREE, group, 0.018, [x, caseTop + headH - 0.03, front + 0.012], glow(THREE, bulb % 2 ? "#fff4d6" : color, 2.4));
+  }
+  box(THREE, group, [w + 0.04, 0.03, d + 0.04], [0, caseTop + headH + 0.015, 0], dark);
+}
+
+/**
+ * A popcorn cart: a red cabinet on two big spoked wheels with a push handle,
+ * a brass-posted glass case with the kettle hanging over a heap of popcorn,
+ * a warmer light, and a striped valance under the roof with the sign on it.
+ * Front is +Z; the tint is the sign's neon.
+ */
+function buildPopcornCart(THREE: ThreeNamespace, group: any, size: Size, color: string): void {
+  const w = size.width;
+  const h = size.height;
+  const d = size.depth;
+  const bottom = -h / 2;
+  const red = standard(THREE, "#c8202d", 0.55, 0.05);
+  const cream = standard(THREE, "#f3e9d2", 0.7, 0);
+  const brass = standard(THREE, "#d4a64a", 0.3, 0.85);
+  const dark = standard(THREE, "#1a1d24", 0.5, 0.35);
+  const glass = new THREE.MeshStandardMaterial({ color: "#ffe6b0", transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.05, side: THREE.DoubleSide });
+  const wheelRadius = Math.min(0.17, h * 0.11);
+  const cabinetBottom = bottom + wheelRadius * 0.7;
+  const counterY = bottom + h * 0.55;
+  const cabinetH = counterY - cabinetBottom;
+  const cabinetW = w * 0.92;
+  const cabinetD = d * 0.9;
+  const stripes = (context: CanvasRenderingContext2D, cw: number, ch: number): void => {
+    for (let x = 0; x < cw; x += 32) {
+      context.fillStyle = (x / 32) % 2 ? "#c8202d" : "#f7f1e4";
+      context.fillRect(x, 0, 32, ch);
+    }
+  };
+
+  // The cabinet: red box, striped skirt on every side, brass trim.
+  box(THREE, group, [cabinetW, cabinetH, cabinetD], [0, cabinetBottom + cabinetH / 2, 0], red);
+  const skirtH = cabinetH * 0.72;
+  const skirtY = cabinetBottom + cabinetH * 0.42;
+  canvasPlane(THREE, group, cabinetW * 0.94, skirtH, [256, 256], stripes, [0, skirtY, cabinetD / 2 + 0.006], false);
+  const back = canvasPlane(THREE, group, cabinetW * 0.94, skirtH, [256, 256], stripes, [0, skirtY, -cabinetD / 2 - 0.006], false);
+  back.rotation.y = Math.PI;
+  for (const sign of [-1, 1]) {
+    const side = canvasPlane(THREE, group, cabinetD * 0.94, skirtH, [256, 256], stripes, [sign * (cabinetW / 2 + 0.006), skirtY, 0], false);
+    side.rotation.y = sign * Math.PI / 2;
+  }
+  box(THREE, group, [cabinetW + 0.02, 0.025, cabinetD + 0.02], [0, cabinetBottom + cabinetH * 0.06, 0], brass, false);
+  box(THREE, group, [cabinetW + 0.02, 0.025, cabinetD + 0.02], [0, cabinetBottom + cabinetH * 0.8, 0], brass, false);
+  // A bag dispenser and a scoop hanging on the front, above the skirt.
+  box(THREE, group, [w * 0.22, cabinetH * 0.14, 0.03], [-w * 0.22, cabinetBottom + cabinetH * 0.9, cabinetD / 2 + 0.015], cream, false);
+  box(THREE, group, [0.05, 0.11, 0.02], [w * 0.24, cabinetBottom + cabinetH * 0.9, cabinetD / 2 + 0.012], brass, false);
+  // The counter: a cream slab with a brass edge.
+  box(THREE, group, [w, 0.04, d], [0, counterY + 0.02, 0], cream);
+  box(THREE, group, [w + 0.02, 0.012, d + 0.02], [0, counterY + 0.046, 0], brass, false);
+
+  // The case: brass posts, warm glass, and a serving hatch cut low in the front pane.
+  const caseBottom = counterY + 0.05;
+  const roofY = bottom + h * 0.86;
+  const caseH = roofY - caseBottom;
+  for (const x of [-w / 2 + 0.04, w / 2 - 0.04]) {
+    for (const z of [-d / 2 + 0.04, d / 2 - 0.04]) {
+      cylinder(THREE, group, 0.018, 0.018, caseH, [x, caseBottom + caseH / 2, z], brass, 10);
+    }
+  }
+  const hatchH = caseH * 0.3;
+  const frontPane = box(THREE, group, [w - 0.1, caseH - hatchH, 0.01], [0, caseBottom + hatchH + (caseH - hatchH) / 2, d / 2 - 0.03], glass, false);
+  frontPane.castShadow = false;
+  const backPane = box(THREE, group, [w - 0.1, caseH, 0.01], [0, caseBottom + caseH / 2, -d / 2 + 0.03], glass, false);
+  backPane.castShadow = false;
+  for (const x of [-w / 2 + 0.03, w / 2 - 0.03]) {
+    const pane = box(THREE, group, [0.01, caseH, d - 0.1], [x, caseBottom + caseH / 2, 0], glass, false);
+    pane.castShadow = false;
+  }
+  // The heap of popcorn: a mound and loose kernels on top.
+  const mound = sphere(THREE, group, Math.min(w, d) * 0.4, [0, caseBottom + 0.02, 0], standard(THREE, "#f6e7b4", 0.95, 0));
+  mound.scale.set(1, 0.38, 0.9);
+  const kernels = ["#fff6d8", "#f6e7b4", "#ffd97a", "#fffbe9"];
+  for (let index = 0; index < 16; index += 1) {
+    const angle = index * 2.4;
+    const reach = ((index * 37) % 10) / 10 * Math.min(w, d) * 0.34;
+    sphere(THREE, group, 0.022 + (index % 3) * 0.004, [Math.cos(angle) * reach, caseBottom + 0.04 + Math.max(0, 0.12 - reach * 0.3), Math.sin(angle) * reach * 0.9], standard(THREE, kernels[index % kernels.length]!, 0.95, 0));
+  }
+  // The kettle: a hanging pot with a lid, a crank, and its hanger bar across the case.
+  const kettleRadius = Math.min(w, d) * 0.15;
+  const kettleY = caseBottom + caseH * 0.6;
+  cylinder(THREE, group, 0.01, 0.01, w - 0.12, [0, roofY - 0.05, -d * 0.05], brass, 8).rotation.z = Math.PI / 2;
+  cylinder(THREE, group, 0.006, 0.006, roofY - 0.05 - (kettleY + kettleRadius * 0.7), [0, (roofY - 0.05 + kettleY + kettleRadius * 0.7) / 2, -d * 0.05], brass, 6);
+  cylinder(THREE, group, kettleRadius, kettleRadius * 0.85, kettleRadius * 1.3, [0, kettleY, -d * 0.05], standard(THREE, "#3b3f47", 0.35, 0.9), 20);
+  cylinder(THREE, group, kettleRadius * 1.05, kettleRadius * 1.05, 0.015, [0, kettleY + kettleRadius * 0.66, -d * 0.05], brass, 20);
+  const crank = cylinder(THREE, group, 0.006, 0.006, kettleRadius * 1.2, [kettleRadius * 0.6, kettleY + kettleRadius * 0.8, -d * 0.05], brass, 6);
+  crank.rotation.z = Math.PI / 2;
+  cylinder(THREE, group, 0.012, 0.012, 0.05, [kettleRadius * 1.2, kettleY + kettleRadius * 0.8, -d * 0.05], dark, 8);
+  // The warmer: a glowing tube under the roof.
+  box(THREE, group, [w * 0.6, 0.03, 0.05], [0, roofY - 0.03, d * 0.2], glow(THREE, "#ffb347", 2.2), false);
+
+  // The roof: a red cap with a striped, scalloped valance and the sign on the front.
+  const roofH = h - (roofY - bottom);
+  box(THREE, group, [w + 0.06, roofH * 0.5, d + 0.06], [0, roofY + roofH * 0.75, 0], red);
+  box(THREE, group, [w + 0.1, 0.02, d + 0.1], [0, roofY + roofH * 0.5, 0], brass, false);
+  const valance = (context: CanvasRenderingContext2D, cw: number, ch: number): void => {
+    context.clearRect(0, 0, cw, ch);
+    context.save();
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(cw, 0);
+    context.lineTo(cw, ch * 0.62);
+    const scallops = 8;
+    for (let index = scallops; index > 0; index -= 1) {
+      context.arc((index - 0.5) * (cw / scallops), ch * 0.62, cw / scallops / 2, 0, Math.PI, false);
+    }
+    context.closePath();
+    context.clip();
+    stripes(context, cw, ch);
+    context.restore();
+  };
+  const valanceH = roofH * 0.9;
+  const valanceY = roofY + roofH * 0.5 - valanceH * 0.28;
+  canvasPlane(THREE, group, w + 0.1, valanceH, [512, 128], valance, [0, valanceY, d / 2 + 0.05]);
+  const rear = canvasPlane(THREE, group, w + 0.1, valanceH, [512, 128], valance, [0, valanceY, -d / 2 - 0.05]);
+  rear.rotation.y = Math.PI;
+  for (const sign of [-1, 1]) {
+    const side = canvasPlane(THREE, group, d + 0.1, valanceH, [512, 128], valance, [sign * (w / 2 + 0.05), valanceY, 0]);
+    side.rotation.y = sign * Math.PI / 2;
+  }
+  canvasPlane(THREE, group, w * 0.8, roofH * 0.42, [512, 96], (context, cw, ch) => {
+    context.fillStyle = "#2a0b10";
+    context.fillRect(0, 0, cw, ch);
+    context.font = "900 62px 'Arial Black', Impact, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.shadowColor = color;
+    context.shadowBlur = 24;
+    context.fillStyle = color;
+    context.fillText("POPCORN", cw / 2, ch / 2 + 3);
+    context.shadowBlur = 0;
+    context.fillStyle = "#fff8e6";
+    context.font = "900 54px 'Arial Black', Impact, sans-serif";
+    context.fillText("POPCORN", cw / 2, ch / 2 + 3);
+  }, [0, roofY + roofH * 0.75, d / 2 + 0.036], false);
+
+  // Wheels: two big spoked wheels on a rear axle, a caster at the front, and the push handle behind.
+  const axleZ = -d * 0.26;
+  const axleY = bottom + wheelRadius;
+  cylinder(THREE, group, 0.012, 0.012, w + 0.1, [0, axleY, axleZ], dark, 8).rotation.z = Math.PI / 2;
+  for (const sign of [-1, 1]) {
+    const x = sign * (w / 2 + 0.03);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(wheelRadius - 0.02, 0.02, 10, 32), standard(THREE, "#2b2f38", 0.5, 0.4));
+    rim.position.set(x, axleY, axleZ);
+    rim.rotation.y = Math.PI / 2;
+    rim.castShadow = true;
+    group.add(rim);
+    const hub = cylinder(THREE, group, 0.035, 0.035, 0.04, [x, axleY, axleZ], brass, 12);
+    hub.rotation.z = Math.PI / 2;
+    for (let spoke = 0; spoke < 6; spoke += 1) {
+      const bar = box(THREE, group, [0.012, (wheelRadius - 0.02) * 2, 0.012], [x, axleY, axleZ], brass, false);
+      bar.rotation.x = spoke * Math.PI / 6;
+    }
+  }
+  const caster = cylinder(THREE, group, wheelRadius * 0.35, wheelRadius * 0.35, 0.04, [0, bottom + wheelRadius * 0.35, d * 0.3], dark, 14);
+  caster.rotation.z = Math.PI / 2;
+  cylinder(THREE, group, 0.012, 0.012, cabinetBottom - (bottom + wheelRadius * 0.35), [0, (cabinetBottom + bottom + wheelRadius * 0.35) / 2, d * 0.3], dark, 6);
+  const handleLength = 0.5;
+  for (const sign of [-1, 1]) {
+    const rod = cylinder(THREE, group, 0.014, 0.014, handleLength, [sign * w * 0.36, counterY - 0.1 + handleLength * 0.3, -d / 2 - handleLength * 0.35], brass, 8);
+    rod.rotation.x = -0.75;
+  }
+  const grip = cylinder(THREE, group, 0.018, 0.018, w * 0.72 + 0.03, [0, counterY - 0.1 + handleLength * 0.6, -d / 2 - handleLength * 0.7], standard(THREE, "#3b2a1c", 0.8, 0), 10);
+  grip.rotation.z = Math.PI / 2;
+}
+
 const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
   "strip": (THREE, group, size, color) => {
     box(THREE, group, [size.width, size.height * 0.7, size.depth * 0.7], [0, 0, -size.depth * 0.1], standard(THREE, "#1a1d24", 0.5, 0.4), false);
@@ -387,19 +683,7 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
         break;
       }
       case "claw": {
-        box(THREE, group, [w, h * 0.42, d], [0, bottom + h * 0.21, 0], tint);
-        box(THREE, group, [w, h * 0.1, d], [0, bottom + h * 0.95, 0], tint);
-        for (const x of [-w / 2 + 0.03, w / 2 - 0.03]) {
-          for (const z of [-d / 2 + 0.03, d / 2 - 0.03]) {
-            box(THREE, group, [0.05, h * 0.5, 0.05], [x, bottom + h * 0.67, z], metal);
-          }
-        }
-        const glass = box(THREE, group, [w - 0.1, h * 0.48, d - 0.1], [0, bottom + h * 0.66, 0], new THREE.MeshStandardMaterial({ color: "#9fd8ff", transparent: true, opacity: 0.22, roughness: 0.1 }), false);
-        glass.castShadow = false;
-        for (let index = 0; index < 5; index += 1) {
-          sphere(THREE, group, 0.07, [(index - 2) * 0.13, bottom + h * 0.49, (index % 2 ? 0.12 : -0.1)], standard(THREE, ["#ff5caf", "#ffd33d", "#7dff4d", "#22e5ff", "#a35bff"][index]!, 0.8));
-        }
-        box(THREE, group, [w * 0.8, 0.05, 0.02], [0, bottom + h * 0.92, d / 2 + 0.01], glow(THREE, color, 1.8), false);
+        buildClawMachine(THREE, group, size, color);
         break;
       }
       case "pinball": {
@@ -417,17 +701,7 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
         break;
       }
       case "popcorn": {
-        box(THREE, group, [w, h * 0.42, d], [0, bottom + h * 0.21, 0], standard(THREE, "#b3202c", 0.55));
-        for (const x of [-w / 2 + 0.05, w / 2 - 0.05]) box(THREE, group, [0.04, h * 0.5, 0.04], [x, bottom + h * 0.66, d / 2 - 0.05], metal);
-        for (const x of [-w / 2 + 0.05, w / 2 - 0.05]) box(THREE, group, [0.04, h * 0.5, 0.04], [x, bottom + h * 0.66, -d / 2 + 0.05], metal);
-        const glass = box(THREE, group, [w - 0.06, h * 0.45, d - 0.06], [0, bottom + h * 0.64, 0], new THREE.MeshStandardMaterial({ color: "#ffe6a8", transparent: true, opacity: 0.28, roughness: 0.1 }), false);
-        glass.castShadow = false;
-        box(THREE, group, [w, h * 0.12, d], [0, bottom + h * 0.92, 0], standard(THREE, "#b3202c", 0.55));
-        box(THREE, group, [w * 0.7, h * 0.08, 0.02], [0, bottom + h * 0.92, d / 2 + 0.01], glow(THREE, color, 1.5), false);
-        for (const z of [-d * 0.3, d * 0.3]) {
-          const wheel = cylinder(THREE, group, 0.12, 0.12, 0.04, [w / 2 + 0.02, bottom + 0.12, z], dark, 16);
-          wheel.rotation.z = Math.PI / 2;
-        }
+        buildPopcornCart(THREE, group, size, color);
         break;
       }
       case "counter": {

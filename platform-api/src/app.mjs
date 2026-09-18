@@ -12,6 +12,7 @@ import { handleLoadoutRoute } from "./routes/loadout-routes.mjs";
 import { handleGameProfileRoute } from "./routes/game-profile-routes.mjs";
 import { handleLadderRoute } from "./routes/ladder-routes.mjs";
 import { handleLeaderboardRoute } from "./routes/leaderboard-routes.mjs";
+import { handleAchievementRoute } from "./routes/achievement-routes.mjs";
 import { handleProgressionRoute } from "./routes/progression-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
@@ -305,6 +306,10 @@ export function createApp(options = {}) {
     const getBoardStandings = typeof options?.getBoardStandings === "function" ? options.getBoardStandings : null;
     const getPlayerRunRecords = typeof options?.getPlayerRunRecords === "function" ? options.getPlayerRunRecords : null;
     const recordRun = typeof options?.recordRun === "function" ? options.recordRun : null;
+    // Platform achievements. Null rather than a stub for the same reason: an
+    // unconfigured backend must say 503, not "you earned nothing".
+    const submitAchievementRun = typeof options?.submitAchievementRun === "function" ? options.submitAchievementRun : null;
+    const getPlayerAchievements = typeof options?.getPlayerAchievements === "function" ? options.getPlayerAchievements : null;
     // Earned advancement, read-only. Null for the leaderboards' reason: an
     // unconfigured backend must answer 503 rather than report a level-1 document a
     // client would cache as the truth. There is no write service — XP is awarded
@@ -632,6 +637,10 @@ export function createApp(options = {}) {
         getBoardStandings,
         getPlayerRunRecords,
         recordRun,
+    };
+    const achievementServices = {
+        submitAchievementRun,
+        getPlayerAchievements,
     };
     const progressionServices = {
         getGameXpProgress,
@@ -1064,6 +1073,18 @@ export function createApp(options = {}) {
                 requestOrigin,
                 timestamp,
                 services: leaderboardServices,
+            })) {
+                return;
+            }
+            if (await handleAchievementRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: achievementServices,
             })) {
                 return;
             }

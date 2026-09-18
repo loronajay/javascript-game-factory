@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { ARCADE_GAME_SLUGS } from "../arcade-catalog.mjs";
+import { JUKEBOX_TRACKS } from "../arcade-room-catalog/jukebox.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..");
 const allowedDimensions = new Set(["2d", "3d"]);
@@ -43,4 +44,36 @@ test("known 3D and hybrid cabinets stay classified honestly", () => {
   assert.deepEqual(metadata.get("puckd-up").dimensions, ["3d"]);
   assert.deepEqual(metadata.get("yam-bowling").dimensions, ["2d", "3d"]);
   assert.deepEqual(metadata.get("speed-demon").dimensions, ["2d"]);
+});
+
+test("the arcade-room jukebox carries every track from multi-track cabinet soundtracks", () => {
+  const filesFor = (slug) => JUKEBOX_TRACKS
+    .filter((track) => track.gameSlug === slug)
+    .map((track) => track.file);
+
+  assert.deepEqual(filesFor("tactical-arena"), [
+    "games/tactical-arena/sounds/menu.mp3",
+    "games/tactical-arena/sounds/mission-battle.mp3",
+    "games/tactical-arena/sounds/vs-battle.mp3",
+    "games/tactical-arena/sounds/fatty-battle.mp3",
+    "games/tactical-arena/sounds/king-battle.mp3",
+    "games/tactical-arena/sounds/summoner-battle.mp3",
+    "games/tactical-arena/sounds/final-battle.mp3",
+  ]);
+  assert.deepEqual(filesFor("illuminauts"), [
+    "games/illuminauts/assets/sounds/menu.mp3",
+    "games/illuminauts/assets/sounds/game.mp3",
+  ]);
+  assert.deepEqual(filesFor("cockpit-swarm"), [
+    "games/cockpit-swarm/assets/menu.mp3",
+    "games/cockpit-swarm/assets/game1.mp3",
+    "games/cockpit-swarm/assets/game2.mp3",
+    "games/cockpit-swarm/assets/game3.mp3",
+  ]);
+  assert.deepEqual(filesFor("mini-tactics"), [
+    "games/mini-tactics/sounds/battle.mp3",
+  ]);
+  for (const track of JUKEBOX_TRACKS) {
+    assert.ok(existsSync(resolve(repoRoot, track.file)), `${track.id}: missing ${track.file}`);
+  }
 });

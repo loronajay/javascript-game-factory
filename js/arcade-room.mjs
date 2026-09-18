@@ -112,7 +112,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07101b);
-scene.fog = new THREE.Fog(0x07101b, 12, 27);
+const WALKING_FOG = Object.freeze({ near: 12, far: 27 });
+scene.fog = new THREE.Fog(0x07101b, WALKING_FOG.near, WALKING_FOG.far);
 const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 40);
 camera.rotation.order = "YXZ";
 const player = { x: 0, y: 1.68, z: -0.8, yaw: 0, pitch: -0.03 };
@@ -192,7 +193,9 @@ const roomEditor = createRoomEditor({
     room: {
         width: PLAYER_ROOM_SHELL.width,
         depth: PLAYER_ROOM_SHELL.depth,
-        wallInset: PLAYER_ROOM_SHELL.wallThickness + 0.28,
+        // The cabinet's padded footprint may come within 2 cm of the inner wall face.
+        // The old full-thickness + 28 cm inset created a conspicuous dead strip.
+        wallInset: PLAYER_ROOM_SHELL.wallThickness / 2 + 0.02,
         height: PLAYER_ROOM_SHELL.height,
         wallThickness: PLAYER_ROOM_SHELL.wallThickness,
     },
@@ -238,6 +241,10 @@ const roomEditor = createRoomEditor({
         // above the ceiling, which would otherwise be all they could see.
         ceiling.visible = !editing;
         grid.visible = editing;
+        // The walking fog closes in at 27 m for mood; the build camera stands up to 22 m
+        // outside a 20 m room and would see nothing but fog colour, so it lifts too.
+        scene.fog.near = editing ? WALKING_FOG.near * 4 : WALKING_FOG.near;
+        scene.fog.far = editing ? WALKING_FOG.far * 4 : WALKING_FOG.far;
         if (editing) {
             roomEntered = true;
             startGate.classList.add("is-hidden");
@@ -308,11 +315,15 @@ const decorOverlay = createDecorOverlay({
 const jukebox = createRoomJukebox({
     siteRoot: new URL("../", location.href).toString(),
     frame: decorOverlayFrame,
+    // A guest hears the house record but cannot change it: that is the owner's room.
+    canSetDefault: !visiting,
+    onSetDefault: (trackId) => { void roomEditor.setDefaultTrack(trackId); },
     onChange: (state) => {
         jukeboxChip.hidden = !state.playing || !state.track;
         jukeboxChipTitle.textContent = state.track ? `${state.track.title} · ${state.track.gameTitle}` : "";
     },
 });
+jukebox.setDefaultTrack(roomEditor.getLayout().music.defaultTrackId);
 function openDecor() {
     if (!nearbyDecor || playing || decorOverlay.isOpen() || roomEditor.isEditing())
         return;
@@ -439,10 +450,14 @@ canvas.addEventListener("click", () => {
 enterButton.addEventListener("click", () => {
     if (playing)
         return;
+    const firstEntry = !roomEntered;
     roomEntered = true;
     startGate.classList.add("is-hidden");
     canvas.focus();
     status.textContent = "WASD to move · Drag to look · Click for mouse capture";
+    // The house record starts here and not on load: this click is the gesture autoplay wants.
+    if (firstEntry && !jukebox.status().playing)
+        jukebox.playDefault();
 });
 document.addEventListener("pointerlockchange", () => {
     const locked = document.pointerLockElement === canvas;
@@ -555,12 +570,15 @@ function frame(now) {
     while (accumulator >= TICK_SECONDS) {
         updatePlayer(TICK_SECONDS);
         updateInteraction();
+        // Undo, reset and a fresh load all change the house record under the player; the layout is the truth.
+        jukebox.setDefaultTrack(roomEditor.getLayout().music.defaultTrackId);
         jukebox.update(player, roomEditor.getLayout().decor);
         accumulator -= TICK_SECONDS;
     }
-    const jukeboxSource = jukebox.status().sourceInstanceId;
-    if (jukeboxSource)
-        pulseJukeboxGlow(decorRuntime.modelFor(jukeboxSource), jukebox.pulse(now));
+    const jukeboxPulse = jukebox.pulse(now);
+    for (const instanceId of jukebox.emitterInstanceIds(roomEditor.getLayout().decor)) {
+        pulseJukeboxGlow(decorRuntime.modelFor(instanceId), jukeboxPulse);
+    }
     applyCamera();
     resize();
     camera.updateMatrixWorld();

@@ -34,10 +34,34 @@ const previousButton = requiredElement<HTMLButtonElement>("#jukeboxPrevious");
 const nextButton = requiredElement<HTMLButtonElement>("#jukeboxNext");
 const stopButton = requiredElement<HTMLButtonElement>("#jukeboxStop");
 const count = requiredElement<HTMLElement>("#jukeboxCount");
+const house = requiredElement<HTMLElement>("#jukeboxHouse");
+const houseLabel = requiredElement<HTMLElement>("#jukeboxHouseLabel");
+const houseSetButton = requiredElement<HTMLButtonElement>("#jukeboxHouseSet");
+const houseClearButton = requiredElement<HTMLButtonElement>("#jukeboxHouseClear");
 
 const embedded = window.parent !== window;
 
-function renderState(state: Readonly<{ trackId: string | null; playing: boolean }>): void {
+type PageState = Readonly<{ trackId: string | null; playing: boolean; defaultTrackId: string | null; canSetDefault: boolean }>;
+
+/** The house-record strip: what the room plays for anyone who walks in, and the owner's one button to change it. */
+function renderHouse(state: PageState, track: ReturnType<typeof findJukeboxTrack>): void {
+  house.hidden = !state.canSetDefault;
+  const houseTrack = state.defaultTrackId ? findJukeboxTrack(state.defaultTrackId) : undefined;
+  const isHouse = Boolean(track && houseTrack && track.id === houseTrack.id);
+  houseLabel.replaceChildren();
+  if (houseTrack) {
+    const name = document.createElement("strong");
+    name.textContent = houseTrack.title;
+    houseLabel.append("House record: ", name, ` · ${houseTrack.gameTitle} · plays when anyone walks in`);
+  } else {
+    houseLabel.textContent = "No house record · the room is quiet until someone picks one";
+  }
+  houseSetButton.disabled = !track || isHouse;
+  houseSetButton.textContent = isHouse ? "This is the house record" : "Play this when guests arrive";
+  houseClearButton.hidden = !houseTrack;
+}
+
+function renderState(state: PageState): void {
   const track = state.trackId ? findJukeboxTrack(state.trackId) : undefined;
   nowTitle.textContent = track?.title ?? "Nothing on the turntable";
   nowGame.textContent = track ? `from ${track.gameTitle}` : "Pick a record below";
@@ -50,8 +74,10 @@ function renderState(state: Readonly<{ trackId: string | null; playing: boolean 
     const current = row.dataset.trackId === track?.id;
     row.classList.toggle("is-current", current);
     row.classList.toggle("is-playing", current && state.playing);
+    row.classList.toggle("is-house", row.dataset.trackId === state.defaultTrackId);
     row.setAttribute("aria-pressed", String(current));
   }
+  renderHouse(state, track);
 }
 
 function renderList(): void {
@@ -76,10 +102,13 @@ function renderList(): void {
       const title = document.createElement("span");
       title.className = "jukebox-record__title";
       title.textContent = track.title;
+      const houseTag = document.createElement("span");
+      houseTag.className = "jukebox-record__house";
+      houseTag.textContent = "HOUSE";
       const mark = document.createElement("span");
       mark.className = "jukebox-record__mark";
       mark.setAttribute("aria-hidden", "true");
-      row.append(index, title, mark);
+      row.append(index, title, houseTag, mark);
       section.append(row);
     }
     return section;
@@ -94,15 +123,17 @@ function createSink(): Sink {
     });
   }
   // Standalone: this page IS the room, with a frame nobody will ever load so the message
-  // path stays closed and every command comes through the API below.
+  // path stays closed and every command comes through the API below. There is no room
+  // to walk into, so there is no house record to set either.
   const player = createRoomJukebox({
     siteRoot: new URL("../../", location.href).toString(),
     frame: document.createElement("iframe"),
-    onChange: (status) => renderState({ trackId: status.track?.id ?? null, playing: status.playing }),
+    onChange: (status) => renderState({ trackId: status.track?.id ?? null, playing: status.playing, defaultTrackId: null, canSetDefault: false }),
   });
   return Object.freeze({
     send: (command) => {
       if (command.action === "play") player.play(command.trackId);
+      else if (command.action === "set-default" || command.action === "clear-default") return;
       else if (command.action === "stop") player.stop();
       else if (command.action === "next") player.next();
       else if (command.action === "previous") player.previous();
@@ -122,6 +153,11 @@ toggleButton.addEventListener("click", () => sink.send({ type: JUKEBOX_MESSAGE.c
 previousButton.addEventListener("click", () => sink.send({ type: JUKEBOX_MESSAGE.command, action: "previous" }));
 nextButton.addEventListener("click", () => sink.send({ type: JUKEBOX_MESSAGE.command, action: "next" }));
 stopButton.addEventListener("click", () => sink.send({ type: JUKEBOX_MESSAGE.command, action: "stop" }));
+houseSetButton.addEventListener("click", () => {
+  const trackId = list.querySelector<HTMLElement>(".jukebox-record.is-current")?.dataset.trackId;
+  if (trackId) sink.send({ type: JUKEBOX_MESSAGE.command, action: "set-default", trackId });
+});
+houseClearButton.addEventListener("click", () => sink.send({ type: JUKEBOX_MESSAGE.command, action: "clear-default" }));
 
 window.addEventListener("message", (event: MessageEvent) => {
   if (!embedded || event.origin !== location.origin || event.source !== window.parent) return;
@@ -130,5 +166,5 @@ window.addEventListener("message", (event: MessageEvent) => {
 });
 
 renderList();
-renderState({ trackId: null, playing: false });
+renderState({ trackId: null, playing: false, defaultTrackId: null, canSetDefault: false });
 if (embedded) window.parent.postMessage({ type: JUKEBOX_MESSAGE.hello }, location.origin);

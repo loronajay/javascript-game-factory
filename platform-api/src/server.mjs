@@ -16,6 +16,7 @@ import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getGameXpProgress } from "./db/game-xp.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-records.mjs";
+import { getPlayerAchievements, submitAchievementRun } from "./db/achievements.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
 import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
 import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
@@ -268,6 +269,8 @@ async function bootstrap() {
         getBoardStandings: (params) => getBoardStandings(pool, params),
         getPlayerRunRecords: (params) => getPlayerRunRecords(pool, params),
         recordRun: (params) => recordRun(pool, params),
+        submitAchievementRun: (params) => submitAchievementRun(pool, params),
+        getPlayerAchievements: (params) => getPlayerAchievements(pool, params),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         spendValor: (params) => spendValorForEntitlement(pool, params),
         resetCampaign: (params) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

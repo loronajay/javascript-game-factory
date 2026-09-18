@@ -1,9 +1,12 @@
 import { findDecor } from "./arcade-room-catalog/decor.mjs";
 import { addDecorItem, duplicateDecorItem, nearestWall, placeDecorItem, removeDecorItem, rotateDecorItem, setDecorColor, setDecorLength, setDecorScale, } from "./arcade-room-decor-layout.mjs";
+import { alignCabinetPlacement, alignDecorTarget } from "./arcade-room-decor-align.mjs";
+import { decorFrame, decorHandles, scaleDecorCorner, stretchDecorEnd } from "./arcade-room-decor-resize.mjs";
 import { createDecorThumbnails } from "./arcade-room-decor-thumbnails.mjs";
+import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import { createEditorPanel } from "./arcade-room-editor-panel.mjs";
-import { ROOM_BOUNDS_DEFAULTS, createDefaultRoomLayout, floorObstacles, roomLayoutsEqual, rotatePlacement, setItemHidden, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
-import { EDITOR_CAMERA_PRESETS, applyEditorCameraPreset, createEditorCamera, editorCameraPose, orbitEditorCamera, panEditorCamera, zoomEditorCamera, } from "./arcade-room-camera.mjs";
+import { ROOM_BOUNDS_DEFAULTS, createDefaultRoomLayout, floorObstacles, roomLayoutsEqual, removeStarterNeon, rotatePlacement, setItemHidden, setRoomDefaultTrack, setRoomSurface, updateItemPlacement, } from "./arcade-room-layout.mjs";
+import { EDITOR_CAMERA_LIMITS, EDITOR_CAMERA_PRESETS, applyEditorCameraPreset, createEditorCamera, editorCutawayWalls, editorCameraPose, editorViewOffset, focusEditorCamera, interpolateEditorCamera, orbitEditorCamera, panEditorCamera, panEditorCameraToAnchor, zoomEditorCamera, } from "./arcade-room-camera.mjs";
 /**
  * Key that flips build mode on and off. It has to be a key rather than only a button because pointer
  * lock hides the cursor, and it cannot be Escape because the browser eats that to release the lock.
@@ -16,6 +19,10 @@ const LENGTH_STEP = 0.1;
 const UNDO_DEPTH = 40;
 /** A press that travels less than this before release is a click, not an orbit. */
 const CLICK_SLOP_PX = 4;
+// Alignment snaps within this fraction of the camera's distance, so "close" means the same
+// few pixels whether the view is tight on a shelf or taking in the whole room.
+const SNAP_SCREEN_FRACTION = 0.02;
+const SNAP_RANGE_M = Object.freeze({ min: 0.06, max: 0.3 });
 /** How long after the last resize wheel notch the gesture closes and becomes one undo step. */
 const WHEEL_GESTURE_MS = 350;
 export function createRoomEditor(options) {
@@ -40,6 +47,15 @@ export function createRoomEditor(options) {
     // pan on a right/middle-drag or a Shift+left-drag anywhere. Decided on pointerdown.
     let cameraGesture = "none";
     let view = createEditorCamera(room);
+    // A preset or focus eases from `transitionFrom` to `transitionTo`; any gesture cuts it short where it is.
+    let transitionFrom = null;
+    let transitionTo = null;
+    let transitionStart = 0;
+    let transitionFrame = 0;
+    // The point on the target plane the player grabbed for a pan, so it can be kept under the cursor.
+    let panAnchor = null;
+    // The walking camera's far plane, put back on finish.
+    let walkingFar = camera.far;
     const lastPointer = { x: 0, y: 0 };
     // Where a camera gesture began: a press on empty floor that never moves is a click, and a click on nothing deselects.
     const gestureStart = { x: 0, y: 0 };
@@ -49,6 +65,9 @@ export function createRoomEditor(options) {
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const ceilingPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), roomHeight);
+    // The orbit target lives on this plane; pan and zoom read the cursor against it so
+    // the point under the hand is the one that stays put.
+    const targetPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), EDITOR_CAMERA_LIMITS.targetHeight);
     const planeHit = new THREE.Vector3();
     const selectionBox = new THREE.BoxHelper(cabinets[0]?.model, 0x70e8ff);
     selectionBox.material.depthTest = false;
@@ -57,16 +76,31 @@ export function createRoomEditor(options) {
     selectionBox.renderOrder = 10;
     selectionBox.visible = false;
     scene.add(selectionBox);
+    // Resize handles on the selected decor and the guides drawn while something moves.
+    const gizmos = createEditorGizmos(THREE, scene);
+    // The handle being dragged, and the plane its item lies on that the pointer is projected onto.
+    let handleDrag = null;
+    const handlePlane = new THREE.Plane();
     const panel = createEditorPanel(elements, {
         selectTab: (next) => { tab = next; renderPanel(); },
-        selectCabinet: (instanceId) => selectCabinet(instanceId),
+        // Picking from the list is "show me that one": the view goes to it. A click in
+        // the scene selects without moving, because a drag may be starting.
+        selectCabinet: (instanceId) => { selectCabinet(instanceId); focusSelection(); },
         toggleCabinetHidden: (instanceId) => toggleHidden(instanceId),
         setSurface: (kind, id) => setSurface(kind, id),
         setDecorCategory: (category) => { decorCategory = category; renderPanel(); },
         addDecor: (itemId) => addDecor(itemId),
-        selectDecor: (instanceId) => selectDecor(instanceId),
+        selectDecor: (instanceId) => { selectDecor(instanceId); focusSelection(); },
         clearSelection: () => clearSelection(),
         removeDecor: (instanceId) => removeDecor(instanceId),
+        removeStarterNeon: () => {
+            const next = removeStarterNeon(layout);
+            if (next === layout)
+                return;
+            if (selection?.kind === "decor" && !next.decor.some((item) => item.instanceId === selection.instanceId))
+                selection = null;
+            commit(next, "Starter neon removed · unsaved");
+        },
         duplicateDecor: (instanceId) => duplicateDecor(instanceId),
         setDecorColor: (instanceId, color, phase) => editDecor(setDecorColor(layout, instanceId, color), "Colour changed", phase),
         setDecorLength: (instanceId, length, phase) => editDecor(setDecorLength(layout, instanceId, length, room, catalog), "Length changed", phase),
@@ -105,6 +139,25 @@ export function createRoomEditor(options) {
         if (model)
             selectionBox.setFromObject(model);
         selectionBox.visible = editing && Boolean(model);
+        refreshHandles();
+    }
+    /** Put the resize handles on the selected decor, or take them away. */
+    function refreshHandles() {
+        const item = selectedDecor();
+        const definition = item && findDecor(item.itemId);
+        if (editing && item && definition) {
+            gizmos.setHandles(decorHandles(layout, item.instanceId, room), decorFrame(item, definition, room).normal);
+        }
+        else {
+            gizmos.setHandles([], { x: 0, y: 1, z: 0 });
+        }
+        gizmos.update(camera);
+    }
+    /** How close, in metres, a drag must come to a neighbour's edge to snap; Alt switches it off. */
+    function snapThreshold(event) {
+        if (event.altKey)
+            return 0;
+        return Math.min(SNAP_RANGE_M.max, Math.max(SNAP_RANGE_M.min, view.radius * SNAP_SCREEN_FRACTION));
     }
     function renderPanel() {
         panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory });
@@ -254,8 +307,8 @@ export function createRoomEditor(options) {
         const hint = item.mount === "wall"
             ? "drag it along the wall, arrows to slide and raise"
             : "drag it, arrows to nudge, Q/R to rotate";
-        const size = definition?.scale.enabled ? " · - / + to resize" : definition?.length.enabled ? " · [ / ] to stretch" : "";
-        setStatus(`${definition?.title ?? "Item"} selected · ${hint}${size} · Delete to remove.`);
+        const size = definition?.scale.enabled ? " · drag a corner to resize" : definition?.length.enabled ? " · drag an end arrow to stretch" : "";
+        setStatus(`${definition?.title ?? "Item"} selected · ${hint}${size} · hold Alt to skip snapping · Delete to remove.`);
     }
     function clearSelection() {
         if (!selection)
@@ -279,6 +332,13 @@ export function createRoomEditor(options) {
         const item = layout.items.find((candidate) => candidate.instanceId === instanceId);
         if (item)
             setHidden(instanceId, !item.hidden);
+    }
+    async function setDefaultTrack(trackId) {
+        const result = setRoomDefaultTrack(layout, trackId);
+        if (!result.valid || result.layout === layout)
+            return;
+        commit(result.layout, trackId ? "House record set · unsaved" : "House record cleared · unsaved");
+        await storeLayout();
     }
     function setSurface(kind, id) {
         if (!inventory.owns(id)) {
@@ -473,16 +533,94 @@ export function createRoomEditor(options) {
         const pose = editorCameraPose(view, room);
         camera.position.set(pose.position.x, pose.position.y, pose.position.z);
         camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+        shell.setCutawayWalls(editorCutawayWalls(view, room));
+        gizmos.update(camera);
+        applyViewOffset();
+    }
+    /**
+     * Centre the projection on the strip of canvas the panel leaves free, so the
+     * orbit target - what every gesture is about - is in the middle of what the
+     * player can see and not under the panel. Re-read each time because the panel
+     * and the canvas both resize.
+     */
+    function applyViewOffset() {
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        if (!width || !height)
+            return;
+        const canvasRect = canvas.getBoundingClientRect();
+        const panelRect = elements.panel.hidden ? null : elements.panel.getBoundingClientRect();
+        const offset = editorViewOffset({ width, height }, panelRect
+            ? { left: panelRect.left - canvasRect.left, top: panelRect.top - canvasRect.top, width: panelRect.width, height: panelRect.height }
+            : null);
+        if (offset.x || offset.y)
+            camera.setViewOffset(width, height, offset.x, offset.y, width, height);
+        else
+            camera.clearViewOffset();
+    }
+    /** Ease the view to a destination over `transitionMs`; a gesture during the move keeps whatever frame it reached. */
+    function transitionView(to) {
+        cancelTransition();
+        transitionFrom = view;
+        transitionTo = to;
+        transitionStart = performance.now();
+        view = interpolateEditorCamera(transitionFrom, transitionTo, 0);
+        applyViewCamera();
+        renderViewButtons();
+        transitionFrame = requestAnimationFrame(stepTransition);
+    }
+    function stepTransition(now) {
+        transitionFrame = 0;
+        if (!transitionFrom || !transitionTo)
+            return;
+        const t = (now - transitionStart) / EDITOR_CAMERA_LIMITS.transitionMs;
+        view = interpolateEditorCamera(transitionFrom, transitionTo, t);
+        applyViewCamera();
+        if (t >= 1) {
+            transitionFrom = transitionTo = null;
+            return;
+        }
+        transitionFrame = requestAnimationFrame(stepTransition);
+    }
+    function cancelTransition() {
+        if (transitionFrame)
+            cancelAnimationFrame(transitionFrame);
+        transitionFrame = 0;
+        transitionFrom = transitionTo = null;
+    }
+    /** Bring the view to the selected item (C, or a pick from the list). */
+    function focusSelection() {
+        const item = selectedCabinet() ?? selectedDecor();
+        if (!item || (selectedCabinet()?.hidden ?? false))
+            return;
+        transitionView(focusEditorCamera(view, { x: item.x, z: item.z }, room));
     }
     function renderViewButtons() {
         for (const button of elements.viewButtons.querySelectorAll("[data-view]")) {
             button.setAttribute("aria-pressed", String(button.dataset.view === view.preset));
         }
     }
-    function setView(preset) {
-        view = applyEditorCameraPreset(view, preset, room);
-        applyViewCamera();
-        renderViewButtons();
+    function setView(preset, immediate = false) {
+        const next = applyEditorCameraPreset(view, preset, room);
+        if (immediate) {
+            cancelTransition();
+            view = next;
+            applyViewCamera();
+            renderViewButtons();
+            return;
+        }
+        transitionView(next);
+    }
+    /** Where the cursor's ray meets the target plane, or null when it looks over the horizon. */
+    function targetPlanePoint(event) {
+        updatePointer(event);
+        if (!raycaster.ray.intersectPlane(targetPlane, planeHit))
+            return null;
+        // A hit far beyond the target is the ray grazing the plane near the horizon, where a
+        // few pixels are metres: useless as an anchor, so the screen-delta pan takes over.
+        if (Math.hypot(planeHit.x - view.target.x, planeHit.z - view.target.z) > view.radius * 2)
+            return null;
+        return { x: planeHit.x, z: planeHit.z };
     }
     function updatePointer(event) {
         const bounds = canvas.getBoundingClientRect();
@@ -562,16 +700,60 @@ export function createRoomEditor(options) {
         const cabinet = selectedCabinet();
         if (cabinet) {
             const point = floorPoint(event);
-            if (point)
-                applyCabinetPlacement({ x: point.x + dragOffset.x, z: point.z + dragOffset.z, rotationY: cabinet.rotationY }, true);
+            if (!point)
+                return;
+            const wanted = { x: point.x + dragOffset.x, z: point.z + dragOffset.z, rotationY: cabinet.rotationY };
+            const aligned = alignCabinetPlacement(layout, cabinet.instanceId, wanted, room, catalog, snapThreshold(event));
+            const moved = applyCabinetPlacement(aligned.placement, true);
+            gizmos.setGuides(moved ? aligned.guides : []);
             return;
         }
         const item = selectedDecor();
         if (!item)
             return;
         const target = decorTargetFromPointer(event, item);
-        if (target)
-            applyDecorTarget(target, true);
+        if (!target)
+            return;
+        const aligned = alignDecorTarget(layout, item.instanceId, target, room, catalog, snapThreshold(event));
+        const moved = applyDecorTarget(aligned.target, true);
+        gizmos.setGuides(moved ? aligned.guides : []);
+    }
+    /** Start dragging a resize handle: the pointer is projected onto the item's own surface from here on. */
+    function beginHandleDrag(handle) {
+        const item = selectedDecor();
+        const definition = item && findDecor(item.itemId);
+        if (!item || !definition)
+            return;
+        const { plane } = decorFrame(item, definition, room);
+        // THREE's plane is n·p + d = 0; ours is n·p = c.
+        handlePlane.set(new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z), -plane.constant);
+        handleDrag = handle;
+        gizmos.setActive(handle);
+        canvas.style.cursor = handle.kind === "stretch" ? "ew-resize" : "nwse-resize";
+    }
+    function resizeFromPointer(event) {
+        const item = selectedDecor();
+        if (!item || !handleDrag)
+            return;
+        updatePointer(event);
+        if (!raycaster.ray.intersectPlane(handlePlane, planeHit))
+            return;
+        const point = { x: planeHit.x, y: planeHit.y, z: planeHit.z };
+        const result = handleDrag.kind === "stretch"
+            ? stretchDecorEnd(layout, item.instanceId, handleDrag.end, point, room, catalog, snapThreshold(event))
+            : scaleDecorCorner(layout, item.instanceId, handleDrag.u, handleDrag.v, point, room, catalog);
+        editDecor(result, handleDrag.kind === "stretch" ? "Length changed" : "Resized", "preview");
+        gizmos.setGuides(result.valid ? result.guides : []);
+    }
+    function endHandleDrag() {
+        const item = selectedDecor();
+        const kind = handleDrag?.kind;
+        handleDrag = null;
+        gizmos.setActive(null);
+        gizmos.setGuides([]);
+        // A handle pressed and released without moving opened no gesture, so there is nothing to close.
+        if (item && kind && gestureOpen)
+            editDecor({ valid: true, layout, instanceId: item.instanceId, reason: "" }, kind === "stretch" ? "Length changed" : "Resized", "commit");
     }
     function enter() {
         if (editing || !canEnter())
@@ -583,8 +765,11 @@ export function createRoomEditor(options) {
         document.body.classList.add("is-editing");
         elements.panel.hidden = false;
         elements.editButton.setAttribute("aria-pressed", "true");
-        setView("overview");
-        setStatus("Drag anything to move it · drag the floor to orbit · right-drag to pan · scroll to zoom.");
+        // The lens may stand well outside the room now; the walking camera's far plane would clip the far wall.
+        walkingFar = camera.far;
+        camera.far = Math.max(walkingFar, EDITOR_CAMERA_LIMITS.radius.max + Math.hypot(room.width, room.depth) + 4);
+        setView("overview", true);
+        setStatus("Drag anything to move it · drag the floor to orbit · right-drag to pan · scroll to zoom · C to centre on the selection.");
         renderScene();
         renderPanel();
         onEditingChange(true);
@@ -595,12 +780,21 @@ export function createRoomEditor(options) {
         void storeLayout();
         editing = false;
         dragging = false;
+        handleDrag = null;
         cameraGesture = "none";
         canvas.style.cursor = "";
         document.body.classList.remove("is-editing");
         elements.panel.hidden = true;
         elements.editButton.setAttribute("aria-pressed", "false");
         selectionBox.visible = false;
+        gizmos.setHandles([], { x: 0, y: 1, z: 0 });
+        gizmos.setGuides([]);
+        cancelTransition();
+        panAnchor = null;
+        shell.setCutawayWalls([]);
+        camera.clearViewOffset();
+        camera.far = walkingFar;
+        camera.updateProjectionMatrix();
         onEditingChange(false);
         canvas.focus();
     }
@@ -638,6 +832,7 @@ export function createRoomEditor(options) {
         const panButton = event.button === 1 || event.button === 2 || (event.button === 0 && event.shiftKey);
         if (event.button !== 0 && !panButton)
             return;
+        cancelTransition();
         canvas.setPointerCapture?.(event.pointerId);
         lastPointer.x = event.clientX;
         lastPointer.y = event.clientY;
@@ -645,7 +840,15 @@ export function createRoomEditor(options) {
         gestureStart.y = event.clientY;
         if (panButton) {
             cameraGesture = "pan";
+            panAnchor = targetPlanePoint(event);
             canvas.style.cursor = "all-scroll";
+            return;
+        }
+        // A resize handle sits on top of everything, so it is tested before the item under it.
+        updatePointer(event);
+        const handle = gizmos.pick(raycaster);
+        if (handle && selectedDecor()) {
+            beginHandleDrag(handle);
             return;
         }
         const cabinet = hitCabinet(event);
@@ -673,6 +876,10 @@ export function createRoomEditor(options) {
     canvas.addEventListener("pointermove", (event) => {
         if (!editing)
             return;
+        if (handleDrag) {
+            resizeFromPointer(event);
+            return;
+        }
         if (dragging) {
             moveFromPointer(event);
             return;
@@ -688,23 +895,41 @@ export function createRoomEditor(options) {
             return;
         }
         if (cameraGesture === "pan") {
-            view = panEditorCamera(view, deltaX, deltaY, room);
+            // Grab the floor: the point pressed on stays under the cursor. Over the horizon
+            // (no plane hit) the screen-delta pan takes over so the drag never dies.
+            const hit = panAnchor ? targetPlanePoint(event) : null;
+            view = hit && panAnchor ? panEditorCameraToAnchor(view, panAnchor, hit, room) : panEditorCamera(view, deltaX, deltaY, room);
             applyViewCamera();
             renderViewButtons();
             return;
         }
-        canvas.style.cursor = hitCabinet(event) || hitDecor(event) ? "grab" : "";
+        canvas.style.cursor = hoverCursor(event);
     });
+    /** What the pointer looks like over the room when nothing is held: a resize cursor on a handle, a hand on an item. */
+    function hoverCursor(event) {
+        updatePointer(event);
+        const handle = gizmos.pick(raycaster);
+        if (handle)
+            return handle.kind === "stretch" ? "ew-resize" : "nwse-resize";
+        return hitCabinet(event) || hitDecor(event) ? "grab" : "";
+    }
     const endPointer = (event) => {
         const wasDragging = dragging;
         const wasOrbit = cameraGesture === "orbit";
         dragging = false;
         cameraGesture = "none";
+        panAnchor = null;
         canvas.releasePointerCapture?.(event.pointerId);
         if (!editing)
             return;
-        canvas.style.cursor = hitCabinet(event) || hitDecor(event) ? "grab" : "";
+        if (handleDrag) {
+            endHandleDrag();
+            canvas.style.cursor = hoverCursor(event);
+            return;
+        }
+        canvas.style.cursor = hoverCursor(event);
         if (wasDragging) {
+            gizmos.setGuides([]);
             // Drop an undo step that changed nothing, then let the panel catch up with the final spot.
             if (undoStack[undoStack.length - 1] === layout)
                 undoStack.pop();
@@ -730,10 +955,18 @@ export function createRoomEditor(options) {
             }, WHEEL_GESTURE_MS);
             return;
         }
-        view = zoomEditorCamera(view, event.deltaY);
+        cancelTransition();
+        view = zoomEditorCamera(view, event.deltaY, { anchor: targetPlanePoint(event), room });
         applyViewCamera();
         renderViewButtons();
     }, { passive: false });
+    // The panel and the canvas both move the free strip; keep the projection centred on it.
+    if (typeof ResizeObserver === "function") {
+        const observer = new ResizeObserver(() => { if (editing)
+            applyViewOffset(); });
+        observer.observe(canvas);
+        observer.observe(elements.panel);
+    }
     canvas.addEventListener("pointerup", endPointer);
     canvas.addEventListener("pointercancel", endPointer);
     window.addEventListener("keydown", (event) => {
@@ -772,6 +1005,7 @@ export function createRoomEditor(options) {
             KeyF: () => setView("front"),
             KeyT: () => setView("top"),
             KeyO: () => setView("overview"),
+            KeyC: () => focusSelection(),
             Delete: () => { const item = selectedDecor(); if (item)
                 removeDecor(item.instanceId); },
             Backspace: () => { const item = selectedDecor(); if (item)
@@ -813,6 +1047,7 @@ export function createRoomEditor(options) {
         toggle,
         isEditing: () => editing,
         getLayout: () => layout,
+        setDefaultTrack,
         // Hidden cabinets have no placement as far as the room is concerned: nothing to
         // walk into, nothing to play, nothing to prompt for.
         getCabinetPlacement: (cabinetId) => layout.items.find((item) => item.cabinetId === cabinetId && !item.hidden),

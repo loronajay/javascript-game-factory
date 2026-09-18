@@ -10,14 +10,26 @@
 // and it answers every command with the full state so the page never keeps its
 // own idea of what is playing. `suspend()`/`resume()` are for a cabinet game,
 // which has its own soundtrack; the jukebox waits rather than competing.
+//
+// SPEAKERS RELAY, THEY DO NOT PLAY. Every placed speaker carries whatever is on,
+// and the volume where the player stands is the LOUDEST emitter, never the sum
+// (`jukeboxGainAt`), so two speakers side by side sound like one.
+//
+// THE HOUSE RECORD has no box. It is the layout's `music.defaultTrackId`, played
+// on entry for owner and guest alike through every jukebox and speaker on the
+// floor — and, in a room with neither, everywhere, so a host who set one is
+// never met by silence. Picking a record at a box takes over from it; deleting
+// a box never stops it, because it was not that box's record to begin with.
 
 import {
   JUKEBOX_MESSAGE,
+  JUKEBOX_ITEM_ID,
   JUKEBOX_RANGE,
   adjacentJukeboxTrack,
   findJukeboxTrack,
   isJukeboxCommand,
-  jukeboxGain,
+  isJukeboxEmitter,
+  jukeboxGainAt,
   jukeboxTrackUrl,
   type JukeboxCommand,
   type JukeboxState,
@@ -31,6 +43,10 @@ export type RoomJukeboxOptions = Readonly<{
   /** The overlay frame the jukebox page loads in; commands are accepted from its window only. */
   frame: HTMLIFrameElement;
   onChange?: (state: RoomJukeboxStatus) => void;
+  /** Whether this is the owner's room: only then may the page pick the house record. */
+  canSetDefault?: boolean;
+  /** The owner chose (or cleared, "") the house record; the room stores it in the layout. */
+  onSetDefault?: (trackId: string) => void;
   /** Injected so tests can hand in a fake; the page passes nothing and gets a real element. */
   createAudio?: () => HTMLAudioElement;
 }>;
@@ -38,8 +54,11 @@ export type RoomJukeboxOptions = Readonly<{
 export type RoomJukeboxStatus = Readonly<{
   track: JukeboxTrack | null;
   playing: boolean;
-  /** The placed jukebox the song is coming from. */
+  /** The placed jukebox the song is coming from; null for the house record. */
   sourceInstanceId: string | null;
+  /** The house record as the layout has it, or null. */
+  defaultTrackId: string | null;
+  canSetDefault: boolean;
 }>;
 
 export type RoomJukebox = Readonly<{
@@ -50,8 +69,17 @@ export type RoomJukebox = Readonly<{
   next: () => void;
   previous: () => void;
   toggle: () => void;
-  /** Called each tick: attenuate by the player's distance to the source, and stop if it is gone. */
+  /** The layout's house record changed (loaded, set, undone): remember it, without playing it. */
+  setDefaultTrack: (trackId: string) => void;
+  /** Walking in: start the house record if there is one. */
+  playDefault: () => void;
+  /** The owner's choice from the page; ignored for a guest. */
+  setDefault: (trackId: string) => void;
+  clearDefault: () => void;
+  /** Called each tick: attenuate by the nearest emitter, and stop a picked record whose box is gone. */
   update: (player: Readonly<{ x: number; z: number }>, decor: readonly RoomDecorItem[]) => void;
+  /** The placed jukeboxes the record is coming out of right now — the ones whose tubes should pulse. */
+  emitterInstanceIds: (decor: readonly RoomDecorItem[]) => string[];
   /** A cabinet game is starting: hold the record. */
   suspend: () => void;
   resume: () => void;
@@ -61,26 +89,34 @@ export type RoomJukebox = Readonly<{
   dispose: () => void;
 }>;
 
-export const JUKEBOX_ITEM_ID = "decor.prop.jukebox";
+export { JUKEBOX_ITEM_ID };
 
 export function createRoomJukebox(options: RoomJukeboxOptions): RoomJukebox {
   const audio = options.createAudio ? options.createAudio() : new Audio();
   audio.loop = true;
   audio.preload = "none";
+  const canSetDefault = options.canSetDefault === true;
   let track: JukeboxTrack | null = null;
   let playing = false;
   let suspended = false;
   let sourceInstanceId: string | null = null;
+  let defaultTrackId = "";
   // Full until a tick says otherwise, so the page can also run this standalone with no room to measure.
   let gain: number = JUKEBOX_RANGE.max;
 
   function status(): RoomJukeboxStatus {
-    return Object.freeze({ track, playing, sourceInstanceId });
+    return Object.freeze({ track, playing, sourceInstanceId, defaultTrackId: defaultTrackId || null, canSetDefault });
   }
 
   function announce(): void {
     options.onChange?.(status());
-    const state: JukeboxState = { type: JUKEBOX_MESSAGE.state, trackId: track?.id ?? null, playing };
+    const state: JukeboxState = {
+      type: JUKEBOX_MESSAGE.state,
+      trackId: track?.id ?? null,
+      playing,
+      defaultTrackId: defaultTrackId || null,
+      canSetDefault,
+    };
     try {
       options.frame.contentWindow?.postMessage(state, location.origin);
     } catch {
@@ -130,19 +166,60 @@ export function createRoomJukebox(options: RoomJukeboxOptions): RoomJukebox {
     sourceInstanceId = instanceId;
   }
 
+  function setDefaultTrack(trackId: string): void {
+    const next = findJukeboxTrack(trackId) ? trackId : "";
+    if (next === defaultTrackId) return;
+    defaultTrackId = next;
+    announce();
+  }
+
+  function playDefault(): void {
+    if (!defaultTrackId) return;
+    sourceInstanceId = null;
+    play(defaultTrackId);
+  }
+
+  function chooseDefault(trackId: string): void {
+    if (!canSetDefault) return;
+    if (trackId !== "" && !findJukeboxTrack(trackId)) return;
+    options.onSetDefault?.(trackId);
+    setDefaultTrack(trackId);
+  }
+
+  /**
+   * What the record is coming out of. A picked record: the box it was picked on
+   * plus every speaker, and nothing at all once that box is gone. The house
+   * record: every jukebox and speaker, or `null` for "everywhere" when the room
+   * has none of either.
+   */
+  function emitters(decor: readonly RoomDecorItem[]): RoomDecorItem[] | null {
+    if (sourceInstanceId) {
+      const source = decor.find((item) => item.instanceId === sourceInstanceId && item.itemId === JUKEBOX_ITEM_ID);
+      if (!source) return [];
+      return [source, ...decor.filter((item) => isJukeboxEmitter(item.itemId) && item.itemId !== JUKEBOX_ITEM_ID)];
+    }
+    const all = decor.filter((item) => isJukeboxEmitter(item.itemId));
+    return all.length ? all : null;
+  }
+
   function update(player: Readonly<{ x: number; z: number }>, decor: readonly RoomDecorItem[]): void {
-    if (!sourceInstanceId) return;
-    const source = decor.find((item) => item.instanceId === sourceInstanceId && item.itemId === JUKEBOX_ITEM_ID);
-    if (!source) {
+    if (!track) return;
+    const points = emitters(decor);
+    if (points && points.length === 0) {
       // The box the record was playing on is gone: no source, no sound.
       sourceInstanceId = null;
       if (playing) stop();
       return;
     }
-    const nextGain = jukeboxGain(Math.hypot(player.x - source.x, player.z - source.z));
+    const nextGain = points ? jukeboxGainAt(player, points) : JUKEBOX_RANGE.max;
     if (nextGain === gain) return;
     gain = nextGain;
     applyVolume();
+  }
+
+  function emitterInstanceIds(decor: readonly RoomDecorItem[]): string[] {
+    if (!playing || suspended) return [];
+    return (emitters(decor) ?? []).filter((item) => item.itemId === JUKEBOX_ITEM_ID).map((item) => item.instanceId);
   }
 
   function suspend(): void {
@@ -168,6 +245,8 @@ export function createRoomJukebox(options: RoomJukeboxOptions): RoomJukebox {
     if (!isJukeboxCommand(data)) return;
     const command: JukeboxCommand = data;
     if (command.action === "play") play(command.trackId);
+    else if (command.action === "set-default") chooseDefault(command.trackId);
+    else if (command.action === "clear-default") chooseDefault("");
     else if (command.action === "stop") stop();
     else if (command.action === "next") step(1);
     else if (command.action === "previous") step(-1);
@@ -183,7 +262,12 @@ export function createRoomJukebox(options: RoomJukeboxOptions): RoomJukebox {
     next: () => step(1),
     previous: () => step(-1),
     toggle,
+    setDefaultTrack,
+    playDefault,
+    setDefault: chooseDefault,
+    clearDefault: () => chooseDefault(""),
     update,
+    emitterInstanceIds,
     suspend,
     resume,
     status,

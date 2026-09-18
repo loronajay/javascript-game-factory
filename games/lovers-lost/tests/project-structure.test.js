@@ -76,6 +76,18 @@ test('init-game delegates online wiring, keyboard, and pointer routing to dedica
   );
 });
 
+test('achievements go through the platform reporter and the run-telemetry seam, never localStorage', () => {
+  const initSource = fs.readFileSync(path.join(ROOT, 'scripts', 'init-game.js'), 'utf8');
+  assert(exists('scripts/run-telemetry.js'), 'missing scripts/run-telemetry.js');
+  assert(exists('scripts/lane-stats.js'), 'missing scripts/lane-stats.js');
+  assert(initSource.includes("from './run-telemetry.js'"), 'expected init-game to build the run result through run-telemetry');
+  assert(initSource.includes("js/platform/achievements/achievements.mjs"), 'expected init-game to report runs through the platform achievement reporter');
+  for (const file of ['scripts/run-telemetry.js', 'scripts/lane-stats.js']) {
+    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    assert(!/localStorage|document[.]|fetch[(]/.test(source), `${file} must stay pure`);
+  }
+});
+
 test('node tests live under tests/', () => {
   const expected = [
     'tests/game.test.js',

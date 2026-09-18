@@ -1,5 +1,6 @@
 import { DECOR_MOUNTS, clampDecorLength, clampDecorScale, decorFootprint, findDecor } from "./arcade-room-catalog/decor.mjs";
 import { DEFAULT_SURFACE_IDS, SURFACE_KINDS, findSurface } from "./arcade-room-catalog/surfaces.mjs";
+import { findJukeboxTrack } from "./arcade-room-catalog/jukebox.mjs";
 export const ROOM_LAYOUT_STORAGE_KEY = "jgf.player-arcade.layout.v1";
 export const WALL_SIDES = Object.freeze(["north", "south", "east", "west"]);
 export const ROOM_BOUNDS_DEFAULTS = Object.freeze({ height: 4.8, wallThickness: 0.24 });
@@ -39,10 +40,12 @@ const DEFAULT_DECOR = Object.freeze([
     Object.freeze({ instanceId: "neon-strip-2", itemId: "decor.neon.strip", x: 3.1, y: 2.8, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#53d8ff", length: 2.4, scale: 1 }),
     Object.freeze({ instanceId: "neon-strip-3", itemId: "decor.neon.strip", x: 0, y: 3.35, z: -9.88, rotationY: 0, mount: "wall", wall: "north", color: "#ffd33d", length: 1.8, scale: 1 }),
 ]);
+const STARTER_NEON_INSTANCE_IDS = new Set(DEFAULT_DECOR.map((item) => item.instanceId));
 function rounded(value) {
     return Number(value.toFixed(4));
 }
-function rotatedFootprint(placement, footprint) {
+/** The axis-aligned box a footprint covers once its rotation is applied. */
+export function rotatedFootprint(placement, footprint) {
     const cosine = Math.abs(Math.cos(placement.rotationY));
     const sine = Math.abs(Math.sin(placement.rotationY));
     return {
@@ -53,13 +56,22 @@ function rotatedFootprint(placement, footprint) {
 export function defaultRoomSurfaces() {
     return { ...DEFAULT_SURFACE_IDS };
 }
+export function defaultRoomMusic() {
+    return { defaultTrackId: "" };
+}
 export function createDefaultRoomLayout() {
     return {
         version: 2,
         surfaces: defaultRoomSurfaces(),
+        music: defaultRoomMusic(),
         items: DEFAULT_CABINETS.map((item) => ({ ...item })),
         decor: DEFAULT_DECOR.map((item) => ({ ...item })),
     };
+}
+/** Take down only the three neon strips shipped with the starter room. */
+export function removeStarterNeon(layout) {
+    const decor = layout.decor.filter((item) => !STARTER_NEON_INSTANCE_IDS.has(item.instanceId));
+    return decor.length === layout.decor.length ? layout : { ...layout, decor };
 }
 export function clampPlacementToRoom(placement, room, footprint) {
     const rotated = rotatedFootprint(placement, footprint);
@@ -181,6 +193,14 @@ export function setRoomSurface(layout, kind, id) {
         return { valid: true, layout };
     return { valid: true, layout: { ...layout, surfaces: { ...layout.surfaces, [kind]: id } } };
 }
+/** Pick the house record, or "" for none. A track the jukebox does not carry is refused rather than stored. */
+export function setRoomDefaultTrack(layout, trackId) {
+    if (trackId !== "" && !findJukeboxTrack(trackId))
+        return { valid: false, layout };
+    if (layout.music.defaultTrackId === trackId)
+        return { valid: true, layout };
+    return { valid: true, layout: { ...layout, music: { defaultTrackId: trackId } } };
+}
 function isStoredItem(value) {
     if (!value || typeof value !== "object")
         return false;
@@ -232,6 +252,12 @@ export function normalizeDecorItem(value) {
         length: definition.length.enabled ? clampDecorLength(definition, typeof source.length === "number" ? source.length : 0) : 0,
         scale: clampDecorScale(definition, typeof source.scale === "number" ? source.scale : 1),
     };
+}
+/** A stale id — a record that left the catalog — comes back as none rather than as a broken room. */
+function normalizeMusic(value) {
+    const source = (value && typeof value === "object" ? value : {});
+    const trackId = typeof source.defaultTrackId === "string" && findJukeboxTrack(source.defaultTrackId) ? source.defaultTrackId : "";
+    return { defaultTrackId: trackId };
 }
 function normalizeSurfaces(value) {
     const source = (value && typeof value === "object" ? value : {});
@@ -299,6 +325,7 @@ export function normalizeRoomLayout(value) {
     return {
         version: 2,
         surfaces: normalizeSurfaces(source.surfaces),
+        music: normalizeMusic(source.music),
         items: [...storedItems, ...starterAdditions],
         decor,
     };
@@ -331,6 +358,8 @@ export function roomLayoutsEqual(first, second) {
     if (first.items.length !== second.items.length || first.decor.length !== second.decor.length)
         return false;
     if (SURFACE_KINDS.some((kind) => first.surfaces[kind] !== second.surfaces[kind]))
+        return false;
+    if (first.music.defaultTrackId !== second.music.defaultTrackId)
         return false;
     const itemsEqual = first.items.every((item, index) => {
         const other = second.items[index];

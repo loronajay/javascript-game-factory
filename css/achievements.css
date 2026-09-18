@@ -1,0 +1,229 @@
+/* /achievements/ — the trophy case. Loads after search.css (the stage shell). */
+
+.ach-page-layout {
+  position: relative;
+  z-index: 10;
+  width: min(94vw, 1180px);
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.ach-page__flash {
+  min-height: 1em;
+  color: #88aacc;
+  font-size: 0.82rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.ach-page__back {
+  align-self: flex-start;
+  color: #9fe8ff;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  opacity: 0.8;
+}
+.ach-page__back:hover { opacity: 1; }
+
+/* ---------- per-game section ---------- */
+
+.ach-game {
+  padding: 18px 18px 22px;
+  border-radius: var(--profile-radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 232, 167, 0.06), rgba(12, 8, 34, 0.86) 30%, rgba(7, 6, 20, 0.94)),
+    rgba(9, 8, 22, 0.92);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.ach-game__header { margin-bottom: 18px; }
+
+.ach-game__title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ach-game__title {
+  margin: 0;
+  color: #fff8ff;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ach-game__count {
+  color: #ffd666;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+}
+
+.ach-game__bar {
+  margin-top: 10px;
+  height: 8px;
+  border-radius: var(--profile-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.ach-game__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff8ebd, #ffd666);
+  box-shadow: 0 0 12px rgba(255, 214, 102, 0.5);
+  transition: width 400ms ease;
+}
+
+.ach-game__points {
+  margin: 6px 0 0;
+  color: rgba(255, 248, 255, 0.55);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- tree ---------- */
+
+.ach-tree { display: flex; flex-direction: column; gap: 18px; }
+
+.ach-tree__roots,
+.ach-tree__fan {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.ach-tree__column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  flex: 1 1 250px;
+  max-width: 320px;
+  min-width: 0;
+}
+
+/* a fan of branches under a root spans the whole width and re-centres */
+.ach-tree__column--root { flex-basis: 100%; max-width: none; align-items: center; }
+.ach-tree__column--root > .ach-card { width: min(100%, 340px); }
+.ach-tree__fan { position: relative; width: 100%; padding-top: 16px; }
+
+/* connectors are absolutely positioned so they never become grid/flex items */
+.ach-tree__column > .ach-card + .ach-card { position: relative; }
+.ach-tree__column > .ach-card + .ach-card::before,
+.ach-tree__fan::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(255, 214, 102, 0.7), rgba(255, 214, 102, 0.15));
+  pointer-events: none;
+}
+.ach-tree__column > .ach-card + .ach-card::before { top: -14px; height: 14px; }
+.ach-tree__fan::before { top: 0; height: 16px; }
+
+.ach-tree__capstones {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 214, 102, 0.25);
+}
+.ach-tree__capstone { width: min(100%, 360px); }
+.ach-tree__capstone .ach-card { border-color: rgba(255, 214, 102, 0.55); }
+
+/* ---------- card ---------- */
+
+.ach-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--profile-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff8ff;
+  min-width: 0;
+}
+
+.ach-card--unlocked {
+  border-color: rgba(255, 214, 102, 0.55);
+  background: linear-gradient(135deg, rgba(60, 30, 90, 0.7), rgba(30, 16, 50, 0.85));
+  box-shadow: 0 0 16px rgba(255, 214, 102, 0.12);
+}
+
+.ach-card--locked { opacity: 0.62; }
+.ach-card--locked .ach-card__glyph { filter: grayscale(1) brightness(0.7); }
+.ach-card--secret .ach-card__glyph { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.5); }
+
+.ach-card__art { display: grid; place-items: center; }
+
+.ach-card__glyph,
+.ach-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.ach-card__glyph {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #2a1a05;
+  background: radial-gradient(circle at 30% 30%, #fff0b3, #ffcf4d 55%, #d99a12);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35) inset;
+}
+.ach-card__icon { object-fit: cover; }
+
+.ach-card__body { min-width: 0; }
+
+.ach-card__name {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.ach-card__desc {
+  margin: 3px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: rgba(255, 248, 255, 0.78);
+}
+
+.ach-card__meta {
+  margin: 5px 0 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 248, 255, 0.5);
+}
+.ach-card--unlocked .ach-card__status { color: #ffd666; }
+.ach-card__points { white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .ach-page-layout { width: calc(100vw - 32px); gap: 20px; }
+  .ach-game { padding: 14px 12px 16px; }
+  .ach-tree__column { flex-basis: 100%; max-width: none; }
+  .ach-tree__roots, .ach-tree__fan { gap: 10px; }
+}

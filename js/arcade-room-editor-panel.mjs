@@ -10,8 +10,12 @@
 //
 // THE INSPECTOR IS BUILT ONCE PER SELECTION AND PATCHED. Rebuilding it on
 // every change destroyed the colour picker under the player's pointer and the
-// slider under their thumb; now the same nodes live for as long as the same
+// size field mid-keystroke; now the same nodes live for as long as the same
 // item is selected, and a re-render only updates their values.
+//
+// SIZE IS SET IN THE ROOM, NOT HERE. The handles on the selected item (end
+// arrows, corner grips — `arcade-room-decor-resize.mts`) are how a player
+// resizes; the inspector shows the exact number and takes a typed one.
 import { createColorPicker } from "./arcade-room-color-picker.mjs";
 import { DECOR_CATEGORIES, DECOR_CATEGORY_TITLES, NEON_TINTS, decorByCategory, decorCardImage, decorExtent, findDecor, } from "./arcade-room-catalog/decor.mjs";
 import { SURFACE_CATALOG, SURFACE_KINDS, surfaceGroups } from "./arcade-room-catalog/surfaces.mjs";
@@ -174,18 +178,25 @@ export function createEditorPanel(elements, actions, options = {}) {
             return card;
         }));
     }
-    function sliderRow(label, min, max, step, value, dataKey) {
+    /**
+     * A size row: the handles on the item in the room are the way to resize it;
+     * this is the exact number for a player who wants 2.40 m and not 2.38.
+     */
+    function numberRow(label, min, max, step, value, dataKey, unit, hint) {
         const row = element("div", "inspector__row");
         const text = element("span", "inspector__label", label);
-        const slider = element("input", "inspector__slider");
-        slider.type = "range";
-        slider.min = String(min);
-        slider.max = String(max);
-        slider.step = String(step);
-        slider.value = String(value);
-        slider.dataset[dataKey] = "true";
-        row.append(text, slider);
-        return { row, label: text, slider };
+        const field = element("label", "inspector__number");
+        const input = element("input", "inspector__number-input");
+        input.type = "number";
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(value);
+        input.dataset[dataKey] = "true";
+        input.setAttribute("aria-label", label);
+        field.append(input, element("span", "inspector__unit", unit));
+        row.append(text, field, element("small", "inspector__hint", hint));
+        return { row, label: text, input };
     }
     function buildDecorInspector(selected, definition) {
         const heading = element("div", "inspector__heading");
@@ -200,9 +211,9 @@ export function createEditorPanel(elements, actions, options = {}) {
         const mounts = [];
         let picker = null;
         let lengthLabel = null;
-        let lengthSlider = null;
+        let lengthInput = null;
         let scaleLabel = null;
-        let scaleSlider = null;
+        let scaleInput = null;
         if (definition.mounts.length > 1) {
             const row = element("div", "inspector__row");
             row.append(element("span", "inspector__label", "Mount"));
@@ -230,17 +241,17 @@ export function createEditorPanel(elements, actions, options = {}) {
             nodes.push(row);
         }
         if (definition.length.enabled) {
-            const built = sliderRow("Length", definition.length.min, definition.length.max, 0.1, selected.length || definition.length.default, "length");
-            built.slider.title = "Stretch ([ / ])";
+            const built = numberRow("Length", definition.length.min, definition.length.max, 0.1, selected.length || definition.length.default, "length", "m", "Drag the arrows on either end in the room, or type a length.");
+            built.input.title = "Stretch ([ / ])";
             lengthLabel = built.label;
-            lengthSlider = built.slider;
+            lengthInput = built.input;
             nodes.push(built.row);
         }
         if (definition.scale.enabled) {
-            const built = sliderRow("Size", definition.scale.min, definition.scale.max, 0.05, selected.scale, "scale");
-            built.slider.title = "Resize (- / +)";
+            const built = numberRow("Size", definition.scale.min, definition.scale.max, 0.05, selected.scale, "scale", "×", "Drag a corner grip in the room, or type a size.");
+            built.input.title = "Resize (- / +)";
             scaleLabel = built.label;
-            scaleSlider = built.slider;
+            scaleInput = built.input;
             nodes.push(built.row);
         }
         const tools = element("div", "inspector__tools");
@@ -255,7 +266,7 @@ export function createEditorPanel(elements, actions, options = {}) {
         tools.append(duplicate, remove);
         nodes.push(tools);
         elements.decorInspector.replaceChildren(...nodes);
-        return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, picker, lengthLabel, lengthSlider, scaleLabel, scaleSlider };
+        return { key: `${selected.instanceId}|${selected.itemId}`, where, mounts, picker, lengthLabel, lengthInput, scaleLabel, scaleInput };
     }
     /** Bring the live inspector up to date with the item without touching its nodes. */
     function updateDecorInspector(refs, selected, definition) {
@@ -263,16 +274,16 @@ export function createEditorPanel(elements, actions, options = {}) {
         for (const button of refs.mounts)
             button.setAttribute("aria-pressed", String(button.dataset.mount === selected.mount));
         refs.picker?.setValue(selected.color || definition.tint.default);
-        if (refs.lengthLabel && refs.lengthSlider) {
+        if (refs.lengthLabel && refs.lengthInput) {
             const length = selected.length || definition.length.default;
-            refs.lengthLabel.textContent = `Length · ${length.toFixed(1)} m`;
-            if (document.activeElement !== refs.lengthSlider)
-                refs.lengthSlider.value = String(length);
+            refs.lengthLabel.textContent = `Length · ${length.toFixed(2)} m`;
+            if (document.activeElement !== refs.lengthInput)
+                refs.lengthInput.value = length.toFixed(2);
         }
-        if (refs.scaleLabel && refs.scaleSlider) {
+        if (refs.scaleLabel && refs.scaleInput) {
             refs.scaleLabel.textContent = `Size · ×${selected.scale.toFixed(2)} · ${extentLabel(definition, selected)}`;
-            if (document.activeElement !== refs.scaleSlider)
-                refs.scaleSlider.value = String(selected.scale);
+            if (document.activeElement !== refs.scaleInput)
+                refs.scaleInput.value = selected.scale.toFixed(2);
         }
     }
     function renderDecorInspector(state) {
@@ -318,7 +329,14 @@ export function createEditorPanel(elements, actions, options = {}) {
             return row;
         });
         const title = element("span", "surface-section__group", rows.length ? `PLACED · ${rows.length}` : "NOTHING PLACED YET");
-        elements.decorPlaced.replaceChildren(title, ...rows);
+        const starterIds = new Set(["neon-strip-1", "neon-strip-2", "neon-strip-3"]);
+        const starterCount = state.layout.decor.filter((item) => starterIds.has(item.instanceId)).length;
+        const clearStarter = element("button", "placed-list__clear", "Remove starter neon");
+        clearStarter.type = "button";
+        clearStarter.dataset.removeStarterNeon = "true";
+        clearStarter.hidden = starterCount === 0;
+        clearStarter.title = `Remove ${starterCount} starter neon ${starterCount === 1 ? "bar" : "bars"}`;
+        elements.decorPlaced.replaceChildren(title, clearStarter, ...rows);
     }
     function render(state) {
         renderTabs(state);
@@ -363,6 +381,10 @@ export function createEditorPanel(elements, actions, options = {}) {
     });
     const inspectorClick = (event) => {
         const target = event.target;
+        if (target.closest("[data-remove-starter-neon]")) {
+            actions.removeStarterNeon();
+            return;
+        }
         if (target.closest("[data-clear-selection]")) {
             actions.clearSelection();
             return;
@@ -391,18 +413,21 @@ export function createEditorPanel(elements, actions, options = {}) {
     };
     elements.decorInspector.addEventListener("click", inspectorClick);
     elements.decorPlaced.addEventListener("click", inspectorClick);
-    // A slider fires `input` on every step of a drag and `change` once when it is let go.
-    const sliderEdit = (event, phase) => {
+    // A number field fires `input` on every keystroke or spinner step and `change` when it is left.
+    const numberEdit = (event, phase) => {
         const target = event.target;
         const selectedId = elements.decorInspector.querySelector("[data-duplicate-decor]")?.dataset.duplicateDecor;
-        if (!selectedId || !(target instanceof HTMLInputElement) || target.type !== "range")
+        if (!selectedId || !(target instanceof HTMLInputElement) || target.type !== "number")
+            return;
+        const value = Number(target.value);
+        if (!Number.isFinite(value) || value <= 0)
             return;
         if (target.dataset.length)
-            actions.setDecorLength(selectedId, Number(target.value), phase);
+            actions.setDecorLength(selectedId, value, phase);
         if (target.dataset.scale)
-            actions.setDecorScale(selectedId, Number(target.value), phase);
+            actions.setDecorScale(selectedId, value, phase);
     };
-    elements.decorInspector.addEventListener("input", (event) => sliderEdit(event, "preview"));
-    elements.decorInspector.addEventListener("change", (event) => sliderEdit(event, "commit"));
+    elements.decorInspector.addEventListener("input", (event) => numberEdit(event, "preview"));
+    elements.decorInspector.addEventListener("change", (event) => numberEdit(event, "commit"));
     return Object.freeze({ render });
 }

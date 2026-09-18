@@ -9,7 +9,7 @@ import {
   BOY_CONTACT_REL_PX, GIRL_CONTACT_REL_PX,
 } from './game-constants.js';
 import { getDebugOverlayGeometry } from './renderer.js';
-import { gradeInput } from './obstacles.js';
+import { gradeInput, gradeSpikeJump } from './obstacles.js';
 
 // ── Player geometry ────────────────────────────────────────────────────────────
 
@@ -137,7 +137,11 @@ function contactActionForPlayer(player, animState) {
 function buildDebugCollisionSnapshot(player, obstacles, animState) {
   const frontObstacle = obstacles && obstacles[0];
   const playerHurtbox = playerHurtboxForAnim(player, animState);
-  const timingGrade   = frontObstacle ? gradeInput(frontObstacle, player.distance) : null;
+  // The overlay's green "perfect" band must mean what the sim means: for spikes
+  // that is the jump-start reference, for everything else the input position.
+  const timingGrade   = !frontObstacle ? null
+    : frontObstacle.type === 'spikes' ? gradeSpikeJump(frontObstacle, player.distance, player.speed)
+    : gradeInput(frontObstacle, player.distance, player.speed);
   const snapshot = {
     enabled:             true,
     obstacleType:        frontObstacle ? frontObstacle.type : 'none',

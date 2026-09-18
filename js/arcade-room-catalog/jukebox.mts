@@ -41,6 +41,12 @@ function game(input: GameInput): JukeboxTrack[] {
 export const JUKEBOX_TRACKS: readonly JukeboxTrack[] = Object.freeze([
   ...game({ slug: "tactical-arena", title: "Tactical Arena", root: "games/tactical-arena/sounds", tracks: [
     ["menu", "War Room", "menu.mp3"],
+    ["mission-battle", "Campaign Battle", "mission-battle.mp3"],
+    ["vs-battle", "Versus Battle", "vs-battle.mp3"],
+    ["has-beens", "The Has-Beens", "fatty-battle.mp3"],
+    ["not-my-king", "Not My King", "king-battle.mp3"],
+    ["void-ridden-castle", "Void-Ridden Castle", "summoner-battle.mp3"],
+    ["final-battle", "The Final Battle", "final-battle.mp3"],
   ] }),
   ...game({ slug: "lovers-lost", title: "Lovers Lost", root: "games/lovers-lost/sounds", tracks: [
     ["menu", "Before the Run", "bg-music-menu.mp3"],
@@ -56,8 +62,12 @@ export const JUKEBOX_TRACKS: readonly JukeboxTrack[] = Object.freeze([
   ...game({ slug: "sumorai", title: "Sumorai", root: "games/sumorai/assets/sounds", tracks: [
     ["dojo", "Dojo", "bg-music.wav"],
   ] }),
+  ...game({ slug: "mini-tactics", title: "Mini-Tactics", root: "games/mini-tactics/sounds", tracks: [
+    ["battle", "Battle", "battle.mp3"],
+  ] }),
   ...game({ slug: "illuminauts", title: "Illuminauts", root: "games/illuminauts/assets/sounds", tracks: [
     ["menu", "Suit Up", "menu.mp3"],
+    ["game", "Into the Dark", "game.mp3"],
   ] }),
   ...game({ slug: "bird-duty", title: "Bird Duty", root: "games/bird-duty/assets/scratch/sounds", tracks: [
     ["game", "On Duty", "game-music.mp3"],
@@ -68,6 +78,9 @@ export const JUKEBOX_TRACKS: readonly JukeboxTrack[] = Object.freeze([
   ] }),
   ...game({ slug: "cockpit-swarm", title: "Cockpit Swarm", root: "games/cockpit-swarm/assets", tracks: [
     ["menu", "Hangar", "menu.mp3"],
+    ["game-1", "Swarm Run I", "game1.mp3"],
+    ["game-2", "Swarm Run II", "game2.mp3"],
+    ["game-3", "Swarm Run III", "game3.mp3"],
   ] }),
   ...game({ slug: "build-buddy", title: "Build Buddy", root: "games/build-buddy/assets/sounds/soundtrack", tracks: [
     ["menu", "Build Buddy Menu", "menu.mp3"],
@@ -160,6 +173,33 @@ export function jukeboxGain(distance: number, range = JUKEBOX_RANGE): number {
   return Number((range.max * (1 - t) * (1 - t)).toFixed(4));
 }
 
+/** The one decor item that picks records. */
+export const JUKEBOX_ITEM_ID = "decor.prop.jukebox";
+/** Decor that relays whatever the jukebox is playing; a speaker never plays on its own. */
+export const SPEAKER_ITEM_IDS: readonly string[] = Object.freeze(["decor.prop.speaker-stack", "decor.wall.speaker"]);
+
+export function isJukeboxEmitter(itemId: string): boolean {
+  return itemId === JUKEBOX_ITEM_ID || SPEAKER_ITEM_IDS.includes(itemId);
+}
+
+export type JukeboxEmitterPoint = Readonly<{ x: number; z: number }>;
+
+/**
+ * How loud the record is where the player stands with several things playing
+ * it. It is the LOUDEST one, never the sum: two speakers side by side sound
+ * like one speaker, the same as a real room where the nearer cone masks the
+ * other, and a wall of them cannot be turned into a volume knob. Nothing to
+ * play through is silence.
+ */
+export function jukeboxGainAt(listener: JukeboxEmitterPoint, emitters: readonly JukeboxEmitterPoint[], range = JUKEBOX_RANGE): number {
+  let loudest = 0;
+  for (const emitter of emitters) {
+    const gain = jukeboxGain(Math.hypot(listener.x - emitter.x, listener.z - emitter.z), range);
+    if (gain > loudest) loudest = gain;
+  }
+  return loudest;
+}
+
 /** `postMessage` shapes between the jukebox page (in the overlay) and the room. */
 export const JUKEBOX_MESSAGE = Object.freeze({
   /** Page → room: play this id, or stop, or step. */
@@ -171,21 +211,28 @@ export const JUKEBOX_MESSAGE = Object.freeze({
 } as const);
 
 export type JukeboxCommand =
-  | Readonly<{ type: typeof JUKEBOX_MESSAGE.command; action: "play"; trackId: string }>
-  | Readonly<{ type: typeof JUKEBOX_MESSAGE.command; action: "stop" | "next" | "previous" | "toggle" }>;
+  | Readonly<{ type: typeof JUKEBOX_MESSAGE.command; action: "play" | "set-default"; trackId: string }>
+  | Readonly<{ type: typeof JUKEBOX_MESSAGE.command; action: "stop" | "next" | "previous" | "toggle" | "clear-default" }>;
 
 export type JukeboxState = Readonly<{
   type: typeof JUKEBOX_MESSAGE.state;
   trackId: string | null;
   playing: boolean;
+  /** The house record: what the room plays for anyone who walks in. */
+  defaultTrackId: string | null;
+  /** Only the room's owner may change the house record; the page hides the control otherwise. */
+  canSetDefault: boolean;
 }>;
 
 export function isJukeboxCommand(value: unknown): value is JukeboxCommand {
   if (!value || typeof value !== "object") return false;
   const message = value as Record<string, unknown>;
   if (message.type !== JUKEBOX_MESSAGE.command) return false;
-  if (message.action === "play") return typeof message.trackId === "string" && Boolean(findJukeboxTrack(message.trackId));
-  return message.action === "stop" || message.action === "next" || message.action === "previous" || message.action === "toggle";
+  if (message.action === "play" || message.action === "set-default") {
+    return typeof message.trackId === "string" && Boolean(findJukeboxTrack(message.trackId));
+  }
+  return message.action === "stop" || message.action === "next" || message.action === "previous" || message.action === "toggle"
+    || message.action === "clear-default";
 }
 
 export function isJukeboxState(value: unknown): value is JukeboxState {
@@ -193,5 +240,7 @@ export function isJukeboxState(value: unknown): value is JukeboxState {
   const message = value as Record<string, unknown>;
   return message.type === JUKEBOX_MESSAGE.state
     && (message.trackId === null || typeof message.trackId === "string")
-    && typeof message.playing === "boolean";
+    && typeof message.playing === "boolean"
+    && (message.defaultTrackId === null || typeof message.defaultTrackId === "string")
+    && typeof message.canSetDefault === "boolean";
 }

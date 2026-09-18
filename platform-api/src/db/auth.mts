@@ -203,6 +203,11 @@ const PLAYER_SCOPED_DELETES: ReadonlyArray<readonly [string, readonly string[]]>
   ["game_progress_claims", ["player_id"]],
   ["game_run_records", ["player_id"]],
   ["game_loadouts", ["player_id"]],
+  // The trophy case and the per-run verdict log behind it. Both are the account's
+  // own record and the collection is shown on the public profile, so a deleted
+  // account must stop displaying trophies.
+  ["player_achievements", ["player_id"]],
+  ["game_achievement_runs", ["player_id"]],
   // The driver a player set up inside a cabinet — their name, face and pinned
   // cars. Cosmetic, but it is *shown to other people*, so an account that has
   // been deleted must stop having a face on anybody's VS card.

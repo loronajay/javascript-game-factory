@@ -1,4 +1,6 @@
 
+import { distPerFrame } from './player.js';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const OBSTACLE_TYPES   = ['spikes', 'bird', 'arrowwall', 'goblin'];
 const WARMUP_SEQUENCE  = ['spikes', 'bird', 'goblin', 'arrowwall'];
@@ -62,14 +64,62 @@ function obstacleWindow(obstacle) {
   return HITBOX_WINDOWS[obstacle.type] || HITBOX_WINDOWS.spikes;
 }
 
-function gradeInput(obstacle, playerDistance) {
-  const { open, perfect, late } = obstacleWindow(obstacle);
+// Inputs are sampled once per tick, so a Perfect window narrower than a tick
+// of travel can fall between two frames and be impossible to hit. The base
+// windows above are tuned for starting speed (1 unit/tick); as speed climbs the
+// window keeps at least this many ticks of width so Perfect stays reachable.
+const PERFECT_MIN_TICKS = 2;
+
+function perfectWindow(obstacle, speed) {
+  const base = obstacleWindow(obstacle).perfect;
+  if (speed == null) return base;
+  return Math.max(base, PERFECT_MIN_TICKS * distPerFrame(speed));
+}
+
+// Grades an input made at `playerDistance` against the obstacle's window.
+// `speed` (optional) widens the Perfect band per PERFECT_MIN_TICKS.
+function gradeInput(obstacle, playerDistance, speed) {
+  const { open, late } = obstacleWindow(obstacle);
+  const perfect = perfectWindow(obstacle, speed);
   const delta = obstacle.position - playerDistance;
 
   if (delta > open) return 'miss';
   if (delta < -late) return 'miss';
   if (Math.abs(delta) <= perfect) return 'perfect';
   return 'good';
+}
+
+// ─── Spike jump reference ─────────────────────────────────────────────────────
+// A spike is not cleared at its position: the jump needs SPIKE_JUMP_RISE_TICKS
+// ticks of rise (jumpY 14.5px under JUMP_VY=8, gravity 0.5) before the first
+// spike tip reaches the runner's feet, and at that tick the tip sits
+// SPIKE_TIP_LEAD units past the spike's position. So the latest jump that
+// clears a spike starts `2·distPerFrame(speed) − 1.16` units ahead of it — at
+// starting speed ~0.8 units, at speed 50 ~3.3. Grading the jump around the
+// spike position itself (the previous behaviour) put the Perfect band on
+// frames where the jump had already failed, which is why Perfect on spikes
+// stopped being reachable once a chain raised the speed.
+//
+// The lead is the GIRL's figure. The boy's contact point sits one pixel
+// further from his sprite (BOY_CONTACT_REL_PX 42 vs a visible edge at 41), so
+// he can jump a quarter-unit later; the band is symmetric around the
+// reference, so that quarter-unit still grades Perfect for him. Using the
+// tighter side means neither side can be graded Perfect on a jump that
+// would have failed. tests/telemetry.test.js checks this constant against
+// the real collision sim at several speeds for both sides.
+const SPIKE_JUMP_RISE_TICKS = 2;
+const SPIKE_TIP_LEAD        = 1.16;
+
+function spikeLatestJumpDelta(speed) {
+  return SPIKE_JUMP_RISE_TICKS * distPerFrame(speed) - SPIKE_TIP_LEAD;
+}
+
+// Grades a spike jump by how late it started relative to the latest safe
+// jump: inside the Perfect band past that point is Perfect, any earlier valid
+// jump is Good. Same window shape as every other obstacle, shifted reference.
+function gradeSpikeJump(obstacle, jumpStartDistance, speed) {
+  const reference = jumpStartDistance + spikeLatestJumpDelta(speed);
+  return gradeInput(obstacle, reference, speed);
 }
 
 function windowExpired(obstacle, playerDistance) {
@@ -180,10 +230,14 @@ export {
   pairSpacingIsFeasible,
   requiredInput,
   gradeInput,
+  perfectWindow,
+  gradeSpikeJump,
+  spikeLatestJumpDelta,
   windowExpired,
   makeRng,
   OBSTACLE_TYPES,
   WARMUP_SEQUENCE,
   WAVE_COUNTS,
   BIRD_VISUAL_FOLLOW_MIN,
+  PERFECT_MIN_TICKS,
 };

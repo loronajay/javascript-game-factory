@@ -79,6 +79,25 @@ export function wirePlayerArcadeLink(doc, { requestedPlayerId, viewerPlayerId })
         label.textContent = isOwn ? "My Arcade" : "Visit Arcade";
     link.hidden = false;
 }
+// The trophy-case chip: the viewer's own page links to their collection, any
+// other player's page to that player's (read-only, public). Same shape as the
+// arcade link above.
+export function wirePlayerAchievementsLink(doc, { requestedPlayerId, viewerPlayerId }) {
+    const link = doc.getElementById("playerAchievementsLink");
+    const label = doc.getElementById("playerAchievementsLinkLabel");
+    if (!link)
+        return;
+    const targetId = requestedPlayerId || viewerPlayerId;
+    if (!targetId) {
+        link.hidden = true;
+        return;
+    }
+    const isOwn = targetId === viewerPlayerId;
+    link.href = isOwn ? "../achievements/" : `../achievements/?id=${encodeURIComponent(targetId)}`;
+    if (label)
+        label.textContent = isOwn ? "Trophy Case" : "View Trophies";
+    link.hidden = false;
+}
 const doc = globalThis.document;
 if (typeof doc?.getElementById === "function") {
     const storage = getDefaultPlatformStorage();
@@ -96,6 +115,7 @@ if (typeof doc?.getElementById === "function") {
         ? "me"
         : "";
     wirePlayerArcadeLink(doc, { requestedPlayerId, viewerPlayerId: authSession?.playerId || "" });
+    wirePlayerAchievementsLink(doc, { requestedPlayerId, viewerPlayerId: authSession?.playerId || "" });
     renderPrimaryAppNav(doc.getElementById("playerPrimaryNav"), {
         basePath: "../",
         currentPage,

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Trophy Case</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
+  <link rel="stylesheet" href="../css/search.css">
+  <link rel="stylesheet" href="../css/notifications.css">
+  <link rel="stylesheet" href="../css/achievements.css">
+  <link rel="stylesheet" href="../css/page-stage.css">
+  <!-- Must load last: overrides desktop rules by source order. -->
+  <link rel="stylesheet" href="../css/mobile-landscape.css">
+</head>
+<body class="search-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="search-stage">
+      <div class="search-stage__stars" aria-hidden="true"></div>
+      <div class="search-stage__scene" aria-hidden="true">
+        <div class="search-stage__sun"></div>
+        <div class="search-stage__skyline"></div>
+        <div class="search-stage__floor"></div>
+      </div>
+
+      <div class="search-stage__controls page-stage__controls">
+        <nav id="achPrimaryNav" class="search-stage__nav page-stage__nav"></nav>
+      </div>
+
+      <header class="search-stage__masthead page-stage__masthead">
+        <div class="search-stage__header page-stage__header">
+          <h1 id="achStageTitle" class="pixel-text pixel-text--title search-stage__title">TROPHY CASE</h1>
+          <p id="achStageSubtitle" class="search-stage__subtitle">Loading achievements…</p>
+        </div>
+      </header>
+
+      <div class="ach-page-layout page-stage__layout">
+        <a id="achBackLink" class="ach-page__back" href="../me/">&#8592; Back to profile</a>
+        <div id="achPageRoot" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/pixel-text.mjs"></script>
+  <script type="module" src="../js/platform-config.mjs"></script>
+  <script type="module" src="../js/achievements-page/entry.mjs"></script>
+</body>
+</html>

@@ -10,24 +10,42 @@
 // and it answers every command with the full state so the page never keeps its
 // own idea of what is playing. `suspend()`/`resume()` are for a cabinet game,
 // which has its own soundtrack; the jukebox waits rather than competing.
-import { JUKEBOX_MESSAGE, JUKEBOX_RANGE, adjacentJukeboxTrack, findJukeboxTrack, isJukeboxCommand, jukeboxGain, jukeboxTrackUrl, } from "./arcade-room-catalog/jukebox.mjs";
-export const JUKEBOX_ITEM_ID = "decor.prop.jukebox";
+//
+// SPEAKERS RELAY, THEY DO NOT PLAY. Every placed speaker carries whatever is on,
+// and the volume where the player stands is the LOUDEST emitter, never the sum
+// (`jukeboxGainAt`), so two speakers side by side sound like one.
+//
+// THE HOUSE RECORD has no box. It is the layout's `music.defaultTrackId`, played
+// on entry for owner and guest alike through every jukebox and speaker on the
+// floor — and, in a room with neither, everywhere, so a host who set one is
+// never met by silence. Picking a record at a box takes over from it; deleting
+// a box never stops it, because it was not that box's record to begin with.
+import { JUKEBOX_MESSAGE, JUKEBOX_ITEM_ID, JUKEBOX_RANGE, adjacentJukeboxTrack, findJukeboxTrack, isJukeboxCommand, isJukeboxEmitter, jukeboxGainAt, jukeboxTrackUrl, } from "./arcade-room-catalog/jukebox.mjs";
+export { JUKEBOX_ITEM_ID };
 export function createRoomJukebox(options) {
     const audio = options.createAudio ? options.createAudio() : new Audio();
     audio.loop = true;
     audio.preload = "none";
+    const canSetDefault = options.canSetDefault === true;
     let track = null;
     let playing = false;
     let suspended = false;
     let sourceInstanceId = null;
+    let defaultTrackId = "";
     // Full until a tick says otherwise, so the page can also run this standalone with no room to measure.
     let gain = JUKEBOX_RANGE.max;
     function status() {
-        return Object.freeze({ track, playing, sourceInstanceId });
+        return Object.freeze({ track, playing, sourceInstanceId, defaultTrackId: defaultTrackId || null, canSetDefault });
     }
     function announce() {
         options.onChange?.(status());
-        const state = { type: JUKEBOX_MESSAGE.state, trackId: track?.id ?? null, playing };
+        const state = {
+            type: JUKEBOX_MESSAGE.state,
+            trackId: track?.id ?? null,
+            playing,
+            defaultTrackId: defaultTrackId || null,
+            canSetDefault,
+        };
         try {
             options.frame.contentWindow?.postMessage(state, location.origin);
         }
@@ -75,22 +93,64 @@ export function createRoomJukebox(options) {
     function attach(instanceId) {
         sourceInstanceId = instanceId;
     }
-    function update(player, decor) {
-        if (!sourceInstanceId)
+    function setDefaultTrack(trackId) {
+        const next = findJukeboxTrack(trackId) ? trackId : "";
+        if (next === defaultTrackId)
             return;
-        const source = decor.find((item) => item.instanceId === sourceInstanceId && item.itemId === JUKEBOX_ITEM_ID);
-        if (!source) {
+        defaultTrackId = next;
+        announce();
+    }
+    function playDefault() {
+        if (!defaultTrackId)
+            return;
+        sourceInstanceId = null;
+        play(defaultTrackId);
+    }
+    function chooseDefault(trackId) {
+        if (!canSetDefault)
+            return;
+        if (trackId !== "" && !findJukeboxTrack(trackId))
+            return;
+        options.onSetDefault?.(trackId);
+        setDefaultTrack(trackId);
+    }
+    /**
+     * What the record is coming out of. A picked record: the box it was picked on
+     * plus every speaker, and nothing at all once that box is gone. The house
+     * record: every jukebox and speaker, or `null` for "everywhere" when the room
+     * has none of either.
+     */
+    function emitters(decor) {
+        if (sourceInstanceId) {
+            const source = decor.find((item) => item.instanceId === sourceInstanceId && item.itemId === JUKEBOX_ITEM_ID);
+            if (!source)
+                return [];
+            return [source, ...decor.filter((item) => isJukeboxEmitter(item.itemId) && item.itemId !== JUKEBOX_ITEM_ID)];
+        }
+        const all = decor.filter((item) => isJukeboxEmitter(item.itemId));
+        return all.length ? all : null;
+    }
+    function update(player, decor) {
+        if (!track)
+            return;
+        const points = emitters(decor);
+        if (points && points.length === 0) {
             // The box the record was playing on is gone: no source, no sound.
             sourceInstanceId = null;
             if (playing)
                 stop();
             return;
         }
-        const nextGain = jukeboxGain(Math.hypot(player.x - source.x, player.z - source.z));
+        const nextGain = points ? jukeboxGainAt(player, points) : JUKEBOX_RANGE.max;
         if (nextGain === gain)
             return;
         gain = nextGain;
         applyVolume();
+    }
+    function emitterInstanceIds(decor) {
+        if (!playing || suspended)
+            return [];
+        return (emitters(decor) ?? []).filter((item) => item.itemId === JUKEBOX_ITEM_ID).map((item) => item.instanceId);
     }
     function suspend() {
         if (!playing)
@@ -120,6 +180,10 @@ export function createRoomJukebox(options) {
         const command = data;
         if (command.action === "play")
             play(command.trackId);
+        else if (command.action === "set-default")
+            chooseDefault(command.trackId);
+        else if (command.action === "clear-default")
+            chooseDefault("");
         else if (command.action === "stop")
             stop();
         else if (command.action === "next")
@@ -137,7 +201,12 @@ export function createRoomJukebox(options) {
         next: () => step(1),
         previous: () => step(-1),
         toggle,
+        setDefaultTrack,
+        playDefault,
+        setDefault: chooseDefault,
+        clearDefault: () => chooseDefault(""),
         update,
+        emitterInstanceIds,
         suspend,
         resume,
         status,

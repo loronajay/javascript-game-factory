@@ -27,6 +27,12 @@
         <button id="jukeboxStop" type="button" title="Stop" disabled>&#9632;</button>
       </div>
     </header>
+    <!-- The house record: owner only. The room hides this for a guest and for a standalone open. -->
+    <div id="jukeboxHouse" class="jukebox__house" hidden>
+      <span id="jukeboxHouseLabel" class="jukebox__house-label">No house record · the room is quiet until someone picks one</span>
+      <button id="jukeboxHouseSet" type="button" disabled>Play this when guests arrive</button>
+      <button id="jukeboxHouseClear" type="button" hidden>Clear</button>
+    </div>
     <p class="jukebox__hint">Every cabinet's soundtrack, one turntable &middot; <span id="jukeboxCount"></span> &middot; the music follows you round the room</p>
     <div id="jukeboxList" class="jukebox__list" aria-label="Records"></div>
   </main>

@@ -1,4 +1,5 @@
 import { STARTING_SPEED } from './player.js';
+import { sanitizeLaneStats } from './lane-stats.js';
 
 function sanitizeResolvedOutcome(outcome) {
   return {
@@ -26,6 +27,12 @@ function buildLaneSnapshot(player, obstacles, animState, resolved, elapsed, seq)
       jumpY:               player?.jumpY ?? 0,
       jumpVY:              player?.jumpVY ?? 0,
       jumpStartDistance:   player?.jumpStartDistance ?? null,
+      jumpChainAnchor:     player?.jumpChainAnchor ?? null,
+      crouchStartDistance: player?.crouchStartDistance ?? null,
+      finishFrame:         player?.finishFrame ?? null,
+      // Telemetry rides the snapshot so the partner's lane stats on the other
+      // machine are the partner's own tally, not an inference from feedback.
+      stats:               sanitizeLaneStats(player?.stats),
       assistActive:        !!player?.assistActive,
       assistOpportunities: player?.assistOpportunities ?? 0,
     },
@@ -66,6 +73,10 @@ function applyLaneSnapshot(currentLane, snapshot, lastSeq = -1) {
       jumpY:               snapshot?.player?.jumpY ?? 0,
       jumpVY:              snapshot?.player?.jumpVY ?? 0,
       jumpStartDistance:   snapshot?.player?.jumpStartDistance ?? null,
+      jumpChainAnchor:     snapshot?.player?.jumpChainAnchor ?? null,
+      crouchStartDistance: snapshot?.player?.crouchStartDistance ?? null,
+      finishFrame:         Number.isFinite(Number(snapshot?.player?.finishFrame)) ? Math.floor(Number(snapshot.player.finishFrame)) : null,
+      stats:               sanitizeLaneStats(snapshot?.player?.stats ?? currentLane.player?.stats),
       assistActive:        !!snapshot?.player?.assistActive,
       assistOpportunities: snapshot?.player?.assistOpportunities ?? 0,
     },

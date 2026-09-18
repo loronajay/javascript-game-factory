@@ -15,6 +15,8 @@ const ASSIST_MAX_OPP        = 3;
 const WARMUP_OBSTACLE_COUNT = 4;
 const STARTING_SPEED        = 10; // players begin here; floor (5) is reached only after heavy misses
 
+import { createLaneStats } from './lane-stats.js';
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 function createPlayer(side) {
   return {
@@ -26,6 +28,14 @@ function createPlayer(side) {
     obstaclesFaced: 0,
     state: 'running',   // running | jumping | crouching | blocking | attacking | hit | finished
     jumpStartDistance: null,
+    // Position of the last spike cleared by the current jump (spike chains).
+    jumpChainAnchor: null,
+    // Distance at which the current crouch began; graded against the bird's
+    // timing window the way jumpStartDistance is graded against spikes.
+    crouchStartDistance: null,
+    // Frame the lane crossed RUN_DISTANCE, or null while still running.
+    finishFrame: null,
+    stats: createLaneStats(),
     assistActive: false,
     assistOpportunities: 0,
   };

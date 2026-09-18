@@ -347,7 +347,11 @@ button, a { font: inherit; }
 .tint-grid { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .tint { width: 26px; height: 26px; border: 2px solid transparent; border-radius: 50%; background: var(--tint); box-shadow: 0 0 10px var(--tint); cursor: pointer; }
 .tint[aria-pressed="true"] { border-color: #fff; }
-.inspector__slider { width: 100%; accent-color: #ffd33d; }
+.inspector__number { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 0 10px 0 0; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; background: rgba(255,255,255,.05); }
+.inspector__number:focus-within { border-color: #ffd33d; }
+.inspector__number-input { width: 72px; padding: 7px 8px; border: 0; background: transparent; color: #fff; font: 800 13px/1 ui-monospace, monospace; outline: none; }
+.inspector__unit { color: #9fb2c2; font: 700 11px/1 ui-monospace, monospace; }
+.inspector__hint { color: #8fa3b8; font: 600 10px/1.35 ui-monospace, monospace; }
 
 /* — Colour picker: an inline pad + hue strip, never a popup that a re-render can close — */
 .color-picker { display: grid; gap: 8px; --picker-hue: 0; --picker-color: #ff2d95; }
@@ -382,3 +386,5 @@ button, a { font: inherit; }
 .placed-list__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--tint); box-shadow: 0 0 8px var(--tint); }
 .placed-list__remove { width: 34px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; background: rgba(255,255,255,.04); color: #ff8d91; font-size: 18px; cursor: pointer; }
 .placed-list__remove:hover { border-color: #ff8d91; }
+.placed-list__clear { width: 100%; margin: 5px 0 1px; padding: 8px 10px; border: 1px solid rgba(255, 141, 145, .5); border-radius: 9px; background: rgba(255, 77, 126, .1); color: #ff9ab7; font: 800 10px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.placed-list__clear:hover { background: rgba(255, 77, 126, .2); color: #fff; }

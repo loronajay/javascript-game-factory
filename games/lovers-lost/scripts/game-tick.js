@@ -19,10 +19,11 @@ import {
 } from './player.js';
 import {
   createObstacle, generateWarmup, generateWave,
-  requiredInput, gradeInput, windowExpired, makeRng,
+  requiredInput, gradeInput, gradeSpikeJump, windowExpired, makeRng,
   WAVE_COUNTS,
 } from './obstacles.js';
 import { evaluateRun } from './scoring.js';
+import { recordObstacleOutcome } from './lane-stats.js';
 import { normalizeDebugObstacleType } from './debug-flags.js';
 
 const GAMEOVER_HOLD_FRAMES = 120; // 2 seconds
@@ -35,13 +36,56 @@ function applyGradeOutcome(player, grade) {
   return applyMiss(player);
 }
 
-function spikeTimingGrade(player, obstacle) {
-  if (player.jumpStartDistance == null) return 'miss';
-  return gradeInput(obstacle, player.jumpStartDistance);
+// The one place an obstacle's resolved grade becomes player state: score/speed
+// through applyGradeOutcome, telemetry through recordObstacleOutcome. Every
+// resolution branch below goes through here so the grade the renderer shows,
+// the grade the snapshot ships and the grade the achievement claim reports are
+// the same value.
+function resolveObstacleGrade(player, obstacle, grade) {
+  return recordObstacleOutcome(applyGradeOutcome(player, grade), obstacle, grade);
 }
 
+// A spike chain (two spikes within SPIKE_CHAIN_MAX_SPACING) is cleared by one
+// jump. The second spike is graded as if the jump had been taken for it at
+// the same lateness — so a Perfect jump over a chain is Perfect for every
+// spike it clears, instead of the trailing spikes being capped at Good by a
+// jump start that belonged to the first. `jumpChainAnchor` is the position of
+// the last spike this jump cleared and is dropped on landing.
+function spikeTimingGrade(player, obstacle) {
+  if (player.jumpStartDistance == null) return 'miss';
+  const anchor = player.jumpChainAnchor;
+  const start  = player.jumpStartDistance + (anchor != null ? obstacle.position - anchor : 0);
+  return gradeSpikeJump(obstacle, start, player.speed);
+}
+
+// Resolves a spike the runner got over: grade it, tally it, and if the jump
+// is still in the air remember this spike as the chain anchor.
+function resolveSpikeClear(player, obstacle) {
+  const grade = spikeClearGrade(player, obstacle);
+  let next = resolveObstacleGrade(player, obstacle, grade);
+  if (next.state === 'jumping') next = { ...next, jumpChainAnchor: obstacle.position };
+  return { player: next, grade };
+}
+
+// A spike that ends up behind the player was cleared. Timing decides between
+// Perfect (jump started inside the perfect window) and Good (any other jump
+// that got over it — including one started before the window opened).
 function spikeClearGrade(player, obstacle) {
   const grade = spikeTimingGrade(player, obstacle);
+  if (grade === 'perfect') return 'perfect';
+  return 'good';
+}
+
+function birdTimingGrade(player, obstacle) {
+  if (player.crouchStartDistance == null) return 'miss';
+  return gradeInput(obstacle, player.crouchStartDistance, player.speed);
+}
+
+// Mirror of spikeClearGrade for the bird: the crouch's start distance is graded
+// against the bird's window. Before this the bird was the one obstacle whose
+// clear was always Good, so Perfect execution was impossible on it.
+function birdClearGrade(player, obstacle) {
+  const grade = birdTimingGrade(player, obstacle);
   if (grade === 'perfect') return 'perfect';
   return 'good';
 }
@@ -107,17 +151,11 @@ function processAction(player, obstacles, action) {
     return { player, obstacles };
   }
 
-  let newPlayer;
   if (action !== required) {
-    newPlayer = applyMiss(player);
-    return { player: newPlayer, obstacles: obstacles.slice(1), grade: 'miss' };
+    return { player: resolveObstacleGrade(player, obs, 'miss'), obstacles: obstacles.slice(1), grade: 'miss' };
   }
 
-  if (grade === 'perfect')     newPlayer = applyPerfect(player);
-  else if (grade === 'good')   newPlayer = applyGood(player);
-  else                         newPlayer = applyMiss(player);
-
-  return { player: newPlayer, obstacles: obstacles.slice(1), grade };
+  return { player: resolveObstacleGrade(player, obs, grade), obstacles: obstacles.slice(1), grade };
 }
 
 // ── Auto-resolution helpers ────────────────────────────────────────────────────
@@ -163,15 +201,16 @@ function processMissedObstacles(player, obstacles) {
     if (frontObstacle.type === 'spikes') {
       if (spikeTouchesPlayer(p, frontObstacle)) {
         const before = p;
-        p = applyMiss(p);
+        p = resolveObstacleGrade(p, frontObstacle, 'miss');
         resolved.push({ obstacle: frontObstacle, grade: 'miss', ...classifyAutoResolvedObstacle(before, p, frontObstacle, 'miss') });
         obs = obs.slice(1);
         continue;
       }
       if (spikeFullyBehindPlayer(p, frontObstacle)) {
         const before = p;
-        const grade  = spikeClearGrade(p, frontObstacle);
-        p = grade === 'miss' ? applyMiss(p) : applyGradeOutcome(p, grade);
+        const cleared = resolveSpikeClear(p, frontObstacle);
+        const grade   = cleared.grade;
+        p = cleared.player;
         resolved.push({ obstacle: frontObstacle, grade, ...classifyAutoResolvedObstacle(before, p, frontObstacle, grade) });
         obs = obs.slice(1);
         continue;
@@ -183,14 +222,14 @@ function processMissedObstacles(player, obstacles) {
       const before    = p;
       const animState = animStateForPlayerState(p);
       if (birdTouchesPlayer(p, frontObstacle, animState)) {
-        p = applyMiss(p);
+        p = resolveObstacleGrade(p, frontObstacle, 'miss');
         resolved.push({ obstacle: frontObstacle, grade: 'miss', ...classifyAutoResolvedObstacle(before, p, frontObstacle, 'miss') });
         obs = obs.slice(1);
         continue;
       }
       if (birdFullyBehindPlayer(p, frontObstacle, animState)) {
-        const grade = 'good';
-        p = applyGood(p);
+        const grade = birdClearGrade(p, frontObstacle);
+        p = resolveObstacleGrade(p, frontObstacle, grade);
         resolved.push({ obstacle: frontObstacle, grade, ...classifyAutoResolvedObstacle(before, p, frontObstacle, grade) });
         obs = obs.slice(1);
         continue;
@@ -205,7 +244,7 @@ function processMissedObstacles(player, obstacles) {
     if (!windowExpired(frontObstacle, p.distance)) break;
 
     const before = p;
-    p = applyMiss(p);
+    p = resolveObstacleGrade(p, frontObstacle, 'miss');
     resolved.push({ obstacle: frontObstacle, grade: 'miss', ...classifyAutoResolvedObstacle(before, p, frontObstacle, 'miss') });
     obs = obs.slice(1);
   }
@@ -222,19 +261,19 @@ function resolveContactAction(player, obstacles, animState) {
   if (frontObstacle.type === 'spikes') {
     if (spikeTouchesPlayer(player, frontObstacle)) {
       return {
-        player: applyMiss(player),
+        player: resolveObstacleGrade(player, frontObstacle, 'miss'),
         obstacles: obstacles.slice(1),
         action: player.state === 'jumping' ? 'jump' : SPIKE_RESOLVE_ACTION,
         grade: 'miss',
       };
     }
     if (spikeFullyBehindPlayer(player, frontObstacle)) {
-      const grade = spikeClearGrade(player, frontObstacle);
+      const cleared = resolveSpikeClear(player, frontObstacle);
       return {
-        player:    grade === 'miss' ? applyMiss(player) : applyGradeOutcome(player, grade),
+        player:    cleared.player,
         obstacles: obstacles.slice(1),
-        action:    grade === 'miss' ? SPIKE_RESOLVE_ACTION : 'jump',
-        grade,
+        action:    'jump',
+        grade:     cleared.grade,
       };
     }
     return { player, obstacles, action: null };
@@ -243,28 +282,29 @@ function resolveContactAction(player, obstacles, animState) {
   if (frontObstacle.type === 'bird') {
     if (birdTouchesPlayer(player, frontObstacle, animState)) {
       return {
-        player:    applyMiss(player),
+        player:    resolveObstacleGrade(player, frontObstacle, 'miss'),
         obstacles: obstacles.slice(1),
         action:    contactActionForPlayer(player, animState) || BIRD_RESOLVE_ACTION,
         grade:     'miss',
       };
     }
     if (birdFullyBehindPlayer(player, frontObstacle, animState)) {
+      const grade = birdClearGrade(player, frontObstacle);
       return {
-        player:    applyGood(player),
+        player:    resolveObstacleGrade(player, frontObstacle, grade),
         obstacles: obstacles.slice(1),
         action:    contactActionForPlayer(player, animState) || BIRD_RESOLVE_ACTION,
-        grade:     'good',
+        grade,
       };
     }
     return { player, obstacles, action: null };
   }
 
   if (frontObstacle.type === 'arrowwall') {
-    const grade = gradeInput(frontObstacle, player.distance);
+    const grade = gradeInput(frontObstacle, player.distance, player.speed);
     if (shieldBlocksArrowWall(player, frontObstacle, animState) && grade !== 'miss') {
       return {
-        player:    grade === 'perfect' ? applyPerfect(player) : applyGood(player),
+        player:    resolveObstacleGrade(player, frontObstacle, grade),
         obstacles: obstacles.slice(1),
         action:    'block',
         grade,
@@ -272,7 +312,7 @@ function resolveContactAction(player, obstacles, animState) {
     }
     if (arrowWallTouchesPlayer(player, frontObstacle, animState)) {
       return {
-        player:    applyMiss(player),
+        player:    resolveObstacleGrade(player, frontObstacle, 'miss'),
         obstacles: obstacles.slice(1),
         action:    contactActionForPlayer(player, animState) || ARROWWALL_RESOLVE_ACTION,
         grade:     'miss',
@@ -282,10 +322,10 @@ function resolveContactAction(player, obstacles, animState) {
   }
 
   if (frontObstacle.type === 'goblin') {
-    const grade = gradeInput(frontObstacle, player.distance);
+    const grade = gradeInput(frontObstacle, player.distance, player.speed);
     if (swordHitsGoblin(player, frontObstacle, animState) && grade !== 'miss') {
       return {
-        player:    grade === 'perfect' ? applyPerfect(player) : applyGood(player),
+        player:    resolveObstacleGrade(player, frontObstacle, grade),
         obstacles: obstacles.slice(1),
         action:    'attack',
         grade,
@@ -293,7 +333,7 @@ function resolveContactAction(player, obstacles, animState) {
     }
     if (goblinTouchesPlayer(player, frontObstacle, animState)) {
       return {
-        player:    applyMiss(player),
+        player:    resolveObstacleGrade(player, frontObstacle, 'miss'),
         obstacles: obstacles.slice(1),
         action:    contactActionForPlayer(player, animState) || GOBLIN_RESOLVE_ACTION,
         grade:     'miss',
@@ -316,24 +356,47 @@ function resolveContactAction(player, obstacles, animState) {
 
 function startJump(player) {
   if (player.state !== 'running') return player;
-  return { ...player, state: 'jumping', jumpY: 0, jumpVY: JUMP_VY, jumpStartDistance: player.distance };
+  return { ...player, state: 'jumping', jumpY: 0, jumpVY: JUMP_VY, jumpStartDistance: player.distance, jumpChainAnchor: null };
+}
+
+// Applies the held-crouch input to the player's state. Entering a crouch stamps
+// crouchStartDistance (the bird's timing reference); releasing clears it.
+// Crouching mid-air cancels the jump, which is the pre-existing behaviour.
+function applyCrouchHeld(player, crouchHeld) {
+  if (player.state === 'finished') return player;
+  if (crouchHeld) {
+    if (player.state === 'crouching') return player;
+    const wasJumping = player.state === 'jumping';
+    return {
+      ...player,
+      state: 'crouching',
+      crouchStartDistance: player.distance,
+      ...(wasJumping ? { jumpY: 0, jumpVY: 0, jumpStartDistance: null, jumpChainAnchor: null } : {}),
+    };
+  }
+  if (player.state === 'crouching') return { ...player, state: 'running', crouchStartDistance: null };
+  return player;
 }
 
 function tickJumpArc(player) {
   if (player.state !== 'jumping') return player;
   const newVY = player.jumpVY - JUMP_GRAVITY;
   const newY  = player.jumpY + newVY;
-  if (newY <= 0) return { ...player, state: 'running', jumpY: 0, jumpVY: 0, jumpStartDistance: null };
+  if (newY <= 0) return { ...player, state: 'running', jumpY: 0, jumpVY: 0, jumpStartDistance: null, jumpChainAnchor: null };
   return { ...player, jumpY: newY, jumpVY: newVY };
 }
 
-function finishPlayer(player) {
-  return { ...player, state: 'finished', jumpY: 0, jumpVY: 0, jumpStartDistance: null };
+function finishPlayer(player, finishFrame = null) {
+  return {
+    ...player,
+    state: 'finished', jumpY: 0, jumpVY: 0, jumpStartDistance: null, jumpChainAnchor: null, crouchStartDistance: null,
+    finishFrame: player.finishFrame ?? finishFrame,
+  };
 }
 
 // ── Side frame tick ────────────────────────────────────────────────────────────
 
-function tickSideFrame(player, obstacles, elapsedSec, simulate = true) {
+function tickSideFrame(player, obstacles, elapsedSec, simulate = true, elapsedFrames = null) {
   if (!simulate) return { player, obstacles, resolved: [] };
 
   let nextPlayer = player.state !== 'finished' ? advanceDistance(player) : player;
@@ -342,7 +405,7 @@ function tickSideFrame(player, obstacles, elapsedSec, simulate = true) {
   nextPlayer = tickJumpArc(nextPlayer);
 
   if (isFinished(nextPlayer) && nextPlayer.state !== 'finished') {
-    nextPlayer = finishPlayer(nextPlayer);
+    nextPlayer = finishPlayer(nextPlayer, elapsedFrames ?? Math.round(elapsedSec * 60));
   }
 
   if (nextPlayer.state === 'finished') return { player: nextPlayer, obstacles: [], resolved: [] };
@@ -359,8 +422,8 @@ function tickFrame(state, options) {
   const elapsed    = state.elapsed + 1;
   const elapsedSec = elapsed / 60;
   const simulatedSides = options?.simulatedSides || {};
-  const boyResult  = tickSideFrame(state.boy,  state.boyObstacles,  elapsedSec, simulatedSides.boy  !== false);
-  const girlResult = tickSideFrame(state.girl, state.girlObstacles, elapsedSec, simulatedSides.girl !== false);
+  const boyResult  = tickSideFrame(state.boy,  state.boyObstacles,  elapsedSec, simulatedSides.boy  !== false, elapsed);
+  const girlResult = tickSideFrame(state.girl, state.girlObstacles, elapsedSec, simulatedSides.girl !== false, elapsed);
   const boy        = boyResult.player;
   const girl       = girlResult.player;
   const boyObs     = boyResult.obstacles;
@@ -424,8 +487,11 @@ function shouldHandleScoreScreenKeydown(phase, key) {
 export {
   GAMEOVER_HOLD_FRAMES,
   applyGradeOutcome,
+  resolveObstacleGrade,
   spikeTimingGrade,
   spikeClearGrade,
+  birdTimingGrade,
+  birdClearGrade,
   animStateForPlayerState,
   obstacleCourseForDebug,
   createGameState,
@@ -435,6 +501,7 @@ export {
   processMissedObstacles,
   resolveContactAction,
   startJump,
+  applyCrouchHeld,
   tickJumpArc,
   finishPlayer,
   tickSideFrame,

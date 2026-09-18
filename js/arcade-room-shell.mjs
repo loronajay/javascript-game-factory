@@ -64,6 +64,27 @@ export function createRoomShell(THREE, scene, dimensions) {
         scene.add(skirt);
         trimMeshes.push(skirt);
     }
+    // A ghosted wall is a faint see-through pane rather than nothing: the room keeps
+    // its outline, a wall item dragged onto it still has a surface to be read against,
+    // and it stops writing depth so nothing behind it is lost. The set is kept so a
+    // surface change (which swaps the material) does not silently un-ghost a wall.
+    let ghosted = new Set();
+    const GHOST_OPACITY = 0.14;
+    function applyGhost(side) {
+        const wall = walls[side];
+        const ghost = ghosted.has(side);
+        wall.material.transparent = ghost;
+        wall.material.opacity = ghost ? GHOST_OPACITY : 1;
+        wall.material.depthWrite = !ghost;
+        wall.material.needsUpdate = true;
+        wall.receiveShadow = !ghost;
+        wall.castShadow = false;
+    }
+    function setCutawayWalls(hidden) {
+        ghosted = new Set(hidden);
+        for (const side of Object.keys(walls))
+            applyGhost(side);
+    }
     let current = { ...DEFAULT_SURFACE_IDS };
     function applySurfaces(surfaces) {
         if (surfaces.floor !== current.floor)
@@ -74,6 +95,8 @@ export function createRoomShell(THREE, scene, dimensions) {
                 applySurfaceMaterial(THREE, wall, style, { u: width, v: height });
             for (const wall of [walls.east, walls.west])
                 applySurfaceMaterial(THREE, wall, style, { u: depth, v: height });
+            for (const side of Object.keys(walls))
+                applyGhost(side);
         }
         if (surfaces.ceiling !== current.ceiling)
             applySurfaceMaterial(THREE, ceiling, styleFor("ceiling", surfaces.ceiling), { u: width, v: depth });
@@ -92,5 +115,6 @@ export function createRoomShell(THREE, scene, dimensions) {
         walls: Object.freeze(walls),
         wallMeshes: Object.freeze([walls.north, walls.south, walls.east, walls.west]),
         applySurfaces,
+        setCutawayWalls,
     });
 }

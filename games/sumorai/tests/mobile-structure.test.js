@@ -58,6 +58,16 @@ test('mobile styles include landscape gate and shared controller overrides', () 
   assert(source.includes('env(safe-area-inset-bottom)'), 'expected safe-area inset handling');
 });
 
+test('cabinet mode has a dedicated short-screen menu instead of mobile overflow styles', () => {
+  const html = read('index.html');
+  const css = read('style.css');
+  assert(html.includes("has('cabinet')"), 'expected cabinet query detection before first paint');
+  assert(html.includes("classList.add('cabinet-mode')"), 'expected cabinet-mode root class');
+  assert(css.includes('html.cabinet-mode #screen-menu'), 'expected cabinet menu layout override');
+  assert(css.includes('grid-template-columns: repeat(2, minmax(0, 1fr))'), 'expected compact two-column cabinet actions');
+  assert(css.includes('html.cabinet-mode .btn'), 'expected cabinet buttons to override mobile minimum heights');
+});
+
 test('game routes mounted mobile controller events through the default P1 input profile', () => {
   const source = read('game.js');
   assert(source.includes('isMobileControllerMounted(document)'), 'expected mobile controller detection in tickActive');

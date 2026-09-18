@@ -39,6 +39,12 @@
 // when the client sent one, because the client seeds its starter neon exactly
 // when the key is ABSENT — a version 2 row with `decor: []` is a room the
 // player deliberately stripped, and must come back stripped.
+//
+// `music.defaultTrackId` (2026-09-17) is the house record: the jukebox track
+// the room starts playing for anyone who walks in. Same policy again — it is
+// checked for SHAPE (`<game-slug>.<track-slug>`), and the client's jukebox
+// catalog decides whether it is a record that exists; one that is not is
+// silence on the client, never an error here.
 
 export const ARCADE_ROOM_GAME_SLUG = "arcade-room";
 
@@ -65,6 +71,8 @@ const SURFACE_KINDS = ["floor", "wall", "ceiling", "trim"] as const;
 const DECOR_MOUNTS = new Set(["floor", "wall", "ceiling"]);
 const WALL_SIDES = new Set(["north", "south", "east", "west"]);
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
+/** `<game-slug>.<track-slug>` — the namespace every jukebox track id lives in. */
+const TRACK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function cleanText(value: any, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -92,7 +100,13 @@ function surfaceIdPattern(kind: string): RegExp {
 }
 
 export function defaultArcadeRoomGarage(): any {
-  return { version: LAYOUT_VERSION, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, items: [] };
+  return { version: LAYOUT_VERSION, surfaces: { floor: "", wall: "", ceiling: "", trim: "" }, music: { defaultTrackId: "" }, items: [] };
+}
+
+function normalizeMusic(value: any): Record<string, string> {
+  const source = value && typeof value === "object" ? value : {};
+  const trackId = cleanText(source.defaultTrackId, 80);
+  return { defaultTrackId: TRACK_ID_PATTERN.test(trackId) ? trackId : "" };
 }
 
 function normalizeSurfaces(value: any): Record<string, string> {
@@ -142,6 +156,7 @@ export function normalizeArcadeRoomGarage(value: any): any {
   const seen = new Set<string>();
   const items: any[] = [];
   const surfaces = normalizeSurfaces(input.surfaces);
+  const music = normalizeMusic(input.music);
 
   for (const raw of rawItems) {
     const source = raw && typeof raw === "object" ? raw : {};
@@ -159,7 +174,7 @@ export function normalizeArcadeRoomGarage(value: any): any {
     items.push({ instanceId, cabinetId, x, z, rotationY, hidden: source.hidden === true });
   }
 
-  const garage: any = { version: LAYOUT_VERSION, surfaces, items };
+  const garage: any = { version: LAYOUT_VERSION, surfaces, music, items };
   if (Array.isArray(input.decor)) {
     const decor: any[] = [];
     for (const raw of input.decor.slice(0, MAX_DECOR)) {

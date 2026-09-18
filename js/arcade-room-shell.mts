@@ -21,6 +21,8 @@ export type RoomShell = Readonly<{
   /** The four wall meshes in one array for raycasting. */
   wallMeshes: readonly any[];
   applySurfaces: (surfaces: RoomSurfaces) => void;
+  /** Ghost the walls the build camera stands outside of; an empty list restores the closed room. */
+  setCutawayWalls: (hidden: readonly WallSide[]) => void;
 }>;
 
 export function createRoomShell(THREE: ThreeNamespace, scene: any, dimensions: RoomShellDimensions): RoomShell {
@@ -91,6 +93,29 @@ export function createRoomShell(THREE: ThreeNamespace, scene: any, dimensions: R
     trimMeshes.push(skirt);
   }
 
+  // A ghosted wall is a faint see-through pane rather than nothing: the room keeps
+  // its outline, a wall item dragged onto it still has a surface to be read against,
+  // and it stops writing depth so nothing behind it is lost. The set is kept so a
+  // surface change (which swaps the material) does not silently un-ghost a wall.
+  let ghosted = new Set<WallSide>();
+  const GHOST_OPACITY = 0.14;
+
+  function applyGhost(side: WallSide): void {
+    const wall = walls[side];
+    const ghost = ghosted.has(side);
+    wall.material.transparent = ghost;
+    wall.material.opacity = ghost ? GHOST_OPACITY : 1;
+    wall.material.depthWrite = !ghost;
+    wall.material.needsUpdate = true;
+    wall.receiveShadow = !ghost;
+    wall.castShadow = false;
+  }
+
+  function setCutawayWalls(hidden: readonly WallSide[]): void {
+    ghosted = new Set(hidden);
+    for (const side of Object.keys(walls) as WallSide[]) applyGhost(side);
+  }
+
   let current: RoomSurfaces = { ...DEFAULT_SURFACE_IDS };
 
   function applySurfaces(surfaces: RoomSurfaces): void {
@@ -99,6 +124,7 @@ export function createRoomShell(THREE: ThreeNamespace, scene: any, dimensions: R
       const style = styleFor("wall", surfaces.wall);
       for (const wall of [walls.north, walls.south]) applySurfaceMaterial(THREE, wall, style, { u: width, v: height });
       for (const wall of [walls.east, walls.west]) applySurfaceMaterial(THREE, wall, style, { u: depth, v: height });
+      for (const side of Object.keys(walls) as WallSide[]) applyGhost(side);
     }
     if (surfaces.ceiling !== current.ceiling) applySurfaceMaterial(THREE, ceiling, styleFor("ceiling", surfaces.ceiling), { u: width, v: depth });
     if (surfaces.trim !== current.trim) {
@@ -116,5 +142,6 @@ export function createRoomShell(THREE: ThreeNamespace, scene: any, dimensions: R
     walls: Object.freeze(walls),
     wallMeshes: Object.freeze([walls.north, walls.south, walls.east, walls.west]),
     applySurfaces,
+    setCutawayWalls,
   });
 }

@@ -71,6 +71,10 @@
   color: #8fd7ff;
 }
 
+.profile-chip--achievements .profile-chip__kicker {
+  color: #ffd666;
+}
+
 .player-card__topline,
 .player-card__meta,
 .player-card__actions {
