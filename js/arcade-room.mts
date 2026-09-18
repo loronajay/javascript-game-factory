@@ -20,7 +20,7 @@ import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
-import { CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
+import { BATTLESHITS_PLAY_VIEW, CABINET_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
 
 const THREE: any = THREE_VENDOR;
@@ -109,7 +109,7 @@ function applyRoomIdentity(): void {
   roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
   ownerLink.hidden = true;
   if (!layoutStore.accountBacked) {
-    startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, the Yam Bowling lane, or the Shark Hall pool table, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
+    startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, the Yam Bowling lane, the Shark Hall pool table, or the Puck'd Up air hockey table, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
   }
 }
 applyRoomIdentity();
@@ -178,6 +178,7 @@ const playViews: Readonly<Record<string, CabinetPlayView>> = Object.freeze({
   "bird-duty": CABINET_PLAY_VIEW,
   "lovers-lost": LOVERS_LOST_PLAY_VIEW,
   "sumorai": SUMORAI_PLAY_VIEW,
+  "battleshits": BATTLESHITS_PLAY_VIEW,
   "yam-bowling": YAM_BOWLING_PLAY_VIEW,
   "shark-hall": SHARK_HALL_PLAY_VIEW,
 });

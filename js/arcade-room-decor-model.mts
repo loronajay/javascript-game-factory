@@ -347,6 +347,71 @@ function buildClawMachine(THREE: ThreeNamespace, group: any, size: Size, color: 
 }
 
 /**
+ * A service counter: a dark panelled base on a recessed toe kick, a thick
+ * top with a rounded chrome lip that overhangs every side, a neon accent
+ * strip tucked under the lip on both long faces, and brushed end caps.
+ * It reads the same from the front and the back, so it can stand mid-room
+ * or against a wall without a wrong side; the tint is the neon.
+ */
+function buildCounter(THREE: ThreeNamespace, group: any, size: Size, color: string): void {
+  const w = size.width;
+  const h = size.height;
+  const d = size.depth;
+  const bottom = -h / 2;
+  const body = standard(THREE, "#242b35", 0.55, 0.2);
+  const panel = standard(THREE, "#2f3846", 0.5, 0.25);
+  const chrome = standard(THREE, "#d3d8df", 0.25, 0.85);
+  const top = standard(THREE, "#151a22", 0.35, 0.3);
+  const dark = standard(THREE, "#0f1218", 0.7, 0.2);
+  const neon = glow(THREE, color, 2.2);
+
+  const topH = Math.min(0.07, h * 0.08);
+  const kickH = Math.min(0.1, h * 0.1);
+  const kickInset = Math.min(0.06, d * 0.1);
+  const bodyBottom = bottom + kickH;
+  const bodyTop = bottom + h - topH;
+  const bodyH = bodyTop - bodyBottom;
+  const overhang = Math.min(0.05, d * 0.08);
+
+  // Toe kick, set back on every side so the counter appears to float a little.
+  box(THREE, group, [w - kickInset * 2, kickH, d - kickInset * 2], [0, bottom + kickH / 2, 0], dark);
+  // The base body.
+  box(THREE, group, [w, bodyH, d], [0, bodyBottom + bodyH / 2, 0], body);
+  // Raised panels along both long faces, split into even bays.
+  const bays = Math.max(2, Math.round(w / 0.6));
+  const bayW = w / bays;
+  const panelH = bodyH * 0.62;
+  const panelY = bodyBottom + bodyH * 0.42;
+  for (const sign of [-1, 1]) {
+    for (let bay = 0; bay < bays; bay += 1) {
+      const x = (bay - (bays - 1) / 2) * bayW;
+      box(THREE, group, [bayW - 0.06, panelH, 0.016], [x, panelY, sign * (d / 2 + 0.008)], panel, false);
+    }
+    // Neon accent strip tucked under the top lip.
+    box(THREE, group, [w * 0.94, 0.018, 0.012], [0, bodyTop - 0.035, sign * (d / 2 + 0.006)], neon, false);
+    // A chrome foot rail low on each long side.
+    box(THREE, group, [w * 0.96, 0.02, 0.02], [0, bodyBottom + 0.06, sign * (d / 2 + 0.01)], chrome, false);
+  }
+  // Brushed end caps on the short sides.
+  for (const sign of [-1, 1]) {
+    box(THREE, group, [0.016, bodyH * 0.9, d * 0.92], [sign * (w / 2 + 0.008), bodyBottom + bodyH / 2, 0], chrome, false);
+  }
+  // The top: a dark slab with a rounded chrome lip running all the way round.
+  box(THREE, group, [w + overhang * 2, topH, d + overhang * 2], [0, bodyTop + topH / 2, 0], top);
+  const lipR = topH / 2;
+  const lipY = bodyTop + topH / 2;
+  const lipX = w / 2 + overhang;
+  const lipZ = d / 2 + overhang;
+  for (const sign of [-1, 1]) {
+    const longLip = cylinder(THREE, group, lipR, lipR, w + overhang * 2, [0, lipY, sign * lipZ], chrome, 12);
+    longLip.rotation.z = Math.PI / 2;
+    const shortLip = cylinder(THREE, group, lipR, lipR, d + overhang * 2, [sign * lipX, lipY, 0], chrome, 12);
+    shortLip.rotation.x = Math.PI / 2;
+    for (const other of [-1, 1]) sphere(THREE, group, lipR, [sign * lipX, lipY, other * lipZ], chrome);
+  }
+}
+
+/**
  * A popcorn cart: a red cabinet on two big spoked wheels with a push handle,
  * a brass-posted glass case with the kettle hanging over a heap of popcorn,
  * a warmer light, and a striped valance under the roof with the sign on it.
@@ -732,13 +797,7 @@ const BUILDERS: Record<DecorModelSpec["kind"], Build> = {
         break;
       }
       case "counter": {
-        box(THREE, group, [w, h * 0.9, d], [0, bottom + h * 0.45, 0], standard(THREE, "#26313b", 0.6, 0.2));
-        box(THREE, group, [w + 0.08, 0.06, d + 0.08], [0, bottom + h * 0.93, 0], standard(THREE, "#c7ccd3", 0.3, 0.6));
-        box(THREE, group, [w * 0.96, 0.04, 0.02], [0, bottom + h * 0.2, d / 2 + 0.01], glow(THREE, color, 2), false);
-        box(THREE, group, [w * 0.9, h * 0.45, 0.02], [0, bottom + h * 0.55, d / 2 + 0.01], glow(THREE, "#0d1b28", 0.6), false);
-        for (let index = 0; index < 4; index += 1) {
-          sphere(THREE, group, 0.07, [(index - 1.5) * w * 0.2, bottom + h * 0.55, d / 2 + 0.03], standard(THREE, ["#ff5caf", "#ffd33d", "#7dff4d", "#22e5ff"][index]!, 0.8));
-        }
+        buildCounter(THREE, group, size, color);
         break;
       }
       case "speaker-stack": {
@@ -858,6 +917,8 @@ function lightOffset(definition: DecorDefinition, mount: DecorMount, size: Size)
   if (mount === "wall") return [0, 0, size.depth / 2 + 0.18];
   if (mount === "ceiling") return [0, -size.height / 2 - 0.2, 0];
   if (definition.model.kind === "strip") return [0, size.height / 2 + 0.15, 0];
+  // The counter glows on both long faces, so its light hangs over the top rather than off a front.
+  if (definition.model.kind === "prop" && definition.model.prop === "counter") return [0, size.height / 2 + 0.2, 0];
   return [0, size.height * 0.4, size.depth / 2 + 0.1];
 }
 

@@ -180,7 +180,7 @@ export const DECOR_CATALOG = Object.freeze([
     decor({ slug: "stool", category: "furniture", title: "Bar Stool", mounts: ["floor"], size: { width: 0.4, height: 0.75, depth: 0.4 }, blocksWalking: true, tint: "#ff3b3b", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "stool" } }),
     decor({ slug: "table", category: "furniture", title: "Café Table", mounts: ["floor"], size: { width: 0.8, height: 0.78, depth: 0.8 }, blocksWalking: true, tint: "#111318", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "table" } }),
     decor({ slug: "beanbag", category: "furniture", title: "Beanbag", mounts: ["floor"], size: { width: 1.0, height: 0.55, depth: 1.0 }, blocksWalking: true, tint: "#a35bff", scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "beanbag" } }),
-    decor({ slug: "counter", category: "furniture", title: "Prize Counter", mounts: ["floor"], size: { width: 2.4, height: 1.1, depth: 0.8 }, blocksWalking: true, tint: "#22e5ff", light: { intensity: 1.2, distance: 3.5 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "counter" } }),
+    decor({ slug: "counter", category: "furniture", title: "Counter", mounts: ["floor"], size: { width: 2.4, height: 1.1, depth: 0.8 }, blocksWalking: true, tint: "#22e5ff", light: { intensity: 1.2, distance: 3.5 }, scale: SCALE_RANGES.prop, model: { kind: "prop", prop: "counter" } }),
     // — Props (solid) —
     // The jukebox is interactive: walk up, press E, and pick a record from every cabinet's
     // soundtrack (`jukebox.mts`). The page only picks; the room plays, so the song keeps

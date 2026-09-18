@@ -31,10 +31,17 @@ export const SUMORAI_CABINET_ART = Object.freeze({
   playerTwo: "../games/sumorai/assets/sprites/Player_2/idle.svg",
 });
 
+export const BATTLESHITS_CABINET_ART = Object.freeze({
+  keyArt: "../games/battleshits/images/menu-throne-room.png",
+  heroArt: "../games/battleshits/images/menu-hero-toilet.png",
+  sideArt: "../room/assets/cabinets/battleshits-side-panel.png",
+});
+
 export const CABINET_MARQUEE_GEOMETRY = Object.freeze({
   birdDuty: Object.freeze({ depth: 0.8, centerZ: 0, artZ: 0.407, bodyFrontZ: 0.28 }),
   loversLost: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
   sumorai: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
+  battleshits: Object.freeze({ depth: 0.85, centerZ: 0, artZ: 0.432, bodyFrontZ: 0.305 }),
 });
 
 export const CABINET_CONTROL_SURFACE = Object.freeze({
@@ -67,6 +74,13 @@ export const LOVERS_LOST_PLAY_VIEW = Object.freeze({
 });
 
 export const SUMORAI_PLAY_VIEW = Object.freeze({
+  position: Object.freeze({ x: 0, y: 1.49, z: 1.52 }),
+  fov: 34,
+  screen: Object.freeze({ width: 0.68, height: 0.3825, y: 1.5, z: 0.285 }),
+  gameAspect: 16 / 9,
+});
+
+export const BATTLESHITS_PLAY_VIEW = Object.freeze({
   position: Object.freeze({ x: 0, y: 1.49, z: 1.52 }),
   fov: 34,
   screen: Object.freeze({ width: 0.68, height: 0.3825, y: 1.5, z: 0.285 }),

@@ -97,6 +97,39 @@ export const SUMORAI_CABINET = Object.freeze({
         Object.freeze({ id: "topper", material: "emissive" }),
     ]),
 });
+export const BATTLESHITS_CABINET = Object.freeze({
+    id: "cabinet.battleshits.standard",
+    kind: "arcade-cabinet",
+    gameSlug: "battleshits",
+    title: "Battleshits",
+    description: "A navy-and-brass two-player cabinet with fleet controls, porcelain firepower, and storm-tossed side art.",
+    launchMode: "cabinet-screen",
+    dimensions: Object.freeze({ width: 0.92, depth: 0.98, height: 2.3 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+    unlock: Object.freeze({ type: "starter", source: "Battleshits cabinet collection" }),
+    interaction: Object.freeze({
+        radius: 1.62,
+        facingThreshold: 0.42,
+        anchor: Object.freeze({ x: 0, y: 1.2, z: 0.51 }),
+    }),
+    palette: Object.freeze({
+        shell: "#071a2f",
+        trim: "#c89a42",
+        sky: "#0d4f7c",
+        grass: "#0a7391",
+        warning: "#f2e5c4",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "shell", material: "paint" }),
+        Object.freeze({ id: "side-art-left", material: "decal" }),
+        Object.freeze({ id: "side-art-right", material: "decal" }),
+        Object.freeze({ id: "marquee", material: "emissive" }),
+        Object.freeze({ id: "screen", material: "emissive" }),
+        Object.freeze({ id: "control-deck", material: "paint" }),
+        Object.freeze({ id: "coin-door", material: "metal" }),
+        Object.freeze({ id: "topper", material: "emissive" }),
+    ]),
+});
 export const YAM_BOWLING_CABINET = Object.freeze({
     id: "cabinet.yam-bowling.lane",
     kind: "arcade-cabinet",
@@ -160,12 +193,47 @@ export const SHARK_HALL_POOL_TABLE = Object.freeze({
         Object.freeze({ id: "edge-lighting", material: "emissive" }),
     ]),
 });
+export const PUCK_D_UP_AIR_HOCKEY = Object.freeze({
+    id: "cabinet.puckd-up.air-hockey",
+    kind: "arcade-cabinet",
+    gameSlug: "puckd-up",
+    title: "Puck'd Up",
+    description: "A competition air hockey table with a perforated ice bed, recessed goals, sculpted underbody, twin score towers, and electric edge lighting.",
+    launchMode: "fullscreen",
+    dimensions: Object.freeze({ width: 1.35, depth: 2.45, height: 1.22 }),
+    placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+    unlock: Object.freeze({ type: "starter", source: "Puck'd Up table collection" }),
+    interaction: Object.freeze({
+        radius: 1.85,
+        facingThreshold: 0.34,
+        anchor: Object.freeze({ x: 0, y: 0.9, z: 1.38 }),
+    }),
+    palette: Object.freeze({
+        shell: "#08111f",
+        trim: "#59d8ff",
+        sky: "#1477ff",
+        grass: "#eef8ff",
+        warning: "#ff304c",
+    }),
+    parts: Object.freeze([
+        Object.freeze({ id: "table-body", material: "paint" }),
+        Object.freeze({ id: "playfield", material: "paint" }),
+        Object.freeze({ id: "rails", material: "metal" }),
+        Object.freeze({ id: "goals", material: "metal" }),
+        Object.freeze({ id: "mallets", material: "paint" }),
+        Object.freeze({ id: "puck", material: "paint" }),
+        Object.freeze({ id: "scoreboard", material: "emissive" }),
+        Object.freeze({ id: "edge-lighting", material: "emissive" }),
+    ]),
+});
 export const CABINET_CATALOG = Object.freeze([
     BIRD_DUTY_CABINET,
     LOVERS_LOST_CABINET,
     SUMORAI_CABINET,
+    BATTLESHITS_CABINET,
     YAM_BOWLING_CABINET,
     SHARK_HALL_POOL_TABLE,
+    PUCK_D_UP_AIR_HOCKEY,
 ]);
 export function getCabinetFootprint(definition) {
     const padding = definition.placement.clearance * 2;

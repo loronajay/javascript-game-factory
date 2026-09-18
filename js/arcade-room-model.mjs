@@ -1,5 +1,7 @@
 import { createYamBowlingLane } from "./arcade-room-yam-bowling-model.mjs";
 import { createSharkHallPoolTable } from "./arcade-room-shark-hall-model.mjs";
+import { createBattleshitsCabinet } from "./arcade-room-battleshits-model.mjs";
+import { createPuckdUpAirHockeyTable } from "./arcade-room-puckd-up-model.mjs";
 import { BIRD_DUTY_CABINET_ART, CABINET_MARQUEE_GEOMETRY, CABINET_CONTROL_SURFACE, LOVERS_LOST_CABINET_ART, SUMORAI_CABINET_ART, } from "./arcade-room-scene.mjs";
 function canvasTexture(THREE, width, height, draw) {
     const canvas = document.createElement("canvas");
@@ -563,9 +565,13 @@ export function createCabinetModel(THREE, definition) {
         return createLoversLostCabinet(THREE, definition);
     if (definition.gameSlug === "sumorai")
         return createSumoraiCabinet(THREE, definition);
+    if (definition.gameSlug === "battleshits")
+        return createBattleshitsCabinet(THREE, definition);
     if (definition.gameSlug === "yam-bowling")
         return createYamBowlingLane(THREE, definition);
     if (definition.gameSlug === "shark-hall")
         return createSharkHallPoolTable(THREE, definition);
+    if (definition.gameSlug === "puckd-up")
+        return createPuckdUpAirHockeyTable(THREE, definition);
     throw new Error(`No 3D cabinet model is registered for ${definition.gameSlug}`);
 }
