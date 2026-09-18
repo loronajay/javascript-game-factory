@@ -135,6 +135,28 @@ button, a { font: inherit; }
 .jukebox-chip__title { font-size: 13px; font-weight: 700; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .is-playing .jukebox-chip, .is-editing .jukebox-chip { display: none; }
 
+/* Who else is in the arcade, pinned top-right under the header while anyone is. */
+.visitors-chip {
+  position: fixed;
+  z-index: 5;
+  right: 18px;
+  top: 96px;
+  display: grid;
+  row-gap: 3px;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 9px 14px;
+  border: 1px solid rgba(103, 220, 255, .5);
+  border-radius: 10px;
+  background: rgba(7, 16, 27, .9);
+  color: #e6f6ff;
+  pointer-events: none;
+  box-shadow: 0 15px 45px rgba(0,0,0,.4);
+}
+.visitors-chip[hidden] { display: none; }
+.visitors-chip__label { font-size: 10px; letter-spacing: .18em; font-weight: 800; color: #67dcff; }
+.visitors-chip__names { font-size: 13px; font-weight: 700; line-height: 1.35; }
+.is-playing .visitors-chip, .is-editing .visitors-chip { display: none; }
+
 .control-hint { position: fixed; z-index: 2; right: 24px; bottom: 20px; display: flex; gap: 8px; color: #9db0c0; font-size: 11px; }
 .control-hint span { padding: 7px 9px; background: rgba(4, 10, 18, .68); border: 1px solid rgba(255,255,255,.1); border-radius: 7px; }
 .control-hint b { color: #fff; margin-right: 5px; }

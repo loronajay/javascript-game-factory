@@ -24,6 +24,7 @@
 // whole thing is testable under node with no browser, no network, no account.
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { readFactoryAccountSession } from "./platform/api/factory-account-gate.mjs";
+import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { ROOM_LAYOUT_STORAGE_KEY, createDefaultRoomLayout, normalizeRoomLayout, parseRoomLayout, } from "./arcade-room-layout.mjs";
 export const ARCADE_ROOM_GAME_SLUG = "arcade-room";
 function cleanText(value) {
@@ -66,7 +67,9 @@ export function createRoomLayoutStore(options = {}) {
     const session = options.session ?? readFactoryAccountSession();
     const storage = options.storage === undefined ? defaultStorage() : options.storage;
     const signedIn = Boolean(session?.authenticated);
-    const selfId = signedIn ? cleanText(session?.playerId) : "";
+    const selfId = signedIn
+        ? cleanText(session?.playerId) || cleanText(options.selfPlayerId ?? loadFactoryProfile().playerId)
+        : "";
     const requested = cleanText(options.visitPlayerId);
     // A visit to your own id is just your room.
     const visiting = Boolean(requested) && requested !== selfId;
@@ -104,6 +107,14 @@ export function createRoomLayoutStore(options = {}) {
             ? { layout: cached, source: "device", ownerName: "" }
             : { layout: createDefaultRoomLayout(), source: "starter", ownerName: "" };
     }
+    async function loadSelfAvatarId() {
+        if (signedIn && configured) {
+            const garage = await api.fetchGameGarage(ARCADE_ROOM_GAME_SLUG).catch(() => null);
+            if (garage?.garage)
+                return normalizeRoomLayout(garage.garage).avatarId;
+        }
+        return readCache(storage, selfId)?.avatarId ?? createDefaultRoomLayout().avatarId;
+    }
     async function save(layout) {
         if (visiting)
             return { ok: false, target: "device", error: "read_only" };
@@ -140,6 +151,7 @@ export function createRoomLayoutStore(options = {}) {
         ownerPlayerId,
         load: visiting ? loadVisit : loadOwn,
         save,
+        loadSelfAvatarId,
         uploadPicture,
     });
 }

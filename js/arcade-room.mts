@@ -9,9 +9,14 @@ import {
   createCabinetSession,
   findInteractiveDecor,
   getCabinetPrompt,
+  getVisitorPrompt,
   openCabinetSession,
+  spawnOffsetForCompany,
   type InteractiveDecorHit,
 } from "./arcade-room-interaction.mjs";
+import { createRoomPresence, type RemoteMember } from "./arcade-room-presence.mjs";
+import { createRoomVisitors } from "./arcade-room-visitors.mjs";
+import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
 import { JUKEBOX_ITEM_ID, createRoomJukebox } from "./arcade-room-jukebox.mjs";
 import { pulseJukeboxGlow } from "./arcade-room-decor-model.mjs";
@@ -76,6 +81,9 @@ const startTag = requiredElement<HTMLElement>("#startTag");
 const startHeading = requiredElement<HTMLElement>("#startHeading");
 const startCopy = requiredElement<HTMLElement>("#startCopy");
 const ownerLink = requiredElement<HTMLAnchorElement>("#roomOwnerLink");
+const visitorsChip = requiredElement<HTMLElement>("#roomVisitors");
+const visitorsChipLabel = requiredElement<HTMLElement>("#roomVisitorsLabel");
+const visitorsChipNames = requiredElement<HTMLElement>("#roomVisitorsNames");
 
 // Whose room this is. `?id=` names a player to visit; without it, this is the
 // signed-in player's own room (or a local-only room when signed out). The store
@@ -194,6 +202,9 @@ let session = createCabinetSession(CABINET_CATALOG[0].id);
 let interactionReady = false;
 let nearbyCabinet: CabinetRuntimeInstance | null = null;
 let nearbyDecor: InteractiveDecorHit | null = null;
+let nearbyVisitor: RemoteMember | null = null;
+/** Set by updatePlayer on any tick the player actually moved; read by the pose publisher. */
+let playerMoved = false;
 let activeCabinet: CabinetRuntimeInstance | null = null;
 let playing = false;
 /** The game fills the viewport instead of the cabinet's screen. */
@@ -269,6 +280,8 @@ const roomEditor = createRoomEditor({
     // above the ceiling, which would otherwise be all they could see.
     ceiling.visible = !editing;
     grid.visible = editing;
+    // Bodies would sit under the editor's picking rays and the top-down camera; they come back with the walk.
+    visitors.setVisible(!editing);
     // The walking fog closes in at 27 m for mood; the build camera stands up to 22 m
     // outside a 20 m room and would see nothing but fog colour, so it lifts too.
     scene.fog.near = editing ? WALKING_FOG.near * 4 : WALKING_FOG.near;
@@ -282,6 +295,80 @@ const roomEditor = createRoomEditor({
     }
   },
 });
+
+// Everyone else standing in this arcade. The room is keyed by its OWNER's player id so the
+// owner and every guest share one roster; a signed-out player's own room has no id and so
+// no company — it is a room nobody else can reach anyway. A signed-out guest still counts:
+// their local factory profile names them and they wear the default body.
+const visitors = createRoomVisitors(THREE, scene);
+const factoryProfile = loadFactoryProfile();
+const presenceName = factoryProfile.profileName || "Player";
+const presence = createRoomPresence({
+  roomId: layoutStore.ownerPlayerId,
+  identity: {
+    playerId: factoryProfile.playerId,
+    displayName: presenceName,
+    avatarId: visiting ? "" : loaded.layout.avatarId,
+  },
+});
+let presenceAvatarId = visiting ? "" : loaded.layout.avatarId;
+
+function renderVisitorsChip(): void {
+  const members = presence.members();
+  const status = presence.status();
+  const hidden = members.length === 0 && status !== "full";
+  visitorsChip.hidden = hidden;
+  if (hidden) return;
+  if (status === "full") {
+    visitorsChipLabel.textContent = "ARCADE FULL";
+    visitorsChipNames.textContent = "Too many people are in here right now.";
+    return;
+  }
+  visitorsChipLabel.textContent = `HERE NOW · ${members.length}`;
+  visitorsChipNames.textContent = members
+    .map((member) => (member.pose.activity ? `${member.displayName} (${member.pose.activity})` : member.displayName))
+    .join(" · ");
+}
+
+presence.onChange(() => {
+  visitors.sync(presence.members());
+  renderVisitorsChip();
+});
+presence.connect();
+window.addEventListener("pagehide", () => presence.disconnect());
+if (visiting) {
+  // A guest's body is on their own layout, which a visit never loads.
+  void layoutStore.loadSelfAvatarId().then((avatarId) => {
+    presenceAvatarId = avatarId;
+    presence.setIdentity({ playerId: factoryProfile.playerId, displayName: presenceName, avatarId });
+  });
+}
+
+function publishPresence(): void {
+  // A change of body in build mode reaches the others as a rejoin.
+  const avatarId = roomEditor.getLayout().avatarId;
+  if (!visiting && avatarId !== presenceAvatarId) {
+    presenceAvatarId = avatarId;
+    presence.setIdentity({ playerId: factoryProfile.playerId, displayName: presenceName, avatarId });
+  }
+  presence.publishPose({
+    x: player.x,
+    z: player.z,
+    yaw: player.yaw,
+    moving: playerMoved,
+    activity: playing && activeCabinet ? activeCabinet.definition.title : roomEditor.isEditing() ? "building" : "",
+  });
+}
+
+let lastWaveAt = 0;
+function waveAtVisitor(): void {
+  if (!nearbyVisitor || playing || decorOverlay.isOpen() || roomEditor.isEditing()) return;
+  const now = performance.now();
+  if (now - lastWaveAt < 1200) return;
+  lastWaveAt = now;
+  presence.emote("wave");
+  status.textContent = `You waved at ${nearbyVisitor.displayName}`;
+}
 
 function applyCamera(): void {
   if (roomEditor.isEditing()) return;
@@ -317,12 +404,18 @@ function updateInteraction(): void {
   }
   // A cabinet wins when both are in reach; otherwise any interactive decor (the calendar).
   nearbyDecor = nearbyCabinet ? null : findInteractiveDecor(roomEditor.getLayout().decor, { x: player.x, z: player.z, forward: forwardVector() });
-  interactionReady = Boolean(nearbyCabinet || nearbyDecor);
+  // A person comes last: the room's things are what E is for, a wave is the courtesy on top.
+  nearbyVisitor = nearbyCabinet || nearbyDecor ? null : visitors.nearest({ x: player.x, z: player.z, forward: forwardVector() });
+  interactionReady = Boolean(nearbyCabinet || nearbyDecor || nearbyVisitor);
   prompt.textContent = !roomEntered
     ? ""
     : nearbyCabinet
       ? getCabinetPrompt(true, nearbyCabinet.definition.title)
-      : nearbyDecor?.definition.interaction?.prompt ?? "";
+      : nearbyDecor
+        ? nearbyDecor.definition.interaction?.prompt ?? ""
+        : nearbyVisitor
+          ? getVisitorPrompt(nearbyVisitor.displayName)
+          : "";
   prompt.classList.toggle("is-visible", interactionReady && !playing && !decorOverlay.isOpen());
 }
 
@@ -503,7 +596,8 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyE" && interactionReady) {
     event.preventDefault();
     if (nearbyCabinet) openCabinet();
-    else openDecor();
+    else if (nearbyDecor) openDecor();
+    else waveAtVisitor();
   }
 });
 window.addEventListener("keyup", (event) => keys.delete(event.code));
@@ -515,6 +609,8 @@ canvas.addEventListener("click", () => {
 enterButton.addEventListener("click", () => {
   if (playing) return;
   const firstEntry = !roomEntered;
+  // Step aside from anyone already standing on the spawn point.
+  if (firstEntry) player.x += spawnOffsetForCompany({ x: player.x, z: player.z }, presence.members());
   roomEntered = true;
   startGate.classList.add("is-hidden");
   canvas.focus();
@@ -538,6 +634,7 @@ document.addEventListener("mousemove", (event) => {
 });
 
 function updatePlayer(dt: number): void {
+  playerMoved = false;
   if (playing || decorOverlay.isOpen() || roomEditor.isEditing() || !roomEntered) return;
   const forward = forwardVector();
   const right = { x: -forward.z, z: forward.x };
@@ -564,6 +661,7 @@ function updatePlayer(dt: number): void {
       && Math.abs(localZ) < obstacle.footprint.depth / 2 + 0.18;
   });
   if (!blocked) {
+    playerMoved = nextX !== player.x || nextZ !== player.z;
     player.x = nextX;
     player.z = nextZ;
   }
@@ -630,16 +728,19 @@ const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;
 function frame(now: number): void {
-  accumulator += Math.min((now - previous) / 1000, 0.1);
+  const frameSeconds = Math.min((now - previous) / 1000, 0.1);
+  accumulator += frameSeconds;
   previous = now;
   while (accumulator >= TICK_SECONDS) {
     updatePlayer(TICK_SECONDS);
     updateInteraction();
+    publishPresence();
     // Undo, reset and a fresh load all change the house record under the player; the layout is the truth.
     jukebox.setDefaultTrack(roomEditor.getLayout().music.defaultTrackId);
     jukebox.update(player, roomEditor.getLayout().decor);
     accumulator -= TICK_SECONDS;
   }
+  visitors.update(frameSeconds, now);
   const jukeboxPulse = jukebox.pulse(now);
   for (const instanceId of jukebox.emitterInstanceIds(roomEditor.getLayout().decor)) {
     pulseJukeboxGlow(decorRuntime.modelFor(instanceId), jukeboxPulse);

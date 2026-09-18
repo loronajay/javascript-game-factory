@@ -25,6 +25,7 @@
 
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { readFactoryAccountSession } from "./platform/api/factory-account-gate.mjs";
+import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import {
   ROOM_LAYOUT_STORAGE_KEY,
   createDefaultRoomLayout,
@@ -43,6 +44,12 @@ export type RoomStoreOptions = Readonly<{
   /** The `?id=` on the URL, or empty for "my room". */
   visitPlayerId?: string;
   session?: Readonly<{ authenticated: boolean; playerId: string }> | null;
+  /**
+   * The signed-in player's id when the session does not carry one. The stored auth
+   * session knows only that a token exists; the id lives on the factory profile,
+   * which sign-in binds to the account. Injectable so tests need no storage.
+   */
+  selfPlayerId?: string;
   api?: RoomStoreApi | null;
   storage?: Pick<Storage, "getItem" | "setItem"> | null;
 }>;
@@ -88,6 +95,12 @@ export type RoomLayoutStore = Readonly<{
   ownerPlayerId: string;
   load: () => Promise<RoomLoadResult>;
   save: (layout: RoomLayout) => Promise<RoomSaveResult>;
+  /**
+   * The body the signed-in player wears when standing in ANY room. It is the
+   * `avatarId` of their own layout, which a visit never loads, so a guest asks
+   * for it here: the account first, this device's cache next, the default last.
+   */
+  loadSelfAvatarId: () => Promise<string>;
   /**
    * Send a picture up for a custom poster. Only an account-backed owner can:
    * a picture lives on the platform, not on this device, and a visitor has no
@@ -139,7 +152,9 @@ export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayou
   const session = options.session ?? readFactoryAccountSession();
   const storage = options.storage === undefined ? defaultStorage() : options.storage;
   const signedIn = Boolean(session?.authenticated);
-  const selfId = signedIn ? cleanText(session?.playerId) : "";
+  const selfId = signedIn
+    ? cleanText(session?.playerId) || cleanText(options.selfPlayerId ?? loadFactoryProfile().playerId)
+    : "";
   const requested = cleanText(options.visitPlayerId);
   // A visit to your own id is just your room.
   const visiting = Boolean(requested) && requested !== selfId;
@@ -180,6 +195,14 @@ export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayou
       : { layout: createDefaultRoomLayout(), source: "starter", ownerName: "" };
   }
 
+  async function loadSelfAvatarId(): Promise<string> {
+    if (signedIn && configured) {
+      const garage = await api!.fetchGameGarage(ARCADE_ROOM_GAME_SLUG).catch(() => null);
+      if (garage?.garage) return normalizeRoomLayout(garage.garage).avatarId;
+    }
+    return readCache(storage, selfId)?.avatarId ?? createDefaultRoomLayout().avatarId;
+  }
+
   async function save(layout: RoomLayout): Promise<RoomSaveResult> {
     if (visiting) return { ok: false, target: "device", error: "read_only" };
     // The cache is written first, synchronously: the layout is the player's the moment they press save.
@@ -214,6 +237,7 @@ export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayou
     ownerPlayerId,
     load: visiting ? loadVisit : loadOwn,
     save,
+    loadSelfAvatarId,
     uploadPicture,
   });
 }
