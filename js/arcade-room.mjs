@@ -97,7 +97,7 @@ function applyRoomIdentity() {
     roomEyebrow.textContent = `PERSONAL SPACE · ${cabinetCount}`;
     ownerLink.hidden = true;
     if (!layoutStore.accountBacked) {
-        startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, the Yam Bowling lane, the Shark Hall pool table, or the Puck'd Up air hockey table, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
+        startCopy.textContent = "Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, the Yam Bowling lane, the Shark Hall pool table, Puck'd Up air hockey, or the Mini Hoops carnival machine, then build the room out — floors, walls, neon and decor. Sign in to keep it on your account so friends can visit it.";
     }
 }
 applyRoomIdentity();

@@ -153,6 +153,14 @@ const DEFAULT_CABINETS: readonly RoomLayoutItem[] = Object.freeze([
     rotationY: 0,
     hidden: false,
   }),
+  Object.freeze({
+    instanceId: "mini-hoops-1",
+    cabinetId: "cabinet.mini-hoops.carnival",
+    x: 4,
+    z: 4,
+    rotationY: 0,
+    hidden: false,
+  }),
 ]);
 
 /**

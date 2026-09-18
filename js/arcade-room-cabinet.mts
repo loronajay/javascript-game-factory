@@ -263,6 +263,41 @@ export const PUCK_D_UP_AIR_HOCKEY: CabinetDefinition = Object.freeze({
   ]),
 });
 
+export const MINI_HOOPS_CABINET: CabinetDefinition = Object.freeze({
+  id: "cabinet.mini-hoops.carnival",
+  kind: "arcade-cabinet",
+  gameSlug: "mini-hoops",
+  title: "Mini Hoops",
+  description: "A full walk-up carnival basketball machine with an enclosed return court, regulation-style rim, ball trough, scoring tower, and glowing midway marquee.",
+  launchMode: "fullscreen",
+  dimensions: Object.freeze({ width: 2.1, depth: 3.2, height: 2.55 }),
+  placement: Object.freeze({ surface: "floor", snapDegrees: 15, clearance: 0.06 }),
+  unlock: Object.freeze({ type: "starter", source: "Mini Hoops carnival collection" }),
+  interaction: Object.freeze({
+    radius: 2.15,
+    facingThreshold: 0.34,
+    anchor: Object.freeze({ x: 0, y: 1.1, z: 1.72 }),
+  }),
+  palette: Object.freeze({
+    shell: "#161b31",
+    trim: "#f08a34",
+    sky: "#29b6d8",
+    grass: "#f3c24f",
+    warning: "#f45151",
+  }),
+  parts: Object.freeze([
+    Object.freeze({ id: "court-ramp", material: "paint" }),
+    Object.freeze({ id: "ball-trough", material: "paint" }),
+    Object.freeze({ id: "cage", material: "metal" }),
+    Object.freeze({ id: "backboard", material: "paint" }),
+    Object.freeze({ id: "hoop", material: "metal" }),
+    Object.freeze({ id: "basketballs", material: "paint" }),
+    Object.freeze({ id: "scoreboard", material: "emissive" }),
+    Object.freeze({ id: "marquee", material: "emissive" }),
+    Object.freeze({ id: "edge-lighting", material: "emissive" }),
+  ]),
+});
+
 export const CABINET_CATALOG: readonly CabinetDefinition[] = Object.freeze([
   BIRD_DUTY_CABINET,
   LOVERS_LOST_CABINET,
@@ -271,6 +306,7 @@ export const CABINET_CATALOG: readonly CabinetDefinition[] = Object.freeze([
   YAM_BOWLING_CABINET,
   SHARK_HALL_POOL_TABLE,
   PUCK_D_UP_AIR_HOCKEY,
+  MINI_HOOPS_CABINET,
 ]);
 
 export function getCabinetFootprint(definition: CabinetDefinition): { width: number; depth: number } {
