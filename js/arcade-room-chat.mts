@@ -122,7 +122,7 @@ export function createRoomChat(options: RoomChatOptions): RoomChat {
   }
 
   function refused(code: string): void {
-    if (code === "TOO_FAST") push("system", "", "", "Slow down a little — that line was not sent.");
+    if (code === "TOO_FAST") push("system", "", "", "Slow down a little — that was not sent.");
   }
 
   function noteRoster(members: readonly ChatRosterMember[], online: boolean): void {

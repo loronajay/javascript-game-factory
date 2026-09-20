@@ -211,6 +211,105 @@ button, a { font: inherit; }
 .room-chat[data-open="true"] .room-chat__input { display: block; pointer-events: auto; }
 .room-chat[data-open="true"] .room-chat__input:focus { border-color: #ffd33d; box-shadow: 0 0 0 3px rgba(255, 211, 61, .18), 0 15px 45px rgba(0,0,0,.4); }
 .is-playing .room-chat, .is-editing .room-chat { display: none; }
+/* The music chip shares the bottom-left corner: while a record is on, the chat sits above it. */
+.room-shell:has(.jukebox-chip:not([hidden])) .room-chat { bottom: 86px; }
+
+/* The emote wheel: Q opens it, the mouse steers (or hovers a slot when it is not captured), a click sends. */
+.emote-wheel {
+  position: fixed;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.emote-wheel[hidden] { display: none; }
+.emote-wheel__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 250px;
+  height: 250px;
+  border: 1px solid rgba(103, 220, 255, .35);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(7, 16, 27, .82) 0 58%, rgba(7, 16, 27, .35) 74%, transparent 76%);
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  transform: translate(-50%, -50%);
+}
+.emote-wheel__hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 96px;
+  transform: translate(-50%, -50%);
+  color: #9db0c0;
+  font-size: 10px;
+  letter-spacing: .14em;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.5;
+}
+.emote-wheel__hint b { display: block; color: #ffd33d; font-size: 12px; }
+.emote-wheel__slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  justify-items: center;
+  row-gap: 4px;
+  width: 92px;
+  transform: translate(calc(-50% + var(--dx) * 88px), calc(-50% + var(--dy) * 88px)) scale(.92);
+  transition: transform .12s ease, filter .12s ease;
+  filter: saturate(.7) brightness(.85);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.emote-wheel__slot img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.7));
+}
+.emote-wheel__slot small {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(7, 16, 27, .9);
+  color: #e6f6ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  white-space: nowrap;
+}
+.emote-wheel__slot[aria-selected="true"] {
+  transform: translate(calc(-50% + var(--dx) * 88px), calc(-50% + var(--dy) * 88px)) scale(1.22);
+  filter: none;
+}
+.emote-wheel__slot[aria-selected="true"] small { background: #ffd33d; color: #1a1400; }
+.emote-wheel[data-cooling="true"] .emote-wheel__hint b { color: #7f93a6; }
+
+/* The sender has no body to see it on: their own emote pops in the lower middle for a moment. */
+.emote-self {
+  position: fixed;
+  z-index: 5;
+  left: 50%;
+  bottom: 150px;
+  width: 72px;
+  height: 72px;
+  pointer-events: none;
+  translate: -50% 0;
+}
+.emote-self[hidden] { display: none; }
+.emote-self img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 6px 14px rgba(0,0,0,.8)); animation: emote-self-pop 3s ease-out forwards; }
+@keyframes emote-self-pop {
+  0% { transform: scale(.4) translateY(20px); opacity: 0; }
+  12% { transform: scale(1.15) translateY(-6px); opacity: 1; }
+  22% { transform: scale(1) translateY(0); opacity: 1; }
+  80% { transform: scale(1) translateY(-10px); opacity: 1; }
+  100% { transform: scale(.9) translateY(-40px); opacity: 0; }
+}
+.is-playing .emote-wheel, .is-editing .emote-wheel, .is-playing .emote-self, .is-editing .emote-self { display: none; }
 
 .control-hint { position: fixed; z-index: 2; right: 24px; bottom: 20px; display: flex; gap: 8px; color: #9db0c0; font-size: 11px; }
 .control-hint span { padding: 7px 9px; background: rgba(4, 10, 18, .68); border: 1px solid rgba(255,255,255,.1); border-radius: 7px; }

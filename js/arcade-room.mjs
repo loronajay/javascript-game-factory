@@ -8,6 +8,8 @@ import { createRoomPresence } from "./arcade-room-presence.mjs";
 import { createRoomVisitors } from "./arcade-room-visitors.mjs";
 import { createRoomChat } from "./arcade-room-chat.mjs";
 import { createRoomChatView } from "./arcade-room-chat-view.mjs";
+import { createEmoteWheel, emoteById } from "./arcade-room-emotes.mjs";
+import { createEmoteWheelView } from "./arcade-room-emote-wheel-view.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
 import { JUKEBOX_ITEM_ID, createRoomJukebox } from "./arcade-room-jukebox.mjs";
@@ -77,6 +79,8 @@ const visitorsChipNames = requiredElement("#roomVisitorsNames");
 const chatRoot = requiredElement("#roomChat");
 const chatLog = requiredElement("#roomChatLog");
 const chatInput = requiredElement("#roomChatInput");
+const emoteWheelRoot = requiredElement("#emoteWheel");
+const emoteSelfRoot = requiredElement("#emoteSelf");
 // Whose room this is. `?id=` names a player to visit; without it, this is the
 // signed-in player's own room (or a local-only room when signed out). The store
 // decides which, and everything below asks it rather than re-deriving the answer.
@@ -256,6 +260,7 @@ const roomEditor = createRoomEditor({
     canEnter: () => !playing && !decorOverlay.isOpen() && !visiting,
     onEditingChange: (editing) => {
         keys.clear();
+        emoteWheel.cancel();
         // Roof off while building: the overview and top-down views look into the room from
         // above the ceiling, which would otherwise be all they could see.
         ceiling.visible = !editing;
@@ -319,6 +324,16 @@ presence.onChat((line) => {
     visitors.say(line.clientId, line.text, performance.now());
 });
 presence.onChatRefused((code) => chat.refused(code));
+// Emotes ride the same `arcade_room_emote` frame as the wave. Q opens the wheel, the mouse
+// steers, a click sends: the pure module owns what is lit and the cooldown, the view owns
+// the ring and the sender's own pop, and the visitor bodies float the picture over the head.
+const emoteWheel = createEmoteWheel({ send: (id) => { presence.emote(id); return presence.status() === "online"; }, now: () => performance.now() });
+const emoteWheelView = createEmoteWheelView({ wheel: emoteWheel, root: emoteWheelRoot, selfRoot: emoteSelfRoot, now: () => performance.now() });
+emoteWheel.onChange(() => {
+    const sent = emoteWheel.lastSent();
+    if (sent && performance.now() - sent.at < 50)
+        status.textContent = `You sent ${emoteById(sent.id)?.label.toLowerCase() ?? sent.id} to the arcade`;
+});
 presence.onChange(() => {
     visitors.sync(presence.members());
     renderVisitorsChip();
@@ -450,6 +465,7 @@ jukebox.setDefaultTrack(roomEditor.getLayout().music.defaultTrackId);
 function openDecor() {
     if (!nearbyDecor || playing || decorOverlay.isOpen() || roomEditor.isEditing())
         return;
+    emoteWheel.cancel();
     if (nearbyDecor.item.itemId === JUKEBOX_ITEM_ID)
         jukebox.attach(nearbyDecor.item.instanceId);
     decorOverlay.open(nearbyDecor.definition);
@@ -494,6 +510,7 @@ function openCabinet() {
         return;
     if (decorOverlay.isOpen())
         return;
+    emoteWheel.cancel();
     activeCabinet = nearbyCabinet;
     session = openCabinetSession(createCabinetSession(activeCabinet.definition.id));
     playing = true;
@@ -601,6 +618,11 @@ window.addEventListener("keydown", (event) => {
         keys.clear();
         return;
     }
+    // Q opens (and closes) the emote wheel; it takes no other key, so walking goes on under it.
+    if (roomEntered && emoteWheel.handleKey({ type: "keydown", code: event.code, repeat: event.repeat })) {
+        event.preventDefault();
+        return;
+    }
     keys.add(event.code);
     if (event.code === "KeyF" && !event.repeat && document.fullscreenEnabled) {
         event.preventDefault();
@@ -618,8 +640,16 @@ window.addEventListener("keydown", (event) => {
     }
 });
 window.addEventListener("keyup", (event) => keys.delete(event.code));
-window.addEventListener("blur", () => keys.clear());
+window.addEventListener("blur", () => {
+    keys.clear();
+    emoteWheel.cancel();
+});
 canvas.addEventListener("click", () => {
+    // With the wheel up a click is the choice, never a request for the mouse.
+    if (emoteWheel.isOpen()) {
+        emoteWheel.choose();
+        return;
+    }
     if (!playing && !decorOverlay.isOpen() && !roomEditor.isEditing() && roomEntered)
         canvas.requestPointerLock?.().catch(() => undefined);
 });
@@ -650,6 +680,11 @@ window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
     if ((document.pointerLockElement !== canvas && !draggingLook) || playing || decorOverlay.isOpen() || roomEditor.isEditing())
         return;
+    // While the wheel is up the mouse steers the highlight, not the view.
+    if (emoteWheel.isOpen()) {
+        emoteWheel.steer(event.movementX, event.movementY);
+        return;
+    }
     player.yaw -= event.movementX * 0.0022;
     player.pitch = THREE.MathUtils.clamp(player.pitch - event.movementY * 0.0018, -1.1, 1.05);
 });
@@ -776,6 +811,7 @@ function frame(now) {
     }
     visitors.update(frameSeconds, now, presence.members());
     chatView.tick();
+    emoteWheelView.tick();
     const jukeboxPulse = jukebox.pulse(now);
     for (const instanceId of jukebox.emitterInstanceIds(roomEditor.getLayout().decor)) {
         pulseJukeboxGlow(decorRuntime.modelFor(instanceId), jukeboxPulse);

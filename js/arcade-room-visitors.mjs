@@ -7,10 +7,12 @@
 // the clips the pack ships with. Poses arrive ten times a second and a body
 // drawn straight onto each one would stutter, so a body eases toward a target
 // that `arcade-room-visitor-motion.mts` runs forward from the latest pose, and
-// the gait follows the sender's measured speed. An emote plays its clip once
-// and returns to idle. A chat line is a speech bubble over the name tag for a
-// few seconds (`say`); the log at the bottom of the screen is the record, the
-// bubble is who is talking.
+// the gait follows the sender's measured speed. A gesture emote (the wave)
+// plays its clip once and returns to idle; a picture emote (the four cards
+// from `arcade-room-emotes.mts`) floats over the head for a few seconds
+// instead. A chat line is a speech bubble over the name tag for a few seconds
+// (`say`); the log at the bottom of the screen is the record, the bubble is
+// who is talking.
 //
 // Movement is not an event. The roster is handed in on every `update` and each
 // body reads its member's latest pose from it there; `sync` only reconciles who
@@ -30,12 +32,18 @@ import { findArcadeAvatar, DEFAULT_ARCADE_AVATAR_ID } from "./arcade-room-avatar
 import { findVisitorInReach } from "./arcade-room-interaction.mjs";
 import { createRemoteMotion } from "./arcade-room-visitor-motion.mjs";
 import { wrapChatBubble } from "./arcade-room-chat.mjs";
+import { EMOTE_DISPLAY_MS, emoteById } from "./arcade-room-emotes.mjs";
 /** How tall a body stands, whatever the GLB's native units. */
 export const VISITOR_HEIGHT = 1.78;
 /** How long an emote clip is allowed to run before the body returns to idle. */
 export const EMOTE_SECONDS = 2.2;
 /** A speech bubble stays up this long, the last part of it fading. */
 export const BUBBLE_SECONDS = 6;
+/** A picture emote hangs over the head this long, the last part of it fading. */
+export const EMOTE_CARD_SECONDS = EMOTE_DISPLAY_MS / 1000;
+const EMOTE_CARD_FADE_SECONDS = 0.6;
+/** World size of the picture over a head. */
+const EMOTE_CARD_SIZE = 0.62;
 const BUBBLE_FADE_SECONDS = 0.8;
 const BUBBLE_MAX_LINES = 3;
 /** The target is caught up at this rate per second: quick enough to track a sprint, smooth enough not to snap. */
@@ -50,6 +58,8 @@ export function createRoomVisitors(THREE, scene) {
     scene.add(root);
     const loader = new GLTFLoader();
     const bodies = new Map();
+    const textureLoader = new THREE.TextureLoader();
+    const cardTextures = new Map();
     const placeholderGeometry = new THREE.CapsuleGeometry(0.28, VISITOR_HEIGHT - 0.56, 6, 12);
     const placeholderMaterial = new THREE.MeshStandardMaterial({ color: 0x3b7dd8, emissive: 0x11284a, roughness: 0.6, transparent: true, opacity: 0.55 });
     function paintTag(body) {
@@ -214,6 +224,11 @@ export function createRoomVisitors(THREE, scene) {
         bubble.renderOrder = 11;
         bubble.visible = false;
         group.add(bubble);
+        const card = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, toneMapped: false }));
+        card.renderOrder = 12;
+        card.visible = false;
+        card.scale.set(EMOTE_CARD_SIZE, EMOTE_CARD_SIZE, 1);
+        group.add(card);
         root.add(group);
         const body = {
             member,
@@ -224,6 +239,8 @@ export function createRoomVisitors(THREE, scene) {
             tagText: "",
             bubble,
             bubbleUntil: 0,
+            card,
+            cardUntil: 0,
             mixer: null,
             clips: { idle: null, walk: null, run: null, emote: null },
             current: null,
@@ -245,6 +262,36 @@ export function createRoomVisitors(THREE, scene) {
         body.tag.material.dispose?.();
         body.bubble.material.map?.dispose?.();
         body.bubble.material.dispose?.();
+        // The card's texture is shared from the cache; only its material is this body's.
+        body.card.material.dispose?.();
+    }
+    /** Show a picture emote over a body's head; the texture is loaded once per id and shared. */
+    function showCard(body, emoteId, now) {
+        const emote = emoteById(emoteId);
+        if (!emote)
+            return;
+        let texture = cardTextures.get(emote.id);
+        if (!texture) {
+            texture = textureLoader.load(emote.image);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            // Pixel art stays pixel art.
+            texture.magFilter = THREE.NearestFilter;
+            cardTextures.set(emote.id, texture);
+        }
+        body.card.material.map = texture;
+        body.card.material.opacity = 1;
+        body.card.material.needsUpdate = true;
+        body.card.userData.emoteId = emote.id;
+        body.card.visible = true;
+        body.cardUntil = now + EMOTE_CARD_SECONDS * 1000;
+        placeCard(body, 0);
+    }
+    /** The card rides above whatever is over the head — the tag, or the bubble when one is up — and lifts as it fades. */
+    function placeCard(body, lift) {
+        const top = body.bubble.visible
+            ? body.bubble.position.y + body.bubble.scale.y / 2
+            : body.tag.position.y + body.tag.scale.y / 2;
+        body.card.position.y = top + EMOTE_CARD_SIZE / 2 + 0.06 + lift;
     }
     function say(clientId, text, now) {
         const body = bodies.get(clientId);
@@ -306,11 +353,26 @@ export function createRoomVisitors(THREE, scene) {
                 else
                     body.bubble.material.opacity = Math.min(1, left / BUBBLE_FADE_SECONDS);
             }
+            if (body.card.visible) {
+                const left = (body.cardUntil - now) / 1000;
+                if (left <= 0)
+                    body.card.visible = false;
+                else {
+                    body.card.material.opacity = Math.min(1, left / EMOTE_CARD_FADE_SECONDS);
+                    // A bubble arriving or fading under it moves the card with it; a little lift as it goes.
+                    placeCard(body, (1 - Math.min(1, left / EMOTE_CARD_SECONDS)) * 0.18);
+                }
+            }
             if (body.member.emote && body.member.emoteAt > body.emoteSeenAt) {
                 body.emoteSeenAt = body.member.emoteAt;
-                body.emoteUntil = now + EMOTE_SECONDS * 1000;
-                if (body.clips.emote)
-                    play(body, body.clips.emote, true);
+                if (emoteById(body.member.emote)) {
+                    showCard(body, body.member.emote, now);
+                }
+                else {
+                    body.emoteUntil = now + EMOTE_SECONDS * 1000;
+                    if (body.clips.emote)
+                        play(body, body.clips.emote, true);
+                }
             }
             if (body.mixer) {
                 const gait = body.motion.gait();
@@ -341,6 +403,9 @@ export function createRoomVisitors(THREE, scene) {
             for (const body of bodies.values())
                 removeBody(body);
             bodies.clear();
+            for (const texture of cardTextures.values())
+                texture.dispose?.();
+            cardTextures.clear();
             scene.remove(root);
         },
     });

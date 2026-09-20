@@ -77,7 +77,7 @@ export function createRoomChat(options) {
     }
     function refused(code) {
         if (code === "TOO_FAST")
-            push("system", "", "", "Slow down a little — that line was not sent.");
+            push("system", "", "", "Slow down a little — that was not sent.");
     }
     function noteRoster(members, online) {
         if (!online)

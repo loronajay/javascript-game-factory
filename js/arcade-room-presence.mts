@@ -74,7 +74,8 @@ export const MAX_CHAT_LENGTH = 200;
 
 export type PresenceStatus = "idle" | "connecting" | "online" | "offline" | "full";
 
-export type PresenceEmote = "wave" | "cheer";
+/** A body gesture (the clip the visitor plays) or a picture emote (the card it floats); the bridge accepts the same set. */
+export type PresenceEmote = "wave" | "cheer" | "heart" | "middle-finger" | "smile" | "crying";
 
 export type PresenceSocket = {
   send: (text: string) => void;
