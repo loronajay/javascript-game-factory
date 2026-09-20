@@ -6,6 +6,8 @@ import { createArcadeAvatarPreview } from "./arcade-room-avatar-preview.mjs";
 import { canInteractWithCabinet, closeCabinetSession, createCabinetSession, findInteractiveDecor, getCabinetPrompt, getVisitorPrompt, openCabinetSession, spawnOffsetForCompany, } from "./arcade-room-interaction.mjs";
 import { createRoomPresence } from "./arcade-room-presence.mjs";
 import { createRoomVisitors } from "./arcade-room-visitors.mjs";
+import { createRoomChat } from "./arcade-room-chat.mjs";
+import { createRoomChatView } from "./arcade-room-chat-view.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createDecorOverlay } from "./arcade-room-decor-overlay.mjs";
 import { JUKEBOX_ITEM_ID, createRoomJukebox } from "./arcade-room-jukebox.mjs";
@@ -72,6 +74,9 @@ const ownerLink = requiredElement("#roomOwnerLink");
 const visitorsChip = requiredElement("#roomVisitors");
 const visitorsChipLabel = requiredElement("#roomVisitorsLabel");
 const visitorsChipNames = requiredElement("#roomVisitorsNames");
+const chatRoot = requiredElement("#roomChat");
+const chatLog = requiredElement("#roomChatLog");
+const chatInput = requiredElement("#roomChatInput");
 // Whose room this is. `?id=` names a player to visit; without it, this is the
 // signed-in player's own room (or a local-only room when signed out). The store
 // decides which, and everything below asks it rather than re-deriving the answer.
@@ -304,9 +309,20 @@ function renderVisitorsChip() {
         .map((member) => (member.pose.activity ? `${member.displayName} (${member.pose.activity})` : member.displayName))
         .join(" · ");
 }
+// Text chat rides the presence socket. The pure module owns the box and the log; the view
+// owns the DOM; the server relays a line to everyone else, so what the local player said
+// is drawn from the send and never comes back over the wire.
+const chat = createRoomChat({ send: (text) => presence.sendChat(text), selfName: presenceName });
+const chatView = createRoomChatView({ chat, root: chatRoot, log: chatLog, input: chatInput, returnFocusTo: canvas });
+presence.onChat((line) => {
+    chat.receive(line);
+    visitors.say(line.clientId, line.text, performance.now());
+});
+presence.onChatRefused((code) => chat.refused(code));
 presence.onChange(() => {
     visitors.sync(presence.members());
     renderVisitorsChip();
+    chat.noteRoster(presence.members(), presence.status() === "online");
 });
 window.addEventListener("pagehide", () => presence.disconnect());
 // A page restored from the back/forward cache comes back with the socket it left with: closed.
@@ -579,6 +595,12 @@ window.addEventListener("keydown", (event) => {
             decorOverlay.close();
         return;
     }
+    // Enter opens the chat box; while it is open every key is the box's and none walks the player.
+    if (roomEntered && chatView.handleKey(event)) {
+        // A key held down when the box opened must not keep the player walking under the typing.
+        keys.clear();
+        return;
+    }
     keys.add(event.code);
     if (event.code === "KeyF" && !event.repeat && document.fullscreenEnabled) {
         event.preventDefault();
@@ -753,6 +775,7 @@ function frame(now) {
         accumulator -= TICK_SECONDS;
     }
     visitors.update(frameSeconds, now, presence.members());
+    chatView.tick();
     const jukeboxPulse = jukebox.pulse(now);
     for (const instanceId of jukebox.emitterInstanceIds(roomEditor.getLayout().decor)) {
         pulseJukeboxGlow(decorRuntime.modelFor(instanceId), jukeboxPulse);

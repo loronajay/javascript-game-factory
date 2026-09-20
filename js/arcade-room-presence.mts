@@ -25,6 +25,10 @@
 // new socket replaces the stale member instead of standing beside it, so a
 // network blip never leaves a clone behind. Two tabs are two sessions and are
 // allowed to coexist.
+//
+// Chat rides the same socket but is not roster state: a line is handed to
+// `onChat` listeners as it arrives and forgotten here. The log, the fade and
+// the input belong to `arcade-room-chat.mts`; this only carries the words.
 
 import { resolveFactoryNetworkUrl } from "./platform/api/factory-network-url.mjs";
 
@@ -55,6 +59,18 @@ export type RemoteMember = Readonly<{
   emote: string;
   emoteAt: number;
 }>;
+
+/** One line of arcade chat as the room hears it; `at` is the local clock, not the sender's. */
+export type ChatLine = Readonly<{
+  clientId: string;
+  playerId: string;
+  displayName: string;
+  text: string;
+  at: number;
+}>;
+
+/** The server's limit; anything longer is cut here so the box can show what will actually go out. */
+export const MAX_CHAT_LENGTH = 200;
 
 export type PresenceStatus = "idle" | "connecting" | "online" | "offline" | "full";
 
@@ -92,6 +108,11 @@ export type RoomPresence = Readonly<{
   /** Throttled and change-detected; call it every tick with the local pose. */
   publishPose: (pose: PresencePose) => void;
   emote: (emote: PresenceEmote) => void;
+  /** Say something to everyone in the arcade. False when nothing went out (empty, or offline). */
+  sendChat: (text: string) => boolean;
+  onChat: (listener: (line: ChatLine) => void) => () => void;
+  /** The server turned a line away (`TOO_FAST`); the sender's box is the only place that matters. */
+  onChatRefused: (listener: (code: string) => void) => () => void;
   /** A new body or name: rejoins in place so the others redraw. */
   setIdentity: (identity: PresenceIdentity) => void;
   members: () => readonly RemoteMember[];
@@ -113,6 +134,10 @@ function cleanText(value: unknown): string {
 function finite(value: unknown, fallback = 0): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+export function normalizeChatText(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_LENGTH) : "";
 }
 
 export function normalizePresencePose(value: unknown, previous: PresencePose | null = null): PresencePose {
@@ -186,6 +211,8 @@ export function createRoomPresence(options: RoomPresenceOptions): RoomPresence {
   let keepaliveHandle: unknown = null;
   const roster = new Map<string, RemoteMember>();
   const listeners = new Set<() => void>();
+  const chatListeners = new Set<(line: ChatLine) => void>();
+  const chatRefusedListeners = new Set<(code: string) => void>();
   let lastSentPose: PresencePose | null = null;
   let lastSentAt = -Infinity;
   let pendingPose: PresencePose | null = null;
@@ -355,9 +382,26 @@ export function createRoomPresence(options: RoomPresenceOptions): RoomPresence {
         notify();
         return;
       }
+      case "arcade_room_chat": {
+        if (cleanText(event.roomId) !== roomId) return;
+        const member = roster.get(cleanText(event.clientId));
+        const text = normalizeChatText(event.text);
+        if (!member || !text) return;
+        const line: ChatLine = Object.freeze({
+          clientId: member.clientId,
+          playerId: member.playerId,
+          displayName: cleanText(event.displayName) || member.displayName,
+          text,
+          at: now(),
+        });
+        for (const listener of chatListeners) listener(line);
+        return;
+      }
       case "error": {
         const code = String(event.code);
-        if (code === "ROOM_FULL") {
+        if (code === "TOO_FAST") {
+          for (const listener of chatRefusedListeners) listener(code);
+        } else if (code === "ROOM_FULL") {
           wanted = false;
           setStatus("full");
           socket?.close();
@@ -421,6 +465,12 @@ export function createRoomPresence(options: RoomPresenceOptions): RoomPresence {
     send({ type: "arcade_room_emote", emote: name });
   }
 
+  function sendChat(text: string): boolean {
+    const clean = normalizeChatText(text);
+    if (!clean) return false;
+    return send({ type: "arcade_room_chat", text: clean });
+  }
+
   function setIdentity(next: PresenceIdentity): void {
     identity = next;
     if (status === "online") sendJoin();
@@ -431,6 +481,15 @@ export function createRoomPresence(options: RoomPresenceOptions): RoomPresence {
     disconnect,
     publishPose,
     emote,
+    sendChat,
+    onChat: (listener: (line: ChatLine) => void) => {
+      chatListeners.add(listener);
+      return () => { chatListeners.delete(listener); };
+    },
+    onChatRefused: (listener: (code: string) => void) => {
+      chatRefusedListeners.add(listener);
+      return () => { chatRefusedListeners.delete(listener); };
+    },
     setIdentity,
     members: () => [...roster.values()],
     status: () => status,

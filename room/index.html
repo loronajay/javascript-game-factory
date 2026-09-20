@@ -29,7 +29,7 @@
         <h2 id="startHeading">Make the room yours.</h2>
         <p id="startCopy">Walk up to play Bird Duty, Lovers Lost, Sumorai, Battleshits, Build Buddy, the Yam Bowling lane, the Shark Hall pool table, Puck'd Up air hockey, or the Mini Hoops carnival machine, then build the room out — floors, walls, neon and decor.</p>
         <button id="enterShowroom" type="button">Enter my arcade</button>
-        <small id="roomStatus">Click to capture the mouse · WASD to move · E to play · B to build</small>
+        <small id="roomStatus">Click to capture the mouse · WASD to move · E to play · Enter to chat · B to build</small>
       </div>
     </section>
 
@@ -43,8 +43,12 @@
       <span id="roomVisitorsLabel" class="visitors-chip__label">HERE NOW</span>
       <span id="roomVisitorsNames" class="visitors-chip__names"></span>
     </div>
+    <section id="roomChat" class="room-chat" data-open="false" aria-label="Arcade chat" hidden>
+      <ol id="roomChatLog" class="room-chat__log" aria-live="polite"></ol>
+      <input id="roomChatInput" class="room-chat__input" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Say something to the arcade… (Enter to send, Esc to cancel)" aria-label="Chat message">
+    </section>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Shift</b> Sprint</span><span><b>F</b> Fullscreen</span><span class="control-hint__build"><b>B</b> Build</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Play</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>F</b> Fullscreen</span><span class="control-hint__build"><b>B</b> Build</span>
     </div>
 
     <aside id="roomEditor" class="room-editor" aria-label="Arcade editor" hidden>

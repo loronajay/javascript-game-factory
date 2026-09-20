@@ -8,7 +8,9 @@
 // drawn straight onto each one would stutter, so a body eases toward a target
 // that `arcade-room-visitor-motion.mts` runs forward from the latest pose, and
 // the gait follows the sender's measured speed. An emote plays its clip once
-// and returns to idle.
+// and returns to idle. A chat line is a speech bubble over the name tag for a
+// few seconds (`say`); the log at the bottom of the screen is the record, the
+// bubble is who is talking.
 //
 // Movement is not an event. The roster is handed in on every `update` and each
 // body reads its member's latest pose from it there; `sync` only reconciles who
@@ -28,6 +30,7 @@ import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { findArcadeAvatar, DEFAULT_ARCADE_AVATAR_ID } from "./arcade-room-avatar-catalog.mjs";
 import { findVisitorInReach } from "./arcade-room-interaction.mjs";
 import { createRemoteMotion, type RemoteMotion } from "./arcade-room-visitor-motion.mjs";
+import { wrapChatBubble } from "./arcade-room-chat.mjs";
 import type { RemoteMember } from "./arcade-room-presence.mjs";
 
 type ThreeNamespace = Record<string, any>;
@@ -36,6 +39,10 @@ type ThreeNamespace = Record<string, any>;
 export const VISITOR_HEIGHT = 1.78;
 /** How long an emote clip is allowed to run before the body returns to idle. */
 export const EMOTE_SECONDS = 2.2;
+/** A speech bubble stays up this long, the last part of it fading. */
+export const BUBBLE_SECONDS = 6;
+const BUBBLE_FADE_SECONDS = 0.8;
+const BUBBLE_MAX_LINES = 3;
 /** The target is caught up at this rate per second: quick enough to track a sprint, smooth enough not to snap. */
 const POSITION_EASE = 11;
 const YAW_EASE = 12;
@@ -47,6 +54,8 @@ type VisitorBody = {
   placeholder: any;
   tag: any;
   tagText: string;
+  bubble: any;
+  bubbleUntil: number;
   mixer: any | null;
   clips: { idle: any | null; walk: any | null; run: any | null; emote: any | null };
   current: any | null;
@@ -62,6 +71,8 @@ export type RoomVisitors = Readonly<{
   sync: (members: readonly RemoteMember[]) => void;
   /** Every frame: take the roster's latest poses, ease every body toward them and advance its animation. */
   update: (dt: number, now: number, members: readonly RemoteMember[]) => void;
+  /** Put a speech bubble over a member's head for a few seconds; `now` is the frame clock. */
+  say: (clientId: string, text: string, now: number) => void;
   /** The member the local player could wave at: in reach and roughly in front. */
   nearest: (viewer: Readonly<{ x: number; z: number; forward: Readonly<{ x: number; z: number }> }>) => RemoteMember | null;
   setVisible: (visible: boolean) => void;
@@ -116,6 +127,55 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
     body.tag.material.map = texture;
     body.tag.material.needsUpdate = true;
     body.tag.scale.set(1.1, 1.1 * (canvas.height / canvas.width), 1);
+    previous?.dispose?.();
+  }
+
+  function paintBubble(body: VisitorBody, text: string): void {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const font = "600 40px system-ui, sans-serif";
+    context.font = font;
+    const padding = 28;
+    const lineHeight = 50;
+    const maxTextWidth = 560;
+    const lines = wrapChatBubble(text, (part) => context.measureText(part).width, maxTextWidth, BUBBLE_MAX_LINES);
+    if (!lines.length) return;
+    const textWidth = Math.max(...lines.map((line) => context.measureText(line).width));
+    // Power-of-two-free sizes are fine for a sprite; keep the canvas snug so the texture stays sharp.
+    canvas.width = Math.ceil(textWidth + padding * 2) + 12;
+    canvas.height = lines.length * lineHeight + padding * 2 - 8 + 26;
+    const bodyHeight = canvas.height - 26;
+    context.fillStyle = "rgba(255, 255, 255, 0.96)";
+    context.beginPath();
+    context.roundRect(6, 6, canvas.width - 12, bodyHeight - 12, 26);
+    context.fill();
+    // The tail points down at the speaker.
+    context.beginPath();
+    context.moveTo(canvas.width / 2 - 18, bodyHeight - 8);
+    context.lineTo(canvas.width / 2, canvas.height - 4);
+    context.lineTo(canvas.width / 2 + 18, bodyHeight - 8);
+    context.closePath();
+    context.fill();
+    context.font = font;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = "#0b1a2a";
+    lines.forEach((line, index) => {
+      context.fillText(line, canvas.width / 2, padding + lineHeight / 2 - 4 + index * lineHeight);
+    });
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const previous = body.bubble.material.map;
+    body.bubble.material.map = texture;
+    body.bubble.material.opacity = 1;
+    body.bubble.material.needsUpdate = true;
+    // 1.1 world units is the tag's width at 512 px; keep the same pixel density.
+    const width = (canvas.width / 512) * 1.1;
+    body.bubble.scale.set(width, width * (canvas.height / canvas.width), 1);
+    // Sit on the tag: the sprite is centred, so lift it by half its own height.
+    body.bubble.position.y = VISITOR_HEIGHT + 0.32 + body.tag.scale.y / 2 + body.bubble.scale.y / 2 + 0.04;
+    body.bubble.visible = true;
     previous?.dispose?.();
   }
 
@@ -187,6 +247,11 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
     tag.position.y = VISITOR_HEIGHT + 0.32;
     tag.renderOrder = 10;
     group.add(tag);
+    // Unlit and untone-mapped: the bubble is paper, not a surface in the room.
+    const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, toneMapped: false }));
+    bubble.renderOrder = 11;
+    bubble.visible = false;
+    group.add(bubble);
     root.add(group);
     const body: VisitorBody = {
       member,
@@ -195,6 +260,8 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
       placeholder,
       tag,
       tagText: "",
+      bubble,
+      bubbleUntil: 0,
       mixer: null,
       clips: { idle: null, walk: null, run: null, emote: null },
       current: null,
@@ -215,6 +282,15 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
     root.remove(body.group);
     body.tag.material.map?.dispose?.();
     body.tag.material.dispose?.();
+    body.bubble.material.map?.dispose?.();
+    body.bubble.material.dispose?.();
+  }
+
+  function say(clientId: string, text: string, now: number): void {
+    const body = bodies.get(clientId);
+    if (!body) return;
+    paintBubble(body, text);
+    body.bubbleUntil = now + BUBBLE_SECONDS * 1000;
   }
 
   function sync(members: readonly RemoteMember[]): void {
@@ -264,6 +340,11 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
       delta = Math.atan2(Math.sin(delta), Math.cos(delta));
       group.rotation.y += delta * yawEase;
 
+      if (body.bubble.visible) {
+        const left = (body.bubbleUntil - now) / 1000;
+        if (left <= 0) body.bubble.visible = false;
+        else body.bubble.material.opacity = Math.min(1, left / BUBBLE_FADE_SECONDS);
+      }
       if (body.member.emote && body.member.emoteAt > body.emoteSeenAt) {
         body.emoteSeenAt = body.member.emoteAt;
         body.emoteUntil = now + EMOTE_SECONDS * 1000;
@@ -288,6 +369,7 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
   return Object.freeze({
     sync,
     update,
+    say,
     nearest: (viewer) => findVisitorInReach(viewer, [...bodies.values()].map((body) => body.member)),
     setVisible: (visible: boolean) => { root.visible = visible; },
     count: () => bodies.size,
