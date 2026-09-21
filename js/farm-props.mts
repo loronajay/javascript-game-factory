@@ -1,0 +1,925 @@
+// The farm's props, built from the room's decor primitives and the farm's
+// own materials: fences, ponds and the yard props, plus the table that
+// indexes EVERY builder — these, the buildings in `farm-props-buildings.mts`
+// and the plants in `farm-props-plants.mts` — by the catalog's `model` name.
+// No art assets — a prop is boxes, cylinders and spheres, the same way every
+// room prop is — but nothing is a flat colour either: a rail is grained
+// timber, a wall is fieldstone, a bale is straw and a trough is galvanised
+// steel, all from `farm-materials.mts` with their tiles in metres.
+//
+// Every builder centres its model on its footprint (x/z) with its base on the
+// ground (y = 0), so `farm-world.mts` places it by `position.set(x, 0, z)` and
+// `rotation.y` and nothing else. A stretchable item (a fence) is built for the
+// row's length and rebuilt when it changes; a pond is sized to its footprint.
+//
+// `FARM_PROP_BUILDERS` is the table the catalog's `model` names index; a
+// test asserts every row names a builder.
+
+import { box, cylinder, sphere, standard, type ThreeNamespace } from "./arcade-room-decor-primitives.mjs";
+import { farmMaterial, scaleUvs, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
+import { farmDecorFootprint, type FarmDecorDefinition } from "./farm-catalog/decor.mjs";
+import type { FarmDecorRow } from "./farm-layout.mjs";
+import { FARM_BUILDING_BUILDERS, type BuildingDoors } from "./farm-props-buildings.mjs";
+import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createStump, createSunflowers, createTree, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
+
+export type { BarnDoors, BuildingDoors } from "./farm-props-buildings.mjs";
+export { createBarn } from "./farm-props-buildings.mjs";
+export { createTree, createPine, createBush } from "./farm-props-plants.mjs";
+
+const WOOD = "#8a5a34";
+const WOOD_DARK = "#5d3a1f";
+const BARN_TRIM = "#f1e6d2";
+const WATER = "#3f7fb8";
+
+/** Grained timber in a colour. */
+function timber(THREE: ThreeNamespace, color = WOOD, metresPerTile = 1.2): any {
+  return farmMaterial(THREE, "wood", { colors: [color, "#2f1c0c", "#9a7248"], metresPerTile });
+}
+
+/** Painted timber: the grain shows faintly through the paint. */
+function painted(THREE: ThreeNamespace, color: string): any {
+  return farmMaterial(THREE, "wood", { colors: [color, "#8a8070", "#ffffff"], metresPerTile: 1.2, bumpScale: 0.006 });
+}
+
+function ironMaterial(THREE: ThreeNamespace): any {
+  return standard(THREE, "#2b2b2b", 0.5, 0.6);
+}
+
+function strawMaterial(THREE: ThreeNamespace, metresPerTile = 0.6): any {
+  return farmMaterial(THREE, "straw", { metresPerTile });
+}
+
+function stoneMaterial(THREE: ThreeNamespace, metresPerTile = 1.2): any {
+  return farmMaterial(THREE, "fieldstone", { metresPerTile });
+}
+
+function waterMaterial(THREE: ThreeNamespace, opacity = 0.86): any {
+  return new THREE.MeshStandardMaterial({ color: WATER, roughness: 0.1, metalness: 0.2, transparent: true, opacity });
+}
+
+/** A rectangular hay bale: straw all over, two twine bands, and the cut ends a shade paler. */
+export function createHayBale(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const hay = strawMaterial(THREE);
+  tbox(THREE, group, [1.4, 0.8, 1], [0, 0.4, 0], hay);
+  const ends = farmMaterial(THREE, "straw", { colors: ["#e0c060", "#b08b2f", "#f4dc88"], metresPerTile: 0.4 });
+  tbox(THREE, group, [0.02, 0.76, 0.96], [0.7, 0.4, 0], ends, false);
+  tbox(THREE, group, [0.02, 0.76, 0.96], [-0.7, 0.4, 0], ends, false);
+  // Two twine bands.
+  const twine = standard(THREE, "#c9a03a", 0.9, 0);
+  for (const x of [-0.42, 0.42]) {
+    box(THREE, group, [0.03, 0.82, 1.02], [x, 0.4, 0], twine, false);
+  }
+  // A few loose wisps on top.
+  for (let index = 0; index < 6; index += 1) {
+    const wisp = box(THREE, group, [0.3, 0.01, 0.02], [-0.5 + index * 0.2, 0.81, -0.3 + (index % 3) * 0.3], twine, false);
+    wisp.rotation.y = index * 0.7;
+  }
+  return group;
+}
+
+/** A galvanised water trough: a ribbed tub on two skids with a float valve, and water in it. */
+export function createTrough(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const steel = farmMaterial(THREE, "corrugated", { colors: ["#9aa2a8", "#6f7780", "#4a5058", "#8a5a2a"], metresPerTile: 0.6 });
+  const rim = standard(THREE, "#7e8790", 0.45, 0.6);
+  // Skids, then the tub: a floor and four ribbed walls, with a rolled rim on top.
+  for (const z of [-0.28, 0.28]) tbox(THREE, group, [1.6, 0.06, 0.08], [0, 0.03, z], timber(THREE, WOOD_DARK), false);
+  tbox(THREE, group, [1.8, 0.06, 0.7], [0, 0.09, 0], rim);
+  tbox(THREE, group, [1.8, 0.5, 0.05], [0, 0.34, -0.325], steel);
+  tbox(THREE, group, [1.8, 0.5, 0.05], [0, 0.34, 0.325], steel);
+  tbox(THREE, group, [0.05, 0.5, 0.7], [-0.875, 0.34, 0], steel);
+  tbox(THREE, group, [0.05, 0.5, 0.7], [0.875, 0.34, 0], steel);
+  for (const [w, x, z, rot] of [[1.84, 0, -0.325, 0], [1.84, 0, 0.325, 0], [0.74, -0.875, 0, Math.PI / 2], [0.74, 0.875, 0, Math.PI / 2]] as const) {
+    const lip = cylinder(THREE, group, 0.03, 0.03, w, [x, 0.6, z], rim, 8, false);
+    lip.rotation.z = Math.PI / 2;
+    lip.rotation.y = rot;
+  }
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.6), waterMaterial(THREE));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.5;
+  group.add(water);
+  // A float valve at one end.
+  cylinder(THREE, group, 0.02, 0.02, 0.4, [0.7, 0.55, -0.2], rim, 6, false).rotation.z = Math.PI / 2;
+  sphere(THREE, group, 0.07, [0.55, 0.52, -0.2], standard(THREE, "#d8a020", 0.5, 0.3));
+  return group;
+}
+
+/**
+ * A run of post-and-rail fence `length` metres long along local +x, centred on
+ * the group. Posts every ~2 m with capped tops; two rails let into them.
+ */
+export function createFenceRun(THREE: ThreeNamespace, length: number): any {
+  const group = new THREE.Group();
+  const post = timber(THREE, WOOD);
+  const rail = timber(THREE, WOOD_DARK);
+  const { count, step } = postSpacing(length, 2);
+  for (let index = 0; index < count; index += 1) {
+    const x = -length / 2 + index * step;
+    tbox(THREE, group, [0.14, 1.15, 0.14], [x, 0.575, 0], post);
+    const cap = tbox(THREE, group, [0.18, 0.05, 0.18], [x, 1.17, 0], post, false);
+    cap.castShadow = false;
+  }
+  for (let index = 0; index < count - 1; index += 1) {
+    const centre = -length / 2 + index * step + step / 2;
+    tbox(THREE, group, [step - 0.06, 0.1, 0.06], [centre, 0.95, 0], rail);
+    tbox(THREE, group, [step - 0.06, 0.1, 0.06], [centre, 0.55, 0], rail);
+    // Nail heads where the rails meet the posts.
+    for (const x of [centre - step / 2 + 0.08, centre + step / 2 - 0.08]) for (const y of [0.95, 0.55]) sphere(THREE, group, 0.012, [x, y, 0.035], ironMaterial(THREE)).castShadow = false;
+  }
+  return group;
+}
+
+function postSpacing(length: number, spacing: number): { count: number; step: number } {
+  const count = Math.max(2, Math.round(length / spacing) + 1);
+  return { count, step: length / (count - 1) };
+}
+
+/** A white picket fence: close pickets with pointed tops on two rails, on posts with finials. */
+export function createPicketFence(THREE: ThreeNamespace, length: number): any {
+  const group = new THREE.Group();
+  const paint = painted(THREE, BARN_TRIM);
+  const shade = painted(THREE, "#d9cdb5");
+  const { count, step } = postSpacing(length, 0.3);
+  for (let index = 0; index < count; index += 1) {
+    const x = -length / 2 + index * step;
+    tbox(THREE, group, [0.09, 0.9, 0.04], [x, 0.45, 0], paint);
+    // A pointed cap: a thin pyramid-ish box turned 45°.
+    const cap = box(THREE, group, [0.064, 0.064, 0.04], [x, 0.93, 0], paint, false);
+    cap.rotation.z = Math.PI / 4;
+  }
+  tbox(THREE, group, [length, 0.07, 0.03], [0, 0.72, 0.03], shade);
+  tbox(THREE, group, [length, 0.07, 0.03], [0, 0.32, 0.03], shade);
+  // A post with a finial every couple of metres.
+  const posts = postSpacing(length, 2);
+  for (let index = 0; index < posts.count; index += 1) {
+    const x = -length / 2 + index * posts.step;
+    tbox(THREE, group, [0.12, 1.05, 0.12], [x, 0.525, 0], paint);
+    sphere(THREE, group, 0.07, [x, 1.11, 0], paint);
+  }
+  return group;
+}
+
+/** A dry-stone wall: one fieldstone run with an uneven top of capstones and the odd stone proud of the face. */
+export function createStoneWall(THREE: ThreeNamespace, length: number): any {
+  const group = new THREE.Group();
+  const stone = stoneMaterial(THREE, 0.9);
+  const height = 0.96;
+  tbox(THREE, group, [length, height, 0.46], [0, height / 2, 0], stone);
+  // Capstones set on edge along the top, each a little different.
+  for (let x = -length / 2; x < length / 2; x += 0.34) {
+    const w = Math.min(0.3, length / 2 - x);
+    if (w <= 0.05) break;
+    const cap = tbox(THREE, group, [w, 0.16 + ((Math.round(x * 10) % 3) * 0.03), 0.5], [x + w / 2, height + 0.06, 0], stone);
+    cap.rotation.x = ((Math.round(x * 7) % 5) - 2) * 0.05;
+  }
+  // Stones standing proud of the faces.
+  for (let x = -length / 2 + 0.25; x < length / 2 - 0.2; x += 0.55) {
+    const side = Math.round(x * 3) % 2 ? 1 : -1;
+    const bump = tsphere(THREE, group, 0.12, [x, 0.2 + ((Math.round(x * 5) % 3) * 0.25), side * 0.2], stone, 8, 6);
+    bump.scale.set(1.2, 0.7, 0.6);
+  }
+  return group;
+}
+
+/**
+ * The gate: two tall posts and a hinged panel of rails and a diagonal brace.
+ * The panel is a door on the buildings' own contract — `setOpen` starts the
+ * swing (outward, toward the row's +z), `update(dt)` eases it — and the scene
+ * drops the gate's box from the obstacle list while it stands open.
+ */
+export function createGate(THREE: ThreeNamespace): Readonly<{ group: any; doors: BuildingDoors }> {
+  const group = new THREE.Group();
+  const post = timber(THREE, WOOD);
+  const rail = timber(THREE, WOOD_DARK);
+  const metal = ironMaterial(THREE);
+  const width = 2.4;
+  for (const x of [-width / 2, width / 2]) {
+    tbox(THREE, group, [0.18, 1.35, 0.18], [x, 0.675, 0], post);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.14, 4), post);
+    cap.position.set(x, 1.42, 0);
+    cap.rotation.y = Math.PI / 4;
+    group.add(cap);
+  }
+  const hinge = new THREE.Group();
+  const leafWidth = width - 0.3;
+  for (const y of [0.3, 0.62, 0.94]) tbox(THREE, hinge, [leafWidth, 0.09, 0.06], [leafWidth / 2, y, 0], rail);
+  tbox(THREE, hinge, [0.09, 0.8, 0.06], [0.08, 0.62, 0.035], rail);
+  tbox(THREE, hinge, [0.09, 0.8, 0.06], [leafWidth - 0.08, 0.62, 0.035], rail);
+  const brace = tbox(THREE, hinge, [0.08, Math.hypot(leafWidth, 0.64) - 0.2, 0.05], [leafWidth / 2, 0.62, 0.07], rail, false);
+  brace.rotation.z = Math.atan2(leafWidth, 0.64);
+  // Strap hinges on the post side, a latch on the other.
+  for (const y of [0.3, 0.94]) {
+    box(THREE, hinge, [0.5, 0.05, 0.015], [0.3, y, 0.04], metal, false);
+    box(THREE, hinge, [0.05, 0.12, 0.05], [-0.05, y, 0], metal, false);
+  }
+  box(THREE, hinge, [0.16, 0.04, 0.03], [leafWidth - 0.02, 0.66, 0.05], metal, false);
+  hinge.position.set(-width / 2 + 0.12, 0, 0);
+  group.add(hinge);
+  let open = false;
+  let swing = 0;
+  const doors: BuildingDoors = Object.freeze({
+    setOpen(next: boolean) { open = next; },
+    isOpen: () => open,
+    update(dt: number) {
+      const target = open ? 1 : 0;
+      if (swing === target) return false;
+      swing = target > swing ? Math.min(target, swing + dt * GATE_SWING_SPEED) : Math.max(target, swing - dt * GATE_SWING_SPEED);
+      const eased = swing * swing * (3 - 2 * swing);
+      // The leaf runs from the hinge toward +x; a negative turn about y carries that edge to +z, out through the fence line.
+      hinge.rotation.y = -eased * GATE_SWING;
+      return swing !== target;
+    },
+  });
+  return Object.freeze({ group, doors });
+}
+
+const GATE_SWING = 1.7;
+const GATE_SWING_SPEED = 1.6;
+
+/** A split-rail fence: rough rails resting in crossed posts, the way a pioneer fence goes up. */
+export function createSplitRail(THREE: ThreeNamespace, length: number): any {
+  const group = new THREE.Group();
+  const rail = farmMaterial(THREE, "bark", { colors: ["#9a7248", "#5a3a1f", "#c9a06a"], metresPerTile: 0.5, bumpScale: 0.02 });
+  const dark = farmMaterial(THREE, "bark", { colors: [WOOD_DARK, "#2f1c0c", "#8a6240"], metresPerTile: 0.5, bumpScale: 0.02 });
+  const { count, step } = postSpacing(length, 2.2);
+  for (let index = 0; index < count; index += 1) {
+    const x = -length / 2 + index * step;
+    for (const sign of [1, -1] as const) {
+      const post = tcylinder(THREE, group, 0.06, 0.07, 1.4, [x, 0.62, 0], dark, 7);
+      post.rotation.x = sign * 0.32;
+    }
+  }
+  for (let index = 0; index < count - 1; index += 1) {
+    const centre = -length / 2 + index * step + step / 2;
+    for (const [y, z] of [[0.35, 0.0], [0.72, 0.05], [1.05, -0.04]] as const) {
+      const bar = tcylinder(THREE, group, 0.05, 0.06, step + 0.2, [centre, y, z], index % 2 ? rail : dark, 7);
+      bar.rotation.z = Math.PI / 2;
+    }
+  }
+  return group;
+}
+
+/** A wire fence: slim posts with four strands of wire between them, barbed. */
+export function createWireFence(THREE: ThreeNamespace, length: number): any {
+  const group = new THREE.Group();
+  const post = timber(THREE, WOOD);
+  const wire = standard(THREE, "#b9bec4", 0.4, 0.7);
+  const { count, step } = postSpacing(length, 2.5);
+  for (let index = 0; index < count; index += 1) {
+    tbox(THREE, group, [0.1, 1.2, 0.1], [-length / 2 + index * step, 0.6, 0], post);
+    for (const y of [0.3, 0.6, 0.9, 1.15]) sphere(THREE, group, 0.014, [-length / 2 + index * step, y, 0.055], wire).castShadow = false;
+  }
+  for (const y of [0.3, 0.6, 0.9, 1.15]) {
+    const strand = cylinder(THREE, group, 0.008, 0.008, length, [0, y, 0], wire, 4, false);
+    strand.rotation.z = Math.PI / 2;
+    for (let x = -length / 2 + 0.3; x < length / 2; x += 0.5) {
+      const barb = box(THREE, group, [0.04, 0.04, 0.008], [x, y, 0], wire, false);
+      barb.rotation.z = Math.PI / 4;
+    }
+  }
+  return group;
+}
+
+/** A hedgerow: a clipped run of dense leaf, its top a row of overlapping mounds, taller than the animals and solid to the walker. */
+export function createHedgeRow(THREE: ThreeNamespace, length: number): any {
+  const group = new THREE.Group();
+  const leaves = farmMaterial(THREE, "foliage", { colors: ["#3f8a46", "#245420", "#6fb24c"], metresPerTile: 0.6 });
+  const dark = farmMaterial(THREE, "foliage", { colors: ["#2b6331", "#173a1c", "#4f9a3a"], metresPerTile: 0.6 });
+  tbox(THREE, group, [length, 0.9, 0.6], [0, 0.45, 0], leaves);
+  const bumps = Math.max(2, Math.round(length / 0.45));
+  for (let index = 0; index < bumps; index += 1) {
+    const x = -length / 2 + (index + 0.5) * (length / bumps);
+    const blob = tsphere(THREE, group, 0.36, [x, 0.9, (index % 2 ? 0.08 : -0.08)], index % 3 === 0 ? dark : leaves, 12, 10);
+    blob.scale.y = 0.75;
+    tsphere(THREE, group, 0.3, [x, 0.4, index % 2 ? -0.28 : 0.28], index % 2 ? dark : leaves, 12, 10);
+    tsphere(THREE, group, 0.26, [x + 0.15, 0.62, index % 2 ? 0.26 : -0.26], leaves, 10, 8);
+  }
+  // Woody stems showing at the foot.
+  for (let x = -length / 2 + 0.3; x < length / 2; x += 0.6) cylinder(THREE, group, 0.03, 0.04, 0.3, [x, 0.12, 0], timber(THREE, WOOD_DARK), 6, false);
+  return group;
+}
+
+/**
+ * A pond sized to its footprint: a raised earth bank sloping down to a sheet
+ * of water, a lip of stones, cattails and a rock or two — the swimmers'
+ * whole world. The bank is a lathe, so it is a real hollow, not a disc.
+ */
+export function createPond(THREE: ThreeNamespace, width: number, depth: number): any {
+  const group = new THREE.Group();
+  const bank = farmMaterial(THREE, "soil", { colors: ["#6b4b2c", "#3f2a16", "#8f6f48"], metresPerTile: 1.2 });
+  const mud = farmMaterial(THREE, "soil", { colors: ["#4a3a2a", "#2a1e14", "#6a5a44"], metresPerTile: 1.2 });
+  const grass = farmMaterial(THREE, "foliage", { colors: ["#5f9a3c", "#3a6a28", "#8fc45a"], metresPerTile: 0.6 });
+  // The bank profile, on a unit radius, scaled to the footprint: a grassy lip outside, bare earth over it, mud below the water.
+  const outer = [new THREE.Vector2(0.56, 0), new THREE.Vector2(0.52, 0.16), new THREE.Vector2(0.5, 0.2), new THREE.Vector2(0.47, 0.19)];
+  const inner = [new THREE.Vector2(0.47, 0.19), new THREE.Vector2(0.42, 0.1), new THREE.Vector2(0.34, 0.05), new THREE.Vector2(0.18, 0.03), new THREE.Vector2(0, 0.03)];
+  const bankMesh = new THREE.Mesh(scaleUvs(new THREE.LatheGeometry(outer, 40), 1.2, Math.PI * (width + depth) / 2, 0.6), bank);
+  bankMesh.scale.set(width, 1, depth);
+  bankMesh.receiveShadow = true;
+  group.add(bankMesh);
+  const basin = new THREE.Mesh(scaleUvs(new THREE.LatheGeometry(inner, 40), 1.2, Math.PI * (width + depth) / 2, 1.5), mud);
+  basin.scale.set(width, 1, depth);
+  basin.receiveShadow = true;
+  group.add(basin);
+  // Grass tufts along the outer lip.
+  const tufts = Math.max(12, Math.round((width + depth) * 3));
+  for (let index = 0; index < tufts; index += 1) {
+    const angle = (index / tufts) * Math.PI * 2;
+    const tuft = tsphere(THREE, group, 0.14 + ((index * 5) % 3) * 0.03, [Math.cos(angle) * (width / 2 + 0.02), 0.16, Math.sin(angle) * (depth / 2 + 0.02)], grass, 8, 6);
+    tuft.scale.y = 0.6;
+  }
+  const sheet = new THREE.Mesh(new THREE.CircleGeometry(0.5, 40), waterMaterial(THREE, 0.8));
+  sheet.scale.set(width - 0.45, depth - 0.45, 1);
+  sheet.rotation.x = -Math.PI / 2;
+  sheet.position.y = 0.14;
+  sheet.receiveShadow = true;
+  group.add(sheet);
+  // Stones round the lip and cattails at one end.
+  const stone = stoneMaterial(THREE, 0.5);
+  const count = Math.max(10, Math.round((width + depth) * 2));
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index / count) * Math.PI * 2 + 0.1;
+    const jitter = ((index * 37) % 7) / 7;
+    const x = Math.cos(angle) * (width / 2 - 0.2);
+    const z = Math.sin(angle) * (depth / 2 - 0.2);
+    const pebble = tsphere(THREE, group, 0.08 + jitter * 0.1, [x, 0.17, z], stone, 8, 6);
+    pebble.scale.set(1.3, 0.55, 1);
+    pebble.rotation.y = angle;
+  }
+  const reed = standard(THREE, "#5a7a34", 0.9, 0);
+  const head = standard(THREE, "#5a3d24", 0.9, 0);
+  for (let index = 0; index < 7; index += 1) {
+    const angle = 3.6 + index * 0.14;
+    const x = Math.cos(angle) * (width / 2 - 0.35);
+    const z = Math.sin(angle) * (depth / 2 - 0.35);
+    const height = 0.7 + (index % 3) * 0.2;
+    cylinder(THREE, group, 0.012, 0.018, height, [x, 0.1 + height / 2, z], reed, 5, false);
+    cylinder(THREE, group, 0.035, 0.035, 0.18, [x, 0.1 + height + 0.06, z], head, 6, false);
+    const blade = box(THREE, group, [0.03, height * 0.9, 0.006], [x + 0.06, 0.1 + height * 0.45, z], reed, false);
+    blade.rotation.z = -0.15;
+  }
+  return group;
+}
+
+/** A scarecrow: a post, a crossbar, a stuffed shirt with straw at the cuffs, a sack head with a stitched face, and a straw hat. */
+export function createScarecrow(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const wood = timber(THREE, WOOD_DARK);
+  const shirt = farmMaterial(THREE, "brick", { colors: ["#b03a3a", "#7a2828", "#c95a4a", "#3a6ab0"], metresPerTile: 0.35, bumpScale: 0.005 });
+  const trousers = farmMaterial(THREE, "plaster", { colors: ["#3a5a8a", "#22406a", "#5a7aaa"], metresPerTile: 0.6 });
+  const sack = farmMaterial(THREE, "plaster", { colors: ["#d8c39a", "#a8956e", "#f0e2c0"], metresPerTile: 0.4 });
+  const straw = strawMaterial(THREE, 0.3);
+  tcylinder(THREE, group, 0.05, 0.06, 2.1, [0, 1.05, 0], wood, 8);
+  tbox(THREE, group, [1.3, 0.08, 0.08], [0, 1.55, 0], wood);
+  tbox(THREE, group, [0.5, 0.7, 0.3], [0, 1.25, 0], shirt);
+  tbox(THREE, group, [0.5, 0.18, 0.18], [-0.55, 1.55, 0], shirt);
+  tbox(THREE, group, [0.5, 0.18, 0.18], [0.55, 1.55, 0], shirt);
+  tbox(THREE, group, [0.42, 0.5, 0.26], [0, 0.65, 0], trousers);
+  // Patches on the shirt and a button line.
+  box(THREE, group, [0.14, 0.12, 0.01], [0.12, 1.15, 0.16], standard(THREE, "#3a6ab0", 0.9, 0), false);
+  for (const y of [1.5, 1.38, 1.26, 1.14]) sphere(THREE, group, 0.015, [0, y, 0.16], standard(THREE, "#f1e6d2", 0.6, 0)).castShadow = false;
+  tsphere(THREE, group, 0.2, [0, 1.85, 0], sack, 12, 10);
+  // A stitched face.
+  const thread = standard(THREE, "#2b2b2b", 0.9, 0);
+  for (const x of [-0.07, 0.07]) {
+    const eye = box(THREE, group, [0.05, 0.012, 0.01], [x, 1.9, 0.19], thread, false);
+    eye.rotation.z = x > 0 ? 0.7 : -0.7;
+    const eye2 = box(THREE, group, [0.05, 0.012, 0.01], [x, 1.9, 0.19], thread, false);
+    eye2.rotation.z = x > 0 ? -0.7 : 0.7;
+  }
+  for (let index = 0; index < 5; index += 1) box(THREE, group, [0.03, 0.012, 0.01], [-0.06 + index * 0.03, 1.78 - Math.abs(index - 2) * 0.012, 0.195], thread, false);
+  const brim = tcylinder(THREE, group, 0.36, 0.34, 0.03, [0, 2.0, 0], straw, 16);
+  brim.rotation.z = 0.08;
+  tcylinder(THREE, group, 0.15, 0.19, 0.18, [0, 2.1, 0], straw, 12);
+  box(THREE, group, [0.4, 0.04, 0.4], [0, 2.04, 0], standard(THREE, "#a83a3a", 0.8, 0), false);
+  // Straw at the cuffs and hem.
+  tbox(THREE, group, [0.1, 0.14, 0.14], [-0.83, 1.55, 0], straw, false);
+  tbox(THREE, group, [0.1, 0.14, 0.14], [0.83, 1.55, 0], straw, false);
+  tbox(THREE, group, [0.44, 0.12, 0.28], [0, 0.4, 0], straw, false);
+  // A crow on the crossbar.
+  const crow = standard(THREE, "#1b1f24", 0.7, 0);
+  sphere(THREE, group, 0.06, [0.5, 1.65, 0], crow).scale.set(1.5, 0.9, 0.8);
+  sphere(THREE, group, 0.04, [0.58, 1.71, 0], crow);
+  box(THREE, group, [0.05, 0.02, 0.02], [0.63, 1.71, 0], standard(THREE, "#d8a020", 0.6, 0), false);
+  return group;
+}
+
+/** A stone well: a fieldstone shaft with a slate cap ring, a timber frame, a shingled roof over the winch, and a bucket on the rope. */
+export function createWell(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const stone = stoneMaterial(THREE, 0.9);
+  const wood = timber(THREE, WOOD_DARK);
+  const roof = farmMaterial(THREE, "shingles", { metresPerTile: 0.8 });
+  tcylinder(THREE, group, 0.7, 0.75, 0.9, [0, 0.45, 0], stone, 18);
+  tcylinder(THREE, group, 0.76, 0.76, 0.08, [0, 0.94, 0], farmMaterial(THREE, "plaster", { colors: ["#6f6f6f", "#4a4a4a", "#9a9a9a"], metresPerTile: 0.6 }), 18);
+  cylinder(THREE, group, 0.52, 0.52, 0.99, [0, 0.5, 0], standard(THREE, "#0e1216", 1, 0), 18, false);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), waterMaterial(THREE, 0.9));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.35;
+  group.add(water);
+  tbox(THREE, group, [0.12, 1.9, 0.12], [-0.6, 0.95, 0], wood);
+  tbox(THREE, group, [0.12, 1.9, 0.12], [0.6, 0.95, 0], wood);
+  tbox(THREE, group, [1.4, 0.1, 0.1], [0, 1.95, 0], wood);
+  const drum = tcylinder(THREE, group, 0.09, 0.09, 1.2, [0, 1.55, 0], wood, 12);
+  drum.rotation.z = Math.PI / 2;
+  // Rope wound on the drum, and the crank handle.
+  for (let x = -0.25; x <= 0.25; x += 0.05) cylinder(THREE, group, 0.1, 0.1, 0.03, [x, 1.55, 0], standard(THREE, "#c9b99c", 1, 0), 12, false).rotation.z = Math.PI / 2;
+  const crank = box(THREE, group, [0.05, 0.3, 0.05], [0.72, 1.68, 0], ironMaterial(THREE), false);
+  crank.castShadow = false;
+  cylinder(THREE, group, 0.025, 0.025, 0.2, [0.72, 1.82, 0.08], wood, 8).rotation.x = Math.PI / 2;
+  for (const side of [-1, 1] as const) {
+    const slab = tbox(THREE, group, [1.7, 0.06, 0.8], [0, 2.1, side * 0.32], roof);
+    slab.rotation.x = side * 0.62;
+  }
+  tbox(THREE, group, [1.74, 0.08, 0.18], [0, 2.32, 0], roof, false);
+  // Bucket on the rope.
+  cylinder(THREE, group, 0.012, 0.012, 0.5, [0, 1.3, 0], standard(THREE, "#c9b99c", 1, 0), 6, false);
+  tcylinder(THREE, group, 0.14, 0.11, 0.2, [0, 0.98, 0], farmMaterial(THREE, "battens", { colors: ["#7a4a2a", "#3a2412", "#9a6a44", "#6a3f22"], metresPerTile: 0.5 }), 10);
+  cylinder(THREE, group, 0.15, 0.15, 0.02, [0, 1.06, 0], ironMaterial(THREE), 10, false);
+  return group;
+}
+
+/** A slatted garden bench on cast-iron ends. */
+export function createBench(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const slat = timber(THREE, WOOD, 0.8);
+  const iron = ironMaterial(THREE);
+  for (const x of [-0.7, 0.7]) {
+    box(THREE, group, [0.06, 0.45, 0.5], [x, 0.225, 0], iron);
+    box(THREE, group, [0.06, 0.5, 0.06], [x, 0.7, -0.22], iron);
+    // A scroll at the foot and a curl at the top of the arm.
+    const scroll = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.015, 6, 12), iron);
+    scroll.position.set(x, 0.12, 0.2);
+    scroll.rotation.y = Math.PI / 2;
+    group.add(scroll);
+    box(THREE, group, [0.06, 0.05, 0.36], [x, 0.7, -0.05], iron, false);
+  }
+  for (const z of [-0.2, -0.05, 0.1, 0.25]) tbox(THREE, group, [1.6, 0.05, 0.12], [0, 0.47, z], slat);
+  for (const y of [0.6, 0.75, 0.9]) tbox(THREE, group, [1.6, 0.1, 0.05], [0, y, -0.24], slat);
+  return group;
+}
+
+/** A cast-iron lamp post with a fluted column and a warm lamp; lit at all hours, the farm has no night yet. */
+export function createLampPost(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const iron = ironMaterial(THREE);
+  const glass = new THREE.MeshStandardMaterial({ color: "#ffd9a0", emissive: "#ffb347", emissiveIntensity: 1.6, roughness: 0.3, transparent: true, opacity: 0.9 });
+  cylinder(THREE, group, 0.14, 0.18, 0.12, [0, 0.06, 0], iron, 10);
+  cylinder(THREE, group, 0.1, 0.14, 0.3, [0, 0.27, 0], iron, 10);
+  cylinder(THREE, group, 0.05, 0.08, 2.3, [0, 1.55, 0], iron, 10);
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (index / 8) * Math.PI * 2;
+    cylinder(THREE, group, 0.012, 0.012, 2.2, [Math.cos(angle) * 0.055, 1.55, Math.sin(angle) * 0.055], iron, 4, false);
+  }
+  cylinder(THREE, group, 0.09, 0.06, 0.1, [0, 2.72, 0], iron, 10);
+  // The lantern: four glass panes in an iron frame under a little pyramid cap.
+  box(THREE, group, [0.3, 0.32, 0.3], [0, 2.9, 0], glass);
+  for (const [x, z] of [[-0.15, -0.15], [0.15, -0.15], [-0.15, 0.15], [0.15, 0.15]] as const) box(THREE, group, [0.03, 0.34, 0.03], [x, 2.9, z], iron, false);
+  box(THREE, group, [0.38, 0.05, 0.38], [0, 2.72, 0], iron);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.2, 4), iron);
+  cap.position.y = 3.16;
+  cap.rotation.y = Math.PI / 4;
+  group.add(cap);
+  sphere(THREE, group, 0.03, [0, 3.28, 0], iron);
+  const light = new THREE.PointLight(0xffc477, 4, 8, 1.8);
+  light.position.set(0, 2.85, 0);
+  group.add(light);
+  return group;
+}
+
+/** A lily pond: the pond with pads and pink lilies floating on it, and reeds along one bank. */
+export function createLilyPond(THREE: ThreeNamespace, width: number, depth: number): any {
+  const group = createPond(THREE, width, depth);
+  const pad = farmMaterial(THREE, "foliage", { colors: ["#3f8a46", "#2b6331", "#6fb24c"], metresPerTile: 0.4 });
+  const petal = standard(THREE, "#ff8fb0", 0.6, 0);
+  const heart = standard(THREE, "#ffd33d", 0.6, 0);
+  const spots: Array<[number, number, number]> = [[-0.28, -0.18, 0.22], [0.16, -0.3, 0.18], [0.3, 0.12, 0.24], [-0.1, 0.28, 0.2], [-0.32, 0.22, 0.16], [0.02, -0.02, 0.15]];
+  spots.forEach(([u, v, r], index) => {
+    const x = u * (width - 1);
+    const z = v * (depth - 1);
+    const leaf = tcylinder(THREE, group, r, r, 0.02, [x, 0.15, z], pad, 14, false);
+    leaf.rotation.y = index;
+    // The notch every lily pad has.
+    box(THREE, group, [r * 0.25, 0.03, r * 0.6], [x + r * 0.85, 0.15, z], waterMaterial(THREE, 0.8), false).rotation.y = index;
+    if (index % 2 === 0) {
+      for (let k = 0; k < 6; k += 1) {
+        const angle = (k / 6) * Math.PI * 2;
+        const p = sphere(THREE, group, 0.06, [x + Math.cos(angle) * 0.07, 0.2, z + Math.sin(angle) * 0.07], petal);
+        p.scale.set(1.4, 0.5, 0.8);
+        p.rotation.y = -angle;
+      }
+      sphere(THREE, group, 0.04, [x, 0.23, z], heart);
+    }
+  });
+  return group;
+}
+
+/** A doghouse: a little red plank house with a shingle roof, a dark doorway with an arched top, and a name board. */
+export function createDoghouse(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const wall = farmMaterial(THREE, "planks", { metresPerTile: 0.7 });
+  const roof = farmMaterial(THREE, "shingles", { metresPerTile: 0.7 });
+  const trim = painted(THREE, BARN_TRIM);
+  tbox(THREE, group, [1.1, 0.9, 1.3], [0, 0.45, 0], wall);
+  tbox(THREE, group, [1.2, 0.06, 1.4], [0, 0.03, 0], timber(THREE, WOOD_DARK), false);
+  box(THREE, group, [0.5, 0.5, 0.04], [0, 0.27, 0.66], standard(THREE, "#1b1f24", 1, 0), false);
+  cylinder(THREE, group, 0.25, 0.25, 0.04, [0, 0.52, 0.66], standard(THREE, "#1b1f24", 1, 0), 12, false).rotation.x = Math.PI / 2;
+  for (const x of [-0.29, 0.29]) tbox(THREE, group, [0.06, 0.6, 0.05], [x, 0.3, 0.67], trim, false);
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 6, 14, Math.PI), trim);
+  arch.position.set(0, 0.52, 0.67);
+  group.add(arch);
+  for (const side of [-1, 1] as const) {
+    const slab = tbox(THREE, group, [0.78, 0.06, 1.5], [side * 0.31, 1.1, 0], roof);
+    slab.rotation.z = side * -0.65;
+  }
+  tbox(THREE, group, [0.12, 0.08, 1.55], [0, 1.3, 0], roof);
+  for (const x of [-0.55, 0.55]) for (const z of [-0.65, 0.65]) box(THREE, group, [0.06, 0.9, 0.06], [x, 0.45, z], trim, false);
+  tbox(THREE, group, [0.5, 0.14, 0.03], [0, 0.85, 0.66], trim, false);
+  // A bowl by the door.
+  tcylinder(THREE, group, 0.12, 0.09, 0.08, [0.42, 0.04, 0.85], farmMaterial(THREE, "galvanised", { metresPerTile: 0.4 }), 12);
+  return group;
+}
+
+/** A wheelbarrow: a green steel tray on a spoked wheel with two ash handles, parked on its legs, with a load of earth. */
+export function createWheelbarrow(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const paint = farmMaterial(THREE, "galvanised", { colors: ["#3f7228", "#2a4f1a", "#1c3812"], metresPerTile: 0.6, roughness: 0.5, metalness: 0.4 });
+  const wood = timber(THREE, "#c9a06a", 0.6);
+  const iron = ironMaterial(THREE);
+  const tray = tbox(THREE, group, [0.6, 0.3, 0.8], [0, 0.45, -0.1], paint);
+  tray.rotation.x = 0.1;
+  const load = tsphere(THREE, group, 0.28, [0, 0.55, -0.1], farmMaterial(THREE, "soil"), 10, 8);
+  load.scale.set(1, 0.45, 1.3);
+  const wheel = cylinder(THREE, group, 0.2, 0.2, 0.06, [0, 0.2, -0.58], standard(THREE, "#1b1f24", 0.8, 0.1), 14);
+  wheel.rotation.z = Math.PI / 2;
+  cylinder(THREE, group, 0.05, 0.05, 0.08, [0, 0.2, -0.58], iron, 8).rotation.z = Math.PI / 2;
+  for (let spoke = 0; spoke < 4; spoke += 1) {
+    const bar = box(THREE, group, [0.02, 0.36, 0.02], [0, 0.2, -0.58], iron, false);
+    bar.rotation.x = spoke * Math.PI / 4;
+  }
+  for (const x of [-0.22, 0.22]) {
+    const handle = tcylinder(THREE, group, 0.025, 0.025, 1.3, [x, 0.42, 0.15], wood, 6);
+    handle.rotation.x = Math.PI / 2 + 0.12;
+    box(THREE, group, [0.05, 0.36, 0.05], [x, 0.18, 0.25], iron, false);
+    cylinder(THREE, group, 0.03, 0.03, 0.14, [x, 0.5, 0.78], standard(THREE, "#d43a3a", 0.6, 0.2), 8).rotation.x = Math.PI / 2;
+  }
+  return group;
+}
+
+/** A hay wagon: a plank bed on four spoked wheels with iron tyres, heaped with hay, shafts out the front. */
+export function createWagon(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const wood = timber(THREE, WOOD);
+  const dark = timber(THREE, WOOD_DARK);
+  const iron = ironMaterial(THREE);
+  const hay = strawMaterial(THREE);
+  tbox(THREE, group, [1.5, 0.08, 2.2], [0, 0.6, 0], wood);
+  for (const x of [-0.72, 0.72]) {
+    tbox(THREE, group, [0.06, 0.4, 2.2], [x, 0.84, 0], dark);
+    for (let z = -0.9; z <= 0.9; z += 0.45) tbox(THREE, group, [0.08, 0.46, 0.08], [x, 0.85, z], dark, false);
+  }
+  for (const z of [-1.07, 1.07]) tbox(THREE, group, [1.5, 0.4, 0.06], [0, 0.84, z], dark);
+  tbox(THREE, group, [0.1, 0.1, 2.0], [0, 0.5, 0], dark, false);
+  for (const z of [-0.75, 0.75]) {
+    tbox(THREE, group, [1.7, 0.08, 0.08], [0, 0.45, z], dark, false);
+    for (const x of [-0.82, 0.82]) {
+      const rim = cylinder(THREE, group, 0.44, 0.44, 0.06, [x, 0.42, z], iron, 14);
+      rim.rotation.z = Math.PI / 2;
+      const felloe = tcylinder(THREE, group, 0.4, 0.4, 0.07, [x, 0.42, z], dark, 14);
+      felloe.rotation.z = Math.PI / 2;
+      cylinder(THREE, group, 0.33, 0.33, 0.08, [x, 0.42, z], standard(THREE, "#0e0e0e", 0.2, 0), 14, false).rotation.z = Math.PI / 2;
+      for (let spoke = 0; spoke < 6; spoke += 1) {
+        const bar = tbox(THREE, group, [0.05, 0.72, 0.035], [x, 0.42, z], timber(THREE, "#c9a06a"), false);
+        bar.rotation.x = spoke * Math.PI / 6;
+      }
+      cylinder(THREE, group, 0.08, 0.08, 0.12, [x, 0.42, z], dark, 10).rotation.z = Math.PI / 2;
+    }
+  }
+  const heap = tsphere(THREE, group, 0.75, [0, 1.05, 0], hay);
+  heap.scale.set(1, 0.55, 1.4);
+  const heap2 = tsphere(THREE, group, 0.5, [0.2, 1.25, -0.3], hay);
+  heap2.scale.set(1, 0.6, 1.2);
+  for (const x of [-0.35, 0.35]) {
+    const shaft = tcylinder(THREE, group, 0.035, 0.04, 1.2, [x, 0.55, 1.65], wood, 6);
+    shaft.rotation.x = Math.PI / 2;
+  }
+  return group;
+}
+
+/** A barrel: bellied staves under three iron hoops, with a bung in the head. */
+export function createBarrel(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const stave = farmMaterial(THREE, "battens", { colors: ["#7a4a2a", "#3a2412", "#9a6a44", "#6a3f22"], metresPerTile: 0.55 });
+  const hoop = standard(THREE, "#3b3b3b", 0.5, 0.6);
+  const body = new THREE.Mesh(scaleUvs(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 16), 0.55, Math.PI * 0.68, 0.9), stave);
+  body.position.y = 0.45;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+  const belly = tcylinder(THREE, group, 0.34, 0.34, 0.5, [0, 0.45, 0], stave, 16, false);
+  belly.castShadow = false;
+  const bellyTop = tcylinder(THREE, group, 0.3, 0.34, 0.2, [0, 0.8, 0], stave, 16, false);
+  const bellyBottom = tcylinder(THREE, group, 0.34, 0.3, 0.2, [0, 0.1, 0], stave, 16, false);
+  bellyTop.castShadow = false;
+  bellyBottom.castShadow = false;
+  cylinder(THREE, group, 0.32, 0.32, 0.05, [0, 0.14, 0], hoop, 16, false);
+  cylinder(THREE, group, 0.32, 0.32, 0.05, [0, 0.76, 0], hoop, 16, false);
+  cylinder(THREE, group, 0.35, 0.35, 0.05, [0, 0.45, 0], hoop, 16, false);
+  tcylinder(THREE, group, 0.28, 0.28, 0.02, [0, 0.9, 0], farmMaterial(THREE, "wood", { colors: ["#9a7248", "#5a3a1f", "#c9a06a"], metresPerTile: 0.6 }), 16);
+  cylinder(THREE, group, 0.04, 0.04, 0.03, [0.12, 0.92, 0], hoop, 8, false);
+  return group;
+}
+
+/** A crate stack: three planked crates with stencilled boards, one askew on top. */
+export function createCrates(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const plank = farmMaterial(THREE, "planks", { colors: ["#c9a06a", "#8a6a3a", "#e0c090", "#6a4a2a"], metresPerTile: 0.6 });
+  const edge = timber(THREE, WOOD, 0.6);
+  const crate = (size: number, position: readonly [number, number, number], turn: number): void => {
+    const body = tbox(THREE, group, [size, size, size], position, plank);
+    body.rotation.y = turn;
+    for (const dy of [-1, 1]) {
+      const band = tbox(THREE, group, [size + 0.02, 0.06, size + 0.02], [position[0], position[1] + dy * (size / 2 - 0.04), position[2]], edge, false);
+      band.rotation.y = turn;
+    }
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      const half = size / 2 - 0.02;
+      const post = tbox(THREE, group, [0.06, size + 0.01, 0.06], [position[0] + dx * half * Math.cos(turn) - dz * half * Math.sin(turn), position[1], position[2] + dx * half * Math.sin(turn) + dz * half * Math.cos(turn)], edge, false);
+      post.rotation.y = turn;
+    }
+    // A stencilled label on the front.
+    const label = box(THREE, group, [size * 0.5, size * 0.22, 0.01], [position[0] + Math.sin(turn) * (size / 2 + 0.005), position[1], position[2] + Math.cos(turn) * (size / 2 + 0.005)], standard(THREE, "#4a3a2a", 0.9, 0), false);
+    label.rotation.y = turn;
+  };
+  crate(0.55, [-0.28, 0.275, 0.1], 0);
+  crate(0.55, [0.3, 0.275, -0.15], 0.1);
+  crate(0.45, [0, 0.775, 0], 0.45);
+  // Apples spilling from the top crate.
+  const apple = standard(THREE, "#d43a3a", 0.5, 0);
+  for (const [x, z] of [[-0.1, 0.05], [0.08, -0.08], [0.02, 0.1], [-0.06, -0.1]] as const) sphere(THREE, group, 0.05, [x, 1.03, z], apple);
+  return group;
+}
+
+/** A log pile: bark logs stacked in a pyramid between two stakes, with rings on the cut ends. */
+export function createLogPile(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const bark = farmMaterial(THREE, "bark", { metresPerTile: 0.5 });
+  const cut = farmMaterial(THREE, "wood", { colors: ["#c9a06a", "#8a6a3a", "#e0c090"], metresPerTile: 0.3 });
+  const ring = standard(THREE, "#a8824a", 0.9, 0);
+  const rows = [5, 4, 3, 2];
+  rows.forEach((count, row) => {
+    for (let index = 0; index < count; index += 1) {
+      const z = -(count - 1) * 0.16 + index * 0.32;
+      const y = 0.14 + row * 0.26;
+      const log = tcylinder(THREE, group, 0.14, 0.14, 1.4, [0, y, z], bark, 9);
+      log.rotation.z = Math.PI / 2;
+      log.rotation.y = (row + index) * 0.4;
+      for (const x of [-0.7, 0.7]) {
+        const end = tcylinder(THREE, group, 0.13, 0.13, 0.02, [x, y, z], cut, 12, false);
+        end.rotation.z = Math.PI / 2;
+        for (const r of [0.09, 0.05]) cylinder(THREE, group, r, r, 0.005, [x + Math.sign(x) * 0.011, y, z], ring, 12, false).rotation.z = Math.PI / 2;
+      }
+    }
+  });
+  for (const z of [-0.42, 0.42]) tbox(THREE, group, [0.07, 1.15, 0.07], [-0.55, 0.575, z], timber(THREE, WOOD_DARK), false);
+  // An axe leaning on the pile.
+  const handle = cylinder(THREE, group, 0.02, 0.025, 0.8, [0.75, 0.4, 0.5], timber(THREE, "#c9b99c"), 6);
+  handle.rotation.z = -0.45;
+  box(THREE, group, [0.18, 0.12, 0.03], [0.55, 0.7, 0.5], standard(THREE, "#5a6068", 0.4, 0.7));
+  return group;
+}
+
+/** A campfire: a ring of fieldstones, crossed bark logs on ash, and a flickering flame that lights the ground around it. */
+export function createCampfire(THREE: ThreeNamespace): Readonly<{ group: any; animate: (dt: number) => void }> {
+  const group = new THREE.Group();
+  const stone = stoneMaterial(THREE, 0.5);
+  const bark = farmMaterial(THREE, "bark", { metresPerTile: 0.4 });
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (index / 10) * Math.PI * 2;
+    const rock = tsphere(THREE, group, 0.12 + (index % 3) * 0.03, [Math.cos(angle) * 0.5, 0.1, Math.sin(angle) * 0.5], stone, 8, 6);
+    rock.scale.y = 0.7;
+    rock.rotation.y = angle * 3;
+  }
+  cylinder(THREE, group, 0.42, 0.42, 0.04, [0, 0.02, 0], standard(THREE, "#3a3128", 1, 0), 14, false);
+  cylinder(THREE, group, 0.25, 0.25, 0.05, [0, 0.03, 0], standard(THREE, "#1b1a18", 1, 0), 14, false);
+  for (let index = 0; index < 4; index += 1) {
+    const log = tcylinder(THREE, group, 0.06, 0.07, 0.7, [0, 0.14, 0], bark, 7);
+    log.rotation.z = Math.PI / 2 - 0.35;
+    log.rotation.y = index * Math.PI / 4;
+  }
+  // Glowing embers under the flame.
+  const ember = new THREE.MeshStandardMaterial({ color: "#ff6a1a", emissive: "#ff4a00", emissiveIntensity: 2, roughness: 0.8 });
+  for (let index = 0; index < 5; index += 1) sphere(THREE, group, 0.04, [Math.cos(index * 1.3) * 0.12, 0.1, Math.sin(index * 1.3) * 0.12], ember).castShadow = false;
+  const flame = new THREE.MeshStandardMaterial({ color: "#ffb347", emissive: "#ff8a2b", emissiveIntensity: 2.6, roughness: 0.5, transparent: true, opacity: 0.92 });
+  const inner = new THREE.MeshStandardMaterial({ color: "#fff3b0", emissive: "#ffd33d", emissiveIntensity: 3, roughness: 0.5, transparent: true, opacity: 0.95 });
+  const outer = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.62, 8), flame);
+  outer.position.y = 0.48;
+  const core = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.38, 8), inner);
+  core.position.y = 0.36;
+  group.add(outer, core);
+  const light = new THREE.PointLight(0xff9a3c, 6, 9, 1.6);
+  light.position.set(0, 0.7, 0);
+  group.add(light);
+  let time = 0;
+  return Object.freeze({
+    group,
+    animate: (dt: number) => {
+      time += dt;
+      const flicker = 0.85 + Math.sin(time * 11) * 0.08 + Math.sin(time * 23.7) * 0.07;
+      outer.scale.set(flicker, 0.9 + Math.sin(time * 9.3) * 0.12, flicker);
+      core.scale.set(1, 0.9 + Math.sin(time * 13.1 + 1) * 0.15, 1);
+      light.intensity = 5 + Math.sin(time * 17) * 0.8 + Math.sin(time * 7.3) * 0.5;
+    },
+  });
+}
+
+/** A birdbath: a fluted cast-stone pedestal with a shallow bowl of water and a bird on the rim. */
+export function createBirdbath(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const stone = farmMaterial(THREE, "plaster", { colors: ["#b9bec4", "#8a9096", "#e0e4e8"], metresPerTile: 0.5, bumpScale: 0.015 });
+  tcylinder(THREE, group, 0.28, 0.32, 0.08, [0, 0.04, 0], stone, 16);
+  tcylinder(THREE, group, 0.09, 0.14, 0.7, [0, 0.43, 0], stone, 12);
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (index / 8) * Math.PI * 2;
+    cylinder(THREE, group, 0.02, 0.025, 0.66, [Math.cos(angle) * 0.1, 0.43, Math.sin(angle) * 0.1], stone, 5, false);
+  }
+  tcylinder(THREE, group, 0.36, 0.2, 0.14, [0, 0.85, 0], stone, 16);
+  cylinder(THREE, group, 0.3, 0.3, 0.02, [0, 0.91, 0], standard(THREE, "#7a8086", 0.9, 0), 16, false);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), waterMaterial(THREE, 0.85));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.915;
+  group.add(water);
+  // A bird on the rim: body, head, beak, tail.
+  const blue = standard(THREE, "#3a6ab0", 0.7, 0);
+  sphere(THREE, group, 0.05, [0.3, 0.98, 0.05], blue).scale.set(1.4, 0.9, 0.9);
+  sphere(THREE, group, 0.035, [0.36, 1.03, 0.05], blue);
+  box(THREE, group, [0.04, 0.015, 0.015], [0.4, 1.03, 0.05], standard(THREE, "#d8a020", 0.6, 0), false);
+  box(THREE, group, [0.08, 0.02, 0.03], [0.23, 1.0, 0.05], blue, false).rotation.z = 0.4;
+  return group;
+}
+
+/** A signpost: a weathered post with two arrow boards pointing different ways. */
+export function createSignpost(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const wood = timber(THREE, WOOD);
+  const board = painted(THREE, BARN_TRIM);
+  tbox(THREE, group, [0.12, 2.2, 0.12], [0, 1.1, 0], wood);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.1, 4), wood);
+  cap.position.set(0, 2.25, 0);
+  cap.rotation.y = Math.PI / 4;
+  group.add(cap);
+  const arrow = (y: number, turn: number): void => {
+    const plank = tbox(THREE, group, [0.8, 0.2, 0.04], [0.32 * Math.cos(turn), y, -0.32 * Math.sin(turn)], board);
+    plank.rotation.y = turn;
+    const tip = tbox(THREE, group, [0.16, 0.16, 0.04], [0.72 * Math.cos(turn), y, -0.72 * Math.sin(turn)], board, false);
+    tip.rotation.y = turn;
+    tip.rotation.z = Math.PI / 4;
+    // Lettering as a dark bar.
+    const text = box(THREE, group, [0.5, 0.05, 0.01], [0.3 * Math.cos(turn) + Math.sin(turn) * 0.025, y, -0.3 * Math.sin(turn) + Math.cos(turn) * 0.025], standard(THREE, "#3a2a1a", 0.9, 0), false);
+    text.rotation.y = turn;
+    for (const x of [0.02, 0.62]) sphere(THREE, group, 0.012, [x * Math.cos(turn) + Math.sin(turn) * 0.025, y, -x * Math.sin(turn) + Math.cos(turn) * 0.025], ironMaterial(THREE)).castShadow = false;
+  };
+  arrow(1.95, 0.3);
+  arrow(1.65, 2.6);
+  return group;
+}
+
+/** A mailbox: a blue box on a post with the flag up and a newspaper tube under it. */
+export function createMailbox(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const post = timber(THREE, WOOD);
+  const paint = farmMaterial(THREE, "galvanised", { colors: ["#2b4a8a", "#1c3260", "#12224a"], metresPerTile: 0.6, roughness: 0.45, metalness: 0.4 });
+  tbox(THREE, group, [0.1, 1.05, 0.1], [0, 0.525, 0], post);
+  tbox(THREE, group, [0.3, 0.04, 0.5], [0, 1.03, 0], post, false);
+  tbox(THREE, group, [0.26, 0.2, 0.46], [0, 1.15, 0], paint);
+  const dome = tcylinder(THREE, group, 0.13, 0.13, 0.46, [0, 1.25, 0], paint, 12);
+  dome.rotation.x = Math.PI / 2;
+  // The door at the front with a latch, and the flag.
+  cylinder(THREE, group, 0.135, 0.135, 0.01, [0, 1.25, 0.235], standard(THREE, "#1c3260", 0.5, 0.4), 12, false).rotation.x = Math.PI / 2;
+  box(THREE, group, [0.26, 0.2, 0.01], [0, 1.15, 0.235], standard(THREE, "#1c3260", 0.5, 0.4), false);
+  box(THREE, group, [0.06, 0.03, 0.02], [0, 1.05, 0.245], ironMaterial(THREE), false);
+  box(THREE, group, [0.03, 0.18, 0.06], [0.15, 1.35, 0.12], standard(THREE, "#d43a3a", 0.6, 0), false);
+  box(THREE, group, [0.03, 0.03, 0.03], [0.15, 1.24, 0.12], ironMaterial(THREE), false);
+  // Newspaper tube below.
+  cylinder(THREE, group, 0.06, 0.06, 0.4, [0, 0.9, 0.05], standard(THREE, "#d8d8d8", 0.5, 0.3), 10).rotation.x = Math.PI / 2;
+  return group;
+}
+
+/** A cast-iron hand pump over a stone slab, with a bucket beneath the spout and a puddle. */
+export function createWaterPump(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const iron = ironMaterial(THREE);
+  const stone = stoneMaterial(THREE, 0.6);
+  tbox(THREE, group, [0.5, 0.1, 0.8], [0, 0.05, 0], stone);
+  cylinder(THREE, group, 0.09, 0.11, 0.06, [0, 0.13, -0.2], iron, 10);
+  cylinder(THREE, group, 0.07, 0.09, 1.0, [0, 0.6, -0.2], iron, 10);
+  cylinder(THREE, group, 0.09, 0.07, 0.08, [0, 1.12, -0.2], iron, 10);
+  sphere(THREE, group, 0.05, [0, 1.18, -0.2], iron);
+  cylinder(THREE, group, 0.05, 0.05, 0.4, [0, 1.0, 0], iron, 8).rotation.x = Math.PI / 2;
+  cylinder(THREE, group, 0.04, 0.04, 0.2, [0, 0.92, 0.2], iron, 8);
+  const handle = cylinder(THREE, group, 0.025, 0.025, 0.7, [0, 1.25, -0.4], iron, 8);
+  handle.rotation.x = 0.7;
+  sphere(THREE, group, 0.04, [0, 1.5, -0.63], iron);
+  tcylinder(THREE, group, 0.11, 0.09, 0.22, [0, 0.21, 0.24], farmMaterial(THREE, "galvanised", { metresPerTile: 0.4 }), 10);
+  const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.2, 12), waterMaterial(THREE, 0.6));
+  puddle.rotation.x = -Math.PI / 2;
+  puddle.position.set(0.1, 0.101, 0.3);
+  group.add(puddle);
+  return group;
+}
+
+/** A beehive: a stacked white box hive on a stand, with a tin lid and a few bees drifting over it. */
+export function createBeehive(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const paint = painted(THREE, BARN_TRIM);
+  const wood = timber(THREE, WOOD_DARK);
+  for (const [x, z] of [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]] as const) tbox(THREE, group, [0.06, 0.3, 0.06], [x, 0.15, z], wood, false);
+  tbox(THREE, group, [0.5, 0.06, 0.5], [0, 0.33, 0], wood);
+  tbox(THREE, group, [0.48, 0.34, 0.48], [0, 0.53, 0], paint);
+  tbox(THREE, group, [0.5, 0.02, 0.5], [0, 0.71, 0], wood, false);
+  tbox(THREE, group, [0.48, 0.24, 0.48], [0, 0.83, 0], paint);
+  tbox(THREE, group, [0.54, 0.06, 0.54], [0, 0.98, 0], farmMaterial(THREE, "galvanised", { metresPerTile: 0.5 }));
+  box(THREE, group, [0.2, 0.04, 0.02], [0, 0.4, 0.25], standard(THREE, "#1b1f24", 1, 0), false);
+  tbox(THREE, group, [0.3, 0.02, 0.12], [0, 0.36, 0.3], wood, false);
+  // Hand holds on the box sides.
+  for (const side of [-1, 1] as const) box(THREE, group, [0.02, 0.05, 0.16], [side * 0.25, 0.6, 0], standard(THREE, "#1b1f24", 1, 0), false);
+  const bee = standard(THREE, "#ffd33d", 0.6, 0);
+  const stripe = standard(THREE, "#1b1f24", 0.6, 0);
+  for (const [x, y, z] of [[0.3, 1.2, 0.2], [-0.25, 1.35, -0.1], [0.05, 1.1, 0.4]] as const) {
+    sphere(THREE, group, 0.025, [x, y, z], bee).castShadow = false;
+    sphere(THREE, group, 0.026, [x + 0.012, y, z], stripe).castShadow = false;
+  }
+  return group;
+}
+
+/** A placed catalog item as a model; a building with doors also hands back its doors, and a moving prop its animation. */
+export type FarmDecorModel = Readonly<{ group: any; doors: BuildingDoors | null; fixtureDoors: Readonly<Record<string, BuildingDoors>>; animate: ((dt: number) => void) | null }>;
+
+const still = (group: any): FarmDecorModel => ({ group, doors: null, fixtureDoors: {}, animate: null });
+
+/**
+ * Every builder by the catalog's `model` name. A row whose model is missing
+ * here fails the catalog test rather than leaving an empty spot in the field.
+ */
+export const FARM_PROP_BUILDERS: Readonly<Record<string, (THREE: ThreeNamespace, definition: FarmDecorDefinition, row: FarmDecorRow, seed: number) => FarmDecorModel>> = Object.freeze({
+  // Fences are built for the row's length.
+  "fence-post-rail": (THREE, definition, row) => still(createFenceRun(THREE, farmDecorFootprint(definition, row).width)),
+  "fence-picket": (THREE, definition, row) => still(createPicketFence(THREE, farmDecorFootprint(definition, row).width)),
+  "fence-stone-wall": (THREE, definition, row) => still(createStoneWall(THREE, farmDecorFootprint(definition, row).width)),
+  "fence-split-rail": (THREE, definition, row) => still(createSplitRail(THREE, farmDecorFootprint(definition, row).width)),
+  "fence-wire": (THREE, definition, row) => still(createWireFence(THREE, farmDecorFootprint(definition, row).width)),
+  "fence-hedge": (THREE, definition, row) => still(createHedgeRow(THREE, farmDecorFootprint(definition, row).width)),
+  "fence-gate": (THREE) => { const gate = createGate(THREE); return { group: gate.group, doors: gate.doors, fixtureDoors: {}, animate: null }; },
+  // Buildings draw their walls from the catalog's shell.
+  ...Object.fromEntries(Object.entries(FARM_BUILDING_BUILDERS).map(([name, build]) => [name, (THREE: ThreeNamespace, definition: FarmDecorDefinition) => build(THREE, definition)])),
+  // Plants take the seed so no two are twins.
+  "tree-oak": (THREE, _definition, _row, seed) => still(createTree(THREE, seed)),
+  "tree-pine": (THREE, _definition, _row, seed) => still(createPine(THREE, seed)),
+  "tree-birch": (THREE, _definition, _row, seed) => still(createBirch(THREE, seed)),
+  "tree-apple": (THREE, _definition, _row, seed) => still(createAppleTree(THREE, seed)),
+  "tree-willow": (THREE, _definition, _row, seed) => still(createWillow(THREE, seed)),
+  bush: (THREE, _definition, _row, seed) => still(createBush(THREE, seed)),
+  "flower-bed": (THREE, _definition, _row, seed) => still(createFlowerBed(THREE, seed)),
+  sunflowers: (THREE, _definition, _row, seed) => still(createSunflowers(THREE, seed)),
+  "pumpkin-patch": (THREE, _definition, _row, seed) => still(createPumpkinPatch(THREE, seed)),
+  wheat: (THREE, _definition, _row, seed) => still(createWheat(THREE, seed)),
+  "veg-rows": (THREE, _definition, _row, seed) => still(createVegRows(THREE, seed)),
+  lavender: (THREE, _definition, _row, seed) => still(createLavender(THREE, seed)),
+  stump: (THREE) => still(createStump(THREE)),
+  // Water is sized to its footprint.
+  pond: (THREE, definition) => still(createPond(THREE, definition.footprint.width, definition.footprint.depth)),
+  "pond-lily": (THREE, definition) => still(createLilyPond(THREE, definition.footprint.width, definition.footprint.depth)),
+  // Props.
+  "hay-bale": (THREE) => still(createHayBale(THREE)),
+  trough: (THREE) => still(createTrough(THREE)),
+  scarecrow: (THREE) => still(createScarecrow(THREE)),
+  well: (THREE) => still(createWell(THREE)),
+  bench: (THREE) => still(createBench(THREE)),
+  "lamp-post": (THREE) => still(createLampPost(THREE)),
+  doghouse: (THREE) => still(createDoghouse(THREE)),
+  wheelbarrow: (THREE) => still(createWheelbarrow(THREE)),
+  wagon: (THREE) => still(createWagon(THREE)),
+  barrel: (THREE) => still(createBarrel(THREE)),
+  crates: (THREE) => still(createCrates(THREE)),
+  "log-pile": (THREE) => still(createLogPile(THREE)),
+  campfire: (THREE) => { const fire = createCampfire(THREE); return { group: fire.group, doors: null, fixtureDoors: {}, animate: fire.animate }; },
+  birdbath: (THREE) => still(createBirdbath(THREE)),
+  signpost: (THREE) => still(createSignpost(THREE)),
+  mailbox: (THREE) => still(createMailbox(THREE)),
+  "water-pump": (THREE) => still(createWaterPump(THREE)),
+  beehive: (THREE) => still(createBeehive(THREE)),
+});
+
+/** The names every catalog row's `model` must be one of. */
+export function farmPropNames(): string[] {
+  return Object.keys(FARM_PROP_BUILDERS);
+}
+
+/** Build the model for a placed row. Throws for a model no builder draws, which the catalog test rules out. */
+export function createFarmDecorModel(THREE: ThreeNamespace, definition: FarmDecorDefinition, row: FarmDecorRow, seed = 1): FarmDecorModel {
+  const build = FARM_PROP_BUILDERS[definition.model];
+  if (!build) throw new Error(`No farm prop draws ${definition.model}`);
+  const model = build(THREE, definition, row, seed);
+  model.group.userData.decorInstanceId = row.instanceId;
+  return model;
+}

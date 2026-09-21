@@ -71,6 +71,10 @@
   color: #8fd7ff;
 }
 
+.profile-chip--farm .profile-chip__kicker {
+  color: #9ee27a;
+}
+
 .profile-chip--achievements .profile-chip__kicker {
   color: #ffd666;
 }

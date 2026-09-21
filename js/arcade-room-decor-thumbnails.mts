@@ -1,26 +1,21 @@
-// Catalog thumbnails: a picture of the real model for every decor card.
+// Catalog thumbnails for the room's decor cards: the shared offscreen model
+// renderer (`space-editor/model-thumbnails.mts`) pointed at `createDecorModel`.
 //
-// The catalog is procedural, so there is no artwork to show on a card — and a
-// letter in a coloured box tells the player nothing about which neon shape
-// they are about to hang. This renders each definition once through the same
-// `createDecorModel` the room uses, into a small offscreen WebGL canvas, and
-// hands back a data URL the panel drops into an `<img>`. Cached per item id,
-// built on demand so only the open category pays, and the panel stays free of
-// THREE: it is handed a `(definition) => url | null` and nothing else.
+// This file only says which row a card is rendered from (catalog defaults,
+// first mount, size 1), which items are their own picture (a poster's texture
+// loads asynchronously, so the card shows the image directly), how each kind
+// is photographed, and that a glow wash is not part of the framing.
 
 import { decorCardImage, type DecorDefinition } from "./arcade-room-catalog/decor.mjs";
 import type { RoomDecorItem } from "./arcade-room-layout.mjs";
 import { createDecorModel, decorModelBounds, disposeDecorModel } from "./arcade-room-decor-model.mjs";
+import { createModelThumbnails, THUMBNAIL_SIZE, type ModelThumbnails, type ThumbnailView } from "./space-editor/model-thumbnails.mjs";
 
 type ThreeNamespace = Record<string, any>;
 
-export type DecorThumbnails = Readonly<{
-  /** A data URL of the rendered item, or null when this item has nothing to render (a poster is its own picture). */
-  get: (definition: DecorDefinition) => string | null;
-  dispose: () => void;
-}>;
+export type DecorThumbnails = ModelThumbnails<DecorDefinition>;
 
-export const THUMBNAIL_SIZE = Object.freeze({ width: 176, height: 128 });
+export { THUMBNAIL_SIZE };
 
 /** The layout row a thumbnail is rendered from: catalog defaults, first mount, size 1. */
 export function thumbnailItem(definition: DecorDefinition): RoomDecorItem {
@@ -44,84 +39,26 @@ export function thumbnailItem(definition: DecorDefinition): RoomDecorItem {
   };
 }
 
+/**
+ * Wall items are looked at nearly head-on so a sign reads as a sign; everything
+ * else gets the three-quarter view a shop would photograph a chair from.
+ */
+export function thumbnailView(definition: DecorDefinition): ThumbnailView {
+  const mount = definition.mounts[0];
+  const flat = definition.model.kind === "rug";
+  return {
+    azimuth: mount === "wall" ? 0.25 : 0.8,
+    elevation: flat ? 1.05 : mount === "wall" ? 0.12 : mount === "ceiling" ? -0.25 : 0.38,
+  };
+}
+
 export function createDecorThumbnails(THREE: ThreeNamespace): DecorThumbnails {
-  const cache = new Map<string, string | null>();
-  let renderer: any = null;
-  let scene: any = null;
-  let camera: any = null;
-
-  function ensureRenderer(): boolean {
-    if (renderer) return true;
-    try {
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
-    } catch {
-      return false;
-    }
-    renderer.setPixelRatio(1);
-    renderer.setSize(THUMBNAIL_SIZE.width, THUMBNAIL_SIZE.height, false);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-    scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight(0xcfe9ff, 0x2a2430, 2.2));
-    const key = new THREE.DirectionalLight(0xfff2d1, 2.4);
-    key.position.set(2, 4, 3);
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0x70e8ff, 1.2);
-    rim.position.set(-3, 2, -2);
-    scene.add(rim);
-    camera = new THREE.PerspectiveCamera(28, THUMBNAIL_SIZE.width / THUMBNAIL_SIZE.height, 0.01, 50);
-    return true;
-  }
-
-  function render(definition: DecorDefinition): string | null {
-    // A poster or calendar is its own picture and its texture loads asynchronously; the card shows the image directly.
-    if (decorCardImage(definition)) return null;
-    if (!ensureRenderer()) return null;
-    const model = createDecorModel(THREE, definition, thumbnailItem(definition), false);
-    scene.add(model);
-    const bounds = decorModelBounds(THREE, model);
-    const centre = bounds.getCenter(new THREE.Vector3());
-    const extent = bounds.getSize(new THREE.Vector3());
-    const radius = Math.max(extent.x, extent.y, extent.z, 0.05) / 2;
-    const distance = radius / Math.tan((camera.fov * Math.PI / 180) / 2) * 1.15;
-    // Wall items are looked at nearly head-on so a sign reads as a sign; everything
-    // else gets the three-quarter view a shop would photograph a chair from.
-    const mount = definition.mounts[0];
-    const flat = definition.model.kind === "rug";
-    const azimuth = mount === "wall" ? 0.25 : 0.8;
-    const elevation = flat ? 1.05 : mount === "wall" ? 0.12 : mount === "ceiling" ? -0.25 : 0.38;
-    camera.position.set(
-      centre.x + distance * Math.cos(elevation) * Math.sin(azimuth),
-      centre.y + distance * Math.sin(elevation),
-      centre.z + distance * Math.cos(elevation) * Math.cos(azimuth),
-    );
-    camera.lookAt(centre);
-    renderer.render(scene, camera);
-    const url = renderer.domElement.toDataURL("image/png");
-    disposeDecorModel(model);
-    return url;
-  }
-
-  return Object.freeze({
-    get: (definition) => {
-      if (!cache.has(definition.id)) {
-        let url: string | null = null;
-        try {
-          url = render(definition);
-        } catch {
-          url = null;
-        }
-        cache.set(definition.id, url);
-      }
-      return cache.get(definition.id) ?? null;
-    },
-    dispose: () => {
-      cache.clear();
-      renderer?.dispose?.();
-      renderer = null;
-      scene = null;
-      camera = null;
-    },
+  return createModelThumbnails<DecorDefinition>(THREE, {
+    // A poster or calendar is its own picture; the card shows the image directly.
+    build: (definition) => (decorCardImage(definition) ? null : createDecorModel(THREE, definition, thumbnailItem(definition), false)),
+    view: thumbnailView,
+    cacheKey: (definition) => definition.id,
+    dispose: disposeDecorModel,
+    bounds: (model, target) => decorModelBounds(THREE, model, target),
   });
 }

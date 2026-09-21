@@ -44,6 +44,9 @@ export const SURFACE_PATTERNS = Object.freeze([
     "subway",
     "tartan",
     "circuit",
+    // Outdoor grounds, added for the farm (`js/farm-catalog/ground.mts`); the room may use them as floors too.
+    "grass",
+    "dirt",
 ]);
 const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" });
 function surface(kind, slug, title, group, style, swatch) {

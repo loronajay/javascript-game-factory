@@ -51,24 +51,9 @@ import {
   type RoomLayout,
   type RoomLayoutItem,
 } from "./arcade-room-layout.mjs";
-import {
-  EDITOR_CAMERA_LIMITS,
-  EDITOR_CAMERA_PRESETS,
-  applyEditorCameraPreset,
-  createEditorCamera,
-  editorCutawayWalls,
-  editorCameraFromWalkingPose,
-  editorCameraPose,
-  editorViewOffset,
-  focusEditorCamera,
-  interpolateEditorCamera,
-  orbitEditorCamera,
-  panEditorCamera,
-  panEditorCameraToAnchor,
-  zoomEditorCamera,
-  type EditorCameraPreset,
-  type EditorCameraState,
-} from "./arcade-room-camera.mjs";
+import { editorCutawayWalls } from "./arcade-room-camera.mjs";
+import { createEditorCameraController } from "./space-editor/editor-camera-controller.mjs";
+import { createEditHistory } from "./space-editor/editor-history.mjs";
 import type { RoomShell } from "./arcade-room-shell.mjs";
 import type { ArcadeAvatarPreview } from "./arcade-room-avatar-preview.mjs";
 
@@ -158,7 +143,6 @@ const NUDGE_STEP = 0.1;
 const DECOR_SNAP_DEGREES = 15;
 const SCALE_STEP = 0.1;
 const LENGTH_STEP = 0.1;
-const UNDO_DEPTH = 40;
 /** A press that travels less than this before release is a click, not an orbit. */
 const CLICK_SLOP_PX = 4;
 // Alignment snaps within this fraction of the camera's distance, so "close" means the same
@@ -181,10 +165,9 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   let saving = false;
   // The custom poster whose picture is on its way up; one at a time keeps the story simple.
   let uploadingInstanceId = "";
-  const undoStack: RoomLayout[] = [];
-  // A colour or slider drag is one gesture: the layout before it is pushed once, every
+  // A colour or slider drag is one gesture: the layout before it is remembered once, every
   // preview replaces the working layout without a panel re-render, and the commit closes it.
-  let gestureOpen = false;
+  const history = createEditHistory<RoomLayout>({ equal: roomLayoutsEqual });
   let previewFrame = 0;
   let wheelGestureTimer: ReturnType<typeof setTimeout> | undefined;
   const thumbnails = createDecorThumbnails(THREE);
@@ -192,16 +175,20 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   // Which camera gesture the current pointer owns: orbit on a left-drag over empty floor,
   // pan on a right/middle-drag or a Shift+left-drag anywhere. Decided on pointerdown.
   let cameraGesture: "none" | "orbit" | "pan" = "none";
-  let view: EditorCameraState = createEditorCamera(room);
-  // A preset or focus eases from `transitionFrom` to `transitionTo`; any gesture cuts it short where it is.
-  let transitionFrom: EditorCameraState | null = null;
-  let transitionTo: EditorCameraState | null = null;
-  let transitionStart = 0;
-  let transitionFrame = 0;
-  // The point on the target plane the player grabbed for a pan, so it can be kept under the cursor.
-  let panAnchor: { x: number; z: number } | null = null;
-  // The walking camera's far plane, put back on finish.
-  let walkingFar = camera.far;
+  // The build camera: orbit/pan/zoom/presets on the shared controller. Every move drops the
+  // walls between the lens and the floor and re-scales the handles for the new distance.
+  const view = createEditorCameraController({
+    THREE,
+    camera,
+    canvas,
+    bounds: room,
+    viewButtons: elements.viewButtons,
+    offsetBlocks: () => (elements.panel.hidden ? [] : [elements.tabs, elements.drawer, elements.decorInspector]),
+    onPose: (state) => {
+      shell.setCutawayWalls(editorCutawayWalls(state, room));
+      gizmos.update(camera);
+    },
+  });
   const lastPointer = { x: 0, y: 0 };
   // Where a camera gesture began: a press on empty floor that never moves is a click, and a click on nothing deselects.
   const gestureStart = { x: 0, y: 0 };
@@ -211,9 +198,6 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const ceilingPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), roomHeight);
-  // The orbit target lives on this plane; pan and zoom read the cursor against it so
-  // the point under the hand is the one that stays put.
-  const targetPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), EDITOR_CAMERA_LIMITS.targetHeight);
   const planeHit = new THREE.Vector3();
   // The outline is drawn from a box this editor fills itself, so a decor item's glow wash
   // (light on the wall, not the item) can be left out of it.
@@ -319,13 +303,13 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   /** How close, in metres, a drag must come to a neighbour's edge to snap; Alt switches it off. */
   function snapThreshold(event: Readonly<{ altKey: boolean }>): number {
     if (event.altKey) return 0;
-    return Math.min(SNAP_RANGE_M.max, Math.max(SNAP_RANGE_M.min, view.radius * SNAP_SCREEN_FRACTION));
+    return Math.min(SNAP_RANGE_M.max, Math.max(SNAP_RANGE_M.min, view.view().radius * SNAP_SCREEN_FRACTION));
   }
 
   function renderPanel(): void {
     panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory, canUpload: uploadPicture !== null, uploadingInstanceId });
     if (tab === "avatar") avatarPreview.show(layout.avatarId);
-    elements.undoButton.disabled = undoStack.length === 0;
+    elements.undoButton.disabled = !history.canUndo();
   }
 
   function setStatus(message: string, state = "ready"): void {
@@ -336,8 +320,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   /** Replace the layout, remembering the old one for undo, and redraw everything. */
   function commit(next: RoomLayout, message: string, state = "dirty"): void {
     if (next === layout) return;
-    undoStack.push(layout);
-    if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+    history.record(layout);
     layout = next;
     renderScene();
     renderPanel();
@@ -350,11 +333,6 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       return;
     }
     commit(next, `${message} · unsaved`);
-  }
-
-  function pushUndo(): void {
-    undoStack.push(layout);
-    if (undoStack.length > UNDO_DEPTH) undoStack.shift();
   }
 
   /** Redraw the scene once per frame however many previews arrive in between. */
@@ -379,20 +357,15 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
         setStatus(result.reason === "blocked" ? "No room to grow there · move it first." : "That change is not possible here.", "error");
         return;
       }
-      if (!gestureOpen) {
-        gestureOpen = true;
-        pushUndo();
-      }
+      history.open(layout);
       layout = result.layout;
       schedulePreviewRender();
       setStatus(`${message} · unsaved`, "dirty");
       return;
     }
-    if (gestureOpen) {
-      gestureOpen = false;
+    if (history.isOpen()) {
       if (result.valid) layout = result.layout;
-      const before = undoStack[undoStack.length - 1];
-      if (before && roomLayoutsEqual(before, layout)) undoStack.pop();
+      history.close(layout);
       if (previewFrame) {
         cancelAnimationFrame(previewFrame);
         previewFrame = 0;
@@ -465,8 +438,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   }
 
   function undo(): void {
-    if (gestureOpen) return;
-    const previous = undoStack.pop();
+    const previous = history.undo();
     if (!previous) return;
     layout = previous;
     if (selection && !selectedCabinet() && !selectedDecor()) selection = null;
@@ -550,7 +522,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
 
   /** Where a freshly added item lands: near the camera's target so it appears in view. */
   function addTarget(mounts: readonly DecorMount[], wallHeight: number): DecorTarget {
-    const target = view.target;
+    const target = view.view().target;
     const mount = mounts[0]!;
     if (mount === "wall") {
       const wall = nearestWall(target, room);
@@ -582,7 +554,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   function addCabinet(cabinetId: string): void {
     const definition = cabinetEntry(cabinetId)?.cabinet;
     if (!definition) return;
-    const result = addCabinetItem(layout, cabinetId, room, catalog, { x: view.target.x, z: view.target.z, rotationY: 0 });
+    const result = addCabinetItem(layout, cabinetId, room, catalog, { x: view.view().target.x, z: view.view().target.z, rotationY: 0 });
     if (!result.valid) {
       setStatus(`No room for another ${definition.title} near here.`, "error");
       return;
@@ -757,102 +729,11 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     });
   }
 
-  function applyViewCamera(): void {
-    const pose = editorCameraPose(view, room);
-    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
-    camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
-    shell.setCutawayWalls(editorCutawayWalls(view, room));
-    gizmos.update(camera);
-    applyViewOffset();
-  }
-
-  /**
-   * Centre the projection on the widest strip of canvas the build chrome leaves
-   * free, so the orbit target - what every gesture is about - is in the middle of
-   * what the player can see and not under the drawer or the inspector. Re-read
-   * each time because those blocks and the canvas all resize.
-   */
-  function applyViewOffset(): void {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    if (!width || !height) return;
-    const canvasRect = canvas.getBoundingClientRect();
-    const blocks = elements.panel.hidden
-      ? []
-      : [elements.tabs, elements.drawer, elements.decorInspector]
-        .filter((block) => !block.hidden && block.offsetParent !== null)
-        .map((block) => block.getBoundingClientRect())
-        .filter((rect) => rect.width > 0 && rect.height > 0)
-        .map((rect) => ({ left: rect.left - canvasRect.left, top: rect.top - canvasRect.top, width: rect.width, height: rect.height }));
-    const offset = editorViewOffset({ width, height }, blocks);
-    if (offset.x || offset.y) camera.setViewOffset(width, height, offset.x, offset.y, width, height);
-    else camera.clearViewOffset();
-  }
-
-  /** Ease the view to a destination over `transitionMs`; a gesture during the move keeps whatever frame it reached. */
-  function transitionView(to: EditorCameraState): void {
-    cancelTransition();
-    transitionFrom = view;
-    transitionTo = to;
-    transitionStart = performance.now();
-    view = interpolateEditorCamera(transitionFrom, transitionTo, 0);
-    applyViewCamera();
-    renderViewButtons();
-    transitionFrame = requestAnimationFrame(stepTransition);
-  }
-
-  function stepTransition(now: number): void {
-    transitionFrame = 0;
-    if (!transitionFrom || !transitionTo) return;
-    const t = (now - transitionStart) / EDITOR_CAMERA_LIMITS.transitionMs;
-    view = interpolateEditorCamera(transitionFrom, transitionTo, t);
-    applyViewCamera();
-    if (t >= 1) {
-      transitionFrom = transitionTo = null;
-      return;
-    }
-    transitionFrame = requestAnimationFrame(stepTransition);
-  }
-
-  function cancelTransition(): void {
-    if (transitionFrame) cancelAnimationFrame(transitionFrame);
-    transitionFrame = 0;
-    transitionFrom = transitionTo = null;
-  }
-
   /** Bring the view to the selected item (C, or a pick from the list). */
   function focusSelection(): void {
     const item = selectedCabinet() ?? selectedDecor();
     if (!item || (selectedCabinet()?.hidden ?? false)) return;
-    transitionView(focusEditorCamera(view, { x: item.x, z: item.z }, room));
-  }
-
-  function renderViewButtons(): void {
-    for (const button of elements.viewButtons.querySelectorAll<HTMLButtonElement>("[data-view]")) {
-      button.setAttribute("aria-pressed", String(button.dataset.view === view.preset));
-    }
-  }
-
-  function setView(preset: EditorCameraPreset, immediate = false): void {
-    const next = applyEditorCameraPreset(view, preset, room);
-    if (immediate) {
-      cancelTransition();
-      view = next;
-      applyViewCamera();
-      renderViewButtons();
-      return;
-    }
-    transitionView(next);
-  }
-
-  /** Where the cursor's ray meets the target plane, or null when it looks over the horizon. */
-  function targetPlanePoint(event: PointerEvent | WheelEvent): { x: number; z: number } | null {
-    updatePointer(event as PointerEvent);
-    if (!raycaster.ray.intersectPlane(targetPlane, planeHit)) return null;
-    // A hit far beyond the target is the ray grazing the plane near the horizon, where a
-    // few pixels are metres: useless as an anchor, so the screen-delta pan takes over.
-    if (Math.hypot(planeHit.x - view.target.x, planeHit.z - view.target.z) > view.radius * 2) return null;
-    return { x: planeHit.x, z: planeHit.z };
+    view.focus({ x: item.x, z: item.z });
   }
 
   function updatePointer(event: PointerEvent): void {
@@ -987,7 +868,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     gizmos.setActive(null);
     gizmos.setGuides([]);
     // A handle pressed and released without moving opened no gesture, so there is nothing to close.
-    if (item && kind && gestureOpen) editDecor({ valid: true, layout, instanceId: item.instanceId, reason: "" }, kind === "stretch" ? "Length changed" : "Resized", "commit");
+    if (item && kind && history.isOpen()) editDecor({ valid: true, layout, instanceId: item.instanceId, reason: "" }, kind === "stretch" ? "Length changed" : "Resized", "commit");
   }
 
   function enter(): void {
@@ -999,18 +880,12 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     document.body.classList.add("is-editing");
     elements.panel.hidden = false;
     elements.editButton.setAttribute("aria-pressed", "true");
-    // The lens may stand well outside the room now; the walking camera's far plane would clip the far wall.
-    walkingFar = camera.far;
-    camera.far = Math.max(walkingFar, EDITOR_CAMERA_LIMITS.radius.max + Math.hypot(room.width, room.depth) + 4);
     // Build from where the player stands and looks: the walking camera's pose (YXZ rotation, so
     // `x` is pitch and `y` is yaw) becomes the orbit, and nothing on screen jumps. O still resets to the overview.
-    cancelTransition();
-    view = editorCameraFromWalkingPose({
+    view.enter({
       x: camera.position.x, y: camera.position.y, z: camera.position.z,
       yaw: camera.rotation.y, pitch: camera.rotation.x,
-    }, room);
-    applyViewCamera();
-    renderViewButtons();
+    });
     setStatus("Drag anything to move it · drag the floor to orbit · right-drag to pan · scroll to zoom · C to centre on the selection.");
     renderScene();
     renderPanel();
@@ -1031,12 +906,8 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     selectionBox.visible = false;
     gizmos.setHandles([], { x: 0, y: 1, z: 0 });
     gizmos.setGuides([]);
-    cancelTransition();
-    panAnchor = null;
+    view.exit();
     shell.setCutawayWalls([]);
-    camera.clearViewOffset();
-    camera.far = walkingFar;
-    camera.updateProjectionMatrix();
     onEditingChange(false);
     canvas.focus();
   }
@@ -1051,11 +922,6 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   elements.rotateRightButton.addEventListener("click", () => rotate(1));
   elements.undoButton.addEventListener("click", undo);
   elements.saveButton.addEventListener("click", () => { void storeLayout(); });
-  elements.viewButtons.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLElement>("[data-view]");
-    const preset = button?.dataset.view;
-    if (preset && (EDITOR_CAMERA_PRESETS as readonly string[]).includes(preset)) setView(preset as EditorCameraPreset);
-  });
   // Right-drag pans, so the context menu must not steal the gesture while building.
   canvas.addEventListener("contextmenu", (event) => { if (editing) event.preventDefault(); });
   elements.finishButton.addEventListener("click", finish);
@@ -1069,7 +935,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     if (!editing) return;
     const panButton = event.button === 1 || event.button === 2 || (event.button === 0 && event.shiftKey);
     if (event.button !== 0 && !panButton) return;
-    cancelTransition();
+    view.cancelTransition();
     canvas.setPointerCapture?.(event.pointerId);
     lastPointer.x = event.clientX;
     lastPointer.y = event.clientY;
@@ -1077,7 +943,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     gestureStart.y = event.clientY;
     if (panButton) {
       cameraGesture = "pan";
-      panAnchor = targetPlanePoint(event);
+      view.beginPan(event);
       canvas.style.cursor = "all-scroll";
       return;
     }
@@ -1098,8 +964,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       dragOffset.x = anchor ? origin.x - anchor.x : 0;
       dragOffset.z = anchor ? origin.z - anchor.z : 0;
       // The whole drag is one undo step.
-      undoStack.push(layout);
-      if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+      history.open(layout);
       dragging = true;
       canvas.style.cursor = "grabbing";
       return;
@@ -1122,18 +987,11 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     lastPointer.x = event.clientX;
     lastPointer.y = event.clientY;
     if (cameraGesture === "orbit") {
-      view = orbitEditorCamera(view, deltaX, deltaY);
-      applyViewCamera();
-      renderViewButtons();
+      view.orbit(deltaX, deltaY);
       return;
     }
     if (cameraGesture === "pan") {
-      // Grab the floor: the point pressed on stays under the cursor. Over the horizon
-      // (no plane hit) the screen-delta pan takes over so the drag never dies.
-      const hit = panAnchor ? targetPlanePoint(event) : null;
-      view = hit && panAnchor ? panEditorCameraToAnchor(view, panAnchor, hit, room) : panEditorCamera(view, deltaX, deltaY, room);
-      applyViewCamera();
-      renderViewButtons();
+      view.pan(event, deltaX, deltaY);
       return;
     }
     canvas.style.cursor = hoverCursor(event);
@@ -1150,7 +1008,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     const wasOrbit = cameraGesture === "orbit";
     dragging = false;
     cameraGesture = "none";
-    panAnchor = null;
+    view.endPan();
     canvas.releasePointerCapture?.(event.pointerId);
     if (!editing) return;
     if (handleDrag) {
@@ -1162,7 +1020,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     if (wasDragging) {
       gizmos.setGuides([]);
       // Drop an undo step that changed nothing, then let the panel catch up with the final spot.
-      if (undoStack[undoStack.length - 1] === layout) undoStack.pop();
+      history.close(layout);
       renderPanel();
       return;
     }
@@ -1183,14 +1041,11 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       }, WHEEL_GESTURE_MS);
       return;
     }
-    cancelTransition();
-    view = zoomEditorCamera(view, event.deltaY, { anchor: targetPlanePoint(event), room });
-    applyViewCamera();
-    renderViewButtons();
+    view.zoom(event);
   }, { passive: false });
   // The panel and the canvas both move the free strip; keep the projection centred on it.
   if (typeof ResizeObserver === "function") {
-    const observer = new ResizeObserver(() => { if (editing) applyViewOffset(); });
+    const observer = new ResizeObserver(() => { if (editing) view.applyViewOffset(); });
     observer.observe(canvas);
     observer.observe(elements.drawer);
     observer.observe(elements.decorInspector);
@@ -1226,9 +1081,9 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       KeyQ: () => rotate(-1),
       KeyR: () => rotate(1),
       KeyH: () => toggleHidden(),
-      KeyF: () => setView("front"),
-      KeyT: () => setView("top"),
-      KeyO: () => setView("overview"),
+      KeyF: () => view.setView("front"),
+      KeyT: () => view.setView("top"),
+      KeyO: () => view.setView("overview"),
       KeyC: () => focusSelection(),
       Delete: () => { const cabinet = selectedCabinet(); const item = selectedDecor(); if (cabinet) removeCabinet(cabinet.instanceId); else if (item) removeDecor(item.instanceId); },
       Backspace: () => { const cabinet = selectedCabinet(); const item = selectedDecor(); if (cabinet) removeCabinet(cabinet.instanceId); else if (item) removeDecor(item.instanceId); },

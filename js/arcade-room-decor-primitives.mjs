@@ -17,10 +17,10 @@ export function box(THREE, group, size, position, material, shadow = true) {
     group.add(mesh);
     return mesh;
 }
-export function cylinder(THREE, group, radiusTop, radiusBottom, height, position, material, segments = 16) {
+export function cylinder(THREE, group, radiusTop, radiusBottom, height, position, material, segments = 16, shadow = true) {
     const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), material);
     mesh.position.set(...position);
-    mesh.castShadow = true;
+    mesh.castShadow = shadow;
     group.add(mesh);
     return mesh;
 }

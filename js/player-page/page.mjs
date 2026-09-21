@@ -63,9 +63,16 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
  * is the viewer's, otherwise a visit to the room under `?id=` — the same seam the
  * room page reads, so the two never disagree about whose room it is.
  */
-export function wirePlayerArcadeLink(doc, { requestedPlayerId, viewerPlayerId }) {
-    const link = doc.getElementById("playerArcadeLink");
-    const label = doc.getElementById("playerArcadeLinkLabel");
+export function wirePlayerArcadeLink(doc, ids) {
+    wirePlayerSpaceLink(doc, { linkId: "playerArcadeLink", labelId: "playerArcadeLinkLabel", path: "../room/", ownLabel: "My Arcade", visitLabel: "Visit Arcade" }, ids);
+}
+/** The farm chip: the same seam as the arcade's, pointed at `/farm/`. */
+export function wirePlayerFarmLink(doc, ids) {
+    wirePlayerSpaceLink(doc, { linkId: "playerFarmLink", labelId: "playerFarmLinkLabel", path: "../farm/", ownLabel: "My Farm", visitLabel: "Visit Farm" }, ids);
+}
+function wirePlayerSpaceLink(doc, spec, { requestedPlayerId, viewerPlayerId }) {
+    const link = doc.getElementById(spec.linkId);
+    const label = doc.getElementById(spec.labelId);
     if (!link)
         return;
     const targetId = requestedPlayerId || viewerPlayerId;
@@ -74,9 +81,9 @@ export function wirePlayerArcadeLink(doc, { requestedPlayerId, viewerPlayerId })
         return;
     }
     const isOwn = targetId === viewerPlayerId;
-    link.href = isOwn ? "../room/" : `../room/?id=${encodeURIComponent(targetId)}`;
+    link.href = isOwn ? spec.path : `${spec.path}?id=${encodeURIComponent(targetId)}`;
     if (label)
-        label.textContent = isOwn ? "My Arcade" : "Visit Arcade";
+        label.textContent = isOwn ? spec.ownLabel : spec.visitLabel;
     link.hidden = false;
 }
 // The trophy-case chip: the viewer's own page links to their collection, any
@@ -115,6 +122,7 @@ if (typeof doc?.getElementById === "function") {
         ? "me"
         : "";
     wirePlayerArcadeLink(doc, { requestedPlayerId, viewerPlayerId: authSession?.playerId || "" });
+    wirePlayerFarmLink(doc, { requestedPlayerId, viewerPlayerId: authSession?.playerId || "" });
     wirePlayerAchievementsLink(doc, { requestedPlayerId, viewerPlayerId: authSession?.playerId || "" });
     renderPrimaryAppNav(doc.getElementById("playerPrimaryNav"), {
         basePath: "../",

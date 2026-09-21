@@ -1,0 +1,267 @@
+// The farm's layout document: what a player's farm IS, and the pure rules for
+// changing it.
+//
+// Version 2 is a ground finish, the pets that live here, and the DECOR — every
+// placed thing on the field: the fences, the barn, the trees, the ponds. Each
+// slice adds a key and a validator to this file and nothing else has to learn
+// a new shape. `normalizeFarmLayout` is the one place a stored document is made
+// valid; the store, the page and the server-side mirror all lean on it.
+//
+// PETS ARE NOT PLACED. A pet row has no position: the sim gives it one when
+// the farm loads and it wanders from there. What the document keeps is who
+// lives here and what they are called. Decor IS placed, and the rules for
+// placing it live in `farm-decor-layout.mts`.
+//
+// A VERSION-1 DOCUMENT HAD NO DECOR (the field was fixed). Migrating one seeds
+// the starter field, so a farm saved before build mode keeps looking the way
+// it did. In version 2 an ABSENT `decor` also means the starter field (the
+// server only sends the key when the client did), and an EMPTY list is a
+// deliberately cleared field.
+
+import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog/ground.mjs";
+import { findAnimal } from "./farm-catalog/animals.mjs";
+import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
+import type { RoomBounds } from "./arcade-room-layout.mjs";
+
+export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
+export const FARM_LAYOUT_VERSION = 2;
+
+/** The walkable field. The inset is how far in from the field's edge anything may stand. */
+export const FARM_BOUNDS: RoomBounds = Object.freeze({ width: 28, depth: 28, wallInset: 0.3 });
+
+export const MAX_PETS = 12;
+export const MAX_DECOR = 120;
+export const PET_NAME_MAX_LENGTH = 20;
+
+export type FarmPet = Readonly<{
+  instanceId: string;
+  speciesId: string;
+  name: string;
+}>;
+
+/** A placed item. `length` is 0 unless the item stretches (a fence run). */
+export type FarmDecorRow = Readonly<{
+  instanceId: string;
+  itemId: string;
+  x: number;
+  z: number;
+  rotationY: number;
+  length: number;
+}>;
+
+export type FarmLayout = Readonly<{
+  version: 2;
+  ground: string;
+  pets: readonly FarmPet[];
+  decor: readonly FarmDecorRow[];
+}>;
+
+export type FarmPetResult = Readonly<{ valid: boolean; layout: FarmLayout; instanceId: string; reason: string }>;
+
+/** One line, printable, trimmed and capped — what a pet may be called. */
+export function cleanPetName(value: unknown, maxLength = PET_NAME_MAX_LENGTH): string {
+  if (typeof value !== "string") return "";
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[<>]/g, "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+export function farmCacheKey(playerId: string): string {
+  const cleaned = typeof playerId === "string" ? playerId.trim() : "";
+  return `${FARM_LAYOUT_STORAGE_KEY}:${cleaned || "guest"}`;
+}
+
+const row = (instanceId: string, itemId: string, x: number, z: number, rotationY = 0, length = 0): FarmDecorRow =>
+  Object.freeze({ instanceId, itemId, x, z, rotationY, length });
+
+// The perimeter fence stands on the inset line; its posts are 0.14 deep, so its centre is half that further in.
+const EDGE = FARM_BOUNDS.width / 2 - FARM_BOUNDS.wallInset - 0.07;
+const GATE_WIDTH = 2.4;
+const SOUTH_RUN = EDGE - GATE_WIDTH / 2 + 0.07;
+
+/**
+ * The starter field: the perimeter fence (four runs and the south gate), the
+ * barn, four trees, two hay bales and the trough — the slice-1 dressing as
+ * rows the player may now move. `normalizeFarmLayout` seeds it for a document
+ * that has never had decor.
+ */
+export const STARTER_FARM_DECOR: readonly FarmDecorRow[] = Object.freeze([
+  row("post-rail-1", "decor.fence.post-rail", 0, -EDGE, 0, EDGE * 2 + 0.14),
+  row("post-rail-2", "decor.fence.post-rail", -EDGE, 0, Math.PI / 2, EDGE * 2 + 0.14),
+  row("post-rail-3", "decor.fence.post-rail", EDGE, 0, Math.PI / 2, EDGE * 2 + 0.14),
+  row("post-rail-4", "decor.fence.post-rail", -(GATE_WIDTH / 2 + SOUTH_RUN / 2), EDGE, 0, SOUTH_RUN),
+  row("post-rail-5", "decor.fence.post-rail", GATE_WIDTH / 2 + SOUTH_RUN / 2, EDGE, 0, SOUTH_RUN),
+  row("gate-1", "decor.fence.gate", 0, EDGE, 0),
+  row("barn-1", "decor.building.barn", -7.5, -8.5, Math.PI / 12),
+  row("oak-1", "decor.plant.oak", 9.5, -9),
+  row("oak-2", "decor.plant.oak", 11.2, -4.5),
+  row("oak-3", "decor.plant.oak", -11.5, 4),
+  row("oak-4", "decor.plant.oak", 7.8, 9.5),
+  row("hay-bale-1", "decor.prop.hay-bale", -1.2, -8.6, 0.4),
+  row("hay-bale-2", "decor.prop.hay-bale", 0.9, -8.9, -0.2),
+  row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
+]);
+
+export function createDefaultFarmLayout(): FarmLayout {
+  return Object.freeze({ version: 2, ground: DEFAULT_GROUND_ID, pets: Object.freeze([]), decor: STARTER_FARM_DECOR });
+}
+
+function freezeLayout(layout: FarmLayout): FarmLayout {
+  return Object.freeze({
+    ...layout,
+    pets: Object.freeze(layout.pets.map((pet) => Object.freeze({ ...pet }))),
+    decor: Object.freeze(layout.decor.map((item) => Object.freeze({ ...item }))),
+  });
+}
+
+function normalizePet(value: unknown): FarmPet | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Partial<FarmPet>;
+  const species = findAnimal(source.speciesId);
+  if (!species) return null;
+  if (typeof source.instanceId !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.instanceId)) return null;
+  return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title };
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function wrapRotation(value: number): number {
+  const turn = Math.PI * 2;
+  return Number((((value % turn) + turn) % turn).toFixed(4));
+}
+
+export function normalizeFarmDecorRow(value: unknown): FarmDecorRow | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Partial<FarmDecorRow>;
+  const definition = findFarmDecor(source.itemId);
+  if (!definition) return null;
+  if (typeof source.instanceId !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.instanceId)) return null;
+  if (!finiteNumber(source.x) || !finiteNumber(source.z)) return null;
+  const limitX = FARM_BOUNDS.width / 2;
+  const limitZ = FARM_BOUNDS.depth / 2;
+  return {
+    instanceId: source.instanceId,
+    itemId: definition.id,
+    x: Number(Math.min(limitX, Math.max(-limitX, source.x)).toFixed(4)),
+    z: Number(Math.min(limitZ, Math.max(-limitZ, source.z)).toFixed(4)),
+    rotationY: finiteNumber(source.rotationY) ? wrapRotation(source.rotationY) : 0,
+    length: definition.length.enabled ? clampFarmDecorLength(definition, finiteNumber(source.length) && source.length > 0 ? source.length : definition.length.default) : 0,
+  };
+}
+
+export type FarmHabitatState = Readonly<{ water: boolean }>;
+/** What the farm can house: water once a pond row stands on it. */
+export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }>): FarmHabitatState {
+  return { water: layout.decor.some((item) => findFarmDecor(item.itemId)?.habitat === "water") };
+}
+
+export function normalizeFarmLayout(value: unknown): FarmLayout {
+  if (!value || typeof value !== "object") return createDefaultFarmLayout();
+  const source = value as { version?: unknown; ground?: unknown; pets?: unknown; decor?: unknown };
+  if (source.version !== 1 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
+  const seen = new Set<string>();
+  // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
+  let decor: FarmDecorRow[];
+  if (source.version === 1 || !Array.isArray(source.decor)) {
+    decor = [...STARTER_FARM_DECOR];
+    for (const item of decor) seen.add(item.instanceId);
+  } else {
+    decor = [];
+    for (const raw of source.decor) {
+      const item = normalizeFarmDecorRow(raw);
+      if (!item || seen.has(item.instanceId)) continue;
+      seen.add(item.instanceId);
+      decor.push(item);
+      if (decor.length >= MAX_DECOR) break;
+    }
+  }
+  const habitats = farmHabitats({ decor });
+  const pets: FarmPet[] = [];
+  const petIds = new Set<string>();
+  for (const raw of Array.isArray(source.pets) ? source.pets : []) {
+    const pet = normalizePet(raw);
+    if (!pet || petIds.has(pet.instanceId)) continue;
+    // A swimmer with no pond to live in is dropped rather than drawn on the grass.
+    if (findAnimal(pet.speciesId)?.habitat === "water" && !habitats.water) continue;
+    petIds.add(pet.instanceId);
+    pets.push(pet);
+    if (pets.length >= MAX_PETS) break;
+  }
+  return freezeLayout({ version: 2, ground: normalizeGroundId(source.ground), pets, decor });
+}
+
+export function parseFarmLayout(serialized: string | null): FarmLayout {
+  if (!serialized) return createDefaultFarmLayout();
+  try {
+    return normalizeFarmLayout(JSON.parse(serialized));
+  } catch {
+    return createDefaultFarmLayout();
+  }
+}
+
+/** `<species>-<n>`, n one past the highest that species has ever had here, so ids stay stable after a release. */
+export function nextPetInstanceId(layout: FarmLayout, speciesId: string): string {
+  const stem = speciesId.replace(/^pet\./, "");
+  let highest = 0;
+  for (const pet of layout.pets) {
+    const match = new RegExp(`^${stem}-(\\d+)$`).exec(pet.instanceId);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `${stem}-${highest + 1}`;
+}
+
+export function addPet(layout: FarmLayout, speciesId: string, name: string): FarmPetResult {
+  const species = findAnimal(speciesId);
+  if (!species) return { valid: false, layout, instanceId: "", reason: "unknown_species" };
+  if (species.habitat === "water" && !farmHabitats(layout).water) return { valid: false, layout, instanceId: "", reason: "needs_water" };
+  if (layout.pets.length >= MAX_PETS) return { valid: false, layout, instanceId: "", reason: "full" };
+  const instanceId = nextPetInstanceId(layout, species.id);
+  const pet: FarmPet = { instanceId, speciesId: species.id, name: cleanPetName(name) || species.title };
+  return { valid: true, layout: freezeLayout({ ...layout, pets: [...layout.pets, pet] }), instanceId, reason: "" };
+}
+
+export function renamePet(layout: FarmLayout, instanceId: string, name: string): FarmLayout {
+  const index = layout.pets.findIndex((pet) => pet.instanceId === instanceId);
+  if (index < 0) return layout;
+  const species = findAnimal(layout.pets[index].speciesId);
+  const pets = layout.pets.map((pet, at) => (at === index ? { ...pet, name: cleanPetName(name) || species?.title || pet.name } : pet));
+  return freezeLayout({ ...layout, pets });
+}
+
+export function removePet(layout: FarmLayout, instanceId: string): FarmLayout {
+  if (!layout.pets.some((pet) => pet.instanceId === instanceId)) return layout;
+  return freezeLayout({ ...layout, pets: layout.pets.filter((pet) => pet.instanceId !== instanceId) });
+}
+
+/** The pets that need water: what a pond removal has to answer for. */
+export function waterPets(layout: FarmLayout): readonly FarmPet[] {
+  return layout.pets.filter((pet) => findAnimal(pet.speciesId)?.habitat === "water");
+}
+
+export function setFarmGround(layout: FarmLayout, id: string): Readonly<{ valid: boolean; layout: FarmLayout }> {
+  const ground = findGround(id);
+  if (!ground) return { valid: false, layout };
+  return { valid: true, layout: freezeLayout({ ...layout, ground: ground.id }) };
+}
+
+/** Replace the decor list wholesale; the placement rules call this after they have decided. */
+export function withFarmDecor(layout: FarmLayout, decor: readonly FarmDecorRow[]): FarmLayout {
+  return freezeLayout({ ...layout, decor: [...decor] });
+}
+
+export function farmDecorRowsEqual(first: FarmDecorRow, second: FarmDecorRow): boolean {
+  return first.instanceId === second.instanceId && first.itemId === second.itemId
+    && first.x === second.x && first.z === second.z && first.rotationY === second.rotationY && first.length === second.length;
+}
+
+export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean {
+  return first.ground === second.ground
+    && first.pets.length === second.pets.length
+    && first.pets.every((pet, index) => {
+      const other = second.pets[index];
+      return pet.instanceId === other.instanceId && pet.speciesId === other.speciesId && pet.name === other.name;
+    })
+    && first.decor.length === second.decor.length
+    && first.decor.every((item, index) => farmDecorRowsEqual(item, second.decor[index]));
+}

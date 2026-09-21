@@ -29,6 +29,7 @@ import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
 import { createRoomLayoutStore } from "./arcade-room-store.mjs";
+import { forwardOf, lookWalker, stepWalker } from "./arcade-room-walker.mjs";
 import { BATTLESHITS_PLAY_VIEW, BUILD_BUDDY_PLAY_VIEW, CABINET_PLAY_VIEW, COCKPIT_SWARM_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
 
@@ -172,8 +173,7 @@ const shell = createRoomShell(THREE, scene, {
   wallThickness: PLAYER_ROOM_SHELL.wallThickness,
 });
 const { floor, ceiling } = shell;
-const roomHalfWidth = PLAYER_ROOM_SHELL.width / 2;
-const roomHalfDepth = PLAYER_ROOM_SHELL.depth / 2;
+const walkerBounds = { halfWidth: PLAYER_ROOM_SHELL.width / 2, halfDepth: PLAYER_ROOM_SHELL.depth / 2, margin: 0.55 };
 
 // The placement grid only shows in build mode: it is a tool, not a floor.
 const grid = new THREE.GridHelper(PLAYER_ROOM_SHELL.width, 40, 0x297697, 0x1d3447);
@@ -422,7 +422,7 @@ function applyCamera(): void {
 }
 
 function forwardVector(): { x: number; z: number } {
-  return { x: -Math.sin(player.yaw), z: -Math.cos(player.yaw) };
+  return forwardOf(player.yaw);
 }
 
 function updateInteraction(): void {
@@ -703,42 +703,20 @@ document.addEventListener("mousemove", (event) => {
     emoteWheel.steer(event.movementX, event.movementY);
     return;
   }
-  player.yaw -= event.movementX * 0.0022;
-  player.pitch = THREE.MathUtils.clamp(player.pitch - event.movementY * 0.0018, -1.1, 1.05);
+  const looked = lookWalker(player, event.movementX, event.movementY);
+  player.yaw = looked.yaw;
+  player.pitch = looked.pitch;
 });
 
 function updatePlayer(dt: number): void {
   playerMoved = false;
   if (playing || decorOverlay.isOpen() || roomEditor.isEditing() || !roomEntered) return;
-  const forward = forwardVector();
-  const right = { x: -forward.z, z: forward.x };
-  let moveX = 0;
-  let moveZ = 0;
-  if (keys.has("KeyW") || keys.has("ArrowUp")) { moveX += forward.x; moveZ += forward.z; }
-  if (keys.has("KeyS") || keys.has("ArrowDown")) { moveX -= forward.x; moveZ -= forward.z; }
-  if (keys.has("KeyD") || keys.has("ArrowRight")) { moveX += right.x; moveZ += right.z; }
-  if (keys.has("KeyA") || keys.has("ArrowLeft")) { moveX -= right.x; moveZ -= right.z; }
-  const length = Math.hypot(moveX, moveZ);
-  if (!length) return;
-  const speed = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4.3 : 2.65;
-  const nextX = THREE.MathUtils.clamp(player.x + (moveX / length) * speed * dt, -roomHalfWidth + 0.55, roomHalfWidth - 0.55);
-  const nextZ = THREE.MathUtils.clamp(player.z + (moveZ / length) * speed * dt, -roomHalfDepth + 0.55, roomHalfDepth - 0.55);
   // Cabinets and solid decor alike: one obstacle list, the same one placement uses.
-  const blocked = roomEditor.getFloorObstacles().some((obstacle) => {
-    const dx = nextX - obstacle.x;
-    const dz = nextZ - obstacle.z;
-    const cosine = Math.cos(obstacle.rotationY);
-    const sine = Math.sin(obstacle.rotationY);
-    const localX = dx * cosine - dz * sine;
-    const localZ = dx * sine + dz * cosine;
-    return Math.abs(localX) < obstacle.footprint.width / 2 + 0.18
-      && Math.abs(localZ) < obstacle.footprint.depth / 2 + 0.18;
-  });
-  if (!blocked) {
-    playerMoved = nextX !== player.x || nextZ !== player.z;
-    player.x = nextX;
-    player.z = nextZ;
-  }
+  const step = stepWalker(player, keys, dt, walkerBounds, roomEditor.getFloorObstacles());
+  if (!step.moved) return;
+  playerMoved = true;
+  player.x = step.pose.x;
+  player.z = step.pose.z;
 }
 
 function resize(): void {

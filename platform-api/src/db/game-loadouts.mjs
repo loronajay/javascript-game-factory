@@ -23,6 +23,7 @@ import { YAM_BOWLING_GAME_SLUG, YAM_BOWLING_LOADOUT_CATALOG, } from "../services
 import { SHARK_HALL_GAME_SLUG, SHARK_HALL_LOADOUT_CATALOG, } from "../services/shark-hall-loadout-catalog.mjs";
 import { PUCK_D_UP_GAME_SLUG, PUCK_D_UP_LOADOUT_CATALOG, } from "../services/puckd-up-loadout-catalog.mjs";
 import { ARCADE_ROOM_GAME_SLUG, ARCADE_ROOM_LOADOUT_CATALOG, } from "../services/arcade-room-loadout-catalog.mjs";
+import { FARM_GAME_SLUG, FARM_LOADOUT_CATALOG, } from "../services/farm-loadout-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const CATALOGS = {
     [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
@@ -30,6 +31,7 @@ const CATALOGS = {
     [SHARK_HALL_GAME_SLUG]: SHARK_HALL_LOADOUT_CATALOG,
     [PUCK_D_UP_GAME_SLUG]: PUCK_D_UP_LOADOUT_CATALOG,
     [ARCADE_ROOM_GAME_SLUG]: ARCADE_ROOM_LOADOUT_CATALOG,
+    [FARM_GAME_SLUG]: FARM_LOADOUT_CATALOG,
 };
 function cleanText(value, maxLength = 120) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";

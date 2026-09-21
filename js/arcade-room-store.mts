@@ -22,6 +22,14 @@
 //
 // Everything impure is injectable — session, API client, storage — so the
 // whole thing is testable under node with no browser, no network, no account.
+//
+// THE STORE IS GENERIC OVER THE DOCUMENT (2026-09-20). The farm (`/farm/`)
+// keeps its layout the same way under the `farm` slug, so the owner/visitor
+// decision, the cache-in-front contract and the save target live once in
+// `createLayoutStore(spec, options)` and a surface passes a `LayoutDocumentSpec`
+// — its slug, cache key, normalizer and starter document. `createRoomLayoutStore`
+// is that call with the room's spec plus the one room-specific read
+// (`loadSelfAvatarId`), and its behaviour did not change.
 
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { readFactoryAccountSession } from "./platform/api/factory-account-gate.mjs";
@@ -30,7 +38,6 @@ import {
   ROOM_LAYOUT_STORAGE_KEY,
   createDefaultRoomLayout,
   normalizeRoomLayout,
-  parseRoomLayout,
   type RoomLayout,
 } from "./arcade-room-layout.mjs";
 
@@ -63,12 +70,24 @@ export type RoomStoreApi = Readonly<{
   uploadRoomPoster?: (file: File | Blob) => Promise<any>;
 }>;
 
-export type RoomLoadResult = Readonly<{
-  layout: RoomLayout;
+export type LayoutDocumentSpec<T> = Readonly<{
+  /** The `game_loadouts` slug the document rides under. */
+  slug: string;
+  /** The device cache bucket for a player id ("" = signed out). */
+  cacheKey: (playerId: string) => string;
+  /** The one place a stored document is made valid; must return a default for garbage. */
+  normalize: (value: unknown) => T;
+  createDefault: () => T;
+}>;
+
+export type LoadResult<T> = Readonly<{
+  layout: T;
   source: RoomLayoutSource;
   /** The visited player's public name, when the page is a visit. */
   ownerName: string;
 }>;
+
+export type RoomLoadResult = LoadResult<RoomLayout>;
 
 export type RoomSaveResult = Readonly<{
   ok: boolean;
@@ -87,20 +106,14 @@ export type RoomUploadResult = Readonly<{
   error: string;
 }>;
 
-export type RoomLayoutStore = Readonly<{
+export type LayoutStore<T> = Readonly<{
   mode: RoomStoreMode;
   /** True when saves reach the account, i.e. signed in AND the API is configured. */
   accountBacked: boolean;
-  /** Whose room this is: the visited player, or the signed-in player, or "" signed out. */
+  /** Whose space this is: the visited player, or the signed-in player, or "" signed out. */
   ownerPlayerId: string;
-  load: () => Promise<RoomLoadResult>;
-  save: (layout: RoomLayout) => Promise<RoomSaveResult>;
-  /**
-   * The body the signed-in player wears when standing in ANY room. It is the
-   * `avatarId` of their own layout, which a visit never loads, so a guest asks
-   * for it here: the account first, this device's cache next, the default last.
-   */
-  loadSelfAvatarId: () => Promise<string>;
+  load: () => Promise<LoadResult<T>>;
+  save: (layout: T) => Promise<RoomSaveResult>;
   /**
    * Send a picture up for a custom poster. Only an account-backed owner can:
    * a picture lives on the platform, not on this device, and a visitor has no
@@ -108,6 +121,15 @@ export type RoomLayoutStore = Readonly<{
    * where the URL goes.
    */
   uploadPicture: (file: File | Blob) => Promise<RoomUploadResult>;
+}>;
+
+export type RoomLayoutStore = LayoutStore<RoomLayout> & Readonly<{
+  /**
+   * The body the signed-in player wears when standing in ANY room. It is the
+   * `avatarId` of their own layout, which a visit never loads, so a guest asks
+   * for it here: the account first, this device's cache next, the default last.
+   */
+  loadSelfAvatarId: () => Promise<string>;
 }>;
 
 function cleanText(value: unknown): string {
@@ -122,23 +144,31 @@ export function roomCacheKey(playerId: string): string {
   return `${ROOM_LAYOUT_STORAGE_KEY}:${cleanText(playerId) || "guest"}`;
 }
 
-function readCache(storage: RoomStoreOptions["storage"], playerId: string): RoomLayout | null {
+function readCache<T>(spec: LayoutDocumentSpec<T>, storage: RoomStoreOptions["storage"], playerId: string): T | null {
   try {
-    const raw = storage?.getItem(roomCacheKey(playerId)) ?? null;
-    return raw ? parseRoomLayout(raw) : null;
+    const raw = storage?.getItem(spec.cacheKey(playerId)) ?? null;
+    return raw ? spec.normalize(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
 }
 
-function writeCache(storage: RoomStoreOptions["storage"], playerId: string, layout: RoomLayout): boolean {
+function writeCache<T>(spec: LayoutDocumentSpec<T>, storage: RoomStoreOptions["storage"], playerId: string, layout: T): boolean {
   try {
-    storage?.setItem(roomCacheKey(playerId), JSON.stringify(layout));
+    storage?.setItem(spec.cacheKey(playerId), JSON.stringify(layout));
     return true;
   } catch {
     return false;
   }
 }
+
+/** The arcade room's document: the spec `createRoomLayoutStore` uses. */
+export const ROOM_LAYOUT_SPEC: LayoutDocumentSpec<RoomLayout> = Object.freeze({
+  slug: ARCADE_ROOM_GAME_SLUG,
+  cacheKey: roomCacheKey,
+  normalize: normalizeRoomLayout,
+  createDefault: createDefaultRoomLayout,
+});
 
 function defaultStorage(): RoomStoreOptions["storage"] {
   try {
@@ -148,7 +178,7 @@ function defaultStorage(): RoomStoreOptions["storage"] {
   }
 }
 
-export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayoutStore {
+export function createLayoutStore<T>(spec: LayoutDocumentSpec<T>, options: RoomStoreOptions = {}): LayoutStore<T> {
   const session = options.session ?? readFactoryAccountSession();
   const storage = options.storage === undefined ? defaultStorage() : options.storage;
   const signedIn = Boolean(session?.authenticated);
@@ -165,54 +195,46 @@ export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayou
   const accountBacked = !visiting && signedIn && configured;
   const ownerPlayerId = visiting ? requested : selfId;
 
-  async function loadVisit(): Promise<RoomLoadResult> {
+  async function loadVisit(): Promise<LoadResult<T>> {
     const [loadout, profile] = await Promise.all([
-      configured ? api!.fetchGamePublicLoadout(ARCADE_ROOM_GAME_SLUG, requested).catch(() => null) : Promise.resolve(null),
+      configured ? api!.fetchGamePublicLoadout(spec.slug, requested).catch(() => null) : Promise.resolve(null),
       configured ? api!.loadPlayerProfile(requested).catch(() => null) : Promise.resolve(null),
     ]);
     const ownerName = cleanText(profile?.profileName);
     // A visitor is never shown the local cache: it is this browser's room, not theirs.
     return loadout?.layout
-      ? { layout: normalizeRoomLayout(loadout.layout), source: "account", ownerName }
-      : { layout: createDefaultRoomLayout(), source: "starter", ownerName };
+      ? { layout: spec.normalize(loadout.layout), source: "account", ownerName }
+      : { layout: spec.createDefault(), source: "starter", ownerName };
   }
 
-  async function loadOwn(): Promise<RoomLoadResult> {
+  async function loadOwn(): Promise<LoadResult<T>> {
     if (accountBacked) {
-      const garage = await api!.fetchGameGarage(ARCADE_ROOM_GAME_SLUG).catch(() => null);
+      const garage = await api!.fetchGameGarage(spec.slug).catch(() => null);
       if (garage?.garage) {
-        const layout = normalizeRoomLayout(garage.garage);
+        const layout = spec.normalize(garage.garage);
         // Refresh the cache so the next boot on a flaky connection still shows the real room.
-        writeCache(storage, selfId, layout);
+        writeCache(spec, storage, selfId, layout);
         return { layout, source: "account", ownerName: "" };
       }
       // The account read failed: fall through to the cache rather than showing the starter
       // room over a layout the player has already built and saved.
     }
-    const cached = readCache(storage, selfId);
+    const cached = readCache(spec, storage, selfId);
     return cached
       ? { layout: cached, source: "device", ownerName: "" }
-      : { layout: createDefaultRoomLayout(), source: "starter", ownerName: "" };
+      : { layout: spec.createDefault(), source: "starter", ownerName: "" };
   }
 
-  async function loadSelfAvatarId(): Promise<string> {
-    if (signedIn && configured) {
-      const garage = await api!.fetchGameGarage(ARCADE_ROOM_GAME_SLUG).catch(() => null);
-      if (garage?.garage) return normalizeRoomLayout(garage.garage).avatarId;
-    }
-    return readCache(storage, selfId)?.avatarId ?? createDefaultRoomLayout().avatarId;
-  }
-
-  async function save(layout: RoomLayout): Promise<RoomSaveResult> {
+  async function save(layout: T): Promise<RoomSaveResult> {
     if (visiting) return { ok: false, target: "device", error: "read_only" };
     // The cache is written first, synchronously: the layout is the player's the moment they press save.
-    const cached = writeCache(storage, selfId, layout);
+    const cached = writeCache(spec, storage, selfId, layout);
     if (!accountBacked) {
       return cached
         ? { ok: true, target: "device", error: "" }
         : { ok: false, target: "device", error: "device_storage_failed" };
     }
-    const result = await api!.saveGameGarage(ARCADE_ROOM_GAME_SLUG, layout).catch(() => null);
+    const result = await api!.saveGameGarage(spec.slug, layout).catch(() => null);
     if (!result?.ok) return { ok: false, target: "account", error: cleanText(result?.error) || "save_failed" };
     return { ok: true, target: "account", error: "" };
   }
@@ -237,7 +259,32 @@ export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayou
     ownerPlayerId,
     load: visiting ? loadVisit : loadOwn,
     save,
-    loadSelfAvatarId,
     uploadPicture,
   });
+}
+
+export function createRoomLayoutStore(options: RoomStoreOptions = {}): RoomLayoutStore {
+  const store = createLayoutStore(ROOM_LAYOUT_SPEC, options);
+  // Mirrors the decision the generic store made, for the one read that needs the account
+  // even on a visit: a guest's own body is in THEIR room's document, not the one on show.
+  const session = options.session ?? readFactoryAccountSession();
+  const storage = options.storage === undefined ? defaultStorage() : options.storage;
+  const signedIn = Boolean(session?.authenticated);
+  const selfId = signedIn
+    ? cleanText(session?.playerId) || cleanText(options.selfPlayerId ?? loadFactoryProfile().playerId)
+    : "";
+  const api = options.api === undefined
+    ? (signedIn ? createPlatformApiClient() : null)
+    : options.api;
+  const configured = Boolean(api) && api?.isConfigured !== false;
+
+  async function loadSelfAvatarId(): Promise<string> {
+    if (signedIn && configured) {
+      const garage = await api!.fetchGameGarage(ARCADE_ROOM_GAME_SLUG).catch(() => null);
+      if (garage?.garage) return normalizeRoomLayout(garage.garage).avatarId;
+    }
+    return readCache(ROOM_LAYOUT_SPEC, storage, selfId)?.avatarId ?? createDefaultRoomLayout().avatarId;
+  }
+
+  return Object.freeze({ ...store, loadSelfAvatarId });
 }

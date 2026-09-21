@@ -47,6 +47,9 @@ export const SURFACE_PATTERNS = Object.freeze([
   "subway",
   "tartan",
   "circuit",
+  // Outdoor grounds, added for the farm (`js/farm-catalog/ground.mts`); the room may use them as floors too.
+  "grass",
+  "dirt",
 ] as const);
 export type SurfacePattern = typeof SURFACE_PATTERNS[number];
 

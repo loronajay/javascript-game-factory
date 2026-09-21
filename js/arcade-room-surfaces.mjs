@@ -34,6 +34,25 @@ function speckle(context, size, count, seed, paint, radius) {
         context.fill();
     }
 }
+/**
+ * Draw a shape at (x, y) and again across whichever tile edges it reaches, so
+ * an organic pattern (blades, clods, patches) wraps seamlessly when repeated.
+ */
+function wrapped(context, size, x, y, reach, draw) {
+    const xs = [x];
+    const ys = [y];
+    if (x < reach)
+        xs.push(x + size);
+    if (x > size - reach)
+        xs.push(x - size);
+    if (y < reach)
+        ys.push(y + size);
+    if (y > size - reach)
+        ys.push(y - size);
+    for (const wx of xs)
+        for (const wy of ys)
+            draw(wx, wy);
+}
 function withAlpha(hex, alpha) {
     const value = Number.parseInt(hex.slice(1), 16);
     return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
@@ -523,6 +542,83 @@ const PATTERNS = {
         context.fillStyle = color(colors, 1);
         for (let index = 0; index < 18; index += 1) {
             context.fillRect(Math.floor(random() * 16) * cell - 5, Math.floor(random() * 16) * cell - 5, 10, 10);
+        }
+    },
+    // Colours: base green, shadow green, highlight green, bare-earth brown.
+    "grass": (context, size, colors) => {
+        fill(context, size, color(colors, 0));
+        // Soft patchiness first so the field is not one flat tone.
+        const patches = seeded(41);
+        for (let index = 0; index < 40; index += 1) {
+            context.fillStyle = withAlpha(patches() < 0.6 ? color(colors, 1) : color(colors, 3), 0.16 + patches() * 0.14);
+            const rx = 30 + patches() * 90;
+            const ry = 20 + patches() * 60;
+            const spin = patches() * Math.PI;
+            wrapped(context, size, patches() * size, patches() * size, 120, (x, y) => {
+                context.beginPath();
+                context.ellipse(x, y, rx, ry, spin, 0, Math.PI * 2);
+                context.fill();
+            });
+        }
+        // Then blades: short strokes leaning every which way, darker in the shade, lit on top.
+        const random = seeded(43);
+        context.lineCap = "round";
+        for (let index = 0; index < 5200; index += 1) {
+            const length = 5 + random() * 11;
+            const lean = (random() - 0.5) * 8;
+            const tone = random();
+            context.strokeStyle = tone < 0.45 ? color(colors, 1) : tone < 0.85 ? color(colors, 0) : color(colors, 2);
+            context.lineWidth = 1.2 + random() * 1.3;
+            wrapped(context, size, random() * size, random() * size, 18, (x, y) => {
+                context.beginPath();
+                context.moveTo(x, y);
+                context.lineTo(x + lean, y - length);
+                context.stroke();
+            });
+        }
+    },
+    // Colours: base earth, shadow earth, dry highlight, weed green.
+    "dirt": (context, size, colors) => {
+        fill(context, size, color(colors, 0));
+        const patches = seeded(47);
+        for (let index = 0; index < 36; index += 1) {
+            context.fillStyle = withAlpha(patches() < 0.5 ? color(colors, 1) : color(colors, 2), 0.18 + patches() * 0.18);
+            const rx = 24 + patches() * 80;
+            const ry = 16 + patches() * 48;
+            const spin = patches() * Math.PI;
+            wrapped(context, size, patches() * size, patches() * size, 104, (x, y) => {
+                context.beginPath();
+                context.ellipse(x, y, rx, ry, spin, 0, Math.PI * 2);
+                context.fill();
+            });
+        }
+        // Clods and pebbles, then the odd tuft of weed poking through.
+        const clods = seeded(53);
+        for (let index = 0; index < 2600; index += 1) {
+            context.fillStyle = withAlpha(clods() < 0.5 ? color(colors, 1) : color(colors, 2), 0.7);
+            const radius = 2.2 * (0.5 + clods());
+            wrapped(context, size, clods() * size, clods() * size, 5, (x, y) => {
+                context.beginPath();
+                context.arc(x, y, radius, 0, Math.PI * 2);
+                context.fill();
+            });
+        }
+        const random = seeded(59);
+        context.lineCap = "round";
+        context.lineWidth = 1.4;
+        context.strokeStyle = color(colors, 3);
+        for (let index = 0; index < 220; index += 1) {
+            const tuft = [];
+            for (let blade = 0; blade < 3; blade += 1)
+                tuft.push([(random() - 0.5) * 8, -4 - random() * 7]);
+            wrapped(context, size, random() * size, random() * size, 12, (x, y) => {
+                for (const [dx, dy] of tuft) {
+                    context.beginPath();
+                    context.moveTo(x, y);
+                    context.lineTo(x + dx, y + dy);
+                    context.stroke();
+                }
+            });
         }
     },
 };

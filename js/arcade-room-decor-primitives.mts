@@ -25,10 +25,10 @@ export function box(THREE: ThreeNamespace, group: any, size: readonly [number, n
   return mesh;
 }
 
-export function cylinder(THREE: ThreeNamespace, group: any, radiusTop: number, radiusBottom: number, height: number, position: readonly [number, number, number], material: any, segments = 16): any {
+export function cylinder(THREE: ThreeNamespace, group: any, radiusTop: number, radiusBottom: number, height: number, position: readonly [number, number, number], material: any, segments = 16, shadow = true): any {
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), material);
   mesh.position.set(...position);
-  mesh.castShadow = true;
+  mesh.castShadow = shadow;
   group.add(mesh);
   return mesh;
 }

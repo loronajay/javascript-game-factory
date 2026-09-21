@@ -40,6 +40,10 @@ import {
   ARCADE_ROOM_GAME_SLUG,
   ARCADE_ROOM_LOADOUT_CATALOG,
 } from "../services/arcade-room-loadout-catalog.mjs";
+import {
+  FARM_GAME_SLUG,
+  FARM_LOADOUT_CATALOG,
+} from "../services/farm-loadout-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 
@@ -60,6 +64,7 @@ const CATALOGS: Record<string, LoadoutCatalog> = {
   [SHARK_HALL_GAME_SLUG]: SHARK_HALL_LOADOUT_CATALOG,
   [PUCK_D_UP_GAME_SLUG]: PUCK_D_UP_LOADOUT_CATALOG,
   [ARCADE_ROOM_GAME_SLUG]: ARCADE_ROOM_LOADOUT_CATALOG,
+  [FARM_GAME_SLUG]: FARM_LOADOUT_CATALOG,
 };
 
 function cleanText(value: any, maxLength = 120): string {

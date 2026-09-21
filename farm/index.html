@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>My Farm | Javascript Game Factory</title>
+  <link rel="stylesheet" href="../css/space-editor.css">
+  <link rel="stylesheet" href="farm.css">
+</head>
+<body>
+  <main class="farm-shell">
+    <canvas id="farmCanvas" tabindex="0" aria-label="Your 3D farm"></canvas>
+
+    <header class="farm-header">
+      <a href="../grid.html" class="back-link">← Game Grid</a>
+      <div>
+        <span id="farmEyebrow" class="eyebrow">PERSONAL SPACE · THE FARM</span>
+        <h1 id="farmTitle">My Farm</h1>
+      </div>
+      <a id="farmOwnerLink" class="back-link farm-owner-link" href="../player/index.html" hidden>View profile</a>
+      <div class="farm-header__actions">
+        <a href="../room/index.html" class="back-link" title="Walk over to your arcade">My Arcade</a>
+        <button id="openPets" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Adopt, name and release animals (P)">Pets <kbd>P</kbd></button>
+        <button id="editFarm" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Toggle build mode (B)">Build <kbd>B</kbd></button>
+        <button id="fullscreenFarm" class="farm-button farm-fullscreen" type="button" aria-pressed="false" title="Fill the screen with the farm (F)">Fullscreen <kbd>F</kbd></button>
+      </div>
+    </header>
+
+    <section id="startGate" class="start-gate">
+      <div class="start-card">
+        <span id="startTag" class="start-card__tag">YOUR 3D FARM</span>
+        <h2 id="startHeading">Out to the field.</h2>
+        <p id="startCopy">A meadow of your own with a barn, a few trees and a fence around it. Adopt animals and they wander the field; walk up to one and pet it. Press B to build: fences, ponds, plants and more.</p>
+        <button id="enterFarm" type="button">Enter my farm</button>
+        <small id="farmStatus">Click to capture the mouse · WASD to move · E to pet · P for pets · B to build</small>
+      </div>
+    </section>
+
+    <div id="farmPrompt" class="farm-prompt" aria-live="polite"></div>
+    <div class="control-hint" aria-hidden="true">
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Doors · Ladders · Sit · Pick up</span><span><b>E</b> Put pet down</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
+    </div>
+
+    <aside id="petsPanel" class="pets-panel" aria-label="Your pets" hidden>
+      <header class="pets-panel__head">
+        <div>
+          <span class="eyebrow">THE FARM</span>
+          <strong>Your pets <span id="petsCount" class="pets-panel__count">0 / 12</span></strong>
+        </div>
+        <button id="closePets" class="farm-button" type="button" title="Back to the field (P)">Done <kbd>P</kbd></button>
+      </header>
+      <div class="pets-panel__body">
+        <section class="pets-section">
+          <h3 class="pets-section__title">Living here</h3>
+          <div id="petList" class="pet-list"></div>
+        </section>
+        <section class="pets-section">
+          <h3 class="pets-section__title">Adopt</h3>
+          <div id="speciesGrid" class="pet-grid"></div>
+          <div class="pets-adopt">
+            <input id="petName" class="pets-adopt__name" type="text" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Name" aria-label="Name for the new pet">
+            <button class="farm-button farm-button--accent" type="button" data-adopt>Adopt</button>
+          </div>
+          <p id="petsStatus" class="pets-status" aria-live="polite"></p>
+        </section>
+      </div>
+    </aside>
+
+    <aside id="farmEditor" class="space-editor farm-editor" aria-label="Farm editor" hidden>
+      <header class="editor-topbar">
+        <div class="editor-topbar__brand">
+          <span class="eyebrow">BUILD MODE</span>
+          <strong>Build your farm</strong>
+        </div>
+        <div id="cameraViews" class="camera-views" role="group" aria-label="Camera view">
+          <button type="button" data-view="overview" aria-pressed="true" title="Overview (O)">Overview</button>
+          <button type="button" data-view="front" aria-pressed="false" title="Front (F)">Front</button>
+          <button type="button" data-view="left" aria-pressed="false">Left</button>
+          <button type="button" data-view="right" aria-pressed="false">Right</button>
+          <button type="button" data-view="back" aria-pressed="false">Back</button>
+          <button type="button" data-view="top" aria-pressed="false" title="Top-down (T)">Top</button>
+        </div>
+        <div class="editor-topbar__actions">
+          <button id="undoFarmEdit" class="editor-action editor-action--quiet" type="button" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
+          <button id="resetFarmLayout" class="editor-action editor-action--quiet" type="button" title="Put the starter field back">Reset</button>
+          <button id="saveFarmLayout" class="editor-action" type="button">Save farm</button>
+          <button id="finishFarmEditing" class="editor-action editor-action--primary" type="button" title="Save and walk the field (B)">Done <kbd>B</kbd></button>
+        </div>
+      </header>
+
+      <nav id="farmEditorTabs" class="editor-rail" role="tablist" aria-label="Editor sections" data-collapsed="false">
+        <button type="button" role="tab" data-tab="ground" aria-selected="false" title="The ground">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h18M5 17c1-4 3-6 7-6s6 2 7 6M8 11l1-3M12 11V6M16 11l-1-3" /></svg>
+          <span>Ground</span>
+        </button>
+        <button type="button" role="tab" data-tab="fence" aria-selected="true" title="Fences and walls">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V7l2-3 2 3v13M15 20V7l2-3 2 3v13M3 11h18M3 16h18" /></svg>
+          <span>Fences</span>
+        </button>
+        <button type="button" role="tab" data-tab="building" aria-selected="false" title="Barns and sheds">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v10H3zM10 21v-6h4v6" /></svg>
+          <span>Buildings</span>
+        </button>
+        <button type="button" role="tab" data-tab="plant" aria-selected="false" title="Trees and plants">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-7M12 14c-4 0-6-3-6-7 3 0 6 2 6 7zM12 14c4 0 6-3 6-7-3 0-6 2-6 7z" /></svg>
+          <span>Plants</span>
+        </button>
+        <button type="button" role="tab" data-tab="water" aria-selected="false" title="Ponds">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c3-2 6-2 9 0s6 2 9 0M3 19c3-2 6-2 9 0s6 2 9 0M12 4l3 5a3 3 0 1 1-6 0z" /></svg>
+          <span>Water</span>
+        </button>
+        <button type="button" role="tab" data-tab="prop" aria-selected="false" title="Yard props">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11M9 20v-5h6v5" /></svg>
+          <span>Props</span>
+        </button>
+      </nav>
+
+      <section id="farmEditorDrawer" class="editor-drawer">
+        <div id="farmEditorTabPanels" class="editor-tab-panels">
+          <section data-tab-panel="ground" class="editor-tab-panel" hidden>
+            <header class="drawer-head">
+              <h2>Ground</h2>
+              <p>Pick what the field is made of. Everything else stands on top of it.</p>
+            </header>
+            <div id="groundPicker" class="swatch-grid" role="group" aria-label="Ground finishes"></div>
+          </section>
+          <section data-tab-panel="decor" class="editor-tab-panel">
+            <header class="drawer-head">
+              <h2 id="farmCatalogTitle">Fences</h2>
+              <p id="farmCatalogHint">Click a card to place it, then drag it around the field.</p>
+            </header>
+            <div id="farmCatalog" class="decor-grid" role="group" aria-label="Catalog"></div>
+            <div id="farmPlaced" class="placed-list" role="group" aria-label="Placed items"></div>
+          </section>
+        </div>
+      </section>
+
+      <div id="farmInspector" class="inspector editor-inspector" aria-label="Selected item" hidden></div>
+
+      <footer class="editor-bottombar">
+        <div class="editor-tools" aria-label="Rotate the selection">
+          <button id="rotateFarmLeft" type="button" title="Rotate left (Q)">↶ <span>Rotate</span></button>
+          <button id="rotateFarmRight" type="button" title="Rotate right (R)">↷ <span>Rotate</span></button>
+        </div>
+        <p id="farmEditorStatus" class="editor-status" aria-live="polite">Drag anything to move it.</p>
+        <details class="editor-shortcuts">
+          <summary>Shortcuts</summary>
+          <small><b>Arrows</b> nudge · <b>Q / R</b> rotate · <b>Del</b> remove · <b>Ctrl+D</b> duplicate · <b>Drag end arrows</b> stretch a fence · <b>- / +</b> length · <b>Alt+drag</b> no snapping · <b>Ctrl+Z</b> undo · <b>Esc</b> deselect · <b>O / F / T</b> views · <b>C</b> centre on selection · <b>B</b> save &amp; close</small>
+        </details>
+      </footer>
+    </aside>
+  </main>
+  <script type="module" src="../js/platform-config.mjs"></script>
+  <script type="module" src="../js/farm.mjs"></script>
+</body>
+</html>
