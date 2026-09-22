@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#050718">
+  <title>Orbit Pong</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <a class="arcade-link" href="../../grid.html" aria-label="Back to arcade">← Arcade</a>
+
+  <main id="app">
+    <section class="screen menu-screen is-active" data-screen="menu">
+      <div class="brand-lockup">
+        <div class="orbit-mark" aria-hidden="true"><i></i><b></b><em></em></div>
+        <p class="eyebrow">Zero sides. Full circle.</p>
+        <h1>ORBIT<br><span>PONG</span></h1>
+        <p class="lede">Chase the rail. Shape the return. The last paddle to touch the ball owns the point.</p>
+      </div>
+
+      <div class="mode-card glass-panel">
+        <button class="mode-button primary" data-action="single-player">
+          <span><b>Single Player</b><small>Challenge an interception-driven CPU</small></span><i>01</i>
+        </button>
+        <button class="mode-button" data-action="local-multiplayer">
+          <span><b>Local Multiplayer</b><small>Keyboard or two-player multitouch</small></span><i>02</i>
+        </button>
+        <button class="mode-button" data-action="online-multiplayer">
+          <span><b>Online Multiplayer</b><small>Private room or public search</small></span><i>03</i>
+        </button>
+        <div class="difficulty-row">
+          <span>CPU</span>
+          <button data-difficulty="easy">Easy</button>
+          <button class="is-selected" data-difficulty="normal">Normal</button>
+          <button data-difficulty="hard">Hard</button>
+        </div>
+      </div>
+
+      <div class="control-hint"><span>P1</span> A / D <i></i><span>P2</span> ← / →</div>
+    </section>
+
+    <section class="screen online-screen" data-screen="online">
+      <div class="online-card glass-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Factory Network</p>
+          <h2>Online Orbit</h2>
+          <p data-online="status" aria-live="polite">Connecting to match server…</p>
+        </div>
+
+        <div data-online-panel="entry" hidden>
+          <div class="online-actions">
+            <button class="primary" data-action="find-match">Search for Match</button>
+            <button data-action="create-room">Create Private Room</button>
+          </div>
+          <div class="join-row">
+            <input data-online="room-code-input" maxlength="5" placeholder="ROOM CODE" aria-label="Room code" autocomplete="off" spellcheck="false">
+            <button data-action="join-room">Join</button>
+          </div>
+        </div>
+
+        <div data-online-panel="searching" hidden>
+          <div class="search-orbit" aria-hidden="true"><i></i></div>
+          <p>Scanning for another player…</p>
+          <button data-action="cancel-search">Cancel Search</button>
+        </div>
+
+        <div data-online-panel="lobby" hidden>
+          <div class="room-code" data-online="room-code"></div>
+          <div class="roster" data-online="roster"></div>
+          <button class="primary" data-action="ready">Ready</button>
+          <p class="lobby-note" data-online="lobby-note">Both players must be ready.</p>
+        </div>
+
+        <button class="text-button" data-action="online-back">← Main Menu</button>
+      </div>
+    </section>
+
+    <section class="screen game-screen" data-screen="game">
+      <header class="match-header">
+        <div class="player-score p1"><span data-hud="p1-name">Player 1</span><b data-hud="p1-score">0</b></div>
+        <div class="match-status">
+          <span data-hud="mode">LOCAL</span>
+          <strong data-hud="status">GET READY</strong>
+        </div>
+        <div class="player-score p2"><b data-hud="p2-score">0</b><span data-hud="p2-name">Player 2</span></div>
+      </header>
+
+      <div class="arena-shell">
+        <canvas id="gameCanvas" width="720" height="720" aria-label="Orbit Pong circular arena"></canvas>
+        <div class="announcement" data-hud="announcement" aria-live="polite"></div>
+      </div>
+
+      <div class="touch-controls" aria-label="Touch controls">
+        <div class="touch-side p1-touch">
+          <span>P1</span>
+          <button data-touch-player="0" data-orbit="-1" aria-label="Player 1 counterclockwise">←</button>
+          <button data-touch-player="0" data-orbit="1" aria-label="Player 1 clockwise">→</button>
+        </div>
+        <div class="touch-side p2-touch">
+          <button data-touch-player="1" data-orbit="-1" aria-label="Player 2 counterclockwise">←</button>
+          <button data-touch-player="1" data-orbit="1" aria-label="Player 2 clockwise">→</button>
+          <span>P2</span>
+        </div>
+      </div>
+
+      <div class="match-actions">
+        <button data-action="toggle-debug">F3 Debug</button>
+        <button data-action="quit-match">Exit Match</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

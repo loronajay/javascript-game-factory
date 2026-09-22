@@ -57,6 +57,7 @@ js/tests/*
 !js/tests/arcade-gridpage.test.mjs
 !js/tests/admin-catalog-overrides.test.mjs
 !js/tests/admin-cabinet-editor.test.mjs
+!js/tests/farm-music.test.mjs
 
 # Keep the database regression that prevents narrow profile updates from
 # erasing canonical fields after an origin/domain change.

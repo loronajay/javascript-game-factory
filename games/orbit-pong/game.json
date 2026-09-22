@@ -1,0 +1,14 @@
+{
+  "title": "Orbit Pong",
+  "tagline": "Zero sides. Full circle.",
+  "description": "A 360-degree duel where both paddles orbit the same arena. Chase projected serves, shape returns with paddle momentum, and score when your opponent misses the ball you last touched.",
+  "players": "1-2",
+  "categories": ["Arcade", "Sports"],
+  "dimensions": ["2d"],
+  "play_modes": ["solo", "local", "online"],
+  "status": "Playable",
+  "order": 18,
+  "featured": false,
+  "theme": "cosmic",
+  "accentColor": "#48e6ff"
+}

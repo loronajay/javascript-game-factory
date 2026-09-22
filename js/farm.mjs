@@ -26,6 +26,7 @@ import { createPetsPanel } from "./farm-pets-panel.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
+import { createFarmMusic } from "./farm-music.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -39,6 +40,7 @@ const startGate = requiredElement("#startGate");
 const enterButton = requiredElement("#enterFarm");
 const status = requiredElement("#farmStatus");
 const fullscreenButton = requiredElement("#fullscreenFarm");
+const musicButton = requiredElement("#toggleFarmMusic");
 const farmTitle = requiredElement("#farmTitle");
 const farmEyebrow = requiredElement("#farmEyebrow");
 const startTag = requiredElement("#startTag");
@@ -50,6 +52,20 @@ const petsPanelRoot = requiredElement("#petsPanel");
 const editButton = requiredElement("#editFarm");
 const editorPanel = requiredElement("#farmEditor");
 const editorDrawer = requiredElement("#farmEditorDrawer");
+const farmMusic = createFarmMusic();
+function renderMusicButton() {
+    const muted = farmMusic.isMuted();
+    musicButton.setAttribute("aria-pressed", String(muted));
+    musicButton.setAttribute("aria-label", muted ? "Unmute music" : "Mute music");
+    musicButton.title = muted ? "Play farm music (M)" : "Mute farm music (M)";
+    musicButton.firstChild.textContent = muted ? "Music off " : "Music on ";
+}
+function toggleFarmMusic() {
+    farmMusic.setMuted(!farmMusic.isMuted());
+    renderMusicButton();
+}
+musicButton.addEventListener("click", toggleFarmMusic);
+renderMusicButton();
 /** The farm's document, on the shared store: slug `farm`, its own cache bucket, its own normalizer. */
 export const FARM_LAYOUT_SPEC = Object.freeze({
     slug: "farm",
@@ -373,6 +389,11 @@ window.addEventListener("keydown", (event) => {
         return;
     }
     keys.add(event.code);
+    if (event.code === "KeyM" && !event.repeat) {
+        event.preventDefault();
+        toggleFarmMusic();
+        return;
+    }
     if (event.code === "KeyF" && !event.repeat && document.fullscreenEnabled) {
         event.preventDefault();
         setFarmFullscreen(!isFarmFullscreen());
@@ -391,10 +412,12 @@ canvas.addEventListener("click", () => {
 });
 enterButton.addEventListener("click", () => {
     farmEntered = true;
+    farmMusic.start();
     startGate.classList.add("is-hidden");
     canvas.focus();
     status.textContent = "WASD to move · Drag to look · Click for mouse capture";
 });
+window.addEventListener("pagehide", () => farmMusic.destroy(), { once: true });
 document.addEventListener("pointerlockchange", () => {
     const locked = document.pointerLockElement === canvas;
     startGate.classList.toggle("is-hidden", farmEntered);
