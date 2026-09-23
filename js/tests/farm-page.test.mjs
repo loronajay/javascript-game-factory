@@ -19,19 +19,21 @@ test("the farm page ships the shell the composition root requires", () => {
   assert.match(html, /id="farmOwnerLink"[^>]*hidden/);
 });
 
-test("the farm is account-backed and visitable through the room's generic store under its own slug", () => {
-  assert.match(source, /createLayoutStore\(FARM_LAYOUT_SPEC, \{ visitPlayerId, storage: null \}\)/, "farm progress must never use the shared localStorage cache");
+test("the farm is playable signed in or out, saves locally or to a loaded account, and keeps visits read-only", () => {
+  assert.match(source, /createLayoutStore\(FARM_LAYOUT_SPEC, \{ visitPlayerId \}\)/, "signed-out farms use the store's device persistence while signed-in farms remain account-backed");
   assert.match(source, /slug: "farm"/);
   assert.match(source, /cacheKey: farmCacheKey/);
   assert.match(source, /normalize: normalizeFarmLayout/);
   assert.match(source, /new URLSearchParams\(location\.search\)\.get\("id"\)/);
   assert.doesNotMatch(source, /localStorage/, "the store owns the cache");
-  assert.match(source, /const canManageFarm = !visiting && layoutStore\.accountBacked && loaded\.source === "account"/);
-  assert.doesNotMatch(source, /Saved on this device|Kept on this device/, "farm saves never claim a device fallback");
+  assert.match(source, /const canManageFarm = !visiting/);
+  assert.match(source, /const canPersistFarm = canManageFarm && \(!layoutStore\.ownerPlayerId \|\| \(layoutStore\.accountBacked && loaded\.source === "account"\)\)/);
+  assert.match(source, /if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\."/);
+  assert.match(source, /Saved on this device · sign in to keep farm progression with your account\./);
 });
 
 test("leaving the farm checkpoints its running clock with an unload-safe account save", () => {
-  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*if \(canManageFarm\) void layoutStore\.save\(progressedLayout\(\), \{ keepalive: true \}\)/);
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*if \(canPersistFarm\) void layoutStore\.save\(progressedLayout\(\), \{ keepalive: true \}\)/);
 });
 
 test("the shared layout store forwards unload-safe save options to the account", async () => {
@@ -96,7 +98,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /obstacles: \(\) => obstacles/, "pets and the walker share one obstacle list");
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
-  assert.match(source, /if \(!canManageFarm\) openPetsButton\.hidden = true/, "pets stay read-only unless the farm loaded from the account database");
+  assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
   assert.match(source, /if \(!farmEntered \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
   // E on a pet lifts it into the arms (with a heart), and E with a pet in hand sets it down ahead where it fits — through the pure sim and rules.
   assert.match(source, /petSim\.pickUp\(nearbyPet\.instanceId\)/);
@@ -108,7 +110,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /petSim\.tick\(TICK_SECONDS, player\)/, "the sim gets the whole pose, so a carried pet rides the yaw");
   // Every layout change goes through one path that applies, syncs and saves.
   assert.match(source, /async function persistLayout/);
-  assert.match(source, /applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
+  assert.match(source, /applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\.";\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
 });
 
 test("every building's door is worked with E, at its own reach, and the door is solid only while shut", () => {

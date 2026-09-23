@@ -92,13 +92,16 @@ export const FARM_LAYOUT_SPEC: LayoutDocumentSpec<FarmLayout> = Object.freeze({
 });
 
 // Whose farm this is. `?id=` names a player to visit; without it, this is the
-// signed-in player's own farm. Farms deliberately disable the shared room
-// cache: crop progress is database-backed or read-only, never device-backed.
+// signed-in player's own farm. The shared store keeps signed-out farms on this
+// device and treats the database as canonical for signed-in players.
 const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
-const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId, storage: null });
+const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId });
 const visiting = layoutStore.mode === "visitor";
 const loaded = await layoutStore.load();
-const canManageFarm = !visiting && layoutStore.accountBacked && loaded.source === "account";
+const canManageFarm = !visiting;
+// A signed-in fallback must never overwrite the database with a stale device
+// copy or starter layout. Signed-out owners, however, save normally on-device.
+const canPersistFarm = canManageFarm && (!layoutStore.ownerPlayerId || (layoutStore.accountBacked && loaded.source === "account"));
 let layout: FarmLayout = loaded.layout;
 const resumedClock = resumeFarmClock(layout.clock, Date.now());
 layout = withFarmClock(layout, resumedClock.farmMinutes, resumedClock.updatedAt);
@@ -124,14 +127,12 @@ function applyFarmIdentity(): void {
     return;
   }
   ownerLink.hidden = true;
-  if (!canManageFarm) {
-    startTag.textContent = "DATABASE SAVE REQUIRED";
-    startCopy.textContent = layoutStore.accountBacked
-      ? "The farm database could not be loaded. This starter meadow is read-only so it cannot overwrite your saved farm. Try again when the platform is available."
-      : "Sign in to farm. Crops, inventory, time and every field change are saved to your platform account; this starter meadow is read-only.";
-    openPetsButton.hidden = true;
-    openInventoryButton.hidden = true;
-    editButton.hidden = true;
+  if (!layoutStore.ownerPlayerId) {
+    startTag.textContent = "LOCAL FARM";
+    startCopy.textContent = "Play, build and grow while signed out. This farm saves on this device; sign in and reload to keep progression with your account.";
+  } else if (!canPersistFarm) {
+    startTag.textContent = "DATABASE TEMPORARILY UNAVAILABLE";
+    startCopy.textContent = "You can still play and build in this session. Saving is paused so a starter or stale device copy cannot overwrite your account farm.";
   }
 }
 applyFarmIdentity();
@@ -568,7 +569,7 @@ enterButton.addEventListener("click", () => {
   status.textContent = "WASD to move · Drag to look · Click for mouse capture";
 });
 window.addEventListener("pagehide", () => {
-  if (canManageFarm) void layoutStore.save(progressedLayout(), { keepalive: true });
+  if (canPersistFarm) void layoutStore.save(progressedLayout(), { keepalive: true });
   farmMusic.destroy();
 }, { once: true });
 document.addEventListener("pointerlockchange", () => {
@@ -610,15 +611,17 @@ function resize(): void {
 /** What a save result means to the player, wherever the save was asked for. */
 function describeSave(result: Readonly<{ ok: boolean; target: string }>): string {
   if (result.ok && result.target === "account") return "Saved to your account. Friends can visit this farm.";
-  if (!layoutStore.accountBacked) return "Sign in to save farm progress to the platform.";
+  if (result.ok && result.target === "device") return "Saved on this device · sign in to keep farm progression with your account.";
+  if (!layoutStore.accountBacked) return "This device could not save the farm.";
   return "The database save failed. Your farm was not saved; try again in a moment.";
 }
 
 /** Pets-panel changes land here: apply, tell the editor, then save, and say where the save went. */
 async function persistLayout(next: FarmLayout): Promise<string> {
-  if (!canManageFarm) return "Sign in to save farm progress to the platform.";
+  if (!canManageFarm) return "This farm is read-only while visiting.";
   applyLayout(next);
   farmEditor.replaceLayout(next);
+  if (!canPersistFarm) return "Session only · reload when the farm database is available to save safely.";
   return describeSave(await layoutStore.save(layout));
 }
 
@@ -678,7 +681,7 @@ const petsPanel = createPetsPanel({
   },
 }, { thumbnail: speciesThumbnails.get });
 petsPanel.render(layout);
-if (!canManageFarm) openPetsButton.hidden = true;
+if (visiting) openPetsButton.hidden = true;
 
 const inventoryPanel = createFarmInventoryPanel({
   root: requiredElement<HTMLElement>("#inventoryPanel"),
@@ -689,7 +692,7 @@ const inventoryPanel = createFarmInventoryPanel({
   selected: requiredElement<HTMLElement>("#selectedSeed"),
 });
 inventoryPanel.render(layout.agriculture);
-if (!canManageFarm) openInventoryButton.hidden = true;
+if (visiting) openInventoryButton.hidden = true;
 
 // Build mode: the shared editor frame over the farm's own placement rules. The
 // editor owns the layout while it is open; every change comes back through `applyLayout`.
@@ -702,6 +705,7 @@ const farmEditor = createFarmEditor({
   world,
   initialLayout: layout,
   persist: async (next) => {
+    if (!canPersistFarm) return { ok: false, message: "Session only · reload when the farm database is available to save safely." };
     const result = await layoutStore.save(next);
     return { ok: result.ok, message: describeSave(result) };
   },
