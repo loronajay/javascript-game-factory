@@ -18,7 +18,7 @@ import { box, cylinder, sphere, standard } from "./arcade-room-decor-primitives.
 import { farmMaterial, scaleUvs, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
 import { farmDecorFootprint } from "./farm-catalog/decor.mjs";
 import { FARM_BUILDING_BUILDERS } from "./farm-props-buildings.mjs";
-import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createStump, createSunflowers, createTree, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
+import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createSoilPatch, createStump, createSunflowers, createTree, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
 export { createBarn } from "./farm-props-buildings.mjs";
 export { createTree, createPine, createBush } from "./farm-props-plants.mjs";
 const WOOD = "#8a5a34";
@@ -445,7 +445,27 @@ export function createBench(THREE) {
         tbox(THREE, group, [1.6, 0.1, 0.05], [0, y, -0.24], slat);
     return group;
 }
-/** A cast-iron lamp post with a fluted column and a warm lamp; lit at all hours, the farm has no night yet. */
+/** A placeable interior bed: timber frame, mattress, folded quilt and pillows. */
+export function createBed(THREE) {
+    const group = new THREE.Group();
+    const wood = timber(THREE, "#6a4127", 0.9);
+    const linen = standard(THREE, "#f2e5ca", 0.92, 0);
+    const quilt = standard(THREE, "#6f8faa", 0.88, 0);
+    const pillow = standard(THREE, "#fff8e8", 0.95, 0);
+    box(THREE, group, [1.3, 0.16, 2.05], [0, 0.32, 0], wood);
+    for (const x of [-0.56, 0.56])
+        for (const z of [-0.91, 0.91])
+            box(THREE, group, [0.12, 0.45, 0.12], [x, 0.225, z], wood);
+    box(THREE, group, [1.18, 0.22, 1.9], [0, 0.5, 0], linen);
+    box(THREE, group, [1.2, 0.08, 1.25], [0, 0.65, 0.28], quilt);
+    for (const x of [-0.31, 0.31])
+        box(THREE, group, [0.52, 0.14, 0.42], [x, 0.67, -0.67], pillow);
+    box(THREE, group, [1.34, 0.9, 0.12], [0, 0.72, -0.99], wood);
+    for (const x of [-0.56, 0.56])
+        box(THREE, group, [0.12, 1.25, 0.12], [x, 0.625, -0.99], wood);
+    return group;
+}
+/** A cast-iron lamp post with a fluted column and a warm lamp that keeps the field readable at night. */
 export function createLampPost(THREE) {
     const group = new THREE.Group();
     const iron = ironMaterial(THREE);
@@ -860,6 +880,7 @@ export const FARM_PROP_BUILDERS = Object.freeze({
     "tree-apple": (THREE, _definition, _row, seed) => still(createAppleTree(THREE, seed)),
     "tree-willow": (THREE, _definition, _row, seed) => still(createWillow(THREE, seed)),
     bush: (THREE, _definition, _row, seed) => still(createBush(THREE, seed)),
+    "soil-patch": (THREE) => still(createSoilPatch(THREE)),
     "flower-bed": (THREE, _definition, _row, seed) => still(createFlowerBed(THREE, seed)),
     sunflowers: (THREE, _definition, _row, seed) => still(createSunflowers(THREE, seed)),
     "pumpkin-patch": (THREE, _definition, _row, seed) => still(createPumpkinPatch(THREE, seed)),
@@ -876,6 +897,7 @@ export const FARM_PROP_BUILDERS = Object.freeze({
     scarecrow: (THREE) => still(createScarecrow(THREE)),
     well: (THREE) => still(createWell(THREE)),
     bench: (THREE) => still(createBench(THREE)),
+    bed: (THREE) => still(createBed(THREE)),
     "lamp-post": (THREE) => still(createLampPost(THREE)),
     doghouse: (THREE) => still(createDoghouse(THREE)),
     wheelbarrow: (THREE) => still(createWheelbarrow(THREE)),

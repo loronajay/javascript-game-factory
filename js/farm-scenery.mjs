@@ -3,7 +3,7 @@
 //
 // Beyond the fence: a ring of rolling hills that the fog softens into the sky,
 // a treeline between the hills and the field so the horizon is never a flat
-// edge, a few clouds that drift, and the sun itself. Underfoot: thousands of
+// edge and a few clouds that drift. Underfoot: thousands of
 // grass tufts and a scatter of wildflowers as ONE instanced mesh each, kept
 // off every building, pond and solid prop (`rescatter(layout)` re-lays them
 // after a build), so the field reads as a meadow and not a green carpet.
@@ -20,7 +20,9 @@ export const SCENERY = Object.freeze({
     flowers: 320,
     /** Where the treeline and the hills stand from the field's centre. */
     treelineRadius: Object.freeze({ min: 24, max: 40 }),
-    hillRadius: Object.freeze({ min: 55, max: 95 }),
+    // Even the widest randomized hill stays beyond the property's corners.
+    hillRadius: Object.freeze({ min: 78, max: 112 }),
+    hillWidth: Object.freeze({ min: 22, max: 52 }),
     clouds: 9,
 });
 /** A tiny deterministic generator so the countryside is the same on every load. */
@@ -40,9 +42,9 @@ function createHills(THREE, scene, random) {
     for (let index = 0; index < count; index += 1) {
         const angle = (index / count) * Math.PI * 2 + random() * 0.2;
         const radius = SCENERY.hillRadius.min + random() * (SCENERY.hillRadius.max - SCENERY.hillRadius.min);
-        const width = 22 + random() * 30;
+        const width = SCENERY.hillWidth.min + random() * (SCENERY.hillWidth.max - SCENERY.hillWidth.min);
         const height = 6 + random() * 10;
-        const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), radius > 80 ? far : radius > 68 ? mid : near);
+        const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), radius > 100 ? far : radius > 88 ? mid : near);
         hill.scale.set(width, height, width * 0.8);
         hill.position.set(Math.cos(angle) * radius, -height * 0.25, Math.sin(angle) * radius);
         hill.receiveShadow = true;
@@ -118,16 +120,6 @@ function createClouds(THREE, scene, random) {
     }
     return clouds;
 }
-/** The sun: a bright disc with a soft halo, placed along the directional light's own bearing. */
-function createSun(THREE, scene, direction) {
-    const length = Math.hypot(direction.x, direction.y, direction.z) || 1;
-    const at = { x: direction.x / length * 125, y: direction.y / length * 125, z: direction.z / length * 125 };
-    const disc = new THREE.Mesh(new THREE.SphereGeometry(4.5, 16, 12), new THREE.MeshBasicMaterial({ color: "#fff6d8", fog: false }));
-    disc.position.set(at.x, at.y, at.z);
-    const halo = new THREE.Mesh(new THREE.SphereGeometry(11, 16, 12), new THREE.MeshBasicMaterial({ color: "#ffe9b8", fog: false, transparent: true, opacity: 0.22, depthWrite: false }));
-    halo.position.set(at.x, at.y, at.z);
-    scene.add(disc, halo);
-}
 /** Five blades in a clump: thin tapered triangles leaning out from a shared root, merged into one geometry. */
 function createTuftGeometry(THREE) {
     const positions = [];
@@ -165,12 +157,11 @@ function sprinkle(count, random) {
     }
     return out;
 }
-export function createFarmScenery(THREE, scene, options) {
+export function createFarmScenery(THREE, scene) {
     const random = seeded(2026);
     createHills(THREE, scene, random);
     createTreeline(THREE, scene, random);
     const clouds = createClouds(THREE, scene, random);
-    createSun(THREE, scene, options.sunDirection);
     // Ground cover: one instanced mesh of tufts, one of flowers. A tuft is a clump of
     // five thin blades leaning apart — cheap, and from eye height it reads as grass.
     const tuftGeometry = createTuftGeometry(THREE);

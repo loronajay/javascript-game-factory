@@ -22,7 +22,7 @@
 // - The last pond cannot go while swimmers live in it.
 import { clampFarmDecorLength, farmDecorFootprint, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { FARM_BOUNDS, MAX_DECOR, farmHabitats, waterPets, withFarmDecor } from "./farm-layout.mjs";
-import { FARM_SPAWN } from "./farm-scene.mjs";
+import { FARM_SPAWN, buildingLocalToWorld, farmObstacles } from "./farm-scene.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 /** Nothing may stand within this of the gate spawn. */
 export const SPAWN_CLEARANCE = 0.9;
@@ -104,22 +104,54 @@ export function farmDecorCollides(first, second) {
     const takesSpace = (definition) => definition.solid || definition.keepOut;
     return takesSpace(first) && takesSpace(second);
 }
+function localPoint(point, frame) {
+    const dx = point.x - frame.x;
+    const dz = point.z - frame.z;
+    const cosine = Math.cos(frame.rotationY);
+    const sine = Math.sin(frame.rotationY);
+    return { x: dx * cosine - dz * sine, z: dx * sine + dz * cosine };
+}
+/** Interior decor fits only within a shell's inner wall line and outside all of its ground-level fixtures. */
+function interiorFits(interior, definition, building, buildingDefinition) {
+    if (!buildingDefinition.shell)
+        return false;
+    const inset = buildingDefinition.shell.wallThickness + 0.05;
+    const limitX = buildingDefinition.footprint.width / 2 - inset;
+    const limitZ = buildingDefinition.footprint.depth / 2 - inset;
+    if (!boxCorners(interior, farmDecorFootprint(definition, { length: 0 })).every((corner) => {
+        const point = localPoint(corner, building);
+        return Math.abs(point.x) <= limitX && Math.abs(point.z) <= limitZ;
+    }))
+        return false;
+    return !farmObstacles({ decor: [building] }).some((obstacle) => boxesOverlap(interior, interior.footprint, obstacle, obstacle.footprint));
+}
 /** Why a box may not stand where it is asked to, or "ok". */
 export function judgePlacement(layout, instanceId, definition, box, bounds = FARM_BOUNDS) {
     if (!insideFieldBox(box, box.footprint, bounds))
         return "outside";
     if ((definition.solid || definition.keepOut) && obstacleBlocks(FARM_SPAWN, box, SPAWN_CLEARANCE))
         return "spawn";
+    let hasInteriorHome = !definition.interior;
     for (const other of layout.decor) {
         if (other.instanceId === instanceId)
             continue;
         const otherDefinition = definitionOf(other);
         if (!otherDefinition || !farmDecorCollides(definition, otherDefinition))
             continue;
+        if (definition.interior && otherDefinition.shell && interiorFits(box, definition, other, otherDefinition)) {
+            hasInteriorHome = true;
+            continue;
+        }
+        if (otherDefinition.interior && definition.shell) {
+            const candidateBuilding = { instanceId, itemId: definition.id, x: box.x, z: box.z, rotationY: box.rotationY, length: 0 };
+            const otherBox = farmDecorBox(other, otherDefinition);
+            if (interiorFits(otherBox, otherDefinition, candidateBuilding, definition))
+                continue;
+        }
         if (boxesOverlap(box, box.footprint, other, farmDecorFootprint(otherDefinition, other)))
             return "blocked";
     }
-    return "ok";
+    return hasInteriorHome ? "ok" : "blocked";
 }
 export function nextFarmDecorInstanceId(layout, definition) {
     const stem = definition.id.split(".").pop();
@@ -328,10 +360,35 @@ export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
     const instanceId = nextFarmDecorInstanceId(layout, definition);
     const item = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0 };
     const candidate = withFarmDecor(layout, [...layout.decor, item]);
-    const attempt = (x, z) => tryPlace(candidate, item, definition, { x, z, rotationY: item.rotationY }, bounds);
+    const attempt = (x, z, rotationY = item.rotationY) => tryPlace(candidate, item, definition, { x, z, rotationY }, bounds);
     const first = attempt(near.x, near.z);
     if (first.valid)
         return first;
+    if (definition.interior) {
+        const buildings = layout.decor
+            .filter((row) => definitionOf(row)?.shell)
+            .sort((a, b) => Math.hypot(a.x - near.x, a.z - near.z) - Math.hypot(b.x - near.x, b.z - near.z));
+        for (const building of buildings) {
+            const buildingDefinition = definitionOf(building);
+            const halfW = buildingDefinition.footprint.width / 2;
+            const halfD = buildingDefinition.footprint.depth / 2;
+            const localSpots = [];
+            for (let z = -halfD; z <= halfD; z += 0.5) {
+                for (let x = -halfW; x <= halfW; x += 0.5)
+                    localSpots.push({ x, z });
+            }
+            localSpots.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+            for (const rotationY of [building.rotationY, building.rotationY + Math.PI / 2]) {
+                for (const local of localSpots) {
+                    const world = buildingLocalToWorld(building, local);
+                    const result = attempt(world.x, world.z, rotationY);
+                    if (result.valid)
+                        return result;
+                }
+            }
+        }
+        return { valid: false, layout, instanceId: "", reason: "blocked" };
+    }
     for (let ring = 1; ring <= SEARCH_RINGS; ring += 1) {
         const radius = ring * SEARCH_STEP * Math.max(1, Math.max(definition.footprint.width, definition.footprint.depth) / 2);
         const spots = ring * 8;

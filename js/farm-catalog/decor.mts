@@ -93,6 +93,8 @@ export type FarmDecorDefinition = Readonly<{
   gate: Readonly<{ reach: number }> | null;
   /** The item has a door the player works with E: a shell's door or a gate. */
   doors: boolean;
+  /** Must be placed wholly inside a building shell; walls and built-in fixtures still block it. */
+  interior: boolean;
   /** Rotation step for Q/R, in degrees. */
   snapDegrees: number;
   /** Two colours for the catalog card's chip when no render is available. */
@@ -115,6 +117,7 @@ type Spec = Readonly<{
   habitat?: "water";
   shell?: BuildingShell;
   gate?: Readonly<{ reach: number }>;
+  interior?: boolean;
   snapDegrees?: number;
   swatch: readonly [string, string];
   model: string;
@@ -133,6 +136,7 @@ function item(variant: string, spec: Spec): FarmDecorDefinition {
     shell: spec.shell ? Object.freeze({ ...spec.shell, door: spec.shell.door ? Object.freeze({ ...spec.shell.door }) : null }) : null,
     gate: spec.gate ? Object.freeze({ ...spec.gate }) : null,
     doors: Boolean(spec.shell?.door) || Boolean(spec.gate),
+    interior: spec.interior ?? false,
     snapDegrees: spec.snapDegrees ?? 15,
     swatch: Object.freeze([spec.swatch[0], spec.swatch[1]] as const),
     model: spec.model,
@@ -185,11 +189,9 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("apple", { title: "Apple Tree", category: "plant", footprint: { width: 0.6, depth: 0.6 }, swatch: ["#4f9a3a", "#d43a3a"], model: "tree-apple" }),
   item("willow", { title: "Willow", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#7fb35a", "#5d3a1f"], model: "tree-willow" }),
   item("bush", { title: "Hedge Bush", category: "plant", footprint: { width: 1.2, depth: 1 }, swatch: ["#4f9a3a", "#2f6b2a"], model: "bush" }),
+  item("soil-patch", { title: "Growing Plot", category: "plant", footprint: { width: 3, depth: 2 }, solid: false, swatch: ["#5b3820", "#8a633c"], model: "soil-patch" }),
   item("flower-bed", { title: "Flower Bed", category: "plant", footprint: { width: 2, depth: 1 }, solid: false, swatch: ["#ff6f91", "#5f9a3c"], model: "flower-bed" }),
   item("sunflowers", { title: "Sunflowers", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#ffd33d", "#4f9a3a"], model: "sunflowers" }),
-  item("pumpkin-patch", { title: "Pumpkin Patch", category: "plant", footprint: { width: 2.4, depth: 1.6 }, solid: false, swatch: ["#e8792b", "#4f9a3a"], model: "pumpkin-patch" }),
-  item("wheat", { title: "Wheat Patch", category: "plant", footprint: { width: 3, depth: 2 }, solid: false, swatch: ["#d8b24a", "#c9a03a"], model: "wheat" }),
-  item("veg-rows", { title: "Vegetable Rows", category: "plant", footprint: { width: 3, depth: 2 }, solid: false, swatch: ["#5a3d24", "#4f9a3a"], model: "veg-rows" }),
   item("lavender", { title: "Lavender", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#9a7fd6", "#6f8f5a"], model: "lavender" }),
   item("stump", { title: "Tree Stump", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#9a7248", "#5d3a1f"], model: "stump" }),
   // Water: the swimmers' home. Solid to the walker and ground animals so nobody wades in.
@@ -202,6 +204,7 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("scarecrow", { title: "Scarecrow", category: "prop", footprint: { width: 0.5, depth: 0.5 }, swatch: ["#d8b24a", "#8a5a34"], model: "scarecrow" }),
   item("well", { title: "Stone Well", category: "prop", footprint: { width: 1.6, depth: 1.6 }, swatch: ["#8e8b82", "#4a3a33"], model: "well" }),
   item("bench", { title: "Garden Bench", category: "prop", footprint: { width: 1.6, depth: 0.6 }, swatch: ["#8a5a34", "#5d3a1f"], model: "bench" }),
+  item("bed", { title: "Farmhouse Bed", category: "prop", footprint: { width: 1.35, depth: 2.1 }, interior: true, swatch: ["#f2e5ca", "#7d9bb8"], model: "bed" }),
   item("lamp-post", { title: "Lamp Post", category: "prop", footprint: { width: 0.3, depth: 0.3 }, swatch: ["#2b2b2b", "#ffd9a0"], model: "lamp-post" }),
   item("doghouse", { title: "Doghouse", category: "prop", footprint: { width: 1.2, depth: 1.4 }, swatch: ["#a8312b", "#4a3a33"], model: "doghouse" }),
   item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),

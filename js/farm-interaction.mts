@@ -24,6 +24,7 @@ export const DOOR_TOUCH_DISTANCE = 0.9;
 export const LADDER_REACH = 1.4;
 /** How far from the nearest point of a seat the player may stand to sit on it. */
 export const SEAT_REACH = 1.3;
+export const BED_REACH = 2.2;
 const FACING_THRESHOLD = 0.3;
 
 function facingToward(player: FarmPlayerPose, target: Readonly<{ x: number; z: number }>): number {
@@ -112,6 +113,27 @@ export function findSeatInReach(seats: readonly FarmSeat[], player: FarmBodyPose
 
 export const SEAT_PROMPT = "Press E to sit down";
 export const SEATED_PROMPT = "Press E to stand up";
+
+export type BedRow = Readonly<{ instanceId: string; itemId: string; x: number; z: number; rotationY: number }>;
+
+/** The nearest placed bed on the player's level and in view. */
+export function findBedInReach<T extends BedRow>(decor: readonly T[], player: FarmBodyPose): T | null {
+  if (Math.abs(player.y) > LEVEL_TOLERANCE) return null;
+  let best: T | null = null;
+  let bestDistance = Infinity;
+  for (const row of decor) {
+    if (row.itemId !== "decor.prop.bed") continue;
+    const distance = Math.hypot(row.x - player.x, row.z - player.z);
+    if (distance > BED_REACH || facingToward(player, row) < FACING_THRESHOLD) continue;
+    if (distance < bestDistance) {
+      best = row;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+export const BED_PROMPT = "Press E to nap";
 
 /** Pets are bodies with a pose; the nearest one in reach is the one E strokes. */
 export function findPetInReach<T extends Readonly<{ pose: Readonly<{ x: number; z: number }> }>>(pets: readonly T[], player: FarmPlayerPose, reach = 2.2): T | null {

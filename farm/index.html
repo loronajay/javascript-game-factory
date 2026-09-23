@@ -22,6 +22,7 @@
         <a href="../room/index.html" class="back-link" title="Walk over to your arcade">My Arcade</a>
         <button id="toggleFarmMusic" class="farm-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Mute farm music (M)">Music on <kbd>M</kbd></button>
         <button id="openPets" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Adopt, name and release animals (P)">Pets <kbd>P</kbd></button>
+        <button id="openInventory" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Choose seeds and check the harvest (I)">Inventory <kbd>I</kbd></button>
         <button id="editFarm" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Toggle build mode (B)">Build <kbd>B</kbd></button>
         <button id="fullscreenFarm" class="farm-button farm-fullscreen" type="button" aria-pressed="false" title="Fill the screen with the farm (F)">Fullscreen <kbd>F</kbd></button>
       </div>
@@ -38,8 +39,13 @@
     </section>
 
     <div id="farmPrompt" class="farm-prompt" aria-live="polite"></div>
+    <div class="farm-clock" aria-label="Farm time">
+      <span id="farmClockPhase">Morning</span>
+      <strong id="farmClock">8:00 AM</strong>
+    </div>
+    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong></div>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Doors · Ladders · Sit · Pick up</span><span><b>E</b> Put pet down</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Plant · Water · Harvest</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>I</b> Inventory</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
     </div>
 
     <aside id="petsPanel" class="pets-panel" aria-label="Your pets" hidden>
@@ -66,6 +72,38 @@
         </section>
       </div>
     </aside>
+
+    <aside id="inventoryPanel" class="inventory-panel" aria-label="Farm inventory" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">SEED SHED</span><strong>Farm inventory</strong></div>
+        <button id="closeInventory" class="farm-button" type="button" title="Back to the field (I)">Done <kbd>I</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <section class="pets-section">
+          <h3 class="pets-section__title">Seeds · choose what E plants</h3>
+          <div id="seedGrid" class="seed-grid"></div>
+        </section>
+        <section class="pets-section">
+          <h3 class="pets-section__title">Harvest basket</h3>
+          <div id="produceGrid" class="produce-grid"></div>
+        </section>
+      </div>
+    </aside>
+
+    <dialog id="napDialog" class="nap-dialog" aria-labelledby="napHeading">
+      <form method="dialog">
+        <span class="eyebrow">FARMHOUSE BED</span>
+        <h2 id="napHeading">How long should we nap?</h2>
+        <p id="napStatus">The farm keeps moving while you sleep.</p>
+        <div class="nap-dialog__choices">
+          <button type="button" data-nap-hours="1">1 hour</button>
+          <button type="button" data-nap-hours="3">3 hours</button>
+          <button type="button" data-nap-hours="6">6 hours</button>
+        </div>
+        <button class="nap-dialog__cancel" value="cancel">Never mind</button>
+      </form>
+    </dialog>
+    <div class="nap-shade" aria-hidden="true"><span>Sleeping…</span></div>
 
     <aside id="farmEditor" class="space-editor farm-editor" aria-label="Farm editor" hidden>
       <header class="editor-topbar">

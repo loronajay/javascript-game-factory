@@ -17,8 +17,8 @@ import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions, type DoorRow } from "./farm-scene.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
-import { CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPickUpPrompt, getPutDownPrompt, putDownSpot, type LadderInReach, type SeatInReach } from "./farm-interaction.mjs";
-import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, type FarmLayout } from "./farm-layout.mjs";
+import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPickUpPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type SeatInReach } from "./farm-interaction.mjs";
+import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -28,6 +28,10 @@ import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
+import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
+import { advanceAgriculture, cropStatus, findCrop, findSoilPlotInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop } from "./farm-crops.mjs";
+import { createFarmCropsView } from "./farm-crops-view.mjs";
+import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -55,6 +59,11 @@ const petsPanelRoot = requiredElement<HTMLElement>("#petsPanel");
 const editButton = requiredElement<HTMLButtonElement>("#editFarm");
 const editorPanel = requiredElement<HTMLElement>("#farmEditor");
 const editorDrawer = requiredElement<HTMLElement>("#farmEditorDrawer");
+const farmClock = requiredElement<HTMLElement>("#farmClock");
+const farmClockPhase = requiredElement<HTMLElement>("#farmClockPhase");
+const napDialog = requiredElement<HTMLDialogElement>("#napDialog");
+const napStatus = requiredElement<HTMLElement>("#napStatus");
+const openInventoryButton = requiredElement<HTMLButtonElement>("#openInventory");
 
 const farmMusic = createFarmMusic();
 
@@ -83,12 +92,16 @@ export const FARM_LAYOUT_SPEC: LayoutDocumentSpec<FarmLayout> = Object.freeze({
 });
 
 // Whose farm this is. `?id=` names a player to visit; without it, this is the
-// signed-in player's own farm (or a local-only farm when signed out).
+// signed-in player's own farm. Farms deliberately disable the shared room
+// cache: crop progress is database-backed or read-only, never device-backed.
 const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
-const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId });
+const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId, storage: null });
 const visiting = layoutStore.mode === "visitor";
 const loaded = await layoutStore.load();
+const canManageFarm = !visiting && layoutStore.accountBacked && loaded.source === "account";
 let layout: FarmLayout = loaded.layout;
+const resumedClock = resumeFarmClock(layout.clock, Date.now());
+layout = withFarmClock(layout, resumedClock.farmMinutes, resumedClock.updatedAt);
 
 function applyFarmIdentity(): void {
   document.body.classList.toggle("is-visiting", visiting);
@@ -104,14 +117,21 @@ function applyFarmIdentity(): void {
       : "They have not settled their farm yet, so this is the starter meadow.";
     enterButton.textContent = "Enter the farm";
     openPetsButton.hidden = true;
+    openInventoryButton.hidden = true;
     editButton.hidden = true;
     ownerLink.href = `../player/index.html?id=${encodeURIComponent(layoutStore.ownerPlayerId)}`;
     ownerLink.hidden = false;
     return;
   }
   ownerLink.hidden = true;
-  if (!layoutStore.accountBacked) {
-    startCopy.textContent = "A meadow of your own with a barn, a few trees and a fence around it. Sign in to keep it on your account so friends can visit it.";
+  if (!canManageFarm) {
+    startTag.textContent = "DATABASE SAVE REQUIRED";
+    startCopy.textContent = layoutStore.accountBacked
+      ? "The farm database could not be loaded. This starter meadow is read-only so it cannot overwrite your saved farm. Try again when the platform is available."
+      : "Sign in to farm. Crops, inventory, time and every field change are saved to your platform account; this starter meadow is read-only.";
+    openPetsButton.hidden = true;
+    openInventoryButton.hidden = true;
+    editButton.hidden = true;
   }
 }
 applyFarmIdentity();
@@ -137,6 +157,14 @@ camera.rotation.order = "YXZ";
 const world = createFarmWorld(THREE, scene);
 world.applyGround(layout.ground);
 world.sync(layout);
+// `?time=<minute-of-day>` is a visual-QA seam for checking any light state without waiting through the cycle.
+const previewMinute = new URLSearchParams(location.search).get("time");
+let clockMinutes = previewMinute === null ? resumedClock.farmMinutes : advanceFarmTime(Number(previewMinute), 0, 0);
+let napRemainingMinutes = 0;
+let renderedQuarter = -1;
+world.setTime(clockMinutes);
+const cropsView = createFarmCropsView(THREE, scene);
+cropsView.sync(layout, layout.agriculture, clockMinutes);
 
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
@@ -153,6 +181,8 @@ let seats = farmSeats(layout);
 let doorInReach: DoorRow | null = null;
 let ladderInReach: LadderInReach | null = null;
 let seatInReach: SeatInReach | null = null;
+let bedInReach: BedRow | null = null;
+let soilInReach: FarmDecorRow | null = null;
 const keys = new Set<string>();
 let farmEntered = false;
 let draggingLook = false;
@@ -188,17 +218,67 @@ function setPrompt(text: string): void {
   prompt.classList.toggle("is-visible", Boolean(text));
 }
 
+function renderFarmClock(): void {
+  const quarter = quantizeFarmTime(clockMinutes);
+  if (quarter === renderedQuarter) return;
+  renderedQuarter = quarter;
+  farmClock.textContent = formatFarmTime(clockMinutes);
+  farmClockPhase.textContent = farmLightProfile(clockMinutes).phase;
+  cropsView.sync(layout, layout.agriculture, clockMinutes);
+}
+
+function finishNap(): void {
+  napRemainingMinutes = 0;
+  document.body.classList.remove("is-napping");
+  napStatus.textContent = `You wake up at ${formatFarmTime(clockMinutes)}.`;
+  void persistFarmProgress();
+}
+
+function updateFarmTime(dt: number): void {
+  if (napRemainingMinutes > 0) {
+    const elapsed = Math.min(napRemainingMinutes, dt * NAP_MINUTES_PER_REAL_SECOND);
+    clockMinutes += elapsed;
+    napRemainingMinutes -= elapsed;
+    if (napRemainingMinutes <= 1e-6) finishNap();
+  } else {
+    clockMinutes += dt * FARM_MINUTES_PER_REAL_SECOND;
+  }
+  world.setTime(clockMinutes);
+  renderFarmClock();
+}
+
+function openNapDialog(): void {
+  keys.clear();
+  document.exitPointerLock?.();
+  napStatus.textContent = `It is ${formatFarmTime(clockMinutes)}. The farm keeps moving while you sleep.`;
+  napDialog.showModal();
+}
+
+function startNap(hours: number): void {
+  if (!Number.isFinite(hours) || hours <= 0 || napRemainingMinutes > 0) return;
+  napRemainingMinutes = hours * 60;
+  napDialog.close();
+  document.body.classList.add("is-napping");
+}
+
+for (const button of napDialog.querySelectorAll<HTMLButtonElement>("[data-nap-hours]")) {
+  button.addEventListener("click", () => startNap(Number(button.dataset.napHours)));
+}
+renderFarmClock();
+
 function updateInteraction(): void {
   const pose = { x: player.x, z: player.z, y: body.y, yaw: player.yaw, forward: forwardVector() };
-  const walking = farmEntered && !farmEditor.isEditing() && body.mode === "walking";
+  const walking = farmEntered && !farmEditor.isEditing() && !napDialog.open && napRemainingMinutes <= 0 && body.mode === "walking";
   // A released pet leaves the arms with the layout.
   if (carrying && !petSim.find(carrying)) carrying = "";
   // In order of what is nearest to hand: a door, then — hands free — a ladder, a seat, a pet. A door is still worked with a pet in hand.
   doorInReach = walking ? nearestDoor(doorRows(layout), pose, (entry) => canWorkDoor(pose, entry.door, entry.reach)) : null;
   const handsFree = walking && !carrying;
   ladderInReach = handsFree && !doorInReach ? findLadderInReach(ladders, pose) : null;
-  seatInReach = handsFree && !doorInReach && !ladderInReach ? findSeatInReach(seats, pose) : null;
-  nearbyPet = handsFree && !doorInReach && !ladderInReach && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
+  bedInReach = handsFree && !doorInReach && !ladderInReach ? findBedInReach(layout.decor, pose) : null;
+  soilInReach = handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach ? findSoilPlotInReach(layout.decor, pose) : null;
+  seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach ? findSeatInReach(seats, pose) : null;
+  nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
   const held = carrying ? petSim.find(carrying) : null;
   putDownAt = held && body.y < 0.3 ? findPutDownSpot(pose, findAnimal(held.speciesId)?.radius ?? 0.5, (spot) => petSim.canStand(held.speciesId, spot)) : null;
   const putDownFits = putDownAt !== null;
@@ -222,6 +302,26 @@ function updateInteraction(): void {
   }
   if (ladderInReach) {
     setPrompt(getLadderPrompt(ladderInReach.fromTop));
+    return;
+  }
+  if (bedInReach) {
+    setPrompt(BED_PROMPT);
+    return;
+  }
+  if (soilInReach) {
+    const planted = layout.agriculture.crops.find((crop) => crop.plotId === soilInReach!.instanceId);
+    if (!planted) {
+      const selected = findCrop(inventoryPanel.selectedCropId())!;
+      const seeds = layout.agriculture.inventory.seeds[selected.id] ?? 0;
+      setPrompt(seeds > 0 ? `Press E to plant ${selected.title} · ${seeds} seeds left` : `No ${selected.title} seeds · choose another in Inventory`);
+      return;
+    }
+    const definition = findCrop(planted.cropId)!;
+    const crop = cropStatus(planted, clockMinutes);
+    if (crop.mature) setPrompt(`Press E to harvest ${definition.title}`);
+    else if (crop.needsCare) setPrompt(`Press E to tend the ${definition.title}`);
+    else if (crop.thirsty) setPrompt(`Press E to water the ${definition.title}`);
+    else setPrompt(`${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist`);
     return;
   }
   if (seatInReach) {
@@ -267,6 +367,14 @@ function interact(): boolean {
     keys.clear();
     return true;
   }
+  if (bedInReach) {
+    openNapDialog();
+    return true;
+  }
+  if (soilInReach) {
+    workSoilPlot();
+    return true;
+  }
   if (seatInReach) {
     applyBodyStep(sitOn(player, body, seatInReach.seat, seatInReach.point));
     keys.clear();
@@ -281,6 +389,24 @@ function interact(): boolean {
     return true;
   }
   return false;
+}
+
+/** E at a growing plot performs the one action its current state calls for. */
+function workSoilPlot(): void {
+  if (!soilInReach || !canManageFarm) return;
+  const plotId = soilInReach.instanceId;
+  const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId);
+  let action;
+  if (!planted) action = plantFarmCrop(layout.agriculture, plotId, inventoryPanel.selectedCropId(), clockMinutes);
+  else {
+    const state = cropStatus(planted, clockMinutes);
+    if (state.mature) action = harvestFarmCrop(layout.agriculture, plotId, clockMinutes);
+    else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, clockMinutes);
+    else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, clockMinutes);
+    else return;
+  }
+  if (!action.ok) return;
+  void persistLayout(withFarmClock(withFarmAgriculture(layout, action.agriculture), clockMinutes, Date.now()));
 }
 
 /** E on a pet: into the arms. The tag comes off so it does not sit in the player's face, and the heart waits for the put-down. */
@@ -342,6 +468,7 @@ function applyLayout(next: FarmLayout): void {
   layout = next;
   world.applyGround(layout.ground);
   world.sync(layout);
+  cropsView.sync(layout, layout.agriculture, clockMinutes);
   for (const doorId of [...openDoors]) if (!world.doorsFor(doorId)) openDoors.delete(doorId);
   obstacles = farmObstacles(layout, { openDoors });
   platforms = farmPlatforms(layout);
@@ -351,6 +478,7 @@ function applyLayout(next: FarmLayout): void {
   if (body.mode === "climbing" && !ladders.some((ladder) => ladder.id === body.fixtureId)) applyBodyStep(releaseLadder(player, body));
   petSim.sync(layout);
   petsPanel.render(layout);
+  inventoryPanel.render(layout.agriculture);
 }
 
 function isFarmFullscreen(): boolean {
@@ -373,16 +501,32 @@ fullscreenButton.addEventListener("click", () => {
 document.addEventListener("fullscreenchange", syncFullscreenButton);
 
 window.addEventListener("keydown", (event) => {
+  if (napDialog.open || napRemainingMinutes > 0) {
+    keys.clear();
+    return;
+  }
   // Build mode owns the keyboard: the editor listens for itself, and walking keys never reach the walker.
   if (farmEditor.isEditing()) {
     keys.clear();
     return;
   }
-  // P opens and closes the pets panel; while it is open every other key is the panel's.
-  if (event.code === "KeyP" && !event.repeat && !visiting && farmEntered && !(event.target instanceof HTMLInputElement)) {
+  if (event.code === "KeyI" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
     event.preventDefault();
     if (petsPanel.isOpen()) petsPanel.close();
-    else petsPanel.open();
+    inventoryPanel.toggle();
+    keys.clear();
+    return;
+  }
+  if (inventoryPanel.isOpen()) {
+    if (event.code === "Escape") inventoryPanel.close();
+    keys.clear();
+    return;
+  }
+  // P opens and closes the pets panel; while it is open every other key is the panel's.
+  if (event.code === "KeyP" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
+    event.preventDefault();
+    if (petsPanel.isOpen()) petsPanel.close();
+    else { inventoryPanel.close(); petsPanel.open(); }
     return;
   }
   if (petsPanel.isOpen()) {
@@ -414,7 +558,7 @@ window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => keys.clear());
 
 canvas.addEventListener("click", () => {
-  if (farmEntered && !petsPanel.isOpen() && !farmEditor.isEditing()) canvas.requestPointerLock?.().catch(() => undefined);
+  if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !farmEditor.isEditing()) canvas.requestPointerLock?.().catch(() => undefined);
 });
 enterButton.addEventListener("click", () => {
   farmEntered = true;
@@ -423,7 +567,10 @@ enterButton.addEventListener("click", () => {
   canvas.focus();
   status.textContent = "WASD to move · Drag to look · Click for mouse capture";
 });
-window.addEventListener("pagehide", () => farmMusic.destroy(), { once: true });
+window.addEventListener("pagehide", () => {
+  if (canManageFarm) void layoutStore.save(progressedLayout());
+  farmMusic.destroy();
+}, { once: true });
 document.addEventListener("pointerlockchange", () => {
   const locked = document.pointerLockElement === canvas;
   startGate.classList.toggle("is-hidden", farmEntered);
@@ -434,7 +581,7 @@ document.addEventListener("pointerlockchange", () => {
 canvas.addEventListener("pointerdown", () => { draggingLook = !farmEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-  if (petsPanel.isOpen() || farmEditor.isEditing()) return;
+  if (petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing()) return;
   if (document.pointerLockElement !== canvas && !draggingLook) return;
   const looked = lookWalker(player, event.movementX, event.movementY);
   player.yaw = looked.yaw;
@@ -442,7 +589,7 @@ document.addEventListener("mousemove", (event) => {
 });
 
 function updatePlayer(dt: number): void {
-  if (!farmEntered || petsPanel.isOpen() || farmEditor.isEditing()) return;
+  if (!farmEntered || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0) return;
   const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders });
   if (!step.moved) return;
   player.x = step.pose.x;
@@ -463,16 +610,24 @@ function resize(): void {
 /** What a save result means to the player, wherever the save was asked for. */
 function describeSave(result: Readonly<{ ok: boolean; target: string }>): string {
   if (result.ok && result.target === "account") return "Saved to your account. Friends can visit this farm.";
-  if (result.ok) return "Saved on this device only. Sign in to keep it on your account.";
-  if (result.target === "account") return "Kept on this device, but the account save failed. Try again in a moment.";
-  return "This browser could not save the farm.";
+  if (!layoutStore.accountBacked) return "Sign in to save farm progress to the platform.";
+  return "The database save failed. Your farm was not saved; try again in a moment.";
 }
 
 /** Pets-panel changes land here: apply, tell the editor, then save, and say where the save went. */
 async function persistLayout(next: FarmLayout): Promise<string> {
+  if (!canManageFarm) return "Sign in to save farm progress to the platform.";
   applyLayout(next);
   farmEditor.replaceLayout(next);
   return describeSave(await layoutStore.save(layout));
+}
+
+function progressedLayout(): FarmLayout {
+  return withFarmClock(withFarmAgriculture(layout, advanceAgriculture(layout.agriculture, clockMinutes)), clockMinutes, Date.now());
+}
+
+async function persistFarmProgress(): Promise<void> {
+  await persistLayout(progressedLayout());
 }
 
 // Species cards show the real animal: the room's offscreen portrait renderer pointed at the pack.
@@ -523,7 +678,18 @@ const petsPanel = createPetsPanel({
   },
 }, { thumbnail: speciesThumbnails.get });
 petsPanel.render(layout);
-if (visiting) openPetsButton.hidden = true;
+if (!canManageFarm) openPetsButton.hidden = true;
+
+const inventoryPanel = createFarmInventoryPanel({
+  root: requiredElement<HTMLElement>("#inventoryPanel"),
+  openButton: openInventoryButton,
+  closeButton: requiredElement<HTMLButtonElement>("#closeInventory"),
+  seedGrid: requiredElement<HTMLElement>("#seedGrid"),
+  produceGrid: requiredElement<HTMLElement>("#produceGrid"),
+  selected: requiredElement<HTMLElement>("#selectedSeed"),
+});
+inventoryPanel.render(layout.agriculture);
+if (!canManageFarm) openInventoryButton.hidden = true;
 
 // Build mode: the shared editor frame over the farm's own placement rules. The
 // editor owns the layout while it is open; every change comes back through `applyLayout`.
@@ -562,7 +728,7 @@ const farmEditor = createFarmEditor({
     inspector: requiredElement<HTMLElement>("#farmInspector"),
   },
   // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-  canEnter: () => !visiting && farmEntered && !petsPanel.isOpen(),
+  canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !napDialog.open && napRemainingMinutes <= 0,
   onEditingChange: (editing) => {
     keys.clear();
     draggingLook = false;
@@ -586,6 +752,7 @@ function frame(now: number): void {
   accumulator += frameSeconds;
   previous = now;
   while (accumulator >= TICK_SECONDS) {
+    updateFarmTime(TICK_SECONDS);
     updatePlayer(TICK_SECONDS);
     petSim.tick(TICK_SECONDS, player);
     updateInteraction();
@@ -613,6 +780,8 @@ function frame(now: number): void {
   putDownFits: () => putDownAt !== null,
   layout: () => layout,
   editing: () => farmEditor.isEditing(),
+  time: () => clockMinutes,
+  napping: () => napRemainingMinutes > 0,
   obstacles: () => obstacles,
 });
 

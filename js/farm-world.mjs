@@ -17,6 +17,8 @@ import { findFarmDecor } from "./farm-catalog/decor.mjs";
 import { FARM_BOUNDS } from "./farm-layout.mjs";
 import { createFarmDecorModel } from "./farm-props.mjs";
 import { createFarmScenery } from "./farm-scenery.mjs";
+import { celestialOrbit, generateStarField } from "./farm-sky.mjs";
+import { farmLightProfile } from "./farm-time.mjs";
 export const SKY = Object.freeze({
     /** The colour at the horizon and at the zenith; the dome blends between them. */
     horizon: "#dbe9f4",
@@ -59,6 +61,103 @@ function createSkyDome(THREE) {
     dome.name = "farm-sky";
     return dome;
 }
+function canvasTexture(THREE, size, draw) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext("2d");
+    draw(context, size);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+}
+function createStarTexture(THREE) {
+    return canvasTexture(THREE, 32, (context, size) => {
+        const centre = size / 2;
+        const glow = context.createRadialGradient(centre, centre, 0, centre, centre, centre);
+        glow.addColorStop(0, "rgba(255,255,255,1)");
+        glow.addColorStop(0.16, "rgba(255,255,255,1)");
+        glow.addColorStop(0.42, "rgba(220,232,255,.72)");
+        glow.addColorStop(1, "rgba(190,215,255,0)");
+        context.fillStyle = glow;
+        context.fillRect(0, 0, size, size);
+    });
+}
+function createStars(THREE) {
+    const root = new THREE.Group();
+    root.name = "farm-stars";
+    const texture = createStarTexture(THREE);
+    const styles = Object.freeze({
+        faint: Object.freeze({ size: 0.42, opacity: 0.54 }),
+        medium: Object.freeze({ size: 0.72, opacity: 0.74 }),
+        bright: Object.freeze({ size: 1.08, opacity: 0.95 }),
+    });
+    const stars = generateStarField(520);
+    for (const tier of ["faint", "medium", "bright"]) {
+        const positions = [];
+        const colors = [];
+        for (const star of stars) {
+            if (star.size !== tier)
+                continue;
+            positions.push(star.x * 112, star.y * 112, star.z * 112);
+            const cool = new THREE.Color(star.warmth > 0.82 ? 0xffedcf : star.warmth < 0.18 ? 0xc9ddff : 0xf2f5ff);
+            colors.push(cool.r, cool.g, cool.b);
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+        const style = styles[tier];
+        const material = new THREE.PointsMaterial({ map: texture, size: style.size, vertexColors: true, transparent: true, opacity: 0, alphaTest: 0.02, depthWrite: false, fog: false });
+        const points = new THREE.Points(geometry, material);
+        points.userData.nightOpacity = style.opacity;
+        points.renderOrder = -1;
+        root.add(points);
+    }
+    return root;
+}
+function createSunTexture(THREE) {
+    return canvasTexture(THREE, 128, (context, size) => {
+        const centre = size / 2;
+        const glow = context.createRadialGradient(centre - 8, centre - 10, 2, centre, centre, centre);
+        glow.addColorStop(0, "rgba(255,255,245,1)");
+        glow.addColorStop(0.34, "rgba(255,245,194,1)");
+        glow.addColorStop(0.51, "rgba(255,196,91,.96)");
+        glow.addColorStop(0.62, "rgba(255,177,65,.32)");
+        glow.addColorStop(1, "rgba(255,150,40,0)");
+        context.fillStyle = glow;
+        context.fillRect(0, 0, size, size);
+    });
+}
+function createMoonTexture(THREE) {
+    return canvasTexture(THREE, 128, (context, size) => {
+        const centre = size / 2;
+        const radius = 43;
+        context.save();
+        context.beginPath();
+        context.arc(centre, centre, radius, 0, Math.PI * 2);
+        context.clip();
+        const face = context.createRadialGradient(centre - 15, centre - 17, 4, centre, centre, radius);
+        face.addColorStop(0, "#fffdf1");
+        face.addColorStop(0.62, "#e8e9dc");
+        face.addColorStop(1, "#aeb7c1");
+        context.fillStyle = face;
+        context.fillRect(0, 0, size, size);
+        context.globalAlpha = 0.18;
+        context.fillStyle = "#73808b";
+        for (const [x, y, r] of [[43, 44, 8], [78, 38, 5], [83, 72, 10], [50, 82, 5], [64, 59, 4]]) {
+            context.beginPath();
+            context.arc(x, y, r, 0, Math.PI * 2);
+            context.fill();
+        }
+        context.restore();
+    });
+}
+function createCelestialSprite(THREE, texture, scale, name, additive = false) {
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, fog: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending });
+    const sprite = new THREE.Sprite(material);
+    sprite.name = name;
+    sprite.scale.set(scale, scale, 1);
+    return sprite;
+}
 function disposeModel(group) {
     group.traverse((object) => {
         object.geometry?.dispose?.();
@@ -74,7 +173,14 @@ export function createFarmWorld(THREE, scene) {
     const { width, depth } = FARM_BOUNDS;
     scene.background = new THREE.Color(SKY.horizon);
     scene.fog = new THREE.Fog(SKY.horizon, SKY.fog.near, SKY.fog.far);
-    scene.add(createSkyDome(THREE));
+    const sky = createSkyDome(THREE);
+    const stars = createStars(THREE);
+    const sunVisual = createCelestialSprite(THREE, createSunTexture(THREE), 15, "farm-sun", true);
+    const moonVisual = createCelestialSprite(THREE, createMoonTexture(THREE), 8, "farm-moon");
+    scene.add(sky);
+    scene.add(stars);
+    scene.add(sunVisual);
+    scene.add(moonVisual);
     // Daylight: a warm sun with a shadow box that covers the field, and a sky/ground fill.
     const hemisphere = new THREE.HemisphereLight(0xd6ecff, 0x5a7a3a, 1.0);
     scene.add(hemisphere);
@@ -92,6 +198,10 @@ export function createFarmWorld(THREE, scene) {
     sun.shadow.bias = -0.0006;
     scene.add(sun);
     scene.add(sun.target);
+    const moon = new THREE.DirectionalLight(0xbfd8ff, 0.8);
+    moon.position.set(18, 22, -12);
+    scene.add(moon);
+    scene.add(moon.target);
     // The field, and a wider apron of the same ground outside it so the edge of
     // the world is past the fog rather than a cliff at the fence line.
     const span = { u: width, v: depth };
@@ -110,7 +220,7 @@ export function createFarmWorld(THREE, scene) {
     apron.receiveShadow = true;
     scene.add(apron);
     // The countryside past the fence and the tufts underfoot — nothing the player places.
-    const scenery = createFarmScenery(THREE, scene, { sunDirection });
+    const scenery = createFarmScenery(THREE, scene);
     const decorRoot = new THREE.Group();
     decorRoot.name = "farm-decor";
     scene.add(decorRoot);
@@ -175,6 +285,28 @@ export function createFarmWorld(THREE, scene) {
         applySurfaceMaterial(THREE, ground, style, span);
         applySurfaceMaterial(THREE, apron, style, apronSpan);
     }
+    function setTime(minutes) {
+        const profile = farmLightProfile(minutes);
+        const horizon = new THREE.Color(profile.horizon);
+        sky.material.uniforms.horizon.value.copy(horizon);
+        sky.material.uniforms.zenith.value.set(profile.zenith);
+        scene.background.copy(horizon);
+        scene.fog.color.set(profile.fog);
+        hemisphere.intensity = profile.hemisphere;
+        sun.color.set(profile.sunColor);
+        sun.intensity = profile.sun;
+        moon.color.set(profile.moonColor);
+        moon.intensity = profile.moon;
+        for (const tier of stars.children)
+            tier.material.opacity = profile.stars * tier.userData.nightOpacity;
+        const orbit = celestialOrbit(minutes);
+        sun.position.set(orbit.sun.x * 42, orbit.sun.y * 42, orbit.sun.z * 42);
+        moon.position.set(orbit.moon.x * 42, orbit.moon.y * 42, orbit.moon.z * 42);
+        sunVisual.position.set(orbit.sun.x * 126, orbit.sun.y * 126, orbit.sun.z * 126);
+        moonVisual.position.set(orbit.moon.x * 126, orbit.moon.y * 126, orbit.moon.z * 126);
+        sunVisual.visible = profile.sun > 0.02 && orbit.sun.y > -0.035;
+        moonVisual.visible = profile.moon > 0.02 && orbit.moon.y > -0.035;
+    }
     return Object.freeze({
         ground,
         applyGround,
@@ -196,5 +328,6 @@ export function createFarmWorld(THREE, scene) {
             return null;
         },
         update,
+        setTime,
     });
 }

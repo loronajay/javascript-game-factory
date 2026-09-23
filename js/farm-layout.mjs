@@ -20,8 +20,9 @@
 import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog/ground.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
+import { createStarterAgriculture, normalizeAgriculture } from "./farm-crops.mjs";
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
-export const FARM_LAYOUT_VERSION = 2;
+export const FARM_LAYOUT_VERSION = 3;
 /** The walkable field. The inset is how far in from the field's edge anything may stand. */
 export const FARM_BOUNDS = Object.freeze({ width: 28, depth: 28, wallInset: 0.3 });
 export const MAX_PETS = 12;
@@ -66,13 +67,22 @@ export const STARTER_FARM_DECOR = Object.freeze([
     row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
 ]);
 export function createDefaultFarmLayout() {
-    return Object.freeze({ version: 2, ground: DEFAULT_GROUND_ID, pets: Object.freeze([]), decor: STARTER_FARM_DECOR });
+    return Object.freeze({
+        version: 3,
+        ground: DEFAULT_GROUND_ID,
+        pets: Object.freeze([]),
+        decor: STARTER_FARM_DECOR,
+        agriculture: createStarterAgriculture(),
+        clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0 }),
+    });
 }
 function freezeLayout(layout) {
     return Object.freeze({
         ...layout,
         pets: Object.freeze(layout.pets.map((pet) => Object.freeze({ ...pet }))),
         decor: Object.freeze(layout.decor.map((item) => Object.freeze({ ...item }))),
+        agriculture: layout.agriculture,
+        clock: Object.freeze({ ...layout.clock }),
     });
 }
 function normalizePet(value) {
@@ -123,7 +133,7 @@ export function normalizeFarmLayout(value) {
     if (!value || typeof value !== "object")
         return createDefaultFarmLayout();
     const source = value;
-    if (source.version !== 1 && source.version !== FARM_LAYOUT_VERSION)
+    if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION)
         return createDefaultFarmLayout();
     const seen = new Set();
     // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
@@ -160,7 +170,14 @@ export function normalizeFarmLayout(value) {
         if (pets.length >= MAX_PETS)
             break;
     }
-    return freezeLayout({ version: 2, ground: normalizeGroundId(source.ground), pets, decor });
+    const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
+    const agriculture = source.version === 3 ? normalizeAgriculture(source.agriculture, plotIds) : createStarterAgriculture();
+    const rawClock = source.clock && typeof source.clock === "object" ? source.clock : {};
+    const clock = {
+        farmMinutes: finiteNumber(rawClock.farmMinutes) ? Math.max(0, rawClock.farmMinutes) : 8 * 60,
+        updatedAt: finiteNumber(rawClock.updatedAt) ? Math.max(0, rawClock.updatedAt) : 0,
+    };
+    return freezeLayout({ version: 3, ground: normalizeGroundId(source.ground), pets, decor, agriculture, clock });
 }
 export function parseFarmLayout(serialized) {
     if (!serialized)
@@ -220,7 +237,14 @@ export function setFarmGround(layout, id) {
 }
 /** Replace the decor list wholesale; the placement rules call this after they have decided. */
 export function withFarmDecor(layout, decor) {
-    return freezeLayout({ ...layout, decor: [...decor] });
+    const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
+    return freezeLayout({ ...layout, decor: [...decor], agriculture: normalizeAgriculture(layout.agriculture, plotIds) });
+}
+export function withFarmAgriculture(layout, agriculture) {
+    return freezeLayout({ ...layout, agriculture });
+}
+export function withFarmClock(layout, farmMinutes, updatedAt) {
+    return freezeLayout({ ...layout, clock: { farmMinutes: Math.max(0, farmMinutes), updatedAt: Math.max(0, updatedAt) } });
 }
 export function farmDecorRowsEqual(first, second) {
     return first.instanceId === second.instanceId && first.itemId === second.itemId
@@ -228,6 +252,9 @@ export function farmDecorRowsEqual(first, second) {
 }
 export function farmLayoutsEqual(first, second) {
     return first.ground === second.ground
+        && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
+        && first.clock.farmMinutes === second.clock.farmMinutes
+        && first.clock.updatedAt === second.clock.updatedAt
         && first.pets.length === second.pets.length
         && first.pets.every((pet, index) => {
             const other = second.pets[index];

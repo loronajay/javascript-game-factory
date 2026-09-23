@@ -33,6 +33,7 @@ import { farmMaterial, metricUvs, tbox, tcylinder, tmesh, tsphere } from "./farm
 import { roundFace, shellWalls } from "./farm-shell.mjs";
 import { farmFixtures, fixtureDoorHinge, fixtureNamed, type FarmFixture } from "./farm-fixtures.mjs";
 import type { FarmDecorDefinition } from "./farm-catalog/decor.mjs";
+import { gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt, hangingLightChain } from "./farm-building-geometry.mjs";
 
 const WOOD = "#8a5a34";
 const WOOD_DARK = "#5d3a1f";
@@ -631,7 +632,7 @@ function hipRoof(THREE: ThreeNamespace, group: any, definition: FarmDecorDefinit
 }
 
 /** A hanging lantern: a warm point light in a little glass-and-iron body on a chain, so no interior is a cave in daylight. */
-function roomLight(THREE: ThreeNamespace, group: any, position: readonly [number, number, number], intensity = 6, distance = 9): void {
+function roomLight(THREE: ThreeNamespace, group: any, position: readonly [number, number, number], intensity: number, distance: number, anchorY: number): void {
   const light = new THREE.PointLight(0xffd9a0, intensity, distance, 1.6);
   light.position.set(position[0], position[1], position[2]);
   group.add(light);
@@ -644,7 +645,9 @@ function roomLight(THREE: ThreeNamespace, group: any, position: readonly [number
     const angle = (index / 4) * Math.PI * 2;
     box(THREE, group, [0.012, 0.22, 0.012], [position[0] + Math.cos(angle) * 0.07, position[1], position[2] + Math.sin(angle) * 0.07], body, false);
   }
-  cylinder(THREE, group, 0.008, 0.008, 0.5, [position[0], position[1] + 0.42, position[2]], body, 4, false);
+  const chain = hangingLightChain(position[1], anchorY);
+  const suspension = cylinder(THREE, group, 0.008, 0.008, chain.height, [position[0], chain.centreY, position[2]], body, 4, false);
+  suspension.userData.farmHangingLight = Object.freeze({ lanternY: position[1], anchorY: chain.topY });
 }
 
 /** A lamp on the wall beside a door, lit. */
@@ -865,9 +868,11 @@ export function createBarn(THREE: ThreeNamespace, definition: FarmDecorDefinitio
   drawFixtureBox(THREE, group, loftHay, hay, { inset: 0.05 });
   for (const y of [loftHay.bottom + 0.27, loftHay.bottom + 0.55]) for (const dx of [-0.4, 0.4]) tbox(THREE, group, [0.05, 0.03, loftHay.depth - 0.06], [loftHay.x + dx, y, loftHay.z], standard(THREE, "#a07a28", 1, 0), false);
   interiorStuds(THREE, group, definition, wood);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.4, 0.6], 9, 11);
-  roomLight(THREE, group, [-halfW + t + 1.2, shell.wallHeight - 1.2, -halfD + t + 2.2], 4, 7);
-  roomLight(THREE, group, [0, shell.wallHeight + 1.4, -halfD + t + 0.8], 4, 6);
+  const barnCeilingAt = (x: number) => gambrelRoofHeightAt({ wallHeight: shell.wallHeight, rise: 2.6, halfSpan: halfW, overhang: 0.45, across: x }) - 0.12;
+  roomLight(THREE, group, [0, shell.wallHeight - 0.4, 0.6], 9, 11, barnCeilingAt(0));
+  const sideLightX = -halfW + t + 1.2;
+  roomLight(THREE, group, [sideLightX, shell.wallHeight - 1.2, -halfD + t + 2.2], 4, 7, barnCeilingAt(sideLightX));
+  roomLight(THREE, group, [0, shell.wallHeight + 1.4, -halfD + t + 0.8], 4, 6, barnCeilingAt(0));
   const doors = createDoorLeaves(THREE, group, definition, "barn", { leaf: farmMaterial(THREE, "battens", { colors: ["#7a2620", "#3a1410", "#a8312b", "#6a1f1a"] }), trim });
   return Object.freeze({ group, doors, fixtureDoors: {}, animate: null });
 }
@@ -963,8 +968,9 @@ export function createStable(THREE: ThreeNamespace, definition: FarmDecorDefinit
   const saddle = tsphere(THREE, group, 0.22, [rack.x, rack.top + 0.06, rack.z], farmMaterial(THREE, "wood", { colors: ["#5a2e14", "#2f1808", "#8a5a34"], metresPerTile: 0.5 }));
   saddle.scale.set(1, 0.45, 0.8);
   interiorStuds(THREE, group, definition, dark, 0.8);
-  roomLight(THREE, group, [-width / 4, shell.wallHeight - 0.35, 0.3], 7, 9);
-  roomLight(THREE, group, [width / 4, shell.wallHeight - 0.35, 0.3], 7, 9);
+  const stableCeiling = gableRoofHeightAt({ wallHeight: shell.wallHeight, rise: 1.5, run: depth / 2 + 0.9, across: 0.3 }) - 0.12;
+  roomLight(THREE, group, [-width / 4, shell.wallHeight - 0.35, 0.3], 7, 9, stableCeiling);
+  roomLight(THREE, group, [width / 4, shell.wallHeight - 0.35, 0.3], 7, 9, stableCeiling);
   const doors = createDoorLeaves(THREE, group, definition, "dutch", { leaf: planks, trim: dark });
   return Object.freeze({ group, doors, fixtureDoors, animate: null });
 }
@@ -1043,7 +1049,7 @@ export function createCottage(THREE: ThreeNamespace, definition: FarmDecorDefini
   interiorStuds(THREE, group, definition, beam, 1.0);
   for (let x = -halfW + t + 0.5; x < halfW - t; x += 0.7) tbox(THREE, group, [0.12, 0.14, depth - t * 2], [x, shell.wallHeight - 0.07, 0], beam, false);
   tbox(THREE, group, [width - t * 2, 0.04, depth - t * 2], [0, shell.wallHeight + 0.02, 0], farmMaterial(THREE, "planks", { colors: ["#d9cdb5", "#a8957a", "#f0e6d2", "#8a7a60"], metresPerTile: 1.2 }), false);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.4, 0.2], 5, 9);
+  roomLight(THREE, group, [0, shell.wallHeight - 0.4, 0.2], 5, 9, shell.wallHeight);
   const doors = createDoorLeaves(THREE, group, definition, "panel", { leaf: paintedWood(THREE, "#3f6a4a"), trim: paintedWood(THREE, "#2e5238") });
   return Object.freeze({ group, doors, fixtureDoors: {}, animate: null });
 }
@@ -1155,7 +1161,7 @@ export function createGreenhouse(THREE: ThreeNamespace, definition: FarmDecorDef
   cylinder(THREE, group, 0.02, 0.02, 0.3, [halfW - 0.85, 0.32, halfD - 0.7], can, 6, false).rotation.z = -0.9;
   const east = fixtureNamed(definition, "bench-east");
   for (let z = east.z - 0.5; z <= east.z + 0.5; z += 0.5) tbox(THREE, group, [0.4, 0.06, 0.3], [east.x, 0.15, z], standard(THREE, "#2b2b2b", 0.8, 0), false);
-  roomLight(THREE, group, [0, shell.wallHeight + 0.5, 0], 3, 8);
+  roomLight(THREE, group, [0, shell.wallHeight + 0.5, 0], 3, 8, shell.wallHeight + 1.15);
   const doors = createDoorLeaves(THREE, group, definition, "glass", { leaf: glass, trim: frame });
   return Object.freeze({ group, doors, fixtureDoors: {}, animate: null });
 }
@@ -1247,7 +1253,7 @@ export function createShed(THREE: ThreeNamespace, definition: FarmDecorDefinitio
   const fork = cylinder(THREE, group, 0.02, 0.02, 1.5, [tools.x - 0.05, 0.75, tools.z], handle, 6);
   fork.rotation.z = 0.12;
   for (const dz of [-0.05, 0, 0.05]) box(THREE, group, [0.015, 0.25, 0.015], [tools.x + 0.07, 1.6, tools.z + dz], metal, false);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.3, 0.2], 3.5, 6);
+  roomLight(THREE, group, [0, shell.wallHeight - 0.3, 0.2], 3.5, 6, shell.wallHeight + 0.16);
   const doors = createDoorLeaves(THREE, group, definition, "plank", { leaf: farmMaterial(THREE, "planks", { colors: ["#4a555c", "#2b3237", "#6a757c", "#1f2529"] }), trim: frameWood });
   return Object.freeze({ group, doors, fixtureDoors: {}, animate: null });
 }
@@ -1315,7 +1321,7 @@ export function createCoop(THREE: ThreeNamespace, definition: FarmDecorDefinitio
   tcylinder(THREE, group, 0.14, 0.18, 0.12, [halfW - 0.5, 0.14, 0.5], galv, 12);
   tcylinder(THREE, group, 0.09, 0.09, 0.3, [halfW - 0.5, 0.33, 0.5], galv, 12);
   tcylinder(THREE, group, 0.12, 0.12, 0.2, [halfW - 0.5, 0.18, -0.1], standard(THREE, "#d43a3a", 0.5, 0), 12);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.3, 0.2], 2.5, 5);
+  roomLight(THREE, group, [0, shell.wallHeight - 0.3, 0.2], 2.5, 5, gableRoofHeightAt({ wallHeight: shell.wallHeight, rise: 1, run: depth / 2 + 0.4, across: 0.2 }) - 0.1);
   const doors = createDoorLeaves(THREE, group, definition, "plank", { leaf: plank, trim: dark });
   return Object.freeze({ group, doors, fixtureDoors: {}, animate: null });
 }
@@ -1392,7 +1398,7 @@ export function createSilo(THREE: ThreeNamespace, definition: FarmDecorDefinitio
   cylinder(THREE, group, 0.22, 0.14, 1.6, [0, shell.wallHeight - 1.2, -inner * 0.35], band, 10);
   // A plate under the dome so the tower has a top from inside.
   cylinder(THREE, group, face.circumradius, face.circumradius, 0.06, [0, shell.wallHeight - 0.03, 0], band, shell.sides, false).rotation.y = Math.PI / shell.sides;
-  roomLight(THREE, group, [0, 2.7, 0.3], 7, 8);
+  roomLight(THREE, group, [0, 2.7, 0.3], 7, 8, shell.wallHeight - 0.06);
   const roofLight = new THREE.PointLight(0xffe9b8, 4, 8, 1.4);
   roofLight.position.set(0, shell.wallHeight - 0.5, 0);
   group.add(roofLight);
@@ -1486,8 +1492,8 @@ export function createWindmill(THREE: ThreeNamespace, definition: FarmDecorDefin
   }
   drawPlatform(THREE, group, fixtureNamed(definition, "loft"), farmMaterial(THREE, "wood", { colors: ["#9a7248", "#5a3a1f", "#c9a06a"], metresPerTile: 2 }));
   drawLadder(THREE, group, fixtureNamed(definition, "ladder"), timberMaterial);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.4, -0.9], 3, 5);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.6, 0.3], 5, 9);
+  roomLight(THREE, group, [0, shell.wallHeight - 0.4, -0.9], 3, 5, shell.wallHeight - 0.06);
+  roomLight(THREE, group, [0, shell.wallHeight - 0.6, 0.3], 5, 9, shell.wallHeight - 0.06);
   const doors = createDoorLeaves(THREE, group, definition, "plank", { leaf: farmMaterial(THREE, "planks", { colors: ["#6a4a2a", "#3a2412", "#8a6a44", "#2a1a0a"] }), trim: timberMaterial });
   let spin = 0;
   return Object.freeze({
@@ -1506,6 +1512,7 @@ export function createGazebo(THREE: ThreeNamespace, definition: FarmDecorDefinit
   const group = new THREE.Group();
   const { width, depth } = definition.footprint;
   const shell = definition.shell!;
+  const canopy = gazeboCanopy(shell.wallHeight, 1.4);
   const halfW = width / 2;
   const halfD = depth / 2;
   const white = paintedWood(THREE, TRIM);
@@ -1541,12 +1548,16 @@ export function createGazebo(THREE: ThreeNamespace, definition: FarmDecorDefinit
     frieze.rotation.y = rot;
     tbox(THREE, frieze, [len - 0.36, 0.05, 0.05], [0, -0.16, 0], white, false);
     for (let s = -len / 2 + 0.3; s < len / 2 - 0.2; s += 0.16) cylinder(THREE, frieze, 0.014, 0.014, 0.3, [s, -0.02, 0], white, 6, false);
+    // The missing upper header made the spindles and canopy look suspended in
+    // mid-air. This rail meets both the post caps and the roof's base.
+    const header = tbox(THREE, frieze, [len, canopy.headerHeight, 0.14], [0, canopy.headerCentreY - (shell.wallHeight - 0.2), 0], white, false);
+    header.userData.gazeboRoofSupport = true;
     group.add(frieze);
   }
   // Octagonal shingled roof over an eave ring, with a finial.
   const radius = Math.hypot(halfW, halfD) + 0.35;
   const cone = new THREE.Mesh(metricUvs(new THREE.ConeGeometry(radius, 1.4, 8), 1.2), roof);
-  cone.position.y = shell.wallHeight + 0.7;
+  cone.position.y = canopy.roofCentreY;
   cone.rotation.y = Math.PI / 8;
   cone.castShadow = true;
   cone.receiveShadow = true;
@@ -1561,7 +1572,7 @@ export function createGazebo(THREE: ThreeNamespace, definition: FarmDecorDefinit
   // Bench ring inside, along the back and sides — every bench a seat — and a lantern.
   const seat = timber(THREE, WOOD);
   for (const name of ["bench-back", "bench-west", "bench-east"]) drawSeat(THREE, group, fixtureNamed(definition, name), seat);
-  roomLight(THREE, group, [0, shell.wallHeight - 0.35, 0], 3, 7);
+  roomLight(THREE, group, [0, shell.wallHeight - 0.35, 0], 3, 7, shell.wallHeight + 0.1);
   return Object.freeze({ group, doors: null, fixtureDoors: {}, animate: null });
 }
 

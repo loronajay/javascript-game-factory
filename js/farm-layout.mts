@@ -21,10 +21,11 @@
 import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog/ground.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
+import { createStarterAgriculture, normalizeAgriculture, type FarmAgriculture } from "./farm-crops.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
 
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
-export const FARM_LAYOUT_VERSION = 2;
+export const FARM_LAYOUT_VERSION = 3;
 
 /** The walkable field. The inset is how far in from the field's edge anything may stand. */
 export const FARM_BOUNDS: RoomBounds = Object.freeze({ width: 28, depth: 28, wallInset: 0.3 });
@@ -50,10 +51,12 @@ export type FarmDecorRow = Readonly<{
 }>;
 
 export type FarmLayout = Readonly<{
-  version: 2;
+  version: 3;
   ground: string;
   pets: readonly FarmPet[];
   decor: readonly FarmDecorRow[];
+  agriculture: FarmAgriculture;
+  clock: Readonly<{ farmMinutes: number; updatedAt: number }>;
 }>;
 
 export type FarmPetResult = Readonly<{ valid: boolean; layout: FarmLayout; instanceId: string; reason: string }>;
@@ -102,7 +105,14 @@ export const STARTER_FARM_DECOR: readonly FarmDecorRow[] = Object.freeze([
 ]);
 
 export function createDefaultFarmLayout(): FarmLayout {
-  return Object.freeze({ version: 2, ground: DEFAULT_GROUND_ID, pets: Object.freeze([]), decor: STARTER_FARM_DECOR });
+  return Object.freeze({
+    version: 3,
+    ground: DEFAULT_GROUND_ID,
+    pets: Object.freeze([]),
+    decor: STARTER_FARM_DECOR,
+    agriculture: createStarterAgriculture(),
+    clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0 }),
+  });
 }
 
 function freezeLayout(layout: FarmLayout): FarmLayout {
@@ -110,6 +120,8 @@ function freezeLayout(layout: FarmLayout): FarmLayout {
     ...layout,
     pets: Object.freeze(layout.pets.map((pet) => Object.freeze({ ...pet }))),
     decor: Object.freeze(layout.decor.map((item) => Object.freeze({ ...item }))),
+    agriculture: layout.agriculture,
+    clock: Object.freeze({ ...layout.clock }),
   });
 }
 
@@ -158,8 +170,8 @@ export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }
 
 export function normalizeFarmLayout(value: unknown): FarmLayout {
   if (!value || typeof value !== "object") return createDefaultFarmLayout();
-  const source = value as { version?: unknown; ground?: unknown; pets?: unknown; decor?: unknown };
-  if (source.version !== 1 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
+  const source = value as { version?: unknown; ground?: unknown; pets?: unknown; decor?: unknown; agriculture?: unknown; clock?: unknown };
+  if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
   const seen = new Set<string>();
   // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
   let decor: FarmDecorRow[];
@@ -188,7 +200,14 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     pets.push(pet);
     if (pets.length >= MAX_PETS) break;
   }
-  return freezeLayout({ version: 2, ground: normalizeGroundId(source.ground), pets, decor });
+  const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
+  const agriculture = source.version === 3 ? normalizeAgriculture(source.agriculture, plotIds) : createStarterAgriculture();
+  const rawClock = source.clock && typeof source.clock === "object" ? source.clock as { farmMinutes?: unknown; updatedAt?: unknown } : {};
+  const clock = {
+    farmMinutes: finiteNumber(rawClock.farmMinutes) ? Math.max(0, rawClock.farmMinutes) : 8 * 60,
+    updatedAt: finiteNumber(rawClock.updatedAt) ? Math.max(0, rawClock.updatedAt) : 0,
+  };
+  return freezeLayout({ version: 3, ground: normalizeGroundId(source.ground), pets, decor, agriculture, clock });
 }
 
 export function parseFarmLayout(serialized: string | null): FarmLayout {
@@ -247,7 +266,16 @@ export function setFarmGround(layout: FarmLayout, id: string): Readonly<{ valid:
 
 /** Replace the decor list wholesale; the placement rules call this after they have decided. */
 export function withFarmDecor(layout: FarmLayout, decor: readonly FarmDecorRow[]): FarmLayout {
-  return freezeLayout({ ...layout, decor: [...decor] });
+  const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
+  return freezeLayout({ ...layout, decor: [...decor], agriculture: normalizeAgriculture(layout.agriculture, plotIds) });
+}
+
+export function withFarmAgriculture(layout: FarmLayout, agriculture: FarmAgriculture): FarmLayout {
+  return freezeLayout({ ...layout, agriculture });
+}
+
+export function withFarmClock(layout: FarmLayout, farmMinutes: number, updatedAt: number): FarmLayout {
+  return freezeLayout({ ...layout, clock: { farmMinutes: Math.max(0, farmMinutes), updatedAt: Math.max(0, updatedAt) } });
 }
 
 export function farmDecorRowsEqual(first: FarmDecorRow, second: FarmDecorRow): boolean {
@@ -257,6 +285,9 @@ export function farmDecorRowsEqual(first: FarmDecorRow, second: FarmDecorRow): b
 
 export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean {
   return first.ground === second.ground
+    && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
+    && first.clock.farmMinutes === second.clock.farmMinutes
+    && first.clock.updatedAt === second.clock.updatedAt
     && first.pets.length === second.pets.length
     && first.pets.every((pet, index) => {
       const other = second.pets[index];

@@ -31,8 +31,8 @@
 // stored as sent and migrated by the client's normalizer, which seeds the
 // starter field for it.
 export const FARM_GAME_SLUG = "farm";
-const LAYOUT_VERSIONS = new Set([1, 2]);
-const LAYOUT_VERSION = 2;
+const LAYOUT_VERSIONS = new Set([1, 2, 3]);
+const LAYOUT_VERSION = 3;
 /** The client caps adoption at 12; the server allows a little headroom so a later raise is a client change. */
 export const FARM_MAX_PETS = 24;
 /** Fences, ponds and plants to come; a bound, not a plan. */
@@ -47,6 +47,7 @@ const GROUND_ID_PATTERN = /^ground\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SPECIES_ID_PATTERN = /^pet\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DECOR_ID_PATTERN = /^decor\.[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
+const CROP_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function cleanText(value, maxLength) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -71,7 +72,40 @@ function normalizeRotation(value) {
 }
 export function defaultFarmGarage() {
     // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-    return { version: LAYOUT_VERSION, ground: "", pets: [] };
+    return { version: LAYOUT_VERSION, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {} }, crops: [] }, clock: { farmMinutes: 480, updatedAt: 0 } };
+}
+function normalizeCropCounts(value) {
+    const input = value && typeof value === "object" ? value : {};
+    const output = {};
+    for (const [id, raw] of Object.entries(input).slice(0, 64)) {
+        if (!CROP_ID_PATTERN.test(id) || typeof raw !== "number" || !Number.isFinite(raw))
+            continue;
+        output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
+    }
+    return output;
+}
+function normalizeAgriculture(value, decorIds) {
+    const input = value && typeof value === "object" ? value : {};
+    const inventory = input.inventory && typeof input.inventory === "object" ? input.inventory : {};
+    const crops = [];
+    const seen = new Set();
+    for (const raw of Array.isArray(input.crops) ? input.crops.slice(0, MAX_DECOR) : []) {
+        const row = raw && typeof raw === "object" ? raw : {};
+        const plotId = cleanText(row.plotId, 40);
+        const cropId = cleanText(row.cropId, 40);
+        if (!INSTANCE_ID_PATTERN.test(plotId) || !decorIds.has(plotId) || seen.has(plotId) || !CROP_ID_PATTERN.test(cropId))
+            continue;
+        seen.add(plotId);
+        crops.push({
+            plotId,
+            cropId,
+            growthMinutes: Math.max(0, boundedNumber(row.growthMinutes, 100000) ?? 0),
+            moistureMinutes: Math.max(0, boundedNumber(row.moistureMinutes, 100000) ?? 0),
+            tended: row.tended === true,
+            lastFarmMinute: Math.max(0, boundedNumber(row.lastFarmMinute, 1000000000) ?? 0),
+        });
+    }
+    return { inventory: { seeds: normalizeCropCounts(inventory.seeds), produce: normalizeCropCounts(inventory.produce) }, crops };
 }
 function normalizePetRow(raw) {
     const source = raw && typeof raw === "object" ? raw : {};
@@ -134,6 +168,15 @@ export function normalizeFarmGarage(value) {
             decor.push(row);
         }
         garage.decor = decor;
+    }
+    if (garage.version === 3) {
+        const decorIds = new Set((garage.decor ?? []).filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => String(row.instanceId)));
+        garage.agriculture = normalizeAgriculture(input.agriculture, decorIds);
+        const clock = input.clock && typeof input.clock === "object" ? input.clock : {};
+        garage.clock = {
+            farmMinutes: Math.max(0, boundedNumber(clock.farmMinutes, 1000000000) ?? 480),
+            updatedAt: Math.max(0, boundedNumber(clock.updatedAt, 1000000000000000) ?? 0),
+        };
     }
     return garage;
 }

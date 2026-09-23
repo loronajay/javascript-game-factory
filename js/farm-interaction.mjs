@@ -17,6 +17,7 @@ export const DOOR_TOUCH_DISTANCE = 0.9;
 export const LADDER_REACH = 1.4;
 /** How far from the nearest point of a seat the player may stand to sit on it. */
 export const SEAT_REACH = 1.3;
+export const BED_REACH = 2.2;
 const FACING_THRESHOLD = 0.3;
 function facingToward(player, target) {
     const dx = target.x - player.x;
@@ -101,6 +102,26 @@ export function findSeatInReach(seats, player) {
 }
 export const SEAT_PROMPT = "Press E to sit down";
 export const SEATED_PROMPT = "Press E to stand up";
+/** The nearest placed bed on the player's level and in view. */
+export function findBedInReach(decor, player) {
+    if (Math.abs(player.y) > LEVEL_TOLERANCE)
+        return null;
+    let best = null;
+    let bestDistance = Infinity;
+    for (const row of decor) {
+        if (row.itemId !== "decor.prop.bed")
+            continue;
+        const distance = Math.hypot(row.x - player.x, row.z - player.z);
+        if (distance > BED_REACH || facingToward(player, row) < FACING_THRESHOLD)
+            continue;
+        if (distance < bestDistance) {
+            best = row;
+            bestDistance = distance;
+        }
+    }
+    return best;
+}
+export const BED_PROMPT = "Press E to nap";
 /** Pets are bodies with a pose; the nearest one in reach is the one E strokes. */
 export function findPetInReach(pets, player, reach = 2.2) {
     return findVisitorInReach(player, pets, { radius: reach, facingThreshold: 0.4 });

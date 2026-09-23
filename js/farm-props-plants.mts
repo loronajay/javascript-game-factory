@@ -32,6 +32,22 @@ const LEAF = "#3f7f34";
 const LEAF_LIGHT = "#5ca34a";
 const LEAF_DEEP = "#2f6428";
 
+/** Canonical empty farmland. Crop GLBs are layered over this plot by the crop view. */
+export function createSoilPatch(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  const earth = farmMaterial(THREE, "soil", { colors: ["#624027", "#342014", "#95683f"], metresPerTile: 0.55 });
+  const ridge = farmMaterial(THREE, "soil", { colors: ["#745033", "#422819", "#a9784b"], metresPerTile: 0.45 });
+  const edge = farmMaterial(THREE, "wood", { colors: ["#8b673f", "#3d2717", "#b48a58"], metresPerTile: 0.7 });
+  tbox(THREE, group, [3, 0.08, 2], [0, 0.04, 0], earth, false);
+  for (const z of [-0.58, 0, 0.58]) {
+    const furrow = tcylinder(THREE, group, 0.13, 0.13, 2.78, [0, 0.1, z], ridge, 8, false);
+    furrow.rotation.z = Math.PI / 2;
+  }
+  for (const z of [-1.02, 1.02]) tbox(THREE, group, [3.12, 0.12, 0.09], [0, 0.08, z], edge, false);
+  for (const x of [-1.52, 1.52]) tbox(THREE, group, [0.09, 0.12, 2.12], [x, 0.08, 0], edge, false);
+  return group;
+}
+
 /** A tiny deterministic generator so a scatter is the same on every load for the same seed. */
 function seeded(seed: number): () => number {
   let n = (seed * 9301 + 49297) % 233280;
