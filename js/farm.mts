@@ -17,7 +17,7 @@ import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions, type DoorRow } from "./farm-scene.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
-import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPickUpPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type SeatInReach } from "./farm-interaction.mjs";
+import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type PetInteractionId, type SeatInReach } from "./farm-interaction.mjs";
 import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
@@ -29,7 +29,7 @@ import { findAnimal } from "./farm-catalog/animals.mjs";
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
-import { advanceAgriculture, cropStatus, findCrop, findSoilPlotInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop } from "./farm-crops.mjs";
+import { SOIL_CELL_LAYOUT, advanceAgriculture, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type SoilCellTarget } from "./farm-crops.mjs";
 import { createFarmCropsView } from "./farm-crops-view.mjs";
 import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
 
@@ -183,7 +183,8 @@ let doorInReach: DoorRow | null = null;
 let ladderInReach: LadderInReach | null = null;
 let seatInReach: SeatInReach | null = null;
 let bedInReach: BedRow | null = null;
-let soilInReach: FarmDecorRow | null = null;
+let soilInReach: SoilCellTarget<FarmDecorRow> | null = null;
+let nearbyPetCanPickUp = false;
 const keys = new Set<string>();
 let farmEntered = false;
 let draggingLook = false;
@@ -277,9 +278,12 @@ function updateInteraction(): void {
   const handsFree = walking && !carrying;
   ladderInReach = handsFree && !doorInReach ? findLadderInReach(ladders, pose) : null;
   bedInReach = handsFree && !doorInReach && !ladderInReach ? findBedInReach(layout.decor, pose) : null;
-  soilInReach = handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach ? findSoilPlotInReach(layout.decor, pose) : null;
+  soilInReach = handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach ? findSoilCellInReach(layout.decor, pose) : null;
   seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach ? findSeatInReach(seats, pose) : null;
   nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
+  const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
+  const canPickUp = Boolean(nearbyPetState && findAnimal(nearbyPetState.speciesId)?.habitat !== "water");
+  nearbyPetCanPickUp = canPickUp;
   const held = carrying ? petSim.find(carrying) : null;
   putDownAt = held && body.y < 0.3 ? findPutDownSpot(pose, findAnimal(held.speciesId)?.radius ?? 0.5, (spot) => petSim.canStand(held.speciesId, spot)) : null;
   const putDownFits = putDownAt !== null;
@@ -310,11 +314,15 @@ function updateInteraction(): void {
     return;
   }
   if (soilInReach) {
-    const planted = layout.agriculture.crops.find((crop) => crop.plotId === soilInReach!.instanceId);
+    const plotId = soilInReach.plot.instanceId;
+    const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId && crop.cellId === soilInReach!.cellId);
+    const occupied = layout.agriculture.crops.filter((crop) => crop.plotId === plotId).length;
     if (!planted) {
       const selected = findCrop(inventoryPanel.selectedCropId())!;
       const seeds = layout.agriculture.inventory.seeds[selected.id] ?? 0;
-      setPrompt(seeds > 0 ? `Press E to plant ${selected.title} · ${seeds} seeds left` : `No ${selected.title} seeds · choose another in Inventory`);
+      setPrompt(seeds > 0
+        ? `Press E to plant 1 ${selected.title} here · ${seeds} seeds · plot ${occupied}/${SOIL_CELL_LAYOUT.length}`
+        : `No ${selected.title} seeds · choose another in Inventory`);
       return;
     }
     const definition = findCrop(planted.cropId)!;
@@ -334,7 +342,7 @@ function updateInteraction(): void {
     return;
   }
   if (nearbyPet) {
-    setPrompt(getPickUpPrompt(nearbyPet.name));
+    setPrompt(getPetInteractionPrompt(nearbyPet.name, { canPickUp }));
     return;
   }
   setPrompt("");
@@ -386,8 +394,7 @@ function interact(): boolean {
     return true;
   }
   if (nearbyPet) {
-    pickPetUp();
-    return true;
+    return interactWithPet("pet");
   }
   return false;
 }
@@ -395,27 +402,36 @@ function interact(): boolean {
 /** E at a growing plot performs the one action its current state calls for. */
 function workSoilPlot(): void {
   if (!soilInReach || !canManageFarm) return;
-  const plotId = soilInReach.instanceId;
-  const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId);
+  const plotId = soilInReach.plot.instanceId;
+  const cellId = soilInReach.cellId;
+  const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId && crop.cellId === cellId);
   let action;
-  if (!planted) action = plantFarmCrop(layout.agriculture, plotId, inventoryPanel.selectedCropId(), clockMinutes);
+  if (!planted) action = plantFarmCrop(layout.agriculture, plotId, cellId, inventoryPanel.selectedCropId(), clockMinutes);
   else {
     const state = cropStatus(planted, clockMinutes);
-    if (state.mature) action = harvestFarmCrop(layout.agriculture, plotId, clockMinutes);
-    else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, clockMinutes);
-    else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, clockMinutes);
+    if (state.mature) action = harvestFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
+    else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
+    else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
     else return;
   }
   if (!action.ok) return;
   void persistLayout(withFarmClock(withFarmAgriculture(layout, action.agriculture), clockMinutes, Date.now()));
 }
 
-/** E on a pet: into the arms. The tag comes off so it does not sit in the player's face, and the heart waits for the put-down. */
-function pickPetUp(): void {
-  if (!nearbyPet || !petSim.pickUp(nearbyPet.instanceId)) return;
+/** Run one available pet action. Feed will enter through this same dispatcher when it is added. */
+function interactWithPet(action: PetInteractionId): boolean {
+  if (!nearbyPet) return false;
+  if (action === "pet") {
+    petBodies.showHeart(nearbyPet.instanceId);
+    petSim.attention(nearbyPet.instanceId);
+    return true;
+  }
+  if (!nearbyPetCanPickUp || !petSim.pickUp(nearbyPet.instanceId)) return false;
   carrying = nearbyPet.instanceId;
   petBodies.setTagVisible(carrying, false);
   nearbyPet = null;
+  nearbyPetCanPickUp = false;
+  return true;
 }
 
 /** E with a pet in hand: set it down ahead if it fits; otherwise the prompt has already said why not and E does nothing. */
@@ -425,8 +441,6 @@ function putPetDown(): boolean {
   if (!held || !spot) return false;
   if (!petSim.putDown(held.instanceId, spot)) return false;
   petBodies.setTagVisible(held.instanceId, true);
-  petBodies.showHeart(held.instanceId);
-  petSim.attention(held.instanceId);
   carrying = "";
   return true;
 }
@@ -549,6 +563,11 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyF" && !event.repeat && document.fullscreenEnabled) {
     event.preventDefault();
     setFarmFullscreen(!isFarmFullscreen());
+    return;
+  }
+  const petInteraction = !event.repeat && farmEntered ? getPetInteraction(event.code) : null;
+  if (petInteraction && nearbyPet && interactWithPet(petInteraction.id)) {
+    event.preventDefault();
     return;
   }
   if (event.code === "KeyE" && !event.repeat && farmEntered) {

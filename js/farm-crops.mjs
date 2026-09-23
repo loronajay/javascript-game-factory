@@ -18,21 +18,36 @@ export const CROP_CATALOG = Object.freeze([
 export function findCrop(id) {
     return typeof id === "string" ? CROP_CATALOG.find((entry) => entry.id === id) : undefined;
 }
-/** The nearest growing plot close enough and in front of the walking player. */
-export function findSoilPlotInReach(decor, player, reach = 2.65) {
+export const SOIL_CELL_LAYOUT = Object.freeze([
+    Object.freeze({ id: "cell-0", x: -1, z: -0.5 }),
+    Object.freeze({ id: "cell-1", x: 0, z: -0.5 }),
+    Object.freeze({ id: "cell-2", x: 1, z: -0.5 }),
+    Object.freeze({ id: "cell-3", x: -1, z: 0.5 }),
+    Object.freeze({ id: "cell-4", x: 0, z: 0.5 }),
+    Object.freeze({ id: "cell-5", x: 1, z: 0.5 }),
+]);
+const SOIL_CELL_IDS = new Set(SOIL_CELL_LAYOUT.map((cell) => cell.id));
+/** The nearest actual planting cell close enough and in front of the walking player. */
+export function findSoilCellInReach(decor, player, reach = 2.65) {
     let best = null;
     let bestDistance = Infinity;
     for (const row of decor) {
         if (row.itemId !== "decor.plant.soil-patch")
             continue;
-        const dx = row.x - player.x;
-        const dz = row.z - player.z;
-        const distance = Math.hypot(dx, dz);
-        const forwardLength = Math.hypot(player.forward.x, player.forward.z) || 1;
-        const facing = distance < 0.001 ? 1 : (player.forward.x * dx + player.forward.z * dz) / (forwardLength * distance);
-        if (distance <= reach && facing >= 0.2 && distance < bestDistance) {
-            best = row;
-            bestDistance = distance;
+        const cosine = Math.cos(row.rotationY);
+        const sine = Math.sin(row.rotationY);
+        for (const cell of SOIL_CELL_LAYOUT) {
+            const x = Number((row.x + cell.x * cosine + cell.z * sine).toFixed(4));
+            const z = Number((row.z - cell.x * sine + cell.z * cosine).toFixed(4));
+            const dx = x - player.x;
+            const dz = z - player.z;
+            const distance = Math.hypot(dx, dz);
+            const forwardLength = Math.hypot(player.forward.x, player.forward.z) || 1;
+            const facing = distance < 0.001 ? 1 : (player.forward.x * dx + player.forward.z * dz) / (forwardLength * distance);
+            if (distance <= reach && facing >= 0.2 && distance < bestDistance) {
+                best = { plot: row, cellId: cell.id, x, z };
+                bestDistance = distance;
+            }
         }
     }
     return best;
@@ -63,11 +78,17 @@ export function normalizeAgriculture(value, validPlotIds) {
             continue;
         const row = raw;
         const definition = findCrop(row.cropId);
-        if (!definition || typeof row.plotId !== "string" || !validPlotIds.has(row.plotId) || seen.has(row.plotId))
+        if (!definition || typeof row.plotId !== "string" || !validPlotIds.has(row.plotId))
             continue;
-        seen.add(row.plotId);
+        const cellId = typeof row.cellId === "string" && SOIL_CELL_IDS.has(row.cellId)
+            ? row.cellId
+            : SOIL_CELL_LAYOUT.find((cell) => !seen.has(`${row.plotId}:${cell.id}`))?.id;
+        if (!cellId || seen.has(`${row.plotId}:${cellId}`))
+            continue;
+        seen.add(`${row.plotId}:${cellId}`);
         crops.push({
             plotId: row.plotId,
+            cellId,
             cropId: definition.id,
             growthMinutes: Math.min(definition.growMinutes, Math.max(0, finite(row.growthMinutes))),
             moistureMinutes: Math.min(MOISTURE_CAPACITY_MINUTES, Math.max(0, finite(row.moistureMinutes))),
@@ -109,42 +130,44 @@ export function cropStatus(row, now) {
 function result(agriculture, ok, reason = "") {
     return Object.freeze({ ok, reason, agriculture });
 }
-export function plantFarmCrop(value, plotId, cropId, now) {
+export function plantFarmCrop(value, plotId, cellId, cropId, now) {
     const agriculture = advanceAgriculture(value, now);
     const definition = findCrop(cropId);
     if (!definition)
         return result(agriculture, false, "unknown_crop");
-    if (agriculture.crops.some((row) => row.plotId === plotId))
+    if (!SOIL_CELL_IDS.has(cellId))
+        return result(agriculture, false, "unknown_cell");
+    if (agriculture.crops.some((row) => row.plotId === plotId && row.cellId === cellId))
         return result(agriculture, false, "occupied");
     if ((agriculture.inventory.seeds[cropId] ?? 0) <= 0)
         return result(agriculture, false, "no_seeds");
     const seeds = { ...agriculture.inventory.seeds, [cropId]: agriculture.inventory.seeds[cropId] - 1 };
-    const cropRow = { plotId, cropId, growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: now };
+    const cropRow = { plotId, cellId, cropId, growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: now };
     return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, seeds: Object.freeze(seeds) }), crops: [...agriculture.crops, cropRow] }), true);
 }
-export function waterFarmCrop(value, plotId, now) {
+export function waterFarmCrop(value, plotId, cellId, now) {
     const agriculture = advanceAgriculture(value, now);
-    if (!agriculture.crops.some((row) => row.plotId === plotId))
+    if (!agriculture.crops.some((row) => row.plotId === plotId && row.cellId === cellId))
         return result(agriculture, false, "empty");
-    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((row) => row.plotId === plotId ? { ...row, moistureMinutes: MOISTURE_CAPACITY_MINUTES } : row) }), true);
+    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((row) => row.plotId === plotId && row.cellId === cellId ? { ...row, moistureMinutes: MOISTURE_CAPACITY_MINUTES } : row) }), true);
 }
-export function tendFarmCrop(value, plotId, now) {
+export function tendFarmCrop(value, plotId, cellId, now) {
     const agriculture = advanceAgriculture(value, now);
-    const row = agriculture.crops.find((entry) => entry.plotId === plotId);
+    const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
     if (!row)
         return result(agriculture, false, "empty");
     if (!cropStatus(row, now).needsCare)
         return result(agriculture, false, "not_ready");
-    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((entry) => entry.plotId === plotId ? { ...entry, tended: true } : entry) }), true);
+    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((entry) => entry.plotId === plotId && entry.cellId === cellId ? { ...entry, tended: true } : entry) }), true);
 }
-export function harvestFarmCrop(value, plotId, now) {
+export function harvestFarmCrop(value, plotId, cellId, now) {
     const agriculture = advanceAgriculture(value, now);
-    const row = agriculture.crops.find((entry) => entry.plotId === plotId);
+    const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
     if (!row)
         return result(agriculture, false, "empty");
     if (!cropStatus(row, now).mature)
         return result(agriculture, false, "not_ready");
     const definition = findCrop(row.cropId);
     const produce = { ...agriculture.inventory.produce, [row.cropId]: Math.min(MAX_STACK, agriculture.inventory.produce[row.cropId] + definition.yield) };
-    return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, produce: Object.freeze(produce) }), crops: agriculture.crops.filter((entry) => entry.plotId !== plotId) }), true);
+    return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, produce: Object.freeze(produce) }), crops: agriculture.crops.filter((entry) => entry.plotId !== plotId || entry.cellId !== cellId) }), true);
 }

@@ -3,11 +3,20 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createLayoutStore } from "../arcade-room-store.mjs";
+import { PET_INTERACTIONS, getPetInteraction, getPetInteractionPrompt } from "../farm-interaction.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..");
 const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
 const source = readFileSync(resolve(repoRoot, "js", "farm.mts"), "utf8");
 const worldSource = readFileSync(resolve(repoRoot, "js", "farm-world.mts"), "utf8");
+
+test("pet and carry remain separate registered interactions", () => {
+  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["pick-up", "KeyC"]]);
+  assert.equal(getPetInteraction("KeyE")?.id, "pet");
+  assert.equal(getPetInteraction("KeyC")?.id, "pick-up");
+  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true }), "E Pet Biscuit · C Pick up");
+  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: false }), "E Pet Bubbles", "uncarryable pets still offer petting");
+});
 
 test("the farm page ships the shell the composition root requires", () => {
   for (const id of ["farmCanvas", "farmPrompt", "startGate", "enterFarm", "farmStatus", "fullscreenFarm", "farmTitle", "farmEyebrow", "startTag", "startHeading", "startCopy", "farmOwnerLink", "openPets", "petsPanel", "closePets", "petList", "speciesGrid", "petName", "petsStatus", "petsCount"]) {
@@ -100,9 +109,13 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
   assert.match(source, /if \(!farmEntered \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
-  // E on a pet lifts it into the arms (with a heart), and E with a pet in hand sets it down ahead where it fits — through the pure sim and rules.
+  // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
+  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp \}\)/);
+  assert.match(source, /function interactWithPet\(action: PetInteractionId\)/);
+  assert.match(source, /if \(action === "pet"\) \{\s*petBodies\.showHeart\(nearbyPet\.instanceId\);\s*petSim\.attention\(nearbyPet\.instanceId\)/, "petting owns the heart and attention response");
+  assert.match(source, /getPetInteraction\(event\.code\)/, "keyboard dispatch comes from the pet interaction registry so Feed can be added later");
   assert.match(source, /petSim\.pickUp\(nearbyPet\.instanceId\)/);
-  assert.match(source, /petBodies\.showHeart\(held\.instanceId\);\s*petSim\.attention\(held\.instanceId\)/, "the heart and the look back come on the put-down, not in the player's face on the pick-up");
+  assert.doesNotMatch(source, /petBodies\.showHeart\(held\.instanceId\)/, "putting a pet down is not secretly the pet interaction");
   assert.match(source, /petSim\.putDown\(held\.instanceId, spot\)/);
   assert.match(source, /findPutDownSpot\(pose, findAnimal\(held\.speciesId\)\?\.radius \?\? 0\.5, \(spot\) => petSim\.canStand\(held\.speciesId, spot\)\)/, "the drop spot comes from the pure rule at the species' own radius, the sim saying what fits");
   assert.match(source, /if \(editing\) dropCarried\(\)/, "build mode empties the arms");

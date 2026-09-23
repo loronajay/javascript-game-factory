@@ -140,8 +140,29 @@ export function findPetInReach<T extends Readonly<{ pose: Readonly<{ x: number; 
   return findVisitorInReach(player, pets, { radius: reach, facingThreshold: 0.4 });
 }
 
-export function getPetPrompt(name: string): string {
-  return `Press E to pet ${name}`;
+/**
+ * Pet actions live in one registry so adding Feed does not displace Pet or
+ * Carry. `available` names the capability the composition root must check;
+ * the pure interaction layer only formats and dispatches the available rows.
+ */
+export const PET_INTERACTIONS = Object.freeze([
+  Object.freeze({ id: "pet", code: "KeyE", key: "E", label: "Pet", available: "always" }),
+  Object.freeze({ id: "pick-up", code: "KeyC", key: "C", label: "Pick up", available: "canPickUp" }),
+] as const);
+
+export type PetInteraction = typeof PET_INTERACTIONS[number];
+export type PetInteractionId = PetInteraction["id"];
+
+export function getPetInteraction(code: string): PetInteraction | null {
+  return PET_INTERACTIONS.find((interaction) => interaction.code === code) ?? null;
+}
+
+/** The complete set of actions this pet offers right now, rendered as one contextual prompt. */
+export function getPetInteractionPrompt(name: string, capabilities: Readonly<{ canPickUp: boolean }>): string {
+  return PET_INTERACTIONS
+    .filter((interaction) => interaction.available === "always" || capabilities.canPickUp)
+    .map((interaction) => `${interaction.key} ${interaction.label}${interaction.id === "pet" ? ` ${name}` : ""}`)
+    .join(" · ");
 }
 
 /** How far ahead of the player a carried pet is set down: its own radius past the arm's reach, so it never lands on the player's feet. */
@@ -152,10 +173,6 @@ export function putDownSpot(player: FarmPlayerPose & Readonly<{ yaw: number }>, 
   const length = Math.hypot(player.forward.x, player.forward.z) || 1;
   const reach = PUT_DOWN_REACH + radius;
   return { x: player.x + (player.forward.x / length) * reach, z: player.z + (player.forward.z / length) * reach, yaw: player.yaw };
-}
-
-export function getPickUpPrompt(name: string): string {
-  return `Press E to pick up ${name}`;
 }
 
 /** While carrying: E sets the pet down where the player looks, or says why it cannot. */

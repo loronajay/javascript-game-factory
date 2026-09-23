@@ -51,6 +51,7 @@ js/tests/*
 !js/tests/arcade-session-nav.test.mjs
 !js/tests/auth-api.test.mjs
 !js/tests/deployment-config.test.mjs
+!js/tests/farm-crops.test.mjs
 # Catalog metadata/filtering and admin override contracts ship with the redesign.
 !js/tests/arcade-catalog-query.test.mjs
 !js/tests/arcade-catalog-metadata.test.mjs

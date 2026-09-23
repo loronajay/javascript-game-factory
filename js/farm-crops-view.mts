@@ -2,7 +2,7 @@
 // where soil exists; agriculture owns what grows there and which GLB stage is shown.
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
-import { cropStatus, findCrop, type FarmAgriculture } from "./farm-crops.mjs";
+import { SOIL_CELL_LAYOUT, cropStatus, findCrop, type FarmAgriculture, type FarmCrop } from "./farm-crops.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 
 type ThreeNamespace = Record<string, any>;
@@ -61,35 +61,50 @@ export function createFarmCropsView(THREE: ThreeNamespace, scene: any): FarmCrop
     return model;
   }
 
-  function loadContent(view: PlotView, soilFile: string, cropFile: string | null, stage: number): void {
+  function cellTile(holder: any, cell: typeof SOIL_CELL_LAYOUT[number], crop: FarmCrop | undefined, wet: boolean): void {
+    const border = new THREE.Mesh(
+      new THREE.BoxGeometry(0.92, 0.025, 0.82),
+      new THREE.MeshStandardMaterial({ color: crop ? 0xc39a52 : 0x9a7845, roughness: 1 }),
+    );
+    border.position.set(cell.x, 0.07, cell.z);
+    border.receiveShadow = true;
+    holder.add(border);
+    const earth = new THREE.Mesh(
+      new THREE.BoxGeometry(0.84, 0.03, 0.74),
+      new THREE.MeshStandardMaterial({ color: wet ? 0x34291d : 0x5a3421, roughness: 1 }),
+    );
+    earth.position.set(cell.x, 0.09, cell.z);
+    earth.receiveShadow = true;
+    holder.add(earth);
+  }
+
+  function loadContent(view: PlotView, crops: readonly FarmCrop[], farmMinutes: number): void {
     const token = ++view.loadToken;
     const holder = new THREE.Group();
     view.content.add(holder);
-    loader.load(assetUrl(soilFile), (gltf: any) => {
-      if (token !== view.loadToken) return;
-      const soil = fittedModel(gltf.scene, { width: 2.9, depth: 1.9 });
-      holder.add(soil);
-    }, undefined, () => undefined);
-    if (!cropFile) return;
-    loader.load(assetUrl(cropFile), (gltf: any) => {
-      if (token !== view.loadToken) return;
-      const source = fittedModel(gltf.scene, { height: 0.42 + stage * 0.19 });
-      const offsets = [[-0.92, -0.52], [0, -0.52], [0.92, -0.52], [-0.92, 0.52], [0, 0.52], [0.92, 0.52]];
-      offsets.forEach(([x, z], index) => {
-        const plant = index === 0 ? source : source.clone(true);
-        plant.position.x += x;
-        plant.position.z += z;
-        plant.rotation.y = (index % 3 - 1) * 0.18;
+    for (const cell of SOIL_CELL_LAYOUT) {
+      const crop = crops.find((entry) => entry.cellId === cell.id);
+      const status = crop ? cropStatus(crop, farmMinutes) : null;
+      cellTile(holder, cell, crop, Boolean(crop && !status?.thirsty));
+      const definition = crop ? findCrop(crop.cropId) : undefined;
+      if (!crop || !definition || !status) continue;
+      loader.load(assetUrl(definition.models[status.stage]), (gltf: any) => {
+        if (token !== view.loadToken) return;
+        const plant = fittedModel(gltf.scene, { width: 0.68, depth: 0.62, height: 0.48 + status.stage * 0.2 });
+        plant.position.x += cell.x;
+        plant.position.y += 0.11;
+        plant.position.z += cell.z;
+        plant.rotation.y = (SOIL_CELL_LAYOUT.indexOf(cell) % 3 - 1) * 0.08;
         holder.add(plant);
-      });
-    }, undefined, () => undefined);
+      }, undefined, () => undefined);
+    }
   }
 
-  function rebuild(view: PlotView, key: string, wet: boolean, cropFile: string | null, stage: number): void {
+  function rebuild(view: PlotView, key: string, crops: readonly FarmCrop[], farmMinutes: number): void {
     view.loadToken += 1;
     for (const child of [...view.content.children]) disposeObject(child);
     view.key = key;
-    loadContent(view, wet ? "Env_Dirt_Large_Watered_01.glb" : "Env_Dirt_Large_Dry_01.glb", cropFile, stage);
+    loadContent(view, crops, farmMinutes);
   }
 
   return Object.freeze({
@@ -107,16 +122,16 @@ export function createFarmCropsView(THREE: ThreeNamespace, scene: any): FarmCrop
           view = { group, content, key: "", loadToken: 0 };
           plots.set(row.instanceId, view);
         }
-        view.group.position.set(row.x, 0.09, row.z);
+        view.group.position.set(row.x, 0.12, row.z);
         view.group.rotation.y = row.rotationY;
-        const planted = agriculture.crops.find((crop) => crop.plotId === row.instanceId);
-        const status = planted ? cropStatus(planted, farmMinutes) : null;
-        const definition = planted ? findCrop(planted.cropId) : undefined;
-        const stage = status?.stage ?? 0;
-        const wet = Boolean(planted && !status?.thirsty);
-        const cropFile = definition ? definition.models[stage] : null;
-        const key = `${cropFile ?? "empty"}:${stage}:${wet ? "wet" : "dry"}`;
-        if (key !== view.key) rebuild(view, key, wet, cropFile, stage);
+        const planted = agriculture.crops.filter((crop) => crop.plotId === row.instanceId);
+        const key = SOIL_CELL_LAYOUT.map((cell) => {
+          const crop = planted.find((entry) => entry.cellId === cell.id);
+          if (!crop) return "empty";
+          const status = cropStatus(crop, farmMinutes);
+          return `${crop.cropId}:${status.stage}:${status.thirsty ? "dry" : "wet"}`;
+        }).join("|");
+        if (key !== view.key) rebuild(view, key, planted, farmMinutes);
       }
       for (const [id, view] of plots) {
         if (wanted.has(id)) continue;
