@@ -147,6 +147,8 @@ export function findPetInReach<T extends Readonly<{ pose: Readonly<{ x: number; 
  */
 export const PET_INTERACTIONS = Object.freeze([
   Object.freeze({ id: "pet", code: "KeyE", key: "E", label: "Pet", available: "always" }),
+  // G = give food; F remains the farm-wide fullscreen key.
+  Object.freeze({ id: "feed", code: "KeyG", key: "G", label: "Feed", available: "canFeed" }),
   Object.freeze({ id: "pick-up", code: "KeyC", key: "C", label: "Pick up", available: "canPickUp" }),
 ] as const);
 
@@ -158,9 +160,11 @@ export function getPetInteraction(code: string): PetInteraction | null {
 }
 
 /** The complete set of actions this pet offers right now, rendered as one contextual prompt. */
-export function getPetInteractionPrompt(name: string, capabilities: Readonly<{ canPickUp: boolean }>): string {
+export function getPetInteractionPrompt(name: string, capabilities: Readonly<{ canPickUp: boolean; canFeed: boolean }>): string {
   return PET_INTERACTIONS
-    .filter((interaction) => interaction.available === "always" || capabilities.canPickUp)
+    .filter((interaction) => interaction.available === "always"
+      || interaction.available === "canPickUp" && capabilities.canPickUp
+      || interaction.available === "canFeed" && capabilities.canFeed)
     .map((interaction) => `${interaction.key} ${interaction.label}${interaction.id === "pet" ? ` ${name}` : ""}`)
     .join(" · ");
 }

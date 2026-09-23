@@ -15,7 +15,8 @@ export function resumeFarmClock(clock: PersistedFarmClock, now: number): Persist
   const current = Number.isFinite(now) ? Math.max(0, now) : 0;
   const savedMinutes = Number.isFinite(clock.farmMinutes) ? Math.max(0, clock.farmMinutes) : 8 * 60;
   const savedAt = Number.isFinite(clock.updatedAt) ? Math.max(0, clock.updatedAt) : 0;
-  if (savedAt <= 0 || current <= savedAt) return Object.freeze({ farmMinutes: savedMinutes, updatedAt: current });
+  if (savedAt <= 0) return Object.freeze({ farmMinutes: savedMinutes, updatedAt: current });
+  if (current <= savedAt) return Object.freeze({ farmMinutes: savedMinutes, updatedAt: savedAt });
   return Object.freeze({ farmMinutes: savedMinutes + ((current - savedAt) / 1000) * FARM_MINUTES_PER_REAL_SECOND, updatedAt: current });
 }
 

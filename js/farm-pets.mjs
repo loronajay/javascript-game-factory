@@ -132,6 +132,13 @@ export function createPetSim(options) {
             return inWater(x, z, radius) && !blockedByPet(x, z, self, radius);
         return inField(x, z, radius) && !blockedBySolid(x, z, radius) && !blockedByKeepOut(x, z, radius) && !blockedByPet(x, z, self, radius);
     }
+    /** Player placement may deliberately put a ground/air pet inside a building; swimmers still require actual water. */
+    function placeable(x, z, self, species) {
+        const radius = species.radius;
+        if (species.habitat === "water")
+            return inWater(x, z, radius) && !blockedByPet(x, z, self, radius);
+        return inField(x, z, radius) && !blockedBySolid(x, z, radius) && !blockedByPet(x, z, self, radius);
+    }
     function spawnSpot(species) {
         if (species.habitat === "water") {
             const ponds = water();
@@ -309,7 +316,7 @@ export function createPetSim(options) {
             }
             // A pond that moved or went while a swimmer was in it: find the swimmer new water.
             for (const pet of pets) {
-                if (pet.species.habitat !== "water" || inWater(pet.x, pet.z, pet.species.radius))
+                if (pet.state === "carried" || pet.species.habitat !== "water" || inWater(pet.x, pet.z, pet.species.radius))
                     continue;
                 const spot = spawnSpot(pet.species);
                 pet.x = spot.x;
@@ -351,7 +358,7 @@ export function createPetSim(options) {
         },
         pickUp(instanceId) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-            if (!pet || pet.species.habitat === "water" || pet.state === "carried")
+            if (!pet || pet.state === "carried")
                 return false;
             pet.state = "carried";
             pet.moving = false;
@@ -362,22 +369,20 @@ export function createPetSim(options) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
             if (!pet || pet.state !== "carried")
                 return false;
-            if (!inField(spot.x, spot.z, pet.species.radius) || blockedBySolid(spot.x, spot.z, pet.species.radius) || blockedByPet(spot.x, spot.z, pet, pet.species.radius))
+            if (!placeable(spot.x, spot.z, pet, pet.species))
                 return false;
             pet.x = spot.x;
             pet.z = spot.z;
             pet.yaw = spot.yaw;
             pet.targetX = spot.x;
             pet.targetZ = spot.z;
-            pet.hover = pet.species.habitat === "air" ? pet.species.hoverHeight : 0;
+            pet.hover = pet.species.habitat === "ground" ? 0 : pet.species.hoverHeight;
             startIdle(pet);
             return true;
         },
         canStand(speciesId, spot) {
             const species = findAnimal(speciesId);
-            if (!species || species.habitat === "water")
-                return false;
-            return inField(spot.x, spot.z, species.radius) && !blockedBySolid(spot.x, spot.z, species.radius) && !blockedByPet(spot.x, spot.z, null, species.radius);
+            return Boolean(species && placeable(spot.x, spot.z, null, species));
         },
         carried() {
             const pet = pets.find((candidate) => candidate.state === "carried");

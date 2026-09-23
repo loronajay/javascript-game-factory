@@ -21,6 +21,7 @@ import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { createStarterAgriculture, normalizeAgriculture } from "./farm-crops.mjs";
+import { createPetProfile, normalizePetProfile } from "./farm-pet-care.mjs";
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
 export const FARM_LAYOUT_VERSION = 3;
 /** The walkable field. The inset is how far in from the field's edge anything may stand. */
@@ -65,14 +66,16 @@ export const STARTER_FARM_DECOR = Object.freeze([
     row("hay-bale-1", "decor.prop.hay-bale", -1.2, -8.6, 0.4),
     row("hay-bale-2", "decor.prop.hay-bale", 0.9, -8.9, -0.2),
     row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
+    row("soil-1", "decor.plant.soil-patch", 4.5, 6.5),
 ]);
-export function createDefaultFarmLayout() {
+export function createDefaultFarmLayout(random = Math.random) {
     return Object.freeze({
         version: 3,
+        onboarding: Object.freeze({ status: "needs_name", introSeen: false }),
         ground: DEFAULT_GROUND_ID,
         pets: Object.freeze([]),
         decor: STARTER_FARM_DECOR,
-        agriculture: createStarterAgriculture(),
+        agriculture: createStarterAgriculture(random),
         clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0 }),
     });
 }
@@ -81,9 +84,22 @@ function freezeLayout(layout) {
         ...layout,
         pets: Object.freeze(layout.pets.map((pet) => Object.freeze({ ...pet }))),
         decor: Object.freeze(layout.decor.map((item) => Object.freeze({ ...item }))),
+        onboarding: Object.freeze({ ...layout.onboarding }),
         agriculture: layout.agriculture,
         clock: Object.freeze({ ...layout.clock }),
     });
+}
+/** Stable per-row entropy for pre-profile pets: migration must individualize once without rerolling on every load. */
+function legacyPetRandom(identity) {
+    let state = 2166136261;
+    for (let index = 0; index < identity.length; index += 1) {
+        state ^= identity.charCodeAt(index);
+        state = Math.imul(state, 16777619) >>> 0;
+    }
+    return () => {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 0x100000000;
+    };
 }
 function normalizePet(value) {
     if (!value || typeof value !== "object")
@@ -94,7 +110,11 @@ function normalizePet(value) {
         return null;
     if (typeof source.instanceId !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.instanceId))
         return null;
-    return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title };
+    const storedProfile = source.profile;
+    const profile = storedProfile && typeof storedProfile === "object"
+        ? normalizePetProfile(species.id, storedProfile)
+        : createPetProfile(species.id, legacyPetRandom(`${species.id}:${source.instanceId}`));
+    return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile };
 }
 function finiteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
@@ -171,13 +191,35 @@ export function normalizeFarmLayout(value) {
             break;
     }
     const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
-    const agriculture = source.version === 3 ? normalizeAgriculture(source.agriculture, plotIds) : createStarterAgriculture();
+    // Old documents are established farms. Only a document created with the explicit
+    // marker may enter onboarding; absence must never re-grant or force-name a dog.
+    const rawOnboarding = source.onboarding && typeof source.onboarding === "object"
+        ? source.onboarding
+        : null;
+    const onboarding = rawOnboarding?.status === "needs_name"
+        ? { status: "needs_name", introSeen: rawOnboarding.introSeen === true }
+        : { status: "complete", introSeen: true };
+    if (onboarding.status === "needs_name")
+        pets.length = 0;
+    const rawAgriculture = source.agriculture && typeof source.agriculture === "object"
+        ? source.agriculture
+        : null;
+    const rawInventory = rawAgriculture?.inventory && typeof rawAgriculture.inventory === "object"
+        ? rawAgriculture.inventory
+        : null;
+    const seedRows = rawInventory?.seeds && typeof rawInventory.seeds === "object" ? Object.keys(rawInventory.seeds) : [];
+    // The API's no-row document deliberately carries an empty inventory. Turn it
+    // into the randomized starter pool once; the immediate onboarding save then
+    // makes every later normalization use the explicit persisted counts.
+    const agriculture = onboarding.status === "needs_name" && seedRows.length === 0
+        ? createStarterAgriculture()
+        : source.version === 3 ? normalizeAgriculture(source.agriculture, plotIds) : normalizeAgriculture(undefined, plotIds);
     const rawClock = source.clock && typeof source.clock === "object" ? source.clock : {};
     const clock = {
         farmMinutes: finiteNumber(rawClock.farmMinutes) ? Math.max(0, rawClock.farmMinutes) : 8 * 60,
         updatedAt: finiteNumber(rawClock.updatedAt) ? Math.max(0, rawClock.updatedAt) : 0,
     };
-    return freezeLayout({ version: 3, ground: normalizeGroundId(source.ground), pets, decor, agriculture, clock });
+    return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, decor, agriculture, clock });
 }
 export function parseFarmLayout(serialized) {
     if (!serialized)
@@ -200,7 +242,7 @@ export function nextPetInstanceId(layout, speciesId) {
     }
     return `${stem}-${highest + 1}`;
 }
-export function addPet(layout, speciesId, name) {
+export function addPet(layout, speciesId, name, random = Math.random) {
     const species = findAnimal(speciesId);
     if (!species)
         return { valid: false, layout, instanceId: "", reason: "unknown_species" };
@@ -209,7 +251,7 @@ export function addPet(layout, speciesId, name) {
     if (layout.pets.length >= MAX_PETS)
         return { valid: false, layout, instanceId: "", reason: "full" };
     const instanceId = nextPetInstanceId(layout, species.id);
-    const pet = { instanceId, speciesId: species.id, name: cleanPetName(name) || species.title };
+    const pet = { instanceId, speciesId: species.id, name: cleanPetName(name) || species.title, profile: createPetProfile(species.id, random) };
     return { valid: true, layout: freezeLayout({ ...layout, pets: [...layout.pets, pet] }), instanceId, reason: "" };
 }
 export function renamePet(layout, instanceId, name) {
@@ -243,6 +285,10 @@ export function withFarmDecor(layout, decor) {
 export function withFarmAgriculture(layout, agriculture) {
     return freezeLayout({ ...layout, agriculture });
 }
+/** Replace pet rows after a pure care/lifecycle pass while preserving the layout's immutable document contract. */
+export function withFarmPets(layout, pets) {
+    return freezeLayout({ ...layout, pets: [...pets] });
+}
 export function withFarmClock(layout, farmMinutes, updatedAt) {
     return freezeLayout({ ...layout, clock: { farmMinutes: Math.max(0, farmMinutes), updatedAt: Math.max(0, updatedAt) } });
 }
@@ -251,14 +297,17 @@ export function farmDecorRowsEqual(first, second) {
         && first.x === second.x && first.z === second.z && first.rotationY === second.rotationY && first.length === second.length;
 }
 export function farmLayoutsEqual(first, second) {
-    return first.ground === second.ground
+    return first.onboarding.status === second.onboarding.status
+        && first.onboarding.introSeen === second.onboarding.introSeen
+        && first.ground === second.ground
         && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
         && first.clock.farmMinutes === second.clock.farmMinutes
         && first.clock.updatedAt === second.clock.updatedAt
         && first.pets.length === second.pets.length
         && first.pets.every((pet, index) => {
             const other = second.pets[index];
-            return pet.instanceId === other.instanceId && pet.speciesId === other.speciesId && pet.name === other.name;
+            return pet.instanceId === other.instanceId && pet.speciesId === other.speciesId && pet.name === other.name
+                && JSON.stringify(pet.profile) === JSON.stringify(other.profile);
         })
         && first.decor.length === second.decor.length
         && first.decor.every((item, index) => farmDecorRowsEqual(item, second.decor[index]));

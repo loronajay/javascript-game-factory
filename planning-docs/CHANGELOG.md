@@ -1,5 +1,21 @@
 # Changelog
 
+## The Farm: Feeding and the Shared Farm Clock (2026-09-23)
+
+**Pet care now moves with the farm instead of the frame loop.** Every profile checkpoints hunger and its zero-hunger grace against the existing persisted farm-minute clock, so normal play, naps, leaving, and returning all advance the same timeline while clock rollback cannot replay elapsed time. Hunger drains 25 points per farm day before data-driven Big Appetite (1.5×) and Light Eater (0.65×) modifiers; time below 40 lowers hidden affection, and a full farm day at zero records that starvation death is due for the later atomic death/tombstone transition.
+
+**G gives one matching species serving.** Feeding first checkpoints elapsed needs, consumes exactly one food only when the pet is below 100, restores 35 hunger up to the cap, and clears the starvation timer. Full pets and missing-food attempts consume nothing. The world prompt and Pets panel now show Full, Content, Hungry, or Starving without revealing affection, and the plan records that pets share farm time, away notifications are unnecessary, runaways are permanent, tombstone deletion is permanent, and gender remains female/male. Focused browser and API tests cover elapsed time, trait rates, threshold crossings, rollback, caps, repeated feeds, missing food, and trust-boundary persistence.
+
+## The Farm: Every Pet Is an Individual (2026-09-23)
+
+**The corgi no longer owns the pet system.** All ten species now receive the same complete persisted profile at adoption—gender, age, individual current/adult size and growth, hidden affection, hunger, happiness, speed, strength, 1–3 compatible traits, and palette identity. Species rows weight speed and strength so a rhino is meaningfully stronger than a duck and a bat skews faster than a hippo, without removing individual variation. Old profile-less pets migrate through stable species-and-instance-id entropy, so they gain the same individuality and traits once without rerolling on reload. Each species also has its own named food, provisional exotic-weighted price, maximum life, and data-only dwelling; the inventory preserves and shows every food stack while only the starter dog begins with 20 servings.
+
+**Swimmers can come up for a cuddle.** Sharks, anglerfish, and jellyfish now use the same C pick-up path as every other pet, can ride safely outside their pond while carried, and can only be put down where their whole radius fits inside a water region. Ground/air placement inside buildings remains intact. All 122 farm tests, focused API trust-boundary tests, both strict TypeScript checks, and browser/API generated-file verification are green.
+
+## The Farm: First-Farm Dog Onboarding (2026-09-23)
+
+**A new farm now begins with a relationship, not an empty catalog.** A persisted onboarding marker distinguishes a genuinely new farm from every legacy or deliberately empty farm. Owners see the introduction once, must give their starter corgi a valid name, and cannot enter normal play until the dog and the whole starter document save together; visitors never see or mutate that owner-only gate. New farms receive exactly one growing plot, 20 Dog Food, and one seed from six randomly selected unique crop types. The first write pins that random pool, while normalization preserves spent supplies, released pets, cleared layouts, and old test farms without re-granting anything. The API trust boundary carries the onboarding marker and identifies a missing database row as new. Focused cache/account/visitor coverage plus the complete 120-test farm suite are green.
+
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
 ## The Farm: Nothing Stands in a Doorway (2026-09-21)

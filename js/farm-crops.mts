@@ -1,6 +1,8 @@
 // Persistent crop rules. This is deliberately independent of THREE and the DOM:
 // the page, server normalizer and headless tests all use the same farming contract.
 
+import { PET_CARE } from "./farm-pet-care.mjs";
+
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
 export const CARE_GATE = 0.5;
@@ -31,6 +33,8 @@ export const CROP_CATALOG: readonly CropDefinition[] = Object.freeze([
 export type FarmInventory = Readonly<{
   seeds: Readonly<Record<string, number>>;
   produce: Readonly<Record<string, number>>;
+  /** Stackable non-crop items. Food starts here; toys remain placed/owned items later. */
+  supplies: Readonly<Record<string, number>>;
 }>;
 
 export type FarmCrop = Readonly<{
@@ -94,13 +98,18 @@ export function findSoilCellInReach<T extends SoilPlotRow>(decor: readonly T[], 
 const count = (value: unknown): number => typeof value === "number" && Number.isFinite(value) ? Math.min(MAX_STACK, Math.max(0, Math.floor(value))) : 0;
 const finite = (value: unknown, fallback = 0): number => typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
-function inventoryWith(defaultSeeds: number, source?: unknown): FarmInventory {
-  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown } : {};
+function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, source?: unknown): FarmInventory {
+  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown } : {};
   const seeds = input.seeds && typeof input.seeds === "object" ? input.seeds as Record<string, unknown> : {};
   const produce = input.produce && typeof input.produce === "object" ? input.produce as Record<string, unknown> : {};
+  const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies as Record<string, unknown> : {};
   return Object.freeze({
-    seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : defaultSeeds]))),
+    seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? defaultSeeds : count(defaultSeeds[entry.id])]))),
     produce: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, count(produce[entry.id])]))),
+    supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
+      care.food.itemId,
+      care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
+    ]))),
   });
 }
 
@@ -108,8 +117,17 @@ function freezeAgriculture(value: { inventory: FarmInventory; crops: readonly Fa
   return Object.freeze({ inventory: value.inventory, crops: Object.freeze(value.crops.map((entry) => Object.freeze({ ...entry }))) });
 }
 
-export function createStarterAgriculture(): FarmAgriculture {
-  return freezeAgriculture({ inventory: inventoryWith(5), crops: [] });
+export function createStarterAgriculture(random: () => number = Math.random): FarmAgriculture {
+  const available = CROP_CATALOG.map((entry) => entry.id);
+  const selected = new Set<string>();
+  const targetCount = Math.min(6, available.length);
+  while (selected.size < targetCount) {
+    const sampled = random();
+    const roll = Number.isFinite(sampled) ? Math.max(0, Math.min(0.999999999, sampled)) : 0;
+    selected.add(available.splice(Math.floor(roll * available.length), 1)[0]);
+  }
+  const seeds = Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, selected.has(entry.id) ? 1 : 0]));
+  return freezeAgriculture({ inventory: inventoryWith(seeds), crops: [] });
 }
 
 export function normalizeAgriculture(value: unknown, validPlotIds: ReadonlySet<string>): FarmAgriculture {

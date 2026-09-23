@@ -133,6 +133,8 @@ export function findPetInReach(pets, player, reach = 2.2) {
  */
 export const PET_INTERACTIONS = Object.freeze([
     Object.freeze({ id: "pet", code: "KeyE", key: "E", label: "Pet", available: "always" }),
+    // G = give food; F remains the farm-wide fullscreen key.
+    Object.freeze({ id: "feed", code: "KeyG", key: "G", label: "Feed", available: "canFeed" }),
     Object.freeze({ id: "pick-up", code: "KeyC", key: "C", label: "Pick up", available: "canPickUp" }),
 ]);
 export function getPetInteraction(code) {
@@ -141,7 +143,9 @@ export function getPetInteraction(code) {
 /** The complete set of actions this pet offers right now, rendered as one contextual prompt. */
 export function getPetInteractionPrompt(name, capabilities) {
     return PET_INTERACTIONS
-        .filter((interaction) => interaction.available === "always" || capabilities.canPickUp)
+        .filter((interaction) => interaction.available === "always"
+        || interaction.available === "canPickUp" && capabilities.canPickUp
+        || interaction.available === "canFeed" && capabilities.canFeed)
         .map((interaction) => `${interaction.key} ${interaction.label}${interaction.id === "pet" ? ` ${name}` : ""}`)
         .join(" · ");
 }

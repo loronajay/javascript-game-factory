@@ -1,4 +1,5 @@
 import { CROP_CATALOG } from "./farm-crops.mjs";
+import { PET_CARE } from "./farm-pet-care.mjs";
 export function createFarmInventoryPanel(elements) {
     let agriculture;
     let selectedCropId = CROP_CATALOG[0].id;
@@ -36,6 +37,12 @@ export function createFarmInventoryPanel(elements) {
             item.className = "produce-row";
             item.innerHTML = `<span>${crop.title}</span><strong>${agriculture.inventory.produce[crop.id] ?? 0}</strong>`;
             return item;
+        }));
+        elements.suppliesGrid.replaceChildren(...PET_CARE.map((care) => {
+            const food = document.createElement("div");
+            food.className = "produce-row";
+            food.innerHTML = `<span>${care.food.title}</span><strong>${agriculture.inventory.supplies[care.food.itemId] ?? 0}</strong>`;
+            return food;
         }));
         const selected = CROP_CATALOG.find((entry) => entry.id === selectedCropId);
         elements.selected.textContent = `${selected.title} seeds × ${agriculture.inventory.seeds[selected.id] ?? 0}`;

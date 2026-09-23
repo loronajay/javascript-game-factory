@@ -10,16 +10,17 @@ const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
 const source = readFileSync(resolve(repoRoot, "js", "farm.mts"), "utf8");
 const worldSource = readFileSync(resolve(repoRoot, "js", "farm-world.mts"), "utf8");
 
-test("pet and carry remain separate registered interactions", () => {
-  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["pick-up", "KeyC"]]);
+test("pet, feed and carry remain separate registered interactions", () => {
+  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["feed", "KeyG"], ["pick-up", "KeyC"]]);
   assert.equal(getPetInteraction("KeyE")?.id, "pet");
+  assert.equal(getPetInteraction("KeyG")?.id, "feed");
   assert.equal(getPetInteraction("KeyC")?.id, "pick-up");
-  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true }), "E Pet Biscuit · C Pick up");
-  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: false }), "E Pet Bubbles", "uncarryable pets still offer petting");
+  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true, canFeed: true }), "E Pet Biscuit · G Feed · C Pick up");
+  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: true, canFeed: false }), "E Pet Bubbles · C Pick up", "aquatic pets can be carried too");
 });
 
 test("the farm page ships the shell the composition root requires", () => {
-  for (const id of ["farmCanvas", "farmPrompt", "startGate", "enterFarm", "farmStatus", "fullscreenFarm", "farmTitle", "farmEyebrow", "startTag", "startHeading", "startCopy", "farmOwnerLink", "openPets", "petsPanel", "closePets", "petList", "speciesGrid", "petName", "petsStatus", "petsCount"]) {
+  for (const id of ["farmCanvas", "farmPrompt", "startGate", "enterFarm", "farmStatus", "fullscreenFarm", "farmTitle", "farmEyebrow", "startTag", "startHeading", "startCopy", "starterDogForm", "starterDogName", "nameStarterDog", "onboardingStatus", "farmOwnerLink", "openPets", "petsPanel", "closePets", "petList", "speciesGrid", "petName", "petsStatus", "petsCount", "suppliesGrid"]) {
     assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
     assert.match(source, new RegExp(`#${id}"`), `farm.mts reads #${id}`);
   }
@@ -110,10 +111,12 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
   assert.match(source, /if \(!farmEntered \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
-  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp \}\)/);
+  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed \}\)/);
+  assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
   assert.match(source, /function interactWithPet\(action: PetInteractionId\)/);
   assert.match(source, /if \(action === "pet"\) \{\s*petBodies\.showHeart\(nearbyPet\.instanceId\);\s*petSim\.attention\(nearbyPet\.instanceId\)/, "petting owns the heart and attention response");
-  assert.match(source, /getPetInteraction\(event\.code\)/, "keyboard dispatch comes from the pet interaction registry so Feed can be added later");
+  assert.match(source, /getPetInteraction\(event\.code\)/, "keyboard dispatch comes from the pet interaction registry");
+  assert.match(source, /feedPet\(layout, nearbyPet\.instanceId, clockMinutes\)/, "feeding advances and persists through the pure needs action");
   assert.match(source, /petSim\.pickUp\(nearbyPet\.instanceId\)/);
   assert.doesNotMatch(source, /petBodies\.showHeart\(held\.instanceId\)/, "putting a pet down is not secretly the pet interaction");
   assert.match(source, /petSim\.putDown\(held\.instanceId, spot\)/);
@@ -124,6 +127,19 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   // Every layout change goes through one path that applies, syncs and saves.
   assert.match(source, /async function persistLayout/);
   assert.match(source, /applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\.";\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
+});
+
+test("first-farm onboarding blocks entry until the required named dog is saved", () => {
+  assert.match(source, /const showFarmIntro = canManageFarm && layout\.onboarding\.status === "needs_name" && !layout\.onboarding\.introSeen/);
+  assert.match(source, /markFarmIntroSeen\(layout\)/);
+  assert.match(source, /starterDogForm\.hidden = !onboardingRequired/);
+  assert.match(source, /enterButton\.hidden = onboardingRequired/);
+  assert.match(source, /completeFarmOnboarding\(layout, starterDogName\.value\)/);
+  assert.match(source, /await onboardingInitialization/, "the intro/grant checkpoint cannot race and overwrite dog completion");
+  assert.match(source, /await layoutStore\.save\(completed\.layout\)/, "the dog and starter grants are one persisted document");
+  assert.match(source, /if \(!saved\.ok\) \{/);
+  assert.match(source, /applyLayout\(completed\.layout\)/);
+  assert.match(source, /if \(canManageFarm && layout\.onboarding\.status !== "complete"\) return;/, "owner play cannot start early while visitors never receive the gate");
 });
 
 test("every building's door is worked with E, at its own reach, and the door is solid only while shut", () => {

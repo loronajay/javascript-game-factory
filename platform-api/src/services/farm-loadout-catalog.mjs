@@ -17,11 +17,11 @@
 // server has never heard of but that fits the pattern is stored; the client's
 // normalizer drops it. That keeps a new animal a client-only change.
 //
-// PETS ARE NOT PLACED. A pet row is an id, a species and a name — no
-// coordinates — because the client's sim gives every pet a spot when the farm
-// loads and it wanders from there. If a later slice pins pets (a doghouse), the
-// position joins the row here with the same bounded-number treatment `decor`
-// already gets.
+// PETS ARE NOT PLACED. A pet row has identity plus an optional bounded care
+// profile — no coordinates — because the client's sim gives every pet a spot
+// when the farm loads and it wanders from there. If a later slice pins pets (a
+// doghouse), the position joins the row here with the same bounded-number
+// treatment `decor` already gets.
 //
 // `decor` IS THE FIELD. Version 2 (build mode) places fences, buildings,
 // plants, ponds and props as rows bounded like the room's, and the key is
@@ -48,6 +48,8 @@ const SPECIES_ID_PATTERN = /^pet\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DECOR_ID_PATTERN = /^decor\.[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
 const CROP_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ITEM_ID_PATTERN = /^(?:food|toy)\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const TRAIT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+$/;
 function cleanText(value, maxLength) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -72,13 +74,23 @@ function normalizeRotation(value) {
 }
 export function defaultFarmGarage() {
     // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-    return { version: LAYOUT_VERSION, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {} }, crops: [] }, clock: { farmMinutes: 480, updatedAt: 0 } };
+    return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {} }, crops: [] }, clock: { farmMinutes: 480, updatedAt: 0 } };
 }
 function normalizeCropCounts(value) {
     const input = value && typeof value === "object" ? value : {};
     const output = {};
     for (const [id, raw] of Object.entries(input).slice(0, 64)) {
         if (!CROP_ID_PATTERN.test(id) || typeof raw !== "number" || !Number.isFinite(raw))
+            continue;
+        output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
+    }
+    return output;
+}
+function normalizeSupplyCounts(value) {
+    const input = value && typeof value === "object" ? value : {};
+    const output = {};
+    for (const [id, raw] of Object.entries(input).slice(0, 64)) {
+        if (!ITEM_ID_PATTERN.test(id) || typeof raw !== "number" || !Number.isFinite(raw))
             continue;
         output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
     }
@@ -105,7 +117,34 @@ function normalizeAgriculture(value, decorIds) {
             lastFarmMinute: Math.max(0, boundedNumber(row.lastFarmMinute, 1000000000) ?? 0),
         });
     }
-    return { inventory: { seeds: normalizeCropCounts(inventory.seeds), produce: normalizeCropCounts(inventory.produce) }, crops };
+    return { inventory: { seeds: normalizeCropCounts(inventory.seeds), produce: normalizeCropCounts(inventory.produce), supplies: normalizeSupplyCounts(inventory.supplies) }, crops };
+}
+function normalizePetProfile(value) {
+    if (!value || typeof value !== "object")
+        return null;
+    const size = value.size && typeof value.size === "object" ? value.size : {};
+    const stats = value.stats && typeof value.stats === "object" ? value.stats : {};
+    const profile = {
+        gender: value.gender === "male" ? "male" : "female",
+        // Species tuning currently reaches 150 days; this is a trust bound, not a shared lifespan rule.
+        ageDays: Math.floor(Math.max(0, boundedNumber(value.ageDays, 200) ?? 0)),
+        affection: Math.max(0, boundedNumber(value.affection, 100) ?? 50),
+        hunger: Math.max(0, boundedNumber(value.hunger, 100) ?? 100),
+        starvingMinutes: Math.floor(Math.max(0, boundedNumber(value.starvingMinutes, 52560000) ?? 0)),
+        happiness: Math.max(0, boundedNumber(value.happiness, 100) ?? 100),
+        size: {
+            current: Math.max(0, boundedNumber(size.current, 5) ?? 1),
+            max: Math.max(0, boundedNumber(size.max, 5) ?? 1),
+            growthPerDay: Math.max(0, boundedNumber(size.growthPerDay, 1) ?? 0),
+        },
+        stats: {
+            speed: Math.max(0, boundedNumber(stats.speed, 100) ?? 50),
+            strength: Math.max(0, boundedNumber(stats.strength, 100) ?? 50),
+        },
+        traits: Array.from(new Set((Array.isArray(value.traits) ? value.traits : []).filter((id) => typeof id === "string" && TRAIT_ID_PATTERN.test(id)).slice(0, 5))),
+        paletteId: cleanText(value.paletteId, 40) || "standard",
+    };
+    return profile;
 }
 function normalizePetRow(raw) {
     const source = raw && typeof raw === "object" ? raw : {};
@@ -113,7 +152,11 @@ function normalizePetRow(raw) {
     const speciesId = cleanText(source.speciesId, 80);
     if (!INSTANCE_ID_PATTERN.test(instanceId) || !SPECIES_ID_PATTERN.test(speciesId))
         return null;
-    return { instanceId, speciesId, name: cleanName(source.name, NAME_LIMIT) };
+    const row = { instanceId, speciesId, name: cleanName(source.name, NAME_LIMIT) };
+    const profile = normalizePetProfile(source.profile);
+    if (profile)
+        row.profile = profile;
+    return row;
 }
 /** A placed item: the room's decor row shape, bounded the same way. Optional finish fields pass through when well-formed. */
 function normalizeDecorRow(raw) {
@@ -140,6 +183,7 @@ function normalizeDecorRow(raw) {
     return row;
 }
 export function normalizeFarmGarage(value) {
+    const missingDocument = !value || typeof value !== "object";
     const input = value && typeof value === "object" ? value : {};
     const seen = new Set();
     const pets = [];
@@ -158,6 +202,16 @@ export function normalizeFarmGarage(value) {
         ground: GROUND_ID_PATTERN.test(submittedGround) ? submittedGround : "",
         pets,
     };
+    const onboarding = input.onboarding && typeof input.onboarding === "object" ? input.onboarding : null;
+    if (onboarding?.status === "needs_name") {
+        garage.onboarding = { status: "needs_name", introSeen: onboarding.introSeen === true };
+    }
+    else if (onboarding?.status === "complete") {
+        garage.onboarding = { status: "complete", introSeen: true };
+    }
+    else if (missingDocument) {
+        garage.onboarding = { status: "needs_name", introSeen: false };
+    }
     if (Array.isArray(input.decor)) {
         const decor = [];
         for (const raw of input.decor.slice(0, MAX_DECOR)) {

@@ -18,6 +18,7 @@ import {
   tendFarmCrop,
   waterFarmCrop,
 } from "../farm-crops.mjs";
+import { PET_CARE } from "../farm-pet-care.mjs";
 
 const carrot = CROP_CATALOG.find((crop) => crop.id === "carrot");
 const cropAssets = resolve(import.meta.dirname, "..", "..", "farm", "assets", "crops");
@@ -28,19 +29,35 @@ function glbJson(file) {
   return JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").replace(/\0+$/, ""));
 }
 
-test("the farming catalog exposes every Grimnir growth-cycle crop and starts testing with five seeds each", () => {
+test("the farming catalog exposes every Grimnir growth-cycle crop and the inventory includes pet-food supplies", () => {
   assert.deepEqual(CROP_CATALOG.map((crop) => crop.id), [
     "bean", "beetroot", "cabbage", "carrot", "cauliflower", "garlic", "potato", "radish",
   ]);
   assert.ok(carrot);
-  const agriculture = createStarterAgriculture();
+  const agriculture = createStarterAgriculture(() => 0);
+  assert.equal(agriculture.inventory.supplies["food.dog-food"], 20);
+  assert.deepEqual(Object.keys(agriculture.inventory.supplies), PET_CARE.map((care) => care.food.itemId));
+  for (const care of PET_CARE.filter((row) => row.speciesId !== "pet.corgi")) assert.equal(agriculture.inventory.supplies[care.food.itemId], 0);
+  assert.equal(Object.values(agriculture.inventory.seeds).filter((count) => count === 1).length, 6);
+  assert.equal(Object.values(agriculture.inventory.seeds).filter((count) => count === 0).length, 2);
   for (const crop of CROP_CATALOG) {
-    assert.equal(agriculture.inventory.seeds[crop.id], 5, crop.id);
+    assert.ok([0, 1].includes(agriculture.inventory.seeds[crop.id]), crop.id);
     assert.equal(agriculture.inventory.produce[crop.id], 0, crop.id);
     assert.equal(crop.models.length, 4);
     assert.ok(crop.models.every((file) => file.endsWith(".glb")));
     assert.ok(crop.growMinutes >= 2 * 1440 && crop.growMinutes <= 4 * 1440);
   }
+});
+
+test("starter seeds choose six unique crops under injected randomness", () => {
+  const low = createStarterAgriculture(() => 0).inventory.seeds;
+  const high = createStarterAgriculture(() => 0.999).inventory.seeds;
+  assert.deepEqual(Object.entries(low).filter(([, count]) => count === 1).map(([id]) => id), [
+    "bean", "beetroot", "cabbage", "carrot", "cauliflower", "garlic",
+  ]);
+  assert.deepEqual(Object.entries(high).filter(([, count]) => count === 1).map(([id]) => id), [
+    "cabbage", "carrot", "cauliflower", "garlic", "potato", "radish",
+  ]);
 });
 
 test("Grimnir GLBs use the shared color texture instead of their embedded white placeholder", () => {
@@ -76,7 +93,7 @@ test("a growing plot exposes six evenly spaced cells and reach selects the cell 
 });
 
 test("one seed creates one plant and all six cells in the same plot can be planted independently", () => {
-  const starter = createStarterAgriculture();
+  const starter = normalizeAgriculture({ inventory: { seeds: { carrot: 5, radish: 5 } } }, new Set(["soil-1"]));
   const planted = plantFarmCrop(starter, "soil-1", "cell-0", "carrot", 480);
   assert.equal(planted.ok, true);
   assert.equal(planted.agriculture.inventory.seeds.carrot, 4);
@@ -105,7 +122,7 @@ test("one seed creates one plant and all six cells in the same plot can be plant
 });
 
 test("growth only advances while moisture remains and watering lasts less than a full farm day", () => {
-  const planted = plantFarmCrop(createStarterAgriculture(), "soil-1", "cell-0", "carrot", 0).agriculture;
+  const planted = plantFarmCrop(createStarterAgriculture(() => 0), "soil-1", "cell-0", "carrot", 0).agriculture;
   const watered = waterFarmCrop(planted, "soil-1", "cell-0", 0);
   assert.equal(watered.ok, true);
   assert.equal(watered.agriculture.crops[0].moistureMinutes, MOISTURE_CAPACITY_MINUTES);
@@ -116,7 +133,7 @@ test("growth only advances while moisture remains and watering lasts less than a
 });
 
 test("a crop stops at the care gate until tended, then can mature and be harvested into inventory", () => {
-  let agriculture = plantFarmCrop(createStarterAgriculture(), "soil-1", "cell-0", "carrot", 0).agriculture;
+  let agriculture = plantFarmCrop(createStarterAgriculture(() => 0), "soil-1", "cell-0", "carrot", 0).agriculture;
   agriculture = waterFarmCrop(agriculture, "soil-1", "cell-0", 0).agriculture;
   let now = MOISTURE_CAPACITY_MINUTES;
   agriculture = advanceAgriculture(agriculture, now);
@@ -146,7 +163,7 @@ test("a crop stops at the care gate until tended, then can mature and be harvest
 
 test("stored agriculture is bounded and unknown crop or orphan plot rows are discarded", () => {
   const normalized = normalizeAgriculture({
-    inventory: { seeds: { carrot: 999, missing: 5 }, produce: { carrot: -4 } },
+    inventory: { seeds: { carrot: 999, missing: 5 }, produce: { carrot: -4 }, supplies: { "food.shark-feed": 7, "food.unknown": 9 } },
     crops: [
       { plotId: "soil-1", cropId: "carrot", growthMinutes: 999999, moistureMinutes: 999999, tended: true, lastFarmMinute: 50 },
       { plotId: "gone", cropId: "carrot", growthMinutes: 1, moistureMinutes: 1, tended: false, lastFarmMinute: 1 },
@@ -155,6 +172,8 @@ test("stored agriculture is bounded and unknown crop or orphan plot rows are dis
   }, new Set(["soil-1", "soil-2"]));
   assert.equal(normalized.inventory.seeds.carrot, 99);
   assert.equal(normalized.inventory.produce.carrot, 0);
+  assert.equal(normalized.inventory.supplies["food.shark-feed"], 7);
+  assert.equal(normalized.inventory.supplies["food.unknown"], undefined);
   assert.equal(normalized.crops.length, 1);
   assert.equal(normalized.crops[0].growthMinutes, carrot.growMinutes);
   assert.equal(normalized.crops[0].moistureMinutes, MOISTURE_CAPACITY_MINUTES);

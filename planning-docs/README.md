@@ -20,6 +20,7 @@ After a context clear, read in this order:
 - `badge-plans/javascript_game_factory_canon_badge_batch_1_scope.md` - future badge pass reference. Note this covers **platform profile badges**, which are still unwired placeholders; Tactical Arena's in-game badge system is separate and shipped (`games/tactical-arena/SOCIAL_FEATURES_PLAN.md`).
 - `profile-editor-plans/04_PANEL_APPEARANCE_EDITOR_SCOPE.md` - active scope for deeper live-preview panel appearance editing, starting with the hero card
 - `GAME_SDK_PLAN.md` - proposed shared cabinet SDK; not started
+- `FARM_PETS_AND_CARE_PLAN.md` - active, checkable source of truth for the farm's pet onboarding, per-pet stats/traits, care, food inventory, lifespan/death, and later species work
 
 ## Historical Or Mostly Implemented Docs
 

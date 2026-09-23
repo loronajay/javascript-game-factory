@@ -31,6 +31,9 @@ import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmT
 import { SOIL_CELL_LAYOUT, advanceAgriculture, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop } from "./farm-crops.mjs";
 import { createFarmCropsView } from "./farm-crops-view.mjs";
 import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
+import { completeFarmOnboarding, markFarmIntroSeen } from "./farm-onboarding.mjs";
+import { advancePetNeeds, advancePetProfile, feedPet, petNeedStatus } from "./farm-pet-needs.mjs";
+import { findPetCare } from "./farm-pet-care.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -61,6 +64,10 @@ const farmClockPhase = requiredElement("#farmClockPhase");
 const napDialog = requiredElement("#napDialog");
 const napStatus = requiredElement("#napStatus");
 const openInventoryButton = requiredElement("#openInventory");
+const starterDogForm = requiredElement("#starterDogForm");
+const starterDogName = requiredElement("#starterDogName");
+const nameStarterDog = requiredElement("#nameStarterDog");
+const onboardingStatus = requiredElement("#onboardingStatus");
 const farmMusic = createFarmMusic();
 function renderMusicButton() {
     const muted = farmMusic.isMuted();
@@ -94,8 +101,17 @@ const canManageFarm = !visiting;
 // copy or starter layout. Signed-out owners, however, save normally on-device.
 const canPersistFarm = canManageFarm && (!layoutStore.ownerPlayerId || (layoutStore.accountBacked && loaded.source === "account"));
 let layout = loaded.layout;
+const showFarmIntro = canManageFarm && layout.onboarding.status === "needs_name" && !layout.onboarding.introSeen;
+let onboardingInitialization = null;
 const resumedClock = resumeFarmClock(layout.clock, Date.now());
-layout = withFarmClock(layout, resumedClock.farmMinutes, resumedClock.updatedAt);
+layout = withFarmClock(advancePetNeeds(layout, resumedClock.farmMinutes), resumedClock.farmMinutes, resumedClock.updatedAt);
+if (showFarmIntro) {
+    layout = markFarmIntroSeen(layout);
+    // This first write pins the random seed pool before a reload can make a new one.
+    // Account fallback sessions are intentionally read-only, as with every farm write.
+    if (canPersistFarm)
+        onboardingInitialization = layoutStore.save(layout);
+}
 function applyFarmIdentity() {
     document.body.classList.toggle("is-visiting", visiting);
     if (visiting) {
@@ -127,6 +143,23 @@ function applyFarmIdentity() {
     }
 }
 applyFarmIdentity();
+function renderOnboardingGate() {
+    const onboardingRequired = canManageFarm && layout.onboarding.status === "needs_name";
+    starterDogForm.hidden = !onboardingRequired;
+    enterButton.hidden = onboardingRequired;
+    if (!onboardingRequired)
+        return;
+    startTag.textContent = showFarmIntro ? "WELCOME TO YOUR FARM" : "YOUR FIRST FARM FRIEND";
+    startHeading.textContent = showFarmIntro ? "A field, a future, and a dog." : "Name your dog to continue.";
+    startCopy.textContent = showFarmIntro
+        ? "Your new farm includes one growing plot, six kinds of seed, 20 servings of Dog Food, and a dog of your own. Give your dog a name before you step onto the field."
+        : "Your starter supplies are safe. Give your dog a name before normal farm play begins.";
+    if (!canPersistFarm) {
+        nameStarterDog.disabled = true;
+        onboardingStatus.textContent = "Saving is unavailable right now. Reload when the farm database is back.";
+    }
+}
+renderOnboardingGate();
 let renderer;
 try {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
@@ -153,6 +186,7 @@ const previewMinute = new URLSearchParams(location.search).get("time");
 let clockMinutes = previewMinute === null ? resumedClock.farmMinutes : advanceFarmTime(Number(previewMinute), 0, 0);
 let napRemainingMinutes = 0;
 let renderedQuarter = -1;
+let liveNeedsCheckpoint = null;
 world.setTime(clockMinutes);
 const cropsView = createFarmCropsView(THREE, scene);
 cropsView.sync(layout, layout.agriculture, clockMinutes);
@@ -174,6 +208,7 @@ let seatInReach = null;
 let bedInReach = null;
 let soilInReach = null;
 let nearbyPetCanPickUp = false;
+let nearbyPetCanFeed = false;
 const keys = new Set();
 let farmEntered = false;
 let draggingLook = false;
@@ -212,6 +247,7 @@ function renderFarmClock() {
     farmClock.textContent = formatFarmTime(clockMinutes);
     farmClockPhase.textContent = farmLightProfile(clockMinutes).phase;
     cropsView.sync(layout, layout.agriculture, clockMinutes);
+    liveNeedsCheckpoint?.();
 }
 function finishNap() {
     napRemainingMinutes = 0;
@@ -265,8 +301,16 @@ function updateInteraction() {
     seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach ? findSeatInReach(seats, pose) : null;
     nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
     const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
-    const canPickUp = Boolean(nearbyPetState && findAnimal(nearbyPetState.speciesId)?.habitat !== "water");
+    const nearbyPetRow = nearbyPet ? layout.pets.find((pet) => pet.instanceId === nearbyPet.instanceId) : null;
+    const nearbyPetProfile = nearbyPetRow?.profile
+        ? advancePetProfile(nearbyPetRow.profile, nearbyPetRow.speciesId, clockMinutes - layout.clock.farmMinutes)
+        : null;
+    const nearbyPetCare = nearbyPetRow ? findPetCare(nearbyPetRow.speciesId) : null;
+    const canPickUp = Boolean(nearbyPetState);
+    const canFeed = Boolean(canManageFarm && nearbyPetProfile && nearbyPetProfile.hunger < 100 && nearbyPetCare
+        && (layout.agriculture.inventory.supplies[nearbyPetCare.food.itemId] ?? 0) > 0);
     nearbyPetCanPickUp = canPickUp;
+    nearbyPetCanFeed = canFeed;
     const held = carrying ? petSim.find(carrying) : null;
     putDownAt = held && body.y < 0.3 ? findPutDownSpot(pose, findAnimal(held.speciesId)?.radius ?? 0.5, (spot) => petSim.canStand(held.speciesId, spot)) : null;
     const putDownFits = putDownAt !== null;
@@ -330,7 +374,9 @@ function updateInteraction() {
         return;
     }
     if (nearbyPet) {
-        setPrompt(getPetInteractionPrompt(nearbyPet.name, { canPickUp }));
+        const needs = nearbyPetProfile ? petNeedStatus(nearbyPetProfile) : null;
+        const feedback = needs && nearbyPetProfile ? `${needs.label} · hunger ${Math.round(nearbyPetProfile.hunger)}% · ` : "";
+        setPrompt(feedback + getPetInteractionPrompt(nearbyPet.name, { canPickUp, canFeed }));
         return;
     }
     setPrompt("");
@@ -409,7 +455,7 @@ function workSoilPlot() {
         return;
     void persistLayout(withFarmClock(withFarmAgriculture(layout, action.agriculture), clockMinutes, Date.now()));
 }
-/** Run one available pet action. Feed will enter through this same dispatcher when it is added. */
+/** Run one available pet action through the shared registry. */
 function interactWithPet(action) {
     if (!nearbyPet)
         return false;
@@ -418,12 +464,27 @@ function interactWithPet(action) {
         petSim.attention(nearbyPet.instanceId);
         return true;
     }
+    if (action === "feed") {
+        if (!nearbyPetCanFeed)
+            return false;
+        const result = feedPet(layout, nearbyPet.instanceId, clockMinutes);
+        if (!result.ok)
+            return false;
+        const name = nearbyPet.name;
+        petBodies.showHeart(nearbyPet.instanceId);
+        petSim.attention(nearbyPet.instanceId);
+        void persistLayout(withFarmClock(result.layout, clockMinutes, Date.now())).then((saved) => {
+            status.textContent = `${name} ate one serving of ${result.foodTitle}. ${saved}`;
+        });
+        return true;
+    }
     if (!nearbyPetCanPickUp || !petSim.pickUp(nearbyPet.instanceId))
         return false;
     carrying = nearbyPet.instanceId;
     petBodies.setTagVisible(carrying, false);
     nearbyPet = null;
     nearbyPetCanPickUp = false;
+    nearbyPetCanFeed = false;
     return true;
 }
 /** E with a pet in hand: set it down ahead if it fits; otherwise the prompt has already said why not and E does nothing. */
@@ -588,7 +649,38 @@ canvas.addEventListener("click", () => {
     if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !farmEditor.isEditing())
         canvas.requestPointerLock?.().catch(() => undefined);
 });
+starterDogForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const completed = completeFarmOnboarding(layout, starterDogName.value);
+    if (!completed.ok) {
+        onboardingStatus.textContent = "Give your dog a name first.";
+        starterDogName.focus();
+        return;
+    }
+    nameStarterDog.disabled = true;
+    onboardingStatus.textContent = "Saving your new farm…";
+    if (onboardingInitialization)
+        await onboardingInitialization;
+    const saved = await layoutStore.save(completed.layout);
+    if (!saved.ok) {
+        nameStarterDog.disabled = false;
+        onboardingStatus.textContent = "Your farm could not be saved. Try again in a moment.";
+        return;
+    }
+    applyLayout(completed.layout);
+    farmEditor.replaceLayout(completed.layout);
+    starterDogName.value = "";
+    starterDogForm.hidden = true;
+    enterButton.hidden = false;
+    startTag.textContent = "YOUR FARM IS READY";
+    startHeading.textContent = `Meet ${completed.layout.pets[0]?.name ?? "your dog"}.`;
+    startCopy.textContent = "Your dog and starter supplies are saved. Head onto the field when you are ready.";
+    onboardingStatus.textContent = "";
+    enterButton.focus();
+});
 enterButton.addEventListener("click", () => {
+    if (canManageFarm && layout.onboarding.status !== "complete")
+        return;
     farmEntered = true;
     farmMusic.start();
     startGate.classList.add("is-hidden");
@@ -658,7 +750,8 @@ async function persistLayout(next) {
     return describeSave(await layoutStore.save(layout));
 }
 function progressedLayout() {
-    return withFarmClock(withFarmAgriculture(layout, advanceAgriculture(layout.agriculture, clockMinutes)), clockMinutes, Date.now());
+    const needs = advancePetNeeds(layout, clockMinutes);
+    return withFarmClock(withFarmAgriculture(needs, advanceAgriculture(needs.agriculture, clockMinutes)), clockMinutes, Date.now());
 }
 async function persistFarmProgress() {
     await persistLayout(progressedLayout());
@@ -723,6 +816,7 @@ const inventoryPanel = createFarmInventoryPanel({
     closeButton: requiredElement("#closeInventory"),
     seedGrid: requiredElement("#seedGrid"),
     produceGrid: requiredElement("#produceGrid"),
+    suppliesGrid: requiredElement("#suppliesGrid"),
     selected: requiredElement("#selectedSeed"),
 });
 inventoryPanel.render(layout.agriculture);
@@ -783,6 +877,15 @@ const farmEditor = createFarmEditor({
     },
     onLayoutChange: (next) => applyLayout(next),
 });
+// A quarter-hour checkpoint keeps visible needs current without tying survival
+// to render frames. Durable writes remain at the existing save/nap/pagehide seams.
+liveNeedsCheckpoint = () => {
+    if (!canManageFarm)
+        return;
+    layout = withFarmClock(advancePetNeeds(layout, clockMinutes), clockMinutes, Date.now());
+    petsPanel.render(layout);
+    farmEditor.replaceLayout(layout);
+};
 const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;

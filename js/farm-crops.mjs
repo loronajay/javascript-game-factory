@@ -1,5 +1,6 @@
 // Persistent crop rules. This is deliberately independent of THREE and the DOM:
 // the page, server normalizer and headless tests all use the same farming contract.
+import { PET_CARE } from "./farm-pet-care.mjs";
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
 export const CARE_GATE = 0.5;
@@ -58,16 +59,30 @@ function inventoryWith(defaultSeeds, source) {
     const input = source && typeof source === "object" ? source : {};
     const seeds = input.seeds && typeof input.seeds === "object" ? input.seeds : {};
     const produce = input.produce && typeof input.produce === "object" ? input.produce : {};
+    const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies : {};
     return Object.freeze({
-        seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : defaultSeeds]))),
+        seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? defaultSeeds : count(defaultSeeds[entry.id])]))),
         produce: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, count(produce[entry.id])]))),
+        supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
+            care.food.itemId,
+            care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
+        ]))),
     });
 }
 function freezeAgriculture(value) {
     return Object.freeze({ inventory: value.inventory, crops: Object.freeze(value.crops.map((entry) => Object.freeze({ ...entry }))) });
 }
-export function createStarterAgriculture() {
-    return freezeAgriculture({ inventory: inventoryWith(5), crops: [] });
+export function createStarterAgriculture(random = Math.random) {
+    const available = CROP_CATALOG.map((entry) => entry.id);
+    const selected = new Set();
+    const targetCount = Math.min(6, available.length);
+    while (selected.size < targetCount) {
+        const sampled = random();
+        const roll = Number.isFinite(sampled) ? Math.max(0, Math.min(0.999999999, sampled)) : 0;
+        selected.add(available.splice(Math.floor(roll * available.length), 1)[0]);
+    }
+    const seeds = Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, selected.has(entry.id) ? 1 : 0]));
+    return freezeAgriculture({ inventory: inventoryWith(seeds), crops: [] });
 }
 export function normalizeAgriculture(value, validPlotIds) {
     const source = value && typeof value === "object" ? value : {};

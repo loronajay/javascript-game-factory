@@ -11,6 +11,8 @@
 // layout change because they are few and carry live inputs.
 import { adoptableAnimals, findAnimal } from "./farm-catalog/animals.mjs";
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats } from "./farm-layout.mjs";
+import { PET_TRAITS, visiblePetStats } from "./farm-pet-care.mjs";
+import { petNeedStatus } from "./farm-pet-needs.mjs";
 function escapeHtml(value) {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
 }
@@ -75,9 +77,26 @@ export function createPetsPanel(elements, actions, options = {}) {
             const row = document.createElement("div");
             row.className = "pet-row";
             row.dataset.instanceId = pet.instanceId;
-            row.innerHTML = `<span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}</span>`
+            const profile = pet.profile;
+            const stats = profile ? visiblePetStats(profile) : null;
+            const needs = profile ? petNeedStatus(profile) : null;
+            const statMarkup = stats ? `<dl class="pet-row__stats">
+        <div><dt>Gender</dt><dd>${escapeHtml(String(stats.gender))}</dd></div>
+        <div><dt>Age</dt><dd>${stats.ageDays} days</dd></div>
+        <div><dt>Size</dt><dd>${Number(stats.size).toFixed(2)}×</dd></div>
+        <div class="pet-row__need pet-row__need--${needs?.level ?? "content"}"><dt>Hunger</dt><dd>${stats.hunger}% · ${needs?.label ?? "Unknown"}</dd></div>
+        <div><dt>Happiness</dt><dd>${stats.happiness}%</dd></div>
+        <div><dt>Speed</dt><dd>${stats.speed}</dd></div>
+        <div><dt>Strength</dt><dd>${stats.strength}</dd></div>
+      </dl>` : `<p class="pet-row__unscoped">This pet's profile could not be loaded.</p>`;
+            const traitMarkup = profile?.traits.length ? `<ul class="pet-row__traits">${profile.traits.map((id) => {
+                const trait = PET_TRAITS.find((entry) => entry.id === id);
+                return trait ? `<li title="${escapeHtml(trait.description)}">${escapeHtml(trait.title)}</li>` : "";
+            }).join("")}</ul>` : "";
+            row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}</span>`
                 + `<input class="pet-row__name" type="text" maxlength="${PET_NAME_MAX_LENGTH}" value="${escapeHtml(pet.name)}" aria-label="Name of ${escapeHtml(pet.name)}">`
-                + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button>`;
+                + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button></div>`
+                + statMarkup + traitMarkup;
             const input = row.querySelector(".pet-row__name");
             const commit = async () => {
                 const next = input.value.trim();

@@ -52,6 +52,9 @@ js/tests/*
 !js/tests/auth-api.test.mjs
 !js/tests/deployment-config.test.mjs
 !js/tests/farm-crops.test.mjs
+!js/tests/farm-layout.test.mjs
+!js/tests/farm-onboarding.test.mjs
+!js/tests/farm-pet-care.test.mjs
 # Catalog metadata/filtering and admin override contracts ship with the redesign.
 !js/tests/arcade-catalog-query.test.mjs
 !js/tests/arcade-catalog-metadata.test.mjs
@@ -78,6 +81,8 @@ platform-api/tests/*
 !platform-api/tests/yam-bowling-tournament-catalog.test.mjs
 !platform-api/tests/yam-bowling-tournament-route.test.mjs
 !platform-api/tests/cabinet-overrides.test.mjs
+!platform-api/tests/farm-pet-care.test.mjs
+!platform-api/tests/farm-loadout-catalog.test.mjs
 !platform-api/tests/yam-bowling-tournament-db.test.mjs
 
 # Echo Duel keeps its local regression tests out of shipped game builds.
