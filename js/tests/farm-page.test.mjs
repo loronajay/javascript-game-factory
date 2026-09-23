@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createLayoutStore } from "../arcade-room-store.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..");
 const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
@@ -27,6 +28,36 @@ test("the farm is account-backed and visitable through the room's generic store 
   assert.doesNotMatch(source, /localStorage/, "the store owns the cache");
   assert.match(source, /const canManageFarm = !visiting && layoutStore\.accountBacked && loaded\.source === "account"/);
   assert.doesNotMatch(source, /Saved on this device|Kept on this device/, "farm saves never claim a device fallback");
+});
+
+test("leaving the farm checkpoints its running clock with an unload-safe account save", () => {
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*if \(canManageFarm\) void layoutStore\.save\(progressedLayout\(\), \{ keepalive: true \}\)/);
+});
+
+test("the shared layout store forwards unload-safe save options to the account", async () => {
+  const calls = [];
+  const api = {
+    isConfigured: true,
+    fetchGameGarage: async () => ({ garage: { clock: 480 } }),
+    saveGameGarage: async (...args) => { calls.push(args); return { ok: true }; },
+    fetchGamePublicLoadout: async () => null,
+    loadPlayerProfile: async () => null,
+  };
+  const spec = {
+    slug: "farm",
+    cacheKey: () => "unused",
+    normalize: (value) => value,
+    createDefault: () => ({ clock: 480 }),
+  };
+  const store = createLayoutStore(spec, {
+    session: { authenticated: true, playerId: "farmer" },
+    api,
+    storage: null,
+  });
+
+  await store.save({ clock: 735 }, { keepalive: true });
+
+  assert.deepEqual(calls[0], ["farm", { clock: 735 }, { keepalive: true }]);
 });
 
 const bodySource = readFileSync(resolve(repoRoot, "js", "farm-body.mts"), "utf8");

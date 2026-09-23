@@ -575,7 +575,7 @@ enterButton.addEventListener("click", () => {
 });
 window.addEventListener("pagehide", () => {
     if (canManageFarm)
-        void layoutStore.save(progressedLayout());
+        void layoutStore.save(progressedLayout(), { keepalive: true });
     farmMusic.destroy();
 }, { once: true });
 document.addEventListener("pointerlockchange", () => {

@@ -568,7 +568,7 @@ enterButton.addEventListener("click", () => {
   status.textContent = "WASD to move · Drag to look · Click for mouse capture";
 });
 window.addEventListener("pagehide", () => {
-  if (canManageFarm) void layoutStore.save(progressedLayout());
+  if (canManageFarm) void layoutStore.save(progressedLayout(), { keepalive: true });
   farmMusic.destroy();
 }, { once: true });
 document.addEventListener("pointerlockchange", () => {

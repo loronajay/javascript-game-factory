@@ -122,12 +122,12 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
 
-  async function put(path: string, value: unknown, responseKey?: string): Promise<any> {
+  async function put(path: string, value: unknown, responseKey?: string, options: RequestInit = {}): Promise<any> {
     const payload = await requestJson(
       fetchImpl,
       baseUrl,
       path,
-      buildJsonRequestOptions("PUT", value),
+      buildJsonRequestOptions("PUT", value, options),
     );
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
@@ -177,9 +177,9 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const gs = encodePathSegment(gameSlug);
       return gs ? get(`/games/${gs}/garage`) : Promise.resolve(null);
     },
-    saveGameGarage(gameSlug: string, garage: unknown) {
+    saveGameGarage(gameSlug: string, garage: unknown, options: RequestInit = {}) {
       const gs = encodePathSegment(gameSlug);
-      return gs ? put(`/games/${gs}/garage`, { garage }) : Promise.resolve(null);
+      return gs ? put(`/games/${gs}/garage`, { garage }, undefined, options) : Promise.resolve(null);
     },
     fetchGamePublicLoadout(gameSlug: string, playerId: string) {
       const gs = encodePathSegment(gameSlug);

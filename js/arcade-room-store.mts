@@ -64,7 +64,7 @@ export type RoomStoreOptions = Readonly<{
 export type RoomStoreApi = Readonly<{
   isConfigured?: boolean;
   fetchGameGarage: (slug: string) => Promise<any>;
-  saveGameGarage: (slug: string, garage: unknown) => Promise<any>;
+  saveGameGarage: (slug: string, garage: unknown, options?: RoomSaveOptions) => Promise<any>;
   fetchGamePublicLoadout: (slug: string, playerId: string) => Promise<any>;
   loadPlayerProfile: (playerId: string) => Promise<any>;
   uploadRoomPoster?: (file: File | Blob) => Promise<any>;
@@ -96,6 +96,11 @@ export type RoomSaveResult = Readonly<{
   error: string;
 }>;
 
+export type RoomSaveOptions = Readonly<{
+  /** Keep the account request alive while the browser tears down a departing page. */
+  keepalive?: boolean;
+}>;
+
 export type RoomUploadResult = Readonly<{
   ok: boolean;
   /** The platform URL the poster row stores, and the picture's pixel size for its shape. */
@@ -113,7 +118,7 @@ export type LayoutStore<T> = Readonly<{
   /** Whose space this is: the visited player, or the signed-in player, or "" signed out. */
   ownerPlayerId: string;
   load: () => Promise<LoadResult<T>>;
-  save: (layout: T) => Promise<RoomSaveResult>;
+  save: (layout: T, options?: RoomSaveOptions) => Promise<RoomSaveResult>;
   /**
    * Send a picture up for a custom poster. Only an account-backed owner can:
    * a picture lives on the platform, not on this device, and a visitor has no
@@ -225,7 +230,7 @@ export function createLayoutStore<T>(spec: LayoutDocumentSpec<T>, options: RoomS
       : { layout: spec.createDefault(), source: "starter", ownerName: "" };
   }
 
-  async function save(layout: T): Promise<RoomSaveResult> {
+  async function save(layout: T, options?: RoomSaveOptions): Promise<RoomSaveResult> {
     if (visiting) return { ok: false, target: "device", error: "read_only" };
     // The cache is written first, synchronously: the layout is the player's the moment they press save.
     const cached = writeCache(spec, storage, selfId, layout);
@@ -234,7 +239,7 @@ export function createLayoutStore<T>(spec: LayoutDocumentSpec<T>, options: RoomS
         ? { ok: true, target: "device", error: "" }
         : { ok: false, target: "device", error: "device_storage_failed" };
     }
-    const result = await api!.saveGameGarage(spec.slug, layout).catch(() => null);
+    const result = await api!.saveGameGarage(spec.slug, layout, options).catch(() => null);
     if (!result?.ok) return { ok: false, target: "account", error: cleanText(result?.error) || "save_failed" };
     return { ok: true, target: "account", error: "" };
   }

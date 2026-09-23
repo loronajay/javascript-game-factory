@@ -5,6 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createAuthApiClient } from "../platform/api/auth-api.mjs";
+import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
 
 const TOKEN_KEY = "javascript-game-factory.authToken";
 
@@ -81,4 +82,21 @@ test("getSession exposes the HTTP status so callers distinguish rejection from d
 
   assert.equal(unavailable.httpStatus, 503);
   assert.equal(rejected.httpStatus, 401);
+});
+
+test("game garage saves can opt into an unload-safe fetch", async () => {
+  const requests = [];
+  const client = createPlatformApiClient({
+    baseUrl: "https://api.example",
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    },
+  });
+
+  await client.saveGameGarage("farm", { clock: { farmMinutes: 735, updatedAt: 42 } }, { keepalive: true });
+
+  assert.equal(requests[0].url, "https://api.example/games/farm/garage");
+  assert.equal(requests[0].options.method, "PUT");
+  assert.equal(requests[0].options.keepalive, true);
 });

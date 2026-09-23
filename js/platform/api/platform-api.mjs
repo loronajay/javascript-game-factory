@@ -96,8 +96,8 @@ export function createPlatformApiClient(options = {}) {
         });
         return payload && responseKey ? (payload[responseKey] ?? null) : payload;
     }
-    async function put(path, value, responseKey) {
-        const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("PUT", value));
+    async function put(path, value, responseKey, options = {}) {
+        const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("PUT", value, options));
         return payload && responseKey ? (payload[responseKey] ?? null) : payload;
     }
     async function post(path, value, responseKey, options = {}) {
@@ -138,9 +138,9 @@ export function createPlatformApiClient(options = {}) {
             const gs = encodePathSegment(gameSlug);
             return gs ? get(`/games/${gs}/garage`) : Promise.resolve(null);
         },
-        saveGameGarage(gameSlug, garage) {
+        saveGameGarage(gameSlug, garage, options = {}) {
             const gs = encodePathSegment(gameSlug);
-            return gs ? put(`/games/${gs}/garage`, { garage }) : Promise.resolve(null);
+            return gs ? put(`/games/${gs}/garage`, { garage }, undefined, options) : Promise.resolve(null);
         },
         fetchGamePublicLoadout(gameSlug, playerId) {
             const gs = encodePathSegment(gameSlug);

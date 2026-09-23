@@ -122,7 +122,7 @@ export function createLayoutStore(spec, options = {}) {
             ? { layout: cached, source: "device", ownerName: "" }
             : { layout: spec.createDefault(), source: "starter", ownerName: "" };
     }
-    async function save(layout) {
+    async function save(layout, options) {
         if (visiting)
             return { ok: false, target: "device", error: "read_only" };
         // The cache is written first, synchronously: the layout is the player's the moment they press save.
@@ -132,7 +132,7 @@ export function createLayoutStore(spec, options = {}) {
                 ? { ok: true, target: "device", error: "" }
                 : { ok: false, target: "device", error: "device_storage_failed" };
         }
-        const result = await api.saveGameGarage(spec.slug, layout).catch(() => null);
+        const result = await api.saveGameGarage(spec.slug, layout, options).catch(() => null);
         if (!result?.ok)
             return { ok: false, target: "account", error: cleanText(result?.error) || "save_failed" };
         return { ok: true, target: "account", error: "" };
