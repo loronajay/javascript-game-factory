@@ -16,6 +16,8 @@ import { handleAchievementRoute } from "./routes/achievement-routes.mjs";
 import { handleProgressionRoute } from "./routes/progression-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handleTicketRoute } from "./routes/ticket-routes.mjs";
+import { handleFarmEconomyRoute } from "./routes/farm-economy-routes.mjs";
+import { handleGameResultRoute } from "./routes/game-result-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
@@ -314,6 +316,13 @@ export function createApp(options = {}) {
     // Factory-wide tickets. Reads create the welcome wallet exactly once in the
     // database; awards have no public route and are made only by server validators.
     const getTicketWallet = typeof options?.getTicketWallet === "function" ? options.getTicketWallet : null;
+    // Cabinet result settlement (tickets for games without an achievement run).
+    // Null for the same reason: unconfigured must be a 503, never "earned nothing".
+    const submitGameResult = typeof options?.submitGameResult === "function" ? options.submitGameResult : null;
+    const getTicketShop = typeof options?.getTicketShop === "function" ? options.getTicketShop : null;
+    const purchaseTicketShopItem = typeof options?.purchaseTicketShopItem === "function" ? options.purchaseTicketShopItem : null;
+    const adoptFarmPet = typeof options?.adoptFarmPet === "function" ? options.adoptFarmPet : null;
+    const purchaseFarmSupply = typeof options?.purchaseFarmSupply === "function" ? options.purchaseFarmSupply : null;
     // Earned advancement, read-only. Null for the leaderboards' reason: an
     // unconfigured backend must answer 503 rather than report a level-1 document a
     // client would cache as the truth. There is no write service — XP is awarded
@@ -646,7 +655,9 @@ export function createApp(options = {}) {
         submitAchievementRun,
         getPlayerAchievements,
     };
-    const ticketServices = { getTicketWallet };
+    const ticketServices = { getTicketWallet, getTicketShop, purchaseTicketShopItem };
+    const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply };
+    const gameResultServices = { submitGameResult };
     const progressionServices = {
         getGameXpProgress,
     };
@@ -748,6 +759,15 @@ export function createApp(options = {}) {
             match: (p) => p === "/payments/tactical-arena/play-purchases",
             bucket: "play-purchase",
             limit: 60,
+            windowMs: 60 * MINUTE_MS,
+        },
+        {
+            // Ticket settlement. The time-budget fence already bounds what results can
+            // mint; this bounds how hard the settlement transaction can be hammered.
+            // A real match is never shorter than ~20 s, so 120/hour is far above play.
+            match: (p) => /^\/games\/[^/]+\/results$/.test(p),
+            bucket: "game-results",
+            limit: 120,
             windowMs: 60 * MINUTE_MS,
         },
     ];
@@ -1016,6 +1036,18 @@ export function createApp(options = {}) {
             })) {
                 return;
             }
+            if (await handleGameResultRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: gameResultServices,
+            })) {
+                return;
+            }
             if (await handleTicketRoute({
                 req,
                 res,
@@ -1028,6 +1060,11 @@ export function createApp(options = {}) {
             })) {
                 return;
             }
+            if (await handleFarmEconomyRoute({
+                req, res, method, pathname, authClaims, requestOrigin, timestamp,
+                services: farmEconomyServices,
+            }))
+                return;
             if (await handleGameSocialRoute({
                 req,
                 res,

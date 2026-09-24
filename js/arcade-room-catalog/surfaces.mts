@@ -79,6 +79,13 @@ export type SurfaceDefinition = Readonly<{
 }>;
 
 const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" } as const);
+const PURCHASE = Object.freeze({ type: "purchase", source: "Arcade Shop" } as const);
+const STARTER_SURFACE_IDS = new Set([
+  "floor.showroom-slate",
+  "wall.paint-midnight",
+  "ceiling.tile-dark",
+  "trim.steel-navy",
+]);
 
 function surface(
   kind: SurfaceKind,
@@ -95,7 +102,7 @@ function surface(
     group,
     swatch: swatch ?? [style.colors[0] ?? "#888888", style.colors[1] ?? style.colors[0] ?? "#888888"] as const,
     style: Object.freeze({ ...style, colors: Object.freeze([...style.colors]) }),
-    unlock: STARTER,
+    unlock: STARTER_SURFACE_IDS.has(`${kind}.${slug}`) ? STARTER : PURCHASE,
   });
 }
 

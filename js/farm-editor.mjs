@@ -30,13 +30,15 @@ const SNAP_SCREEN_FRACTION = 0.02;
 const SNAP_RANGE_M = Object.freeze({ min: 0.08, max: 0.4 });
 const WHEEL_GESTURE_MS = 350;
 export function createFarmEditor(options) {
-    const { THREE, scene, camera, canvas, world, persist, elements, canEnter, onEditingChange, onLayoutChange } = options;
+    const { THREE, scene, camera, canvas, world, inventory, persist, elements, canEnter, onEditingChange, onLayoutChange } = options;
     let layout = options.initialLayout;
     let selection = "";
     let tab = "fence";
     let editing = false;
     let dragging = false;
     let saving = false;
+    let purchasingItemId = "";
+    let ticketBalance = Number.isSafeInteger(options.ticketBalance) && Number(options.ticketBalance) >= 0 ? Number(options.ticketBalance) : null;
     let previewFrame = 0;
     let wheelGestureTimer;
     let cameraGesture = "none";
@@ -70,6 +72,10 @@ export function createFarmEditor(options) {
     const panel = createFarmEditorPanel(elements, {
         selectTab: (next) => { tab = next; renderPanel(); },
         setGround: (id) => {
+            if (!inventory.owns(id)) {
+                setStatus("You do not own that ground yet.", "error");
+                return;
+            }
             const result = setFarmGround(layout, id);
             if (!result.valid)
                 return;
@@ -82,6 +88,7 @@ export function createFarmEditor(options) {
         duplicateDecor: (instanceId) => duplicate(instanceId),
         rotateDecor: (instanceId, direction) => { select(instanceId, true); rotate(direction); },
         setDecorLength: (instanceId, length, phase) => editLength(setFarmDecorLength(layout, instanceId, length), phase),
+        purchaseItem: (itemId) => { void purchaseItem(itemId); },
     }, { thumbnail: options.thumbnail });
     function selected() {
         return selection ? layout.decor.find((row) => row.instanceId === selection) : undefined;
@@ -111,12 +118,36 @@ export function createFarmEditor(options) {
         gizmos.update(camera);
     }
     function renderPanel() {
-        panel.render({ tab, layout, selection, removeBlockedReason: removeBlockedReason() });
+        panel.render({
+            tab, layout, selection, removeBlockedReason: removeBlockedReason(), inventory,
+            ticketPrices: options.ticketPrices ?? new Map(), ticketBalance,
+            canPurchase: options.purchaseItem != null && purchasingItemId === "",
+        });
         elements.undoButton.disabled = !history.canUndo();
     }
     function setStatus(message, state = "ready") {
         elements.status.textContent = message;
         elements.status.dataset.state = state;
+    }
+    async function purchaseItem(itemId) {
+        if (!options.purchaseItem || purchasingItemId) {
+            setStatus("Sign in to buy permanent farm unlocks.", "error");
+            return;
+        }
+        purchasingItemId = itemId;
+        renderPanel();
+        setStatus("Buying item…");
+        const result = await options.purchaseItem(itemId).catch(() => null);
+        purchasingItemId = "";
+        if (!result?.ok || !inventory.grant(result.itemId)) {
+            renderPanel();
+            setStatus(result?.error === "insufficient_tickets" ? "You do not have enough tickets for that yet." : "That purchase did not go through. Try again.", "error");
+            return;
+        }
+        if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0)
+            ticketBalance = Number(result.balance);
+        renderPanel();
+        setStatus(result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
     }
     function setLayout(next) {
         layout = next;
@@ -236,8 +267,10 @@ export function createFarmEditor(options) {
     }
     function addDecor(itemId) {
         const definition = findFarmDecor(itemId);
-        if (!definition)
+        if (!definition || !inventory.owns(itemId)) {
+            setStatus("You do not own that item yet.", "error");
             return;
+        }
         const target = view.view().target;
         const result = addFarmDecor(layout, definition, { x: target.x, z: target.z, rotationY: 0 });
         if (!result.valid) {

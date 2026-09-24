@@ -16,7 +16,81 @@ const pet = (overrides = {}) => ({ instanceId: "corgi-1", speciesId: "pet.corgi"
 test("the farm slug is registered on the shared garage table", () => {
   assert.equal(FARM_GAME_SLUG, "farm");
   assert.equal(isValidLoadoutSlug(FARM_GAME_SLUG), true);
-  assert.equal(FARM_LOADOUT_CATALOG.requiresEntitlements, false);
+  assert.equal(FARM_LOADOUT_CATALOG.requiresEntitlements, true);
+});
+
+test("paid ground and decor require server-owned Farm entitlements", () => {
+  const input = {
+    version: 3,
+    ground: "ground.clover",
+    pets: [],
+    decor: [
+      { instanceId: "barn-1", itemId: "decor.building.barn", x: 0, z: 0, rotationY: 0 },
+      { instanceId: "mill-1", itemId: "decor.building.windmill", x: 5, z: 5, rotationY: 0 },
+      { instanceId: "fake-1", itemId: "decor.building.fake", x: 2, z: 2, rotationY: 0 },
+    ],
+  };
+  const locked = normalizeFarmGarage(input, { ownedEntitlementIds: new Set() });
+  assert.equal(locked.ground, "");
+  assert.deepEqual(locked.decor.map((row) => row.itemId), ["decor.building.barn"]);
+
+  const owned = normalizeFarmGarage(input, {
+    ownedEntitlementIds: new Set(["ground.clover", "decor.building.windmill", "decor.building.fake"]),
+  });
+  assert.equal(owned.ground, "ground.clover");
+  assert.deepEqual(owned.decor.map((row) => row.itemId), ["decor.building.barn", "decor.building.windmill"]);
+});
+
+test("ordinary farm saves cannot mint paid pets or increase paid supplies", () => {
+  const existing = normalizeFarmGarage({
+    version: 3,
+    onboarding: { status: "complete" },
+    pets: [pet()],
+    agriculture: { inventory: { supplies: { "food.dog-food": 2 } }, crops: [] },
+  });
+  const submitted = normalizeFarmGarage({
+    ...existing,
+    pets: [pet({ name: "Renamed" }), pet({ instanceId: "shark-1", speciesId: "pet.shark", name: "Free Shark" })],
+    agriculture: { ...existing.agriculture, inventory: { ...existing.agriculture.inventory, supplies: { "food.dog-food": 99, "food.shark-feed": 99 } } },
+  }, { currentGarage: existing });
+
+  assert.deepEqual(submitted.pets.map((row) => [row.instanceId, row.name]), [["corgi-1", "Renamed"]]);
+  assert.deepEqual(submitted.agriculture.inventory.supplies, { "food.dog-food": 2 });
+});
+
+test("ordinary saves cannot reroll a server-created pet's identity", () => {
+  const profile = {
+    gender: "female", ageDays: 1, affection: 50, hunger: 90, starvingMinutes: 0, happiness: 90,
+    size: { current: 0.7, max: 1.1, growthPerDay: 0.005 }, stats: { speed: 44, strength: 33 },
+    traits: ["movement.fast"], milestones: [], paletteId: "sable", paletteBonus: 0,
+  };
+  const existing = normalizeFarmGarage({ version: 3, onboarding: { status: "complete" }, pets: [pet({ profile })] });
+  const submitted = normalizeFarmGarage({
+    ...existing,
+    pets: [pet({ profile: { ...profile, gender: "male", size: { current: 0.8, max: 5, growthPerDay: 1 }, stats: { speed: 100, strength: 100 }, traits: ["held.loves"], paletteId: "cosmic", paletteBonus: 0.5 } })],
+  }, { currentGarage: existing });
+  const saved = submitted.pets[0].profile;
+  assert.equal(saved.gender, "female");
+  assert.deepEqual(saved.stats, { speed: 44, strength: 33 });
+  assert.deepEqual(saved.traits, ["movement.fast"]);
+  assert.equal(saved.paletteId, "sable");
+  assert.equal(saved.size.max, 1.1);
+  assert.equal(saved.size.current, 0.8, "care progression may still grow the pet");
+});
+
+test("the one-time onboarding transition may add exactly the free starter corgi", () => {
+  const existing = normalizeFarmGarage({
+    version: 3,
+    onboarding: { status: "needs_name" },
+    pets: [],
+    agriculture: { inventory: { supplies: { "food.dog-food": 20 } }, crops: [] },
+  });
+  const submitted = normalizeFarmGarage({
+    ...existing,
+    onboarding: { status: "complete" },
+    pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck" })],
+  }, { currentGarage: existing });
+  assert.deepEqual(submitted.pets.map((row) => row.speciesId), ["pet.corgi"]);
 });
 
 test("a missing row is the empty v3 farm with a persisted clock and agriculture document", () => {

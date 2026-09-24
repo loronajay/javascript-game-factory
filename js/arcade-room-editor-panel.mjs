@@ -94,7 +94,6 @@ function extentLabel(definition, item) {
     return `${extent.width.toFixed(1)} × ${extent.height.toFixed(1)} m`;
 }
 export function createEditorPanel(elements, actions, options = {}) {
-    let lastCatalogCategory = null;
     let surfacesBuilt = false;
     // Which finish the surfaces tab is showing. Panel-local: it is a way of looking at the
     // catalog, not a fact about the room, so the editor never hears about it.
@@ -203,13 +202,15 @@ export function createEditorPanel(elements, actions, options = {}) {
         // One finish at a time: Floor / Walls / Ceiling / Trim as chips, the way the decor
         // catalog is split by category, instead of 148 swatches in one scroll.
         const chips = element("div", "category-chips");
+        const balance = element("small", "ticket-shop-balance");
+        balance.dataset.ticketShopBalance = "true";
         for (const kind of SURFACE_KINDS) {
             const chip = element("button", "category-chip", SURFACE_TITLES[kind]);
             chip.type = "button";
             chip.dataset.surfaceChip = kind;
             chips.append(chip);
         }
-        elements.surfacePicker.replaceChildren(chips, ...SURFACE_KINDS.map((kind) => {
+        elements.surfacePicker.replaceChildren(balance, chips, ...SURFACE_KINDS.map((kind) => {
             const section = element("section", "surface-section");
             section.dataset.surfaceKind = kind;
             // The paint block leads the section: the finish in use and its colours, before the shelf of alternatives.
@@ -225,7 +226,7 @@ export function createEditorPanel(elements, actions, options = {}) {
                     swatch.dataset.surfaceKind = kind;
                     swatch.dataset.surfaceId = entry.id;
                     swatch.title = entry.title;
-                    swatch.disabled = !state.inventory.owns(entry.id);
+                    swatch.dataset.catalogTitle = entry.title;
                     swatch.style.setProperty("--swatch-a", entry.swatch[0]);
                     swatch.style.setProperty("--swatch-b", entry.swatch[1]);
                     swatch.dataset.pattern = entry.style.pattern;
@@ -300,15 +301,36 @@ export function createEditorPanel(elements, actions, options = {}) {
     function renderSurfaces(state) {
         if (!surfacesBuilt)
             buildSurfacePicker(state);
+        const balance = elements.surfacePicker.querySelector("[data-ticket-shop-balance]");
+        if (balance)
+            balance.textContent = state.ticketBalance === null
+                ? "Ticket shop unavailable"
+                : `${state.ticketBalance.toLocaleString()} tickets available`;
         showSurfaceKind();
         for (const swatch of elements.surfacePicker.querySelectorAll("[data-surface-id]")) {
             const kind = swatch.dataset.surfaceKind;
+            const id = swatch.dataset.surfaceId;
+            const owned = state.inventory.owns(id);
+            const price = state.ticketPrices.get(id);
+            const label = swatch.querySelector(".swatch__label");
+            if (label)
+                label.textContent = owned
+                    ? swatch.dataset.catalogTitle ?? id
+                    : price ? `${swatch.dataset.catalogTitle ?? id} · ${price.toLocaleString()} tickets` : "Locked";
+            swatch.disabled = !owned && !state.canPurchase;
+            if (!owned && price)
+                swatch.dataset.buyItem = id;
+            else
+                delete swatch.dataset.buyItem;
             swatch.setAttribute("aria-pressed", String(state.layout.surfaces[kind] === swatch.dataset.surfaceId));
         }
         renderSurfacePaint(state, surfaceKind);
     }
     function renderDecorCategories(state) {
-        elements.decorCategories.replaceChildren(...DECOR_CATEGORIES.map((category) => {
+        const balance = element("small", "ticket-shop-balance", state.ticketBalance === null
+            ? "Sign in to buy permanent room unlocks"
+            : `${state.ticketBalance.toLocaleString()} tickets available`);
+        elements.decorCategories.replaceChildren(balance, ...DECOR_CATEGORIES.map((category) => {
             const chip = element("button", "category-chip", DECOR_CATEGORY_TITLES[category]);
             chip.type = "button";
             chip.dataset.category = category;
@@ -317,18 +339,20 @@ export function createEditorPanel(elements, actions, options = {}) {
         }));
     }
     function renderDecorCatalog(state) {
-        if (lastCatalogCategory === state.decorCategory)
-            return;
-        lastCatalogCategory = state.decorCategory;
         elements.decorCatalog.replaceChildren(...decorByCategory(state.decorCategory).map((definition) => {
             const card = element("button", "decor-card");
             card.type = "button";
-            card.dataset.addDecor = definition.id;
-            card.title = `Add ${definition.title}`;
-            card.disabled = !state.inventory.owns(definition.id);
+            const owned = state.inventory.owns(definition.id);
+            const price = state.ticketPrices.get(definition.id);
+            if (owned)
+                card.dataset.addDecor = definition.id;
+            else if (price)
+                card.dataset.buyItem = definition.id;
+            card.title = owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`;
+            card.disabled = !owned && !state.canPurchase;
             card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
             const meta = definition.mounts.map((mount) => MOUNT_TITLES[mount]).join(" · ");
-            card.append(element("small", "decor-card__meta", meta));
+            card.append(element("small", "decor-card__meta", owned ? meta : price ? `Buy · ${price.toLocaleString()} tickets` : "Locked"));
             // Something you can walk up to and use, not just look at: badge it so it stands out.
             if (definition.interaction) {
                 card.classList.add("is-interactive");
@@ -696,6 +720,10 @@ export function createEditorPanel(elements, actions, options = {}) {
         }
         const swatch = event.target.closest("[data-surface-id]");
         if (swatch && !swatch.disabled) {
+            if (swatch.dataset.buyItem) {
+                actions.purchaseItem(swatch.dataset.buyItem);
+                return;
+            }
             actions.setSurface(swatch.dataset.surfaceKind, swatch.dataset.surfaceId);
             return;
         }
@@ -722,6 +750,11 @@ export function createEditorPanel(elements, actions, options = {}) {
             actions.setDecorCategory(chip.dataset.category);
     });
     elements.decorCatalog.addEventListener("click", (event) => {
+        const buy = event.target.closest("[data-buy-item]");
+        if (buy && !buy.disabled) {
+            actions.purchaseItem(buy.dataset.buyItem);
+            return;
+        }
         const card = event.target.closest("[data-add-decor]");
         if (card && !card.disabled)
             actions.addDecor(card.dataset.addDecor);

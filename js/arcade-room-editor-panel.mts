@@ -65,6 +65,9 @@ export type PanelState = Readonly<{
   canUpload: boolean;
   /** The custom poster whose picture is on its way up, or "" when none is. */
   uploadingInstanceId: string;
+  ticketPrices: ReadonlyMap<string, number>;
+  ticketBalance: number | null;
+  canPurchase: boolean;
 }>;
 
 /**
@@ -88,6 +91,7 @@ export type PanelActions = Readonly<{
   setAvatar: (avatarId: string) => void;
   setDecorCategory: (category: DecorCategory) => void;
   addDecor: (itemId: string) => void;
+  purchaseItem: (itemId: string) => void;
   selectDecor: (instanceId: string) => void;
   /** Drop the selection so the inspector closes and the catalog gets the panel back. */
   clearSelection: () => void;
@@ -220,7 +224,6 @@ type InspectorRefs = Readonly<{
 }>;
 
 export function createEditorPanel(elements: PanelElements, actions: PanelActions, options: PanelOptions = {}): EditorPanel {
-  let lastCatalogCategory: DecorCategory | null = null;
   let surfacesBuilt = false;
   // Which finish the surfaces tab is showing. Panel-local: it is a way of looking at the
   // catalog, not a fact about the room, so the editor never hears about it.
@@ -340,13 +343,15 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     // One finish at a time: Floor / Walls / Ceiling / Trim as chips, the way the decor
     // catalog is split by category, instead of 148 swatches in one scroll.
     const chips = element("div", "category-chips");
+    const balance = element("small", "ticket-shop-balance");
+    balance.dataset.ticketShopBalance = "true";
     for (const kind of SURFACE_KINDS) {
       const chip = element("button", "category-chip", SURFACE_TITLES[kind]);
       chip.type = "button";
       chip.dataset.surfaceChip = kind;
       chips.append(chip);
     }
-    elements.surfacePicker.replaceChildren(chips, ...SURFACE_KINDS.map((kind) => {
+    elements.surfacePicker.replaceChildren(balance, chips, ...SURFACE_KINDS.map((kind) => {
       const section = element("section", "surface-section");
       section.dataset.surfaceKind = kind;
       // The paint block leads the section: the finish in use and its colours, before the shelf of alternatives.
@@ -362,7 +367,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
           swatch.dataset.surfaceKind = kind;
           swatch.dataset.surfaceId = entry.id;
           swatch.title = entry.title;
-          swatch.disabled = !state.inventory.owns(entry.id);
+          swatch.dataset.catalogTitle = entry.title;
           swatch.style.setProperty("--swatch-a", entry.swatch[0]);
           swatch.style.setProperty("--swatch-b", entry.swatch[1]);
           swatch.dataset.pattern = entry.style.pattern;
@@ -437,16 +442,33 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
 
   function renderSurfaces(state: PanelState): void {
     if (!surfacesBuilt) buildSurfacePicker(state);
+    const balance = elements.surfacePicker.querySelector<HTMLElement>("[data-ticket-shop-balance]");
+    if (balance) balance.textContent = state.ticketBalance === null
+      ? "Ticket shop unavailable"
+      : `${state.ticketBalance.toLocaleString()} tickets available`;
     showSurfaceKind();
     for (const swatch of elements.surfacePicker.querySelectorAll<HTMLButtonElement>("[data-surface-id]")) {
       const kind = swatch.dataset.surfaceKind as SurfaceKind;
+      const id = swatch.dataset.surfaceId!;
+      const owned = state.inventory.owns(id);
+      const price = state.ticketPrices.get(id);
+      const label = swatch.querySelector<HTMLElement>(".swatch__label");
+      if (label) label.textContent = owned
+        ? swatch.dataset.catalogTitle ?? id
+        : price ? `${swatch.dataset.catalogTitle ?? id} · ${price.toLocaleString()} tickets` : "Locked";
+      swatch.disabled = !owned && !state.canPurchase;
+      if (!owned && price) swatch.dataset.buyItem = id;
+      else delete swatch.dataset.buyItem;
       swatch.setAttribute("aria-pressed", String(state.layout.surfaces[kind] === swatch.dataset.surfaceId));
     }
     renderSurfacePaint(state, surfaceKind);
   }
 
   function renderDecorCategories(state: PanelState): void {
-    elements.decorCategories.replaceChildren(...DECOR_CATEGORIES.map((category) => {
+    const balance = element("small", "ticket-shop-balance", state.ticketBalance === null
+      ? "Sign in to buy permanent room unlocks"
+      : `${state.ticketBalance.toLocaleString()} tickets available`);
+    elements.decorCategories.replaceChildren(balance, ...DECOR_CATEGORIES.map((category) => {
       const chip = element("button", "category-chip", DECOR_CATEGORY_TITLES[category]);
       chip.type = "button";
       chip.dataset.category = category;
@@ -456,17 +478,18 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
   }
 
   function renderDecorCatalog(state: PanelState): void {
-    if (lastCatalogCategory === state.decorCategory) return;
-    lastCatalogCategory = state.decorCategory;
     elements.decorCatalog.replaceChildren(...decorByCategory(state.decorCategory).map((definition) => {
       const card = element("button", "decor-card");
       card.type = "button";
-      card.dataset.addDecor = definition.id;
-      card.title = `Add ${definition.title}`;
-      card.disabled = !state.inventory.owns(definition.id);
+      const owned = state.inventory.owns(definition.id);
+      const price = state.ticketPrices.get(definition.id);
+      if (owned) card.dataset.addDecor = definition.id;
+      else if (price) card.dataset.buyItem = definition.id;
+      card.title = owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`;
+      card.disabled = !owned && !state.canPurchase;
       card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
       const meta = definition.mounts.map((mount) => MOUNT_TITLES[mount]).join(" · ");
-      card.append(element("small", "decor-card__meta", meta));
+      card.append(element("small", "decor-card__meta", owned ? meta : price ? `Buy · ${price.toLocaleString()} tickets` : "Locked"));
       // Something you can walk up to and use, not just look at: badge it so it stands out.
       if (definition.interaction) {
         card.classList.add("is-interactive");
@@ -848,6 +871,10 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     }
     const swatch = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-surface-id]");
     if (swatch && !swatch.disabled) {
+      if (swatch.dataset.buyItem) {
+        actions.purchaseItem(swatch.dataset.buyItem);
+        return;
+      }
       actions.setSurface(swatch.dataset.surfaceKind as SurfaceKind, swatch.dataset.surfaceId!);
       return;
     }
@@ -870,6 +897,11 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     if (chip?.dataset.category) actions.setDecorCategory(chip.dataset.category as DecorCategory);
   });
   elements.decorCatalog.addEventListener("click", (event) => {
+    const buy = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-buy-item]");
+    if (buy && !buy.disabled) {
+      actions.purchaseItem(buy.dataset.buyItem!);
+      return;
+    }
     const card = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-add-decor]");
     if (card && !card.disabled) actions.addDecor(card.dataset.addDecor!);
   });

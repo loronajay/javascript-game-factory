@@ -15,8 +15,8 @@ export const GAME_CONFIG = Object.freeze({
   ball: Object.freeze({
     radius: 10,
     startSpeed: 315,
-    hitSpeedMultiplier: 1.025,
-    maxSpeed: 610,
+    hitSpeedIncrease: 32,
+    maxSpeed: 675,
     paddleVelocityInfluence: 32,
     contactOffsetInfluence: 105,
   }),

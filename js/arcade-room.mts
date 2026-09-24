@@ -28,10 +28,11 @@ import { createRoomInventory } from "./arcade-room-catalog/inventory.mjs";
 import { createDecorRuntime } from "./arcade-room-decor-runtime.mjs";
 import { visibleRoomItems, worldPointFromPlacement } from "./arcade-room-layout.mjs";
 import { createRoomShell } from "./arcade-room-shell.mjs";
-import { createRoomLayoutStore } from "./arcade-room-store.mjs";
+import { ARCADE_ROOM_GAME_SLUG, createRoomLayoutStore } from "./arcade-room-store.mjs";
 import { forwardOf, lookWalker, stepWalker } from "./arcade-room-walker.mjs";
 import { BATTLESHITS_PLAY_VIEW, BUILD_BUDDY_PLAY_VIEW, CABINET_PLAY_VIEW, COCKPIT_SWARM_PLAY_VIEW, LOVERS_LOST_PLAY_VIEW, PLAYER_ROOM_SHELL, SHARK_HALL_PLAY_VIEW, SUMORAI_PLAY_VIEW, YAM_BOWLING_PLAY_VIEW } from "./arcade-room-scene.mjs";
 import { playScreenRect } from "./arcade-room-screen.mjs";
+import { createTicketWalletClient, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 
 const THREE: any = THREE_VENDOR;
 
@@ -102,6 +103,10 @@ const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
 const layoutStore = createRoomLayoutStore({ visitPlayerId });
 const visiting = layoutStore.mode === "visitor";
 const loaded = await layoutStore.load();
+const ticketClient = createTicketWalletClient();
+const shop = layoutStore.accountBacked
+  ? await ticketClient.getShop(ARCADE_ROOM_GAME_SLUG).catch(() => null)
+  : null;
 
 function applyRoomIdentity(): void {
   document.body.classList.toggle("is-visiting", visiting);
@@ -182,8 +187,13 @@ grid.visible = false;
 scene.add(grid);
 
 const decorRuntime = createDecorRuntime(THREE, scene);
-// Everything in the catalog is granted in this phase; see arcade-room-catalog/inventory.mts.
-const inventory = createRoomInventory({ grantAll: true });
+const inventory = createRoomInventory({ ownedIds: shop?.ownedIds });
+const ticketPrices = new Map<string, number>(
+  Array.isArray(shop?.items)
+    ? shop.items.filter((entry: any) => typeof entry?.id === "string" && Number.isSafeInteger(entry?.price) && entry.price > 0)
+      .map((entry: any) => [entry.id, entry.price])
+    : [],
+);
 
 type CabinetPlayView = Readonly<{
   position?: Readonly<{ x: number; y: number; z: number }>;
@@ -259,6 +269,13 @@ const roomEditor = createRoomEditor({
   },
   // A picture can only be hung on an account-backed room; otherwise the inspector says to sign in.
   uploadPicture: layoutStore.accountBacked ? (file) => layoutStore.uploadPicture(file) : null,
+  ticketPrices,
+  ticketBalance: Number.isSafeInteger(shop?.balance) ? shop.balance : null,
+  purchaseItem: layoutStore.accountBacked && shop ? async (itemId) => {
+    const result = await ticketClient.purchaseShopItem(ARCADE_ROOM_GAME_SLUG, itemId);
+    if (Number.isSafeInteger(result?.balance)) publishTicketBalance(result.balance);
+    return result;
+  } : null,
   avatarPreview,
   elements: {
     panel: editorPanel,

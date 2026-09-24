@@ -52,7 +52,13 @@ function buildAuthHeaders(): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-async function requestJson(fetchImpl: FetchImpl, baseUrl: string, path: string, options: RequestInit = {}): Promise<any> {
+async function requestJson(
+  fetchImpl: FetchImpl,
+  baseUrl: string,
+  path: string,
+  options: RequestInit = {},
+  acceptErrorPayload = false,
+): Promise<any> {
   if (typeof fetchImpl !== "function" || !baseUrl) {
     return null;
   }
@@ -64,7 +70,7 @@ async function requestJson(fetchImpl: FetchImpl, baseUrl: string, path: string, 
       // every caller stops sending a token the server will never accept again, and so
       // "am I signed in?" starts answering no.
       if (response?.status === 401) handleUnauthorizedResponse();
-      return null;
+      return acceptErrorPayload ? readJsonResponse(response) : null;
     }
     return await readJsonResponse(response);
   } catch {
@@ -132,14 +138,23 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
 
-  async function post(path: string, value: unknown, responseKey?: string, options: RequestInit = {}): Promise<any> {
+  async function post(
+    path: string,
+    value: unknown,
+    responseKey?: string,
+    options: RequestInit = {},
+    acceptErrorPayload = false,
+  ): Promise<any> {
     const payload = await requestJson(
       fetchImpl,
       baseUrl,
       path,
       buildJsonRequestOptions("POST", value, options),
+      acceptErrorPayload,
     );
-    return payload && responseKey ? (payload[responseKey] ?? null) : payload;
+    return payload && responseKey
+      ? (payload[responseKey] ?? (acceptErrorPayload ? payload : null))
+      : payload;
   }
 
   async function del(path: string, responseKey?: string, options: RequestInit = {}): Promise<any> {
@@ -551,6 +566,20 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     // client: only server-side result validators are allowed to mint currency.
     fetchTicketWallet() {
       return get("/tickets/wallet", "wallet");
+    },
+    fetchTicketShop(shopSlug: string) {
+      const encoded = encodePathSegment(shopSlug);
+      return encoded ? get(`/tickets/shops/${encoded}`, "shop") : Promise.resolve(null);
+    },
+    purchaseTicketShopItem(shopSlug: string, itemId: string) {
+      const encoded = encodePathSegment(shopSlug);
+      return encoded ? post(`/tickets/shops/${encoded}/purchases`, { itemId }, "purchase", {}, true) : Promise.resolve(null);
+    },
+    adoptFarmPet({ speciesId, name, purchaseId }: { speciesId: string; name: string; purchaseId: string }) {
+      return post("/games/farm/adoptions", { speciesId, name, purchaseId }, "purchase", {}, true);
+    },
+    purchaseFarmSupply({ itemId, quantity, purchaseId }: { itemId: string; quantity: number; purchaseId: string }) {
+      return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId }, "purchase", {}, true);
     },
     recordGameProgressClaim(gameSlug: string, claim: unknown = {}) {
       const encoded = encodePathSegment(gameSlug);

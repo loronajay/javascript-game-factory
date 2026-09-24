@@ -2,7 +2,16 @@ import { GAME_CONFIG } from "../config.js";
 import { lerpAngle } from "../core/math.js";
 
 const VIEW = 720;
-const CENTER = VIEW / 2;
+const FIELD_STARS = Array.from({ length: 52 }, (_, index) => {
+  const angle = index * 2.399963229728653;
+  const radius = 42 + ((index * 83) % 285);
+  return {
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+    size: index % 9 === 0 ? 1.8 : index % 4 === 0 ? 1.2 : 0.7,
+    phase: (index * 17) % 60,
+  };
+});
 
 function colorWithAlpha(hex, alpha) {
   const value = hex.replace("#", "");
@@ -40,26 +49,47 @@ export function createRenderer(canvas) {
     }
   }
 
-  function drawBackground(ctx, ownerColor) {
-    const gradient = ctx.createRadialGradient(0, 0, 40, 0, 0, 360);
-    gradient.addColorStop(0, colorWithAlpha(ownerColor, 0.12));
-    gradient.addColorStop(0.72, "rgba(5, 8, 24, .92)");
-    gradient.addColorStop(1, "#02030b");
+  function drawBackground(ctx, ownerColor, time) {
+    const gradient = ctx.createRadialGradient(0, 0, 25, 0, 0, 352);
+    gradient.addColorStop(0, colorWithAlpha(ownerColor, 0.1));
+    gradient.addColorStop(0.56, "rgba(7, 12, 38, .24)");
+    gradient.addColorStop(0.84, "rgba(3, 6, 23, .38)");
+    gradient.addColorStop(1, "rgba(3, 5, 18, 0)");
     ctx.fillStyle = gradient;
-    ctx.fillRect(-CENTER, -CENTER, VIEW, VIEW);
-    ctx.strokeStyle = "rgba(117, 166, 255, .06)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 352, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (const star of FIELD_STARS) {
+      const pulse = 0.3 + Math.sin((time + star.phase) * 0.045) * 0.16;
+      ctx.fillStyle = `rgba(220, 237, 255, ${pulse})`;
+      ctx.fillRect(star.x - star.size / 2, star.y - star.size / 2, star.size, star.size);
+    }
+
+    ctx.strokeStyle = colorWithAlpha(ownerColor, 0.085);
     ctx.lineWidth = 1;
-    for (let radius = 55; radius < 350; radius += 42) {
+    for (let radius = 66; radius < 330; radius += 44) {
       ctx.beginPath();
       ctx.arc(0, 0, radius, 0, Math.PI * 2);
       ctx.stroke();
     }
-    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 12) {
+    ctx.strokeStyle = "rgba(160, 198, 255, .045)";
+    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
       ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * 35, Math.sin(angle) * 35);
-      ctx.lineTo(Math.cos(angle) * 340, Math.sin(angle) * 340);
+      ctx.moveTo(Math.cos(angle) * 44, Math.sin(angle) * 44);
+      ctx.lineTo(Math.cos(angle) * 326, Math.sin(angle) * 326);
       ctx.stroke();
     }
+
+    ctx.save();
+    ctx.rotate(time * 0.0007);
+    ctx.setLineDash([28, 18, 4, 18]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = colorWithAlpha(ownerColor, 0.16);
+    ctx.beginPath();
+    ctx.arc(0, 0, 318, -0.5, Math.PI * 1.15);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawArena(ctx, match, ownerColor) {
@@ -199,7 +229,7 @@ export function createRenderer(canvas) {
     const shakeY = shake > 0 ? (Math.random() - 0.5) * shake : 0;
     shake *= 0.78;
     context.setTransform(scale, 0, 0, scale, canvas.width / 2 + shakeX, canvas.height / 2 + shakeY);
-    drawBackground(context, ownerColor);
+    drawBackground(context, ownerColor, match.tick + alpha);
     drawArena(context, match, ownerColor);
     drawBursts(context);
     drawPaddles(context, match, alpha);

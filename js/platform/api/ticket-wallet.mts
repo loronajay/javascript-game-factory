@@ -25,5 +25,17 @@ export function createTicketWalletClient(options: any = {}) {
     getWallet() {
       return api.fetchTicketWallet();
     },
+    getShop(shopSlug: string) {
+      return api.fetchTicketShop(shopSlug);
+    },
+    purchaseShopItem(shopSlug: string, itemId: string) {
+      return api.purchaseTicketShopItem(shopSlug, itemId);
+    },
+    adoptFarmPet(speciesId: string, name: string, purchaseId: string) {
+      return api.adoptFarmPet({ speciesId, name, purchaseId });
+    },
+    purchaseFarmSupply(itemId: string, quantity: number, purchaseId: string) {
+      return api.purchaseFarmSupply({ itemId, quantity, purchaseId });
+    },
   };
 }

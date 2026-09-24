@@ -26,6 +26,8 @@ import { createOnlineClient, getCountdownSecondsRemaining } from './scripts/onli
 import { wireOnlineCallbacks } from './scripts/online-callbacks.js';
 import { createOnlineInputRouter } from './scripts/online-input-router.js';
 import { createRematchFlow, rematchSeed } from './scripts/online-rematch.js';
+import { buildTicketResult, TICKET_GAME_SLUG, TICKET_RESULT_PREFIX } from './scripts/ticket-result.js';
+import { createGameResultId, createGameResultReporter } from '../../js/platform/api/game-results-api.mjs';
 import { buildOnlineIdentity } from './scripts/online-identity.js';
 import { startOnlineMatchSession } from './scripts/online-match-start.js';
 import {
@@ -451,8 +453,36 @@ function _boot(sounds) {
     spawnBloodEffect(gameState, x, y, flip);
   }
 
+  // Tickets: an id is minted when a match starts and spent when it ends. The
+  // server decides the payout; this is fire-and-forget and never blocks the
+  // result screen (signed out or offline resolves to null).
+  const ticketReporter = createGameResultReporter();
+  let ticketResultId = null;
+  let ticketMatchStartedAt = 0;
+
+  function beginTicketMatch() {
+    ticketResultId = createGameResultId(TICKET_RESULT_PREFIX);
+    ticketMatchStartedAt = performance.now();
+  }
+
+  function reportTicketResult() {
+    const payload = buildTicketResult({
+      isOnline,
+      botConfig,
+      onlineSide,
+      onlineIsRanked,
+      gameState,
+      winner: gameState.roundEnd?.winner,
+      resultId: ticketResultId,
+      durationMs: performance.now() - ticketMatchStartedAt,
+    });
+    ticketResultId = null;
+    if (payload) ticketReporter.report(TICKET_GAME_SLUG, payload);
+  }
+
   function startMatch() {
     resetMatchProgress(gameState);
+    beginTicketMatch();
     botState = createBotState();
     startAmbient();
     startRound();
@@ -507,6 +537,7 @@ function _boot(sounds) {
       updateCamera,
       updatePlatforms,
     });
+    if (gameState.phase === 'match_end' && ticketResultId) reportTicketResult();
   }
 
 
@@ -525,6 +556,7 @@ function _boot(sounds) {
     const secsLeft = getCountdownSecondsRemaining(onlineStartAt, onlineClockOffset);
     if (secsLeft <= 0) {
       resetMatchProgress(gameState);
+      beginTicketMatch();
       botState = createBotState();
       startRound();
     }

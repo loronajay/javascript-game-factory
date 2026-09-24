@@ -15,6 +15,8 @@ export type RoomInventory = Readonly<{
   owns: (id: string) => boolean;
   /** The surface to actually render for a requested id: itself when owned and known, else the starter. */
   resolveSurfaceId: (kind: SurfaceKind, id: string) => string;
+  /** Add one server-confirmed durable grant to this live inventory. */
+  grant: (id: string) => boolean;
   readonly grantAll: boolean;
 }>;
 
@@ -46,6 +48,11 @@ export function createRoomInventory(options: RoomInventoryOptions = {}): RoomInv
   return Object.freeze({
     grantAll,
     owns,
+    grant: (id) => {
+      if (!known.has(id)) return false;
+      granted.add(id);
+      return true;
+    },
     resolveSurfaceId: (kind, id) => (owns(id) && findSurface(kind, id) ? id : DEFAULT_SURFACE_IDS[kind]),
   });
 }

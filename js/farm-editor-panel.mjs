@@ -60,7 +60,6 @@ function decorIcon(definition, thumbnail) {
 }
 export function createFarmEditorPanel(elements, actions, options = {}) {
     let groundBuilt = false;
-    let catalogCategory = null;
     let inspector = null;
     function renderTabs(state) {
         for (const button of elements.tabs.querySelectorAll("[data-tab]")) {
@@ -75,10 +74,13 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         if (groundBuilt)
             return;
         groundBuilt = true;
-        elements.groundPicker.replaceChildren(...GROUND_CATALOG.map((ground) => {
+        const balance = element("small", "ticket-shop-balance");
+        balance.dataset.ticketShopBalance = "true";
+        elements.groundPicker.replaceChildren(balance, ...GROUND_CATALOG.map((ground) => {
             const swatch = element("button", "swatch");
             swatch.type = "button";
             swatch.dataset.groundId = ground.id;
+            swatch.dataset.catalogTitle = ground.title;
             swatch.dataset.pattern = ground.style.pattern;
             swatch.title = ground.title;
             swatch.style.setProperty("--swatch-a", ground.swatch[0]);
@@ -89,7 +91,25 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
     }
     function renderGround(state) {
         buildGroundPicker();
+        const balance = elements.groundPicker.querySelector("[data-ticket-shop-balance]");
+        if (balance)
+            balance.textContent = state.ticketBalance === null
+                ? "Sign in to buy permanent farm unlocks"
+                : `${state.ticketBalance.toLocaleString()} tickets available`;
         for (const swatch of elements.groundPicker.querySelectorAll("[data-ground-id]")) {
+            const id = swatch.dataset.groundId;
+            const owned = state.inventory.owns(id);
+            const price = state.ticketPrices.get(id);
+            const label = swatch.querySelector(".swatch__label");
+            if (label)
+                label.textContent = owned
+                    ? swatch.dataset.catalogTitle ?? id
+                    : price ? `${swatch.dataset.catalogTitle ?? id} · ${price.toLocaleString()} tickets` : "Locked";
+            swatch.disabled = !owned && !state.canPurchase;
+            if (!owned && price)
+                swatch.dataset.buyItem = id;
+            else
+                delete swatch.dataset.buyItem;
             swatch.setAttribute("aria-pressed", String(swatch.dataset.groundId === state.layout.ground));
         }
     }
@@ -99,17 +119,23 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         const category = state.tab;
         elements.catalogTitle.textContent = FARM_DECOR_CATEGORY_TITLES[category];
         elements.catalogHint.textContent = CATEGORY_HINTS[category];
-        if (catalogCategory === category)
-            return;
-        catalogCategory = category;
-        elements.catalog.replaceChildren(...farmDecorByCategory(category).map((definition) => {
+        const balance = element("small", "ticket-shop-balance", state.ticketBalance === null
+            ? "Sign in to buy permanent farm unlocks"
+            : `${state.ticketBalance.toLocaleString()} tickets available`);
+        elements.catalog.replaceChildren(balance, ...farmDecorByCategory(category).map((definition) => {
             const card = element("button", "decor-card");
             card.type = "button";
-            card.dataset.addDecor = definition.id;
-            card.title = `Add ${definition.title}`;
+            const owned = state.inventory.owns(definition.id);
+            const price = state.ticketPrices.get(definition.id);
+            if (owned)
+                card.dataset.addDecor = definition.id;
+            else if (price)
+                card.dataset.buyItem = definition.id;
+            card.title = owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`;
+            card.disabled = !owned && !state.canPurchase;
             card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
             const meta = definition.length.enabled ? "stretchable" : definition.habitat === "water" ? "habitat" : definition.shell ? "enterable" : definition.solid ? "solid" : "walk-over";
-            card.append(element("small", "decor-card__meta", meta));
+            card.append(element("small", "decor-card__meta", owned ? meta : price ? `Buy · ${price.toLocaleString()} tickets` : "Locked"));
             if (definition.doors) {
                 card.classList.add("is-interactive");
                 card.append(element("span", "decor-card__badge", "PRESS E"));
@@ -263,10 +289,17 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
     });
     elements.groundPicker.addEventListener("click", (event) => {
         const swatch = event.target.closest("[data-ground-id]");
-        if (swatch?.dataset.groundId)
+        if (swatch?.dataset.buyItem)
+            actions.purchaseItem(swatch.dataset.buyItem);
+        else if (swatch?.dataset.groundId)
             actions.setGround(swatch.dataset.groundId);
     });
     elements.catalog.addEventListener("click", (event) => {
+        const buy = event.target.closest("[data-buy-item]");
+        if (buy?.dataset.buyItem) {
+            actions.purchaseItem(buy.dataset.buyItem);
+            return;
+        }
         const card = event.target.closest("[data-add-decor]");
         if (card?.dataset.addDecor)
             actions.addDecor(card.dataset.addDecor);

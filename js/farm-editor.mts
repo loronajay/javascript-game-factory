@@ -15,6 +15,7 @@
 // preview-then-commit gesture, and a click on nothing deselects.
 
 import { findFarmDecor, type FarmDecorDefinition } from "./farm-catalog/decor.mjs";
+import type { FarmInventory } from "./farm-catalog/inventory.mjs";
 import { addFarmDecor, alignFarmDecorPlacement, duplicateFarmDecor, farmDecorHandles, placeFarmDecor, removeFarmDecor, rotateFarmDecor, setFarmDecorLength, stretchFarmDecorEnd, type FarmDecorResult } from "./farm-decor-layout.mjs";
 import { FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { farmObstacles, type FarmObstacleState } from "./farm-scene.mjs";
@@ -44,6 +45,7 @@ export type FarmEditorElements = FarmPanelElements & Readonly<{
 }>;
 
 export type FarmEditorSaveResult = Readonly<{ ok: boolean; message: string }>;
+export type FarmEditorPurchaseResult = Readonly<{ ok: boolean; itemId: string; price?: number; balance?: number; alreadyOwned?: boolean; error?: string }>;
 
 export type FarmEditorOptions = Readonly<{
   THREE: ThreeNamespace;
@@ -52,6 +54,10 @@ export type FarmEditorOptions = Readonly<{
   canvas: HTMLCanvasElement;
   world: FarmWorld;
   initialLayout: FarmLayout;
+  inventory: FarmInventory;
+  ticketPrices?: ReadonlyMap<string, number>;
+  ticketBalance?: number | null;
+  purchaseItem?: ((itemId: string) => Promise<FarmEditorPurchaseResult | null>) | null;
   /** Where a save goes; the store decides account or device and reports the true thing to say. */
   persist: (layout: FarmLayout) => Promise<FarmEditorSaveResult>;
   elements: FarmEditorElements;
@@ -84,13 +90,15 @@ const SNAP_RANGE_M = Object.freeze({ min: 0.08, max: 0.4 });
 const WHEEL_GESTURE_MS = 350;
 
 export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
-  const { THREE, scene, camera, canvas, world, persist, elements, canEnter, onEditingChange, onLayoutChange } = options;
+  const { THREE, scene, camera, canvas, world, inventory, persist, elements, canEnter, onEditingChange, onLayoutChange } = options;
   let layout = options.initialLayout;
   let selection = "";
   let tab: FarmEditorTab = "fence";
   let editing = false;
   let dragging = false;
   let saving = false;
+  let purchasingItemId = "";
+  let ticketBalance = Number.isSafeInteger(options.ticketBalance) && Number(options.ticketBalance) >= 0 ? Number(options.ticketBalance) : null;
   let previewFrame = 0;
   let wheelGestureTimer: ReturnType<typeof setTimeout> | undefined;
   let cameraGesture: "none" | "orbit" | "pan" = "none";
@@ -126,6 +134,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
   const panel = createFarmEditorPanel(elements, {
     selectTab: (next) => { tab = next; renderPanel(); },
     setGround: (id) => {
+      if (!inventory.owns(id)) { setStatus("You do not own that ground yet.", "error"); return; }
       const result = setFarmGround(layout, id);
       if (!result.valid) return;
       commit(result.layout, "Ground changed · unsaved");
@@ -137,6 +146,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     duplicateDecor: (instanceId) => duplicate(instanceId),
     rotateDecor: (instanceId, direction) => { select(instanceId, true); rotate(direction); },
     setDecorLength: (instanceId, length, phase) => editLength(setFarmDecorLength(layout, instanceId, length), phase),
+    purchaseItem: (itemId) => { void purchaseItem(itemId); },
   }, { thumbnail: options.thumbnail });
 
   function selected(): FarmDecorRow | undefined {
@@ -170,13 +180,37 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
   }
 
   function renderPanel(): void {
-    panel.render({ tab, layout, selection, removeBlockedReason: removeBlockedReason() });
+    panel.render({
+      tab, layout, selection, removeBlockedReason: removeBlockedReason(), inventory,
+      ticketPrices: options.ticketPrices ?? new Map(), ticketBalance,
+      canPurchase: options.purchaseItem != null && purchasingItemId === "",
+    });
     elements.undoButton.disabled = !history.canUndo();
   }
 
   function setStatus(message: string, state = "ready"): void {
     elements.status.textContent = message;
     elements.status.dataset.state = state;
+  }
+
+  async function purchaseItem(itemId: string): Promise<void> {
+    if (!options.purchaseItem || purchasingItemId) {
+      setStatus("Sign in to buy permanent farm unlocks.", "error");
+      return;
+    }
+    purchasingItemId = itemId;
+    renderPanel();
+    setStatus("Buying item…");
+    const result = await options.purchaseItem(itemId).catch(() => null);
+    purchasingItemId = "";
+    if (!result?.ok || !inventory.grant(result.itemId)) {
+      renderPanel();
+      setStatus(result?.error === "insufficient_tickets" ? "You do not have enough tickets for that yet." : "That purchase did not go through. Try again.", "error");
+      return;
+    }
+    if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0) ticketBalance = Number(result.balance);
+    renderPanel();
+    setStatus(result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
   }
 
   function setLayout(next: FarmLayout): void {
@@ -289,7 +323,10 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
 
   function addDecor(itemId: string): void {
     const definition = findFarmDecor(itemId);
-    if (!definition) return;
+    if (!definition || !inventory.owns(itemId)) {
+      setStatus("You do not own that item yet.", "error");
+      return;
+    }
     const target = view.view().target;
     const result = addFarmDecor(layout, definition, { x: target.x, z: target.z, rotationY: 0 });
     if (!result.valid) {

@@ -31,6 +31,8 @@
 // stored as sent and migrated by the client's normalizer, which seeds the
 // starter field for it.
 
+import { FARM_CATALOG_IDS, FARM_STARTER_IDS } from "./farm-ticket-catalog.mjs";
+
 export const FARM_GAME_SLUG = "farm";
 
 const LAYOUT_VERSIONS = new Set([1, 2, 3]);
@@ -150,6 +152,7 @@ function normalizePetProfile(value: any): any | null {
     milestones: Array.from(new Set((Array.isArray(value.milestones) ? value.milestones : [])
       .filter((id: any) => typeof id === "string" && /^dwelling:decor\.[a-z0-9.-]+$/.test(id)).slice(0, 16))),
     paletteId: cleanText(value.paletteId, 40) || "standard",
+    paletteBonus: Math.max(0, boundedNumber(value.paletteBonus, 0.5) ?? 0),
   };
   return profile;
 }
@@ -187,6 +190,20 @@ function normalizePetHistoryRow(raw: any): any | null {
   };
 }
 
+function ownership(context: any): { enforce: boolean; owned: Set<string> } {
+  return {
+    enforce: context?.ownedEntitlementIds instanceof Set,
+    owned: context?.ownedEntitlementIds instanceof Set ? context.ownedEntitlementIds : new Set(),
+  };
+}
+
+function mayUseCatalogId(id: string, context: any): boolean {
+  if (!FARM_CATALOG_IDS.has(id)) return false;
+  if (id === "decor.prop.pet-tombstone") return true;
+  const state = ownership(context);
+  return !state.enforce || FARM_STARTER_IDS.has(id) || state.owned.has(id);
+}
+
 /** A placed item: the room's decor row shape, bounded the same way. Optional finish fields pass through when well-formed. */
 function normalizeDecorRow(raw: any): any | null {
   const source = raw && typeof raw === "object" ? raw : {};
@@ -209,9 +226,12 @@ function normalizeDecorRow(raw: any): any | null {
   return row;
 }
 
-export function normalizeFarmGarage(value: any): any {
+export function normalizeFarmGarage(value: any, context: any = {}): any {
   const missingDocument = !value || typeof value !== "object";
   const input = value && typeof value === "object" ? value : {};
+  const current = context?.currentGarage && typeof context.currentGarage === "object"
+    ? normalizeFarmGarage(context.currentGarage)
+    : null;
   const seen = new Set<string>();
   const pets: any[] = [];
   for (const raw of Array.isArray(input.pets) ? input.pets.slice(0, FARM_MAX_PETS + 10) : []) {
@@ -224,7 +244,7 @@ export function normalizeFarmGarage(value: any): any {
   const submittedGround = cleanText(input.ground, 80);
   const garage: any = {
     version: LAYOUT_VERSIONS.has(input.version) ? input.version : LAYOUT_VERSION,
-    ground: GROUND_ID_PATTERN.test(submittedGround) ? submittedGround : "",
+    ground: GROUND_ID_PATTERN.test(submittedGround) && mayUseCatalogId(submittedGround, context) ? submittedGround : "",
     pets,
   };
   if (Array.isArray(input.petHistory)) {
@@ -245,11 +265,40 @@ export function normalizeFarmGarage(value: any): any {
   } else if (missingDocument) {
     garage.onboarding = { status: "needs_name", introSeen: false };
   }
+  if (current) {
+    const currentPets = new Map((Array.isArray(current.pets) ? current.pets : []).map((row: any) => [row.instanceId, row]));
+    const starterTransition = current.onboarding?.status === "needs_name" && garage.onboarding?.status === "complete";
+    garage.pets = garage.pets.filter((row: any) => {
+      const stored: any = currentPets.get(row.instanceId);
+      if (stored) return stored.speciesId === row.speciesId;
+      return starterTransition && row.speciesId === "pet.corgi" && row.instanceId === "corgi-1";
+    }).map((row: any) => {
+      const stored: any = currentPets.get(row.instanceId);
+      if (!stored?.profile || !row.profile) return row;
+      return {
+        ...row,
+        profile: {
+          ...row.profile,
+          gender: stored.profile.gender,
+          size: { ...row.profile.size, max: stored.profile.size.max, growthPerDay: stored.profile.size.growthPerDay },
+          stats: stored.profile.stats,
+          traits: stored.profile.traits,
+          paletteId: stored.profile.paletteId,
+          paletteBonus: stored.profile.paletteBonus,
+        },
+      };
+    });
+    if (starterTransition) {
+      const starter = garage.pets.find((row: any) => row.instanceId === "corgi-1" && row.speciesId === "pet.corgi");
+      garage.pets = starter ? [starter] : [];
+    }
+  }
   if (Array.isArray(input.decor)) {
     const decor: any[] = [];
     for (const raw of input.decor.slice(0, MAX_DECOR)) {
       const row = normalizeDecorRow(raw);
       if (!row || seen.has(row.instanceId)) continue;
+      if (!mayUseCatalogId(row.itemId, context)) continue;
       seen.add(row.instanceId);
       decor.push(row);
     }
@@ -258,6 +307,12 @@ export function normalizeFarmGarage(value: any): any {
   if (garage.version === 3) {
     const decorIds = new Set<string>((garage.decor ?? []).filter((row: any) => row.itemId === "decor.plant.soil-patch").map((row: any) => String(row.instanceId)));
     garage.agriculture = normalizeAgriculture(input.agriculture, decorIds);
+    if (current?.agriculture?.inventory?.supplies) {
+      const stored = current.agriculture.inventory.supplies;
+      const submitted = garage.agriculture.inventory.supplies;
+      garage.agriculture.inventory.supplies = Object.fromEntries(Object.entries(stored)
+        .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted[id]) || 0)]));
+    }
     const clock = input.clock && typeof input.clock === "object" ? input.clock : {};
     garage.clock = {
       farmMinutes: Math.max(0, boundedNumber(clock.farmMinutes, 1000000000) ?? 480),
@@ -268,14 +323,12 @@ export function normalizeFarmGarage(value: any): any {
 }
 
 /** What a visitor draws: the layout itself. */
-export function farmLoadoutFromGarage(garage: any): any {
-  return { layout: normalizeFarmGarage(garage) };
+export function farmLoadoutFromGarage(garage: any, context: any = {}): any {
+  return { layout: normalizeFarmGarage(garage, context) };
 }
 
 export const FARM_LOADOUT_CATALOG = Object.freeze({
-  // Every ground and species is granted in this phase; the day one has to be
-  // earned, the owned-id test goes beside the namespace check above.
-  requiresEntitlements: false,
+  requiresEntitlements: true,
   normalizeGarage: normalizeFarmGarage,
   loadoutFromGarage: farmLoadoutFromGarage,
 });

@@ -10,8 +10,9 @@
 // their picture swapped in when it arrives; the pet rows are rebuilt on every
 // layout change because they are few and carry live inputs.
 import { adoptableAnimals, findAnimal, findAnimalPalette } from "./farm-catalog/animals.mjs";
+import { animalPaletteDisplayName } from "./farm-pet-palettes.mjs";
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats } from "./farm-layout.mjs";
-import { PET_TRAITS, visiblePetStats } from "./farm-pet-care.mjs";
+import { PET_TRAITS, findPetCare, visiblePetStats } from "./farm-pet-care.mjs";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { petOutcomeWarning } from "./farm-pet-outcomes.mjs";
 function escapeHtml(value) {
@@ -34,10 +35,11 @@ export function createPetsPanel(elements, actions, options = {}) {
         card.className = "pet-card";
         card.dataset.speciesId = species.id;
         card.disabled = !adoptable;
-        card.title = adoptable ? `Adopt a ${species.title}` : species.needs;
+        const care = findPetCare(species.id);
+        card.title = adoptable ? `Adopt a ${species.title} for ${care?.adoptionPrice.toLocaleString() ?? "—"} tickets` : species.needs;
         card.innerHTML = `<span class="pet-card__picture" aria-hidden="true"><span class="pet-card__letter">${escapeHtml(species.title[0])}</span></span>`
             + `<span class="pet-card__title">${escapeHtml(species.title)}</span>`
-            + `<span class="pet-card__note">${escapeHtml(adoptable ? species.habitat : species.needs)}</span>`;
+            + `<span class="pet-card__note">${escapeHtml(adoptable ? `${care?.adoptionPrice.toLocaleString() ?? "—"} tickets · includes 5 ${care?.food.title ?? "food"}` : species.needs)}</span>`;
         const picture = card.querySelector(".pet-card__picture");
         const paint = (url) => {
             picture.innerHTML = `<img src="${url}" alt="">`;
@@ -51,7 +53,7 @@ export function createPetsPanel(elements, actions, options = {}) {
                 other.classList.toggle("is-selected", other.dataset.speciesId === species.id);
             elements.nameInput.placeholder = species.title;
             elements.nameInput.focus();
-            setStatus(full() ? `The farm is full (${MAX_PETS} pets). Release one to adopt another.` : `Name your ${species.title} and press Enter to adopt.`);
+            setStatus(full() ? `The farm is full (${MAX_PETS} pets). Release one to adopt another.` : `Name your ${species.title} · ${care?.adoptionPrice.toLocaleString() ?? "—"} tickets, including 5 ${care?.food.title ?? "food"}.`);
         });
         return card;
     }
@@ -96,7 +98,7 @@ export function createPetsPanel(elements, actions, options = {}) {
                 const trait = PET_TRAITS.find((entry) => entry.id === id);
                 return trait ? `<li title="${escapeHtml(trait.description)}">${escapeHtml(trait.title)}</li>` : "";
             }).join("")}</ul>` : "";
-            row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}${palette && palette.id !== "standard" ? ` · ${escapeHtml(palette.title)}` : ""}</span>`
+            row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}${palette && palette.id !== "standard" ? ` · ${escapeHtml(animalPaletteDisplayName(palette))}` : ""}</span>`
                 + `<input class="pet-row__name" type="text" maxlength="${PET_NAME_MAX_LENGTH}" value="${escapeHtml(pet.name)}" aria-label="Name of ${escapeHtml(pet.name)}">`
                 + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button></div>`
                 + statMarkup

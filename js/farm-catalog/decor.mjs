@@ -45,6 +45,8 @@ export const FARM_DECOR_CATEGORY_TITLES = Object.freeze({
     prop: "Props",
 });
 const STARTER = Object.freeze({ type: "starter", source: "The Farm" });
+const PURCHASE = Object.freeze({ type: "purchase", source: "Farm Shop" });
+const PET_OUTCOME = Object.freeze({ type: "achievement", source: "Pet outcome" });
 const NO_LENGTH = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 function item(variant, spec) {
     return Object.freeze({
@@ -64,7 +66,7 @@ function item(variant, spec) {
         snapDegrees: spec.snapDegrees ?? 15,
         swatch: Object.freeze([spec.swatch[0], spec.swatch[1]]),
         model: spec.model,
-        unlock: STARTER,
+        unlock: spec.unlock ?? PURCHASE,
         catalogVisible: spec.catalogVisible ?? true,
     });
 }
@@ -87,15 +89,15 @@ const SINGLE_DOOR = Object.freeze({ width: 1, height: 2.1, leaves: 1, reach: 1.9
 const SMALL_DOOR = Object.freeze({ width: 0.9, height: 1.9, leaves: 1, reach: 1.8 });
 export const FARM_DECOR_CATALOG = Object.freeze([
     // Fences: stretchable, cross freely, and the walker treats them as walls.
-    item("post-rail", { title: "Post & Rail", category: "fence", footprint: { width: 4, depth: 0.14 }, length: FENCE_LENGTH, swatch: ["#8a5a34", "#5d3a1f"], model: "fence-post-rail" }),
+    item("post-rail", { title: "Post & Rail", category: "fence", footprint: { width: 4, depth: 0.14 }, length: FENCE_LENGTH, swatch: ["#8a5a34", "#5d3a1f"], model: "fence-post-rail", unlock: STARTER }),
     item("picket", { title: "Picket Fence", category: "fence", footprint: { width: 4, depth: 0.12 }, length: FENCE_LENGTH, swatch: ["#f1e6d2", "#c9b99c"], model: "fence-picket" }),
     item("stone-wall", { title: "Stone Wall", category: "fence", footprint: { width: 4, depth: 0.5 }, length: FENCE_LENGTH, swatch: ["#8e8b82", "#5f5c55"], model: "fence-stone-wall" }),
     item("split-rail", { title: "Split Rail", category: "fence", footprint: { width: 4, depth: 0.18 }, length: FENCE_LENGTH, swatch: ["#9a7248", "#5d3a1f"], model: "fence-split-rail" }),
     item("wire", { title: "Wire Fence", category: "fence", footprint: { width: 4, depth: 0.12 }, length: FENCE_LENGTH, swatch: ["#8a5a34", "#b9bec4"], model: "fence-wire" }),
     item("hedge", { title: "Hedgerow", category: "fence", footprint: { width: 4, depth: 0.7 }, length: FENCE_LENGTH, swatch: ["#3f8a46", "#2b6331"], model: "fence-hedge" }),
-    item("gate", { title: "Gate", category: "fence", footprint: { width: 2.4, depth: 0.14 }, gate: { reach: 1.8 }, swatch: ["#8a5a34", "#f1e6d2"], model: "fence-gate" }),
+    item("gate", { title: "Gate", category: "fence", footprint: { width: 2.4, depth: 0.14 }, gate: { reach: 1.8 }, swatch: ["#8a5a34", "#f1e6d2"], model: "fence-gate", unlock: STARTER }),
     // Buildings: every one is a shell the player walks into. The footprint is the outer wall line.
-    item("barn", { title: "Barn", category: "building", footprint: { width: 7, depth: 5.5 }, keepOut: true, shell: walls(3.4, DOUBLE_DOOR), swatch: ["#a8312b", "#4a3a33"], model: "barn" }),
+    item("barn", { title: "Barn", category: "building", footprint: { width: 7, depth: 5.5 }, keepOut: true, shell: walls(3.4, DOUBLE_DOOR), swatch: ["#a8312b", "#4a3a33"], model: "barn", unlock: STARTER }),
     item("stable", { title: "Stable", category: "building", footprint: { width: 8, depth: 4.2 }, keepOut: true, shell: walls(2.9, STABLE_DOOR), swatch: ["#8a5a34", "#4a3a33"], model: "stable" }),
     item("cottage", { title: "Farmhouse", category: "building", footprint: { width: 6, depth: 5 }, keepOut: true, shell: walls(3, SINGLE_DOOR, 0.24), swatch: ["#f1e6d2", "#7a4a3a"], model: "cottage" }),
     item("greenhouse", { title: "Greenhouse", category: "building", footprint: { width: 5, depth: 3.6 }, keepOut: true, shell: walls(2.4, GLASS_DOOR, 0.12), swatch: ["#bfe6ee", "#f1e6d2"], model: "greenhouse" }),
@@ -105,13 +107,13 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("windmill", { title: "Windmill", category: "building", footprint: { width: 4, depth: 4 }, keepOut: true, shell: round(5.2, SINGLE_DOOR, 8, 0.24), snapDegrees: 45, swatch: ["#d9cdb5", "#5d3a1f"], model: "windmill" }),
     item("gazebo", { title: "Gazebo", category: "building", footprint: { width: 4, depth: 4 }, keepOut: true, shell: open(2.6, 0.18), swatch: ["#f1e6d2", "#4a3a33"], model: "gazebo" }),
     // Plants: a tree's footprint is its trunk (you walk under the canopy); beds are not solid.
-    item("oak", { title: "Oak Tree", category: "plant", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#3f7f34", "#5d3a1f"], model: "tree-oak" }),
+    item("oak", { title: "Oak Tree", category: "plant", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#3f7f34", "#5d3a1f"], model: "tree-oak", unlock: STARTER }),
     item("pine", { title: "Pine Tree", category: "plant", footprint: { width: 0.6, depth: 0.6 }, swatch: ["#2f6b3a", "#4a3220"], model: "tree-pine" }),
     item("birch", { title: "Birch Tree", category: "plant", footprint: { width: 0.5, depth: 0.5 }, swatch: ["#e8e4d8", "#7fb35a"], model: "tree-birch" }),
     item("apple", { title: "Apple Tree", category: "plant", footprint: { width: 0.6, depth: 0.6 }, swatch: ["#4f9a3a", "#d43a3a"], model: "tree-apple" }),
     item("willow", { title: "Willow", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#7fb35a", "#5d3a1f"], model: "tree-willow" }),
     item("bush", { title: "Hedge Bush", category: "plant", footprint: { width: 1.2, depth: 1 }, swatch: ["#4f9a3a", "#2f6b2a"], model: "bush" }),
-    item("soil-patch", { title: "Growing Plot", category: "plant", footprint: { width: 3, depth: 2 }, solid: false, swatch: ["#5b3820", "#8a633c"], model: "soil-patch" }),
+    item("soil-patch", { title: "Growing Plot", category: "plant", footprint: { width: 3, depth: 2 }, solid: false, swatch: ["#5b3820", "#8a633c"], model: "soil-patch", unlock: STARTER }),
     item("flower-bed", { title: "Flower Bed", category: "plant", footprint: { width: 2, depth: 1 }, solid: false, swatch: ["#ff6f91", "#5f9a3c"], model: "flower-bed" }),
     item("sunflowers", { title: "Sunflowers", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#ffd33d", "#4f9a3a"], model: "sunflowers" }),
     item("lavender", { title: "Lavender", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#9a7fd6", "#6f8f5a"], model: "lavender" }),
@@ -121,8 +123,8 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 8, depth: 4.5 }, keepOut: true, habitat: "water", swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
     item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 6, depth: 6 }, keepOut: true, habitat: "water", swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
     // Props.
-    item("hay-bale", { title: "Hay Bale", category: "prop", footprint: { width: 1.4, depth: 1 }, swatch: ["#d8b24a", "#b08b2f"], model: "hay-bale" }),
-    item("trough", { title: "Water Trough", category: "prop", footprint: { width: 1.8, depth: 0.7 }, swatch: ["#7e8790", "#3f7fb8"], model: "trough" }),
+    item("hay-bale", { title: "Hay Bale", category: "prop", footprint: { width: 1.4, depth: 1 }, swatch: ["#d8b24a", "#b08b2f"], model: "hay-bale", unlock: STARTER }),
+    item("trough", { title: "Water Trough", category: "prop", footprint: { width: 1.8, depth: 0.7 }, swatch: ["#7e8790", "#3f7fb8"], model: "trough", unlock: STARTER }),
     item("scarecrow", { title: "Scarecrow", category: "prop", footprint: { width: 0.5, depth: 0.5 }, swatch: ["#d8b24a", "#8a5a34"], model: "scarecrow" }),
     item("well", { title: "Stone Well", category: "prop", footprint: { width: 1.6, depth: 1.6 }, swatch: ["#8e8b82", "#4a3a33"], model: "well" }),
     item("bench", { title: "Garden Bench", category: "prop", footprint: { width: 1.6, depth: 0.6 }, swatch: ["#8a5a34", "#5d3a1f"], model: "bench" }),
@@ -131,7 +133,7 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     // Pet dwellings are regular placeable props. `keepOut` keeps random wandering from
     // clipping through their art; the entrance dimensions remain the contract for a
     // later deliberate sleep/enter action.
-    item("doghouse", { title: "Doghouse", category: "prop", footprint: { width: 1.2, depth: 1.4 }, keepOut: true, dwelling: { speciesId: "pet.corgi", entrance: { width: 0.78, height: 0.72 } }, swatch: ["#a8312b", "#4a3a33"], model: "doghouse" }),
+    item("doghouse", { title: "Doghouse", category: "prop", footprint: { width: 1.2, depth: 1.4 }, keepOut: true, dwelling: { speciesId: "pet.corgi", entrance: { width: 0.78, height: 0.72 } }, swatch: ["#a8312b", "#4a3a33"], model: "doghouse", unlock: STARTER }),
     item("duck-coop", { title: "Duck Coop", category: "prop", footprint: { width: 1.5, depth: 1.4 }, keepOut: true, dwelling: { speciesId: "pet.duck", entrance: { width: 0.7, height: 0.65 } }, swatch: ["#d6a35d", "#5d3a1f"], model: "dwelling-duck-coop" }),
     item("treetop-den", { title: "Treetop Den", category: "prop", footprint: { width: 2.2, depth: 1.8 }, keepOut: true, dwelling: { speciesId: "pet.red-panda", entrance: { width: 0.85, height: 0.85 } }, swatch: ["#8a5a34", "#5f8f48"], model: "dwelling-treetop-den" }),
     item("burrow-lodge", { title: "Burrow Lodge", category: "prop", footprint: { width: 1.8, depth: 1.5 }, keepOut: true, dwelling: { speciesId: "pet.platypus", entrance: { width: 0.75, height: 0.55 } }, swatch: ["#6f8f4e", "#6d4b2f"], model: "dwelling-burrow-lodge" }),
@@ -143,10 +145,10 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("jellyfish-lagoon", { title: "Jellyfish Lagoon", category: "prop", footprint: { width: 2.4, depth: 2.4 }, keepOut: true, dwelling: { speciesId: "pet.jellyfish", entrance: { width: 0.9, height: 0.9 } }, swatch: ["#67b6c7", "#d99ac6"], model: "dwelling-jellyfish-lagoon" }),
     // Dog toys are ordinary placed rows: owned from the start while progression is unlocked,
     // and cross-referenced by the corgi care row instead of being special-cased in the editor.
-    item("tennis-ball", { title: "Tennis Ball", category: "prop", footprint: { width: 0.24, depth: 0.24 }, solid: false, snapDegrees: 45, swatch: ["#cbea45", "#f5f0d0"], model: "tennis-ball" }),
-    item("rope-toy", { title: "Rope Toy", category: "prop", footprint: { width: 0.55, depth: 0.18 }, solid: false, snapDegrees: 45, swatch: ["#d9b36c", "#8c5638"], model: "rope-toy" }),
-    item("bone", { title: "Bone", category: "prop", footprint: { width: 0.48, depth: 0.2 }, solid: false, snapDegrees: 45, swatch: ["#eee5ce", "#b8a98c"], model: "bone" }),
-    item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", catalogVisible: false }),
+    item("tennis-ball", { title: "Tennis Ball", category: "prop", footprint: { width: 0.24, depth: 0.24 }, solid: false, snapDegrees: 45, swatch: ["#cbea45", "#f5f0d0"], model: "tennis-ball", unlock: STARTER }),
+    item("rope-toy", { title: "Rope Toy", category: "prop", footprint: { width: 0.55, depth: 0.18 }, solid: false, snapDegrees: 45, swatch: ["#d9b36c", "#8c5638"], model: "rope-toy", unlock: STARTER }),
+    item("bone", { title: "Bone", category: "prop", footprint: { width: 0.48, depth: 0.2 }, solid: false, snapDegrees: 45, swatch: ["#eee5ce", "#b8a98c"], model: "bone", unlock: STARTER }),
+    item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", unlock: PET_OUTCOME, catalogVisible: false }),
     item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
     item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),
     item("barrel", { title: "Barrel", category: "prop", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#7a4a2a", "#3b3b3b"], model: "barrel" }),

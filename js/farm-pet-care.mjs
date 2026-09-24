@@ -79,18 +79,25 @@ export function createPetProfile(speciesId, random) {
         return null;
     const maxSize = round(randomIn({ min: care.size.adultMin, max: care.size.max }, random));
     const currentSize = round(randomIn({ min: care.size.min, max: Math.min(care.size.adultMin, maxSize) }, random));
+    const gender = unit(random()) < 0.5 ? "female" : "male";
+    const baseSpeed = randomIn(care.stats.speed, random);
+    const baseStrength = randomIn(care.stats.strength, random);
+    const traits = chooseTraits(care, random);
+    const palette = pickAnimalPalette(speciesId, random);
+    const paletteBonus = palette?.statBoost ?? 0;
     return Object.freeze({
-        gender: unit(random()) < 0.5 ? "female" : "male",
+        gender,
         ageDays: 0,
         size: Object.freeze({ current: currentSize, max: maxSize, growthPerDay: round((maxSize - currentSize) / 70, 4) }),
         affection: 50,
         hunger: 100,
         starvingMinutes: 0,
         happiness: 100,
-        stats: Object.freeze({ speed: round(randomIn(care.stats.speed, random), 1), strength: round(randomIn(care.stats.strength, random), 1) }),
-        traits: Object.freeze(chooseTraits(care, random)),
+        stats: Object.freeze({ speed: round(Math.min(100, baseSpeed * (1 + paletteBonus)), 1), strength: round(Math.min(100, baseStrength * (1 + paletteBonus)), 1) }),
+        traits: Object.freeze(traits),
         milestones: Object.freeze([]),
-        paletteId: pickAnimalPalette(speciesId, random)?.id ?? "standard",
+        paletteId: palette?.id ?? "standard",
+        paletteBonus,
     });
 }
 export function normalizePetProfile(speciesId, value) {
@@ -100,6 +107,10 @@ export function normalizePetProfile(speciesId, value) {
     const source = value && typeof value === "object" ? value : {};
     const size = source.size && typeof source.size === "object" ? source.size : {};
     const stats = source.stats && typeof source.stats === "object" ? source.stats : {};
+    const palette = findAnimalPalette(speciesId, source.paletteId) ?? findAnimalPalette(speciesId, "standard");
+    const paletteBonus = palette?.statBoost ?? 0;
+    const storedBonus = clamp(source.paletteBonus, 0, 0.5, 0);
+    const bonusMigration = (1 + paletteBonus) / (1 + storedBonus);
     const maxSize = round(clamp(size.max, care.size.adultMin, care.size.max, care.size.adultMin));
     const currentSize = round(clamp(size.current, care.size.min, maxSize, care.size.min));
     const selected = [];
@@ -118,14 +129,15 @@ export function normalizePetProfile(speciesId, value) {
         starvingMinutes: Math.floor(clamp(source.starvingMinutes, 0, 100 * 365 * 24 * 60, 0)),
         happiness: round(clamp(source.happiness, 0, 100, 100), 1),
         stats: Object.freeze({
-            speed: round(clamp(stats.speed, care.stats.speed.min, care.stats.speed.max, (care.stats.speed.min + care.stats.speed.max) / 2), 1),
-            strength: round(clamp(stats.strength, care.stats.strength.min, care.stats.strength.max, (care.stats.strength.min + care.stats.strength.max) / 2), 1),
+            speed: round(clamp((typeof stats.speed === "number" ? stats.speed : (care.stats.speed.min + care.stats.speed.max) / 2) * bonusMigration, care.stats.speed.min, Math.min(100, care.stats.speed.max * (1 + paletteBonus)), (care.stats.speed.min + care.stats.speed.max) / 2), 1),
+            strength: round(clamp((typeof stats.strength === "number" ? stats.strength : (care.stats.strength.min + care.stats.strength.max) / 2) * bonusMigration, care.stats.strength.min, Math.min(100, care.stats.strength.max * (1 + paletteBonus)), (care.stats.strength.min + care.stats.strength.max) / 2), 1),
         }),
         traits: Object.freeze(selected),
         milestones: Object.freeze(Array.from(new Set((Array.isArray(source.milestones) ? source.milestones : [])
             .filter((id) => typeof id === "string" && /^dwelling:decor\.[a-z0-9.-]+$/.test(id))
             .slice(0, 16)))),
-        paletteId: findAnimalPalette(speciesId, source.paletteId)?.id ?? "standard",
+        paletteId: palette?.id ?? "standard",
+        paletteBonus,
     });
 }
 /** The UI contract: affection remains in persistence but never joins this view. */

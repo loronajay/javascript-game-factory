@@ -36,6 +36,46 @@ test("ticket wallet client fails closed when the API is unavailable", async () =
   assert.equal(await client.getWallet(), null);
 });
 
+test("the generic ticket-shop client sends only the item id when purchasing", async () => {
+  const calls = [];
+  const client = createTicketWalletClient({
+    baseUrl: "https://api.example.test",
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return { ok: true, status: 200, json: async () => ({ purchase: { ok: true, itemId: "decor.prop.claw", balance: 3800 } }) };
+    },
+  });
+  const result = await client.purchaseShopItem("arcade-room", "decor.prop.claw");
+  assert.equal(result.balance, 3800);
+  assert.equal(calls[0].url, "https://api.example.test/tickets/shops/arcade-room/purchases");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { itemId: "decor.prop.claw" });
+});
+
+test("the generic ticket-shop client preserves an insufficient-ticket response", async () => {
+  const client = createTicketWalletClient({
+    baseUrl: "https://api.example.test",
+    fetchImpl: async () => ({
+      ok: false,
+      status: 409,
+      json: async () => ({
+        status: "error",
+        error: "insufficient_tickets",
+        itemId: "decor.prop.claw",
+        price: 1200,
+        balance: 900,
+      }),
+    }),
+  });
+
+  assert.deepEqual(await client.purchaseShopItem("arcade-room", "decor.prop.claw"), {
+    status: "error",
+    error: "insufficient_tickets",
+    itemId: "decor.prop.claw",
+    price: 1200,
+    balance: 900,
+  });
+});
+
 test("a settled game result publishes the new ticket balance to the shared shell", () => {
   const events = [];
   const target = { dispatchEvent(event) { events.push(event); } };

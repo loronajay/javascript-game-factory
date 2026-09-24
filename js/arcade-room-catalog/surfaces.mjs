@@ -49,6 +49,13 @@ export const SURFACE_PATTERNS = Object.freeze([
     "dirt",
 ]);
 const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" });
+const PURCHASE = Object.freeze({ type: "purchase", source: "Arcade Shop" });
+const STARTER_SURFACE_IDS = new Set([
+    "floor.showroom-slate",
+    "wall.paint-midnight",
+    "ceiling.tile-dark",
+    "trim.steel-navy",
+]);
 function surface(kind, slug, title, group, style, swatch) {
     return Object.freeze({
         id: `${kind}.${slug}`,
@@ -57,7 +64,7 @@ function surface(kind, slug, title, group, style, swatch) {
         group,
         swatch: swatch ?? [style.colors[0] ?? "#888888", style.colors[1] ?? style.colors[0] ?? "#888888"],
         style: Object.freeze({ ...style, colors: Object.freeze([...style.colors]) }),
-        unlock: STARTER,
+        unlock: STARTER_SURFACE_IDS.has(`${kind}.${slug}`) ? STARTER : PURCHASE,
     });
 }
 const matte = { roughness: 0.78, metalness: 0.04 };

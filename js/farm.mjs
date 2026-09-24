@@ -17,7 +17,7 @@ import { createFarmWorld } from "./farm-world.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions } from "./farm-scene.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody } from "./farm-body.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot } from "./farm-interaction.mjs";
-import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
+import { FARM_BOUNDS, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -25,6 +25,8 @@ import { assetUrlFor, createPetBodies } from "./farm-pet-bodies.mjs";
 import { createPetsPanel } from "./farm-pets-panel.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
+import { createFarmInventory } from "./farm-catalog/inventory.mjs";
+import { createTicketWalletClient, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
@@ -99,6 +101,16 @@ const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
 const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId });
 const visiting = layoutStore.mode === "visitor";
 const loaded = await layoutStore.load();
+const ticketClient = createTicketWalletClient();
+const shop = layoutStore.accountBacked
+    ? await ticketClient.getShop("farm").catch(() => null)
+    : null;
+const farmInventory = createFarmInventory({ ownedIds: shop?.ownedIds });
+const ticketPrices = new Map(Array.isArray(shop?.items)
+    ? shop.items.filter((entry) => typeof entry?.id === "string" && Number.isSafeInteger(entry?.price) && entry.price > 0)
+        .map((entry) => [entry.id, entry.price])
+    : []);
+const farmPurchaseId = (kind) => `${kind}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 const canManageFarm = !visiting;
 // A signed-in fallback must never overwrite the database with a stale device
 // copy or starter layout. Signed-out owners, however, save normally on-device.
@@ -853,17 +865,25 @@ const petsPanel = createPetsPanel({
     count: requiredElement("#petsCount"),
 }, {
     adopt: async (speciesId, name) => {
-        const result = addPet(layout, speciesId, name);
-        if (!result.valid) {
-            if (result.reason === "full")
-                return "The farm is full. Release a pet to adopt another.";
-            if (result.reason === "needs_water")
-                return "That one needs a pond. Ponds are coming.";
-            return "That animal is not in the catalog.";
+        if (!layoutStore.accountBacked)
+            return "Sign in to adopt another pet with tickets.";
+        const result = await ticketClient.adoptFarmPet(speciesId, name, farmPurchaseId("adopt"));
+        if (!result?.ok) {
+            if (result?.error === "insufficient_tickets")
+                return "You do not have enough tickets for that adoption yet.";
+            if (result?.error === "farm_full")
+                return "The farm is full. Release one pet before adopting another.";
+            if (result?.error === "needs_water")
+                return "That animal needs a pond on the farm first.";
+            return "That adoption did not go through. Try again.";
         }
-        const saved = await persistLayout(result.layout);
-        const pet = result.layout.pets.find((row) => row.instanceId === result.instanceId);
-        return (pet?.name ?? "Your pet") + " moved in. " + saved;
+        const next = normalizeFarmLayout(result.layout);
+        applyLayout(next);
+        farmEditor.replaceLayout(next);
+        if (Number.isSafeInteger(result.balance))
+            publishTicketBalance(result.balance);
+        const pet = next.pets.at(-1);
+        return `${pet?.name ?? "Your pet"} moved in with 5 servings of food. ${Number(result.balance).toLocaleString()} tickets remain.`;
     },
     rename: async (instanceId, name) => {
         const next = renamePet(layout, instanceId, name);
@@ -891,7 +911,20 @@ const inventoryPanel = createFarmInventoryPanel({
     produceGrid: requiredElement("#produceGrid"),
     suppliesGrid: requiredElement("#suppliesGrid"),
     selected: requiredElement("#selectedSeed"),
-}, { thumbnail: cropThumbnails.get });
+}, {
+    thumbnail: cropThumbnails.get,
+    purchaseSupply: layoutStore.accountBacked ? async (itemId, quantity) => {
+        const result = await ticketClient.purchaseFarmSupply(itemId, quantity, farmPurchaseId("supply"));
+        if (!result?.ok)
+            return result?.error === "insufficient_tickets" ? "Not enough tickets." : result?.error === "inventory_full" ? "That supply stack is full." : "Purchase failed. Try again.";
+        const next = normalizeFarmLayout(result.layout);
+        applyLayout(next);
+        farmEditor.replaceLayout(next);
+        if (Number.isSafeInteger(result.balance))
+            publishTicketBalance(result.balance);
+        return `Purchased · ${Number(result.balance).toLocaleString()} tickets remain.`;
+    } : null,
+});
 inventoryPanel.render(layout.agriculture);
 if (visiting)
     openInventoryButton.hidden = true;
@@ -905,6 +938,15 @@ const farmEditor = createFarmEditor({
     canvas,
     world,
     initialLayout: layout,
+    inventory: farmInventory,
+    ticketPrices,
+    ticketBalance: Number.isSafeInteger(shop?.balance) ? shop.balance : null,
+    purchaseItem: layoutStore.accountBacked && shop ? async (itemId) => {
+        const result = await ticketClient.purchaseShopItem("farm", itemId);
+        if (Number.isSafeInteger(result?.balance))
+            publishTicketBalance(result.balance);
+        return result;
+    } : null,
     persist: async (next) => {
         if (!canPersistFarm)
             return { ok: false, message: "Session only · reload when the farm database is available to save safely." };

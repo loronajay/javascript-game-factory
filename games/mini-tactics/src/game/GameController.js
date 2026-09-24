@@ -54,6 +54,7 @@ import { HudRenderer } from "../render/hudRenderer.js";
 import { EffectsRenderer } from "../render/effectsRenderer.js";
 import { renderAmbient } from "../render/ambient.js";
 import { scale } from "../render/timing.js";
+import { createMatchTickets } from "./matchTickets.js";
 import {
   TUTORIAL_BASICS_ID,
   completeTutorial,
@@ -79,6 +80,8 @@ export class GameController {
     // Routed to the results screen when a match ends. Defaults to a no-op so the
     // controller stays usable headlessly / in isolation.
     this.onMatchComplete = onMatchComplete ?? (() => {});
+    // Files each finished match for platform tickets (matchTickets.js).
+    this.tickets = createMatchTickets();
     this.onTutorialComplete = onTutorialComplete ?? (() => {});
 
     // Current match framing. `mode` drives mode-specific chrome (e.g. the Restart
@@ -179,6 +182,7 @@ export class GameController {
     this.pendingTutorialComplete = false;
     this._onlineEnded = false;
     this.startedAt = Date.now();
+    this.tickets.begin();
     this.applyLocalControlVisibility();
     this.reset();
   }
@@ -1538,7 +1542,19 @@ export class GameController {
       this._onlineEnded = true;
       this.net?.endMatch({ allowRematch: true });
     }
-    this.onMatchComplete(this.buildMatchSummary());
+    const summary = this.buildMatchSummary();
+    this.reportTickets(summary);
+    this.onMatchComplete(summary);
+  }
+
+  // The local player's seat: seat 1 against the CPU, the lobby seat online.
+  // Hot seat and the tutorial have no single local player and are never filed.
+  reportTickets(summary) {
+    const mySeat = this.mode === "single" ? 1 : this.mode === "online" ? this.net?.mySeat : null;
+    this.tickets.finish(summary, {
+      myTeam: mySeat == null ? null : teamOf(this.match, mySeat),
+      iConceded: mySeat != null && Boolean(this.stats[mySeat]?.conceded),
+    });
   }
 
   // Lazily fetch the running tally for a seat.
@@ -1584,6 +1600,12 @@ export class GameController {
             this.statsFor(healer.player).healingDone += event.healing;
           }
           lastAttacker = null;
+          break;
+        }
+        case EVENTS.PLAYER_CONCEDED: {
+          // Not part of the battle report; it keeps a resigned seat from
+          // being filed for tickets when the rest of the table plays on.
+          this.statsFor(event.player).conceded = true;
           break;
         }
         case EVENTS.UNIT_ELIMINATED: {

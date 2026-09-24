@@ -35,7 +35,7 @@ function buildAuthHeaders() {
     const token = getStoredAuthToken();
     return token ? { authorization: `Bearer ${token}` } : {};
 }
-async function requestJson(fetchImpl, baseUrl, path, options = {}) {
+async function requestJson(fetchImpl, baseUrl, path, options = {}, acceptErrorPayload = false) {
     if (typeof fetchImpl !== "function" || !baseUrl) {
         return null;
     }
@@ -47,7 +47,7 @@ async function requestJson(fetchImpl, baseUrl, path, options = {}) {
             // "am I signed in?" starts answering no.
             if (response?.status === 401)
                 handleUnauthorizedResponse();
-            return null;
+            return acceptErrorPayload ? readJsonResponse(response) : null;
         }
         return await readJsonResponse(response);
     }
@@ -100,9 +100,11 @@ export function createPlatformApiClient(options = {}) {
         const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("PUT", value, options));
         return payload && responseKey ? (payload[responseKey] ?? null) : payload;
     }
-    async function post(path, value, responseKey, options = {}) {
-        const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("POST", value, options));
-        return payload && responseKey ? (payload[responseKey] ?? null) : payload;
+    async function post(path, value, responseKey, options = {}, acceptErrorPayload = false) {
+        const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("POST", value, options), acceptErrorPayload);
+        return payload && responseKey
+            ? (payload[responseKey] ?? (acceptErrorPayload ? payload : null))
+            : payload;
     }
     async function del(path, responseKey, options = {}) {
         const payload = await requestJson(fetchImpl, baseUrl, path, {
@@ -546,6 +548,20 @@ export function createPlatformApiClient(options = {}) {
         // client: only server-side result validators are allowed to mint currency.
         fetchTicketWallet() {
             return get("/tickets/wallet", "wallet");
+        },
+        fetchTicketShop(shopSlug) {
+            const encoded = encodePathSegment(shopSlug);
+            return encoded ? get(`/tickets/shops/${encoded}`, "shop") : Promise.resolve(null);
+        },
+        purchaseTicketShopItem(shopSlug, itemId) {
+            const encoded = encodePathSegment(shopSlug);
+            return encoded ? post(`/tickets/shops/${encoded}/purchases`, { itemId }, "purchase", {}, true) : Promise.resolve(null);
+        },
+        adoptFarmPet({ speciesId, name, purchaseId }) {
+            return post("/games/farm/adoptions", { speciesId, name, purchaseId }, "purchase", {}, true);
+        },
+        purchaseFarmSupply({ itemId, quantity, purchaseId }) {
+            return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId }, "purchase", {}, true);
         },
         recordGameProgressClaim(gameSlug, claim = {}) {
             const encoded = encodePathSegment(gameSlug);

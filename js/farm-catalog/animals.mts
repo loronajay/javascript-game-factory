@@ -20,10 +20,17 @@ export type AnimalClipTable = Readonly<{ idle: ClipRange; attack: ClipRange; dea
 export type AnimalPalette = Readonly<{
   id: string;
   title: string;
+  tier: "classic" | "uncommon" | "rare" | "super-rare";
   /** Relative adoption weight; each species uses a readable 100-point table. */
   weight: number;
+  /** Multiplier applied once to generated Speed and Strength. */
+  statBoost: number;
   /** Multiplied over the source atlas so animation, UVs and detail remain intact. */
   tint: string;
+  /** Warm, cool, and accent targets for selective atlas recoloring. */
+  colors?: readonly [string, string, string];
+  /** Super-rare coats get a subtle reflective finish without altering facial colors. */
+  finish?: "pearl";
 }>;
 
 export type AnimalDefinition = Readonly<{
@@ -77,23 +84,30 @@ function animal(id: string, spec: AnimalSpec): AnimalDefinition {
   });
 }
 
-const petPalettes = (uncommonId: string, uncommonTitle: string, uncommonTint: string, rareId: string, rareTitle: string, rareTint: string): readonly AnimalPalette[] => Object.freeze([
-  Object.freeze({ id: "standard", title: "Classic", weight: 70, tint: "#ffffff" }),
-  Object.freeze({ id: uncommonId, title: uncommonTitle, weight: 24, tint: uncommonTint }),
-  Object.freeze({ id: rareId, title: rareTitle, weight: 6, tint: rareTint }),
+type PaletteRamp = readonly [string, string, string];
+
+const petPalettes = (
+  uncommonId: string, uncommonTitle: string, uncommonColors: PaletteRamp,
+  rareId: string, rareTitle: string, rareColors: PaletteRamp,
+  superRareId: string, superRareTitle: string, superRareColors: PaletteRamp,
+): readonly AnimalPalette[] => Object.freeze([
+  Object.freeze({ id: "standard", title: "Classic", tier: "classic", weight: 69, statBoost: 0, tint: "#ffffff" }),
+  Object.freeze({ id: uncommonId, title: uncommonTitle, tier: "uncommon", weight: 24, statBoost: 0, tint: uncommonColors[0], colors: Object.freeze([...uncommonColors]) as PaletteRamp }),
+  Object.freeze({ id: rareId, title: rareTitle, tier: "rare", weight: 6, statBoost: 0.08, tint: rareColors[0], colors: Object.freeze([...rareColors]) as PaletteRamp }),
+  Object.freeze({ id: superRareId, title: superRareTitle, tier: "super-rare", weight: 1, statBoost: 0.15, tint: superRareColors[0], colors: Object.freeze([...superRareColors]) as PaletteRamp, finish: "pearl" }),
 ]);
 
 export const ANIMAL_CATALOG: readonly AnimalDefinition[] = Object.freeze([
-  animal("corgi", { title: "Corgi", file: "corgi.glb", habitat: "ground", height: 0.6, radius: 0.45, walkSpeed: 1.5, turnRate: 3.2, palettes: petPalettes("sable", "Sable", "#d8a16b", "midnight", "Midnight", "#65708e") }),
-  animal("duck", { title: "Duck", file: "duck.glb", habitat: "ground", height: 0.5, radius: 0.35, walkSpeed: 0.9, turnRate: 3.4, palettes: petPalettes("mallard", "Mallard", "#6f9b79", "lavender", "Lavender", "#b89fd7") }),
-  animal("red-panda", { title: "Red Panda", file: "red-panda.glb", habitat: "ground", height: 0.6, radius: 0.45, walkSpeed: 1.1, palettes: petPalettes("golden", "Golden", "#e0b45f", "silver", "Silver", "#aab6c8") }),
-  animal("platypus", { title: "Platypus", file: "platypus.glb", habitat: "ground", height: 0.45, radius: 0.4, walkSpeed: 0.8, palettes: petPalettes("copper", "Copper", "#c58c64", "moonstone", "Moonstone", "#a9c7c8") }),
-  animal("hippo", { title: "Hippo", file: "hippo.glb", habitat: "ground", height: 1.3, radius: 0.85, walkSpeed: 0.7, turnRate: 1.4, palettes: petPalettes("rosy", "Rosy", "#d6a5ab", "slate", "Slate", "#77889f") }),
-  animal("rhino", { title: "Rhino", file: "rhino.glb", habitat: "ground", height: 1.5, radius: 0.9, walkSpeed: 0.9, turnRate: 1.3, palettes: petPalettes("ochre", "Ochre", "#c7a066", "frost", "Frost", "#aec7d6") }),
-  animal("bat", { title: "Bat", file: "bat.glb", habitat: "air", height: 0.5, radius: 0.35, walkSpeed: 1.8, turnRate: 4, hoverHeight: 1.6, palettes: petPalettes("ember", "Ember", "#c67a5e", "ghost", "Ghost", "#ccd4e6") }),
-  animal("shark", { title: "Shark", file: "shark.glb", habitat: "water", height: 1.2, radius: 0.8, walkSpeed: 1.4, turnRate: 1.8, hoverHeight: -0.45, palettes: petPalettes("tiger", "Tiger", "#c5ad63", "albino", "Albino", "#e7b8b8") }),
-  animal("anglerfish", { title: "Anglerfish", file: "anglerfish.glb", habitat: "water", height: 0.6, radius: 0.4, walkSpeed: 0.7, hoverHeight: -0.3, palettes: petPalettes("ember", "Ember", "#d07049", "abyss", "Abyss", "#665a9c") }),
-  animal("jellyfish", { title: "Jellyfish", file: "jellyfish.glb", habitat: "water", height: 0.6, radius: 0.4, walkSpeed: 0.4, turnRate: 1.5, hoverHeight: -0.2, palettes: petPalettes("sunset", "Sunset", "#e5a0bd", "aurora", "Aurora", "#77c4b9") }),
+  animal("corgi", { title: "Corgi", file: "corgi.glb", habitat: "ground", height: 0.6, radius: 0.45, walkSpeed: 1.5, turnRate: 3.2, palettes: petPalettes("sable", "Sable", ["#b96f32", "#7b4c32", "#dca45f"], "midnight", "Midnight", ["#24345f", "#4e63a6", "#d08a4f"], "cosmic", "Cosmic", ["#8a2be2", "#22d3ee", "#f6c453"]) }),
+  animal("duck", { title: "Duck", file: "duck.glb", habitat: "ground", height: 0.5, radius: 0.35, walkSpeed: 0.9, turnRate: 3.4, palettes: petPalettes("mallard", "Mallard", ["#37694e", "#4c8172", "#d6a94f"], "lavender", "Lavender", ["#9367cf", "#b18ae3", "#f2a55f"], "prism", "Prism", ["#e553ff", "#5ee7f2", "#ffdd57"]) }),
+  animal("red-panda", { title: "Red Panda", file: "red-panda.glb", habitat: "ground", height: 0.6, radius: 0.45, walkSpeed: 1.1, palettes: petPalettes("golden", "Golden", ["#bd7d2c", "#d3a24f", "#76513c"], "silver", "Silver", ["#7e8b9d", "#aebdce", "#dce6ef"], "celestial", "Celestial", ["#3348c8", "#49d7e8", "#f5ca55"]) }),
+  animal("platypus", { title: "Platypus", file: "platypus.glb", habitat: "ground", height: 0.45, radius: 0.4, walkSpeed: 0.8, palettes: petPalettes("copper", "Copper", ["#a65e3e", "#ca825b", "#dfad75"], "moonstone", "Moonstone", ["#548c9a", "#82bdc1", "#c58bbd"], "opaline", "Opaline", ["#f08cc8", "#69d9d0", "#ffd07a"]) }),
+  animal("hippo", { title: "Hippo", file: "hippo.glb", habitat: "ground", height: 1.3, radius: 0.85, walkSpeed: 0.7, turnRate: 1.4, palettes: petPalettes("rosy", "Rosy", ["#a66f78", "#c8919a", "#e0b3b1"], "slate", "Slate", ["#465c76", "#7189a0", "#b47f9e"], "nebula", "Nebula", ["#8d45d8", "#3a7bd5", "#ef66c8"]) }),
+  animal("rhino", { title: "Rhino", file: "rhino.glb", habitat: "ground", height: 1.5, radius: 0.9, walkSpeed: 0.9, turnRate: 1.3, palettes: petPalettes("ochre", "Ochre", ["#92703b", "#b89455", "#d0af70"], "frost", "Frost", ["#76aac2", "#a9d4e2", "#d9edf1"], "crystal", "Crystal", ["#74e0ef", "#9c8cff", "#f2fbff"]) }),
+  animal("bat", { title: "Bat", file: "bat.glb", habitat: "air", height: 0.5, radius: 0.35, walkSpeed: 1.8, turnRate: 4, hoverHeight: 1.6, palettes: petPalettes("ember", "Ember", ["#8f3f34", "#c36347", "#e79a58"], "ghost", "Ghost", ["#9faed1", "#d5ddef", "#b99bd7"], "eclipse", "Eclipse", ["#3d2b8f", "#19d3d1", "#ef5bd7"]) }),
+  animal("shark", { title: "Shark", file: "shark.glb", habitat: "water", height: 1.2, radius: 0.8, walkSpeed: 1.4, turnRate: 1.8, hoverHeight: -0.45, palettes: petPalettes("tiger", "Tiger", ["#9f7b31", "#c8a950", "#5b4c32"], "albino", "Albino", ["#d894a2", "#f0c5cd", "#fff0e8"], "voidfin", "Voidfin", ["#172d6b", "#18c6d9", "#9b5de5"]) }),
+  animal("anglerfish", { title: "Anglerfish", file: "anglerfish.glb", habitat: "water", height: 0.6, radius: 0.4, walkSpeed: 0.7, hoverHeight: -0.3, palettes: petPalettes("ember", "Ember", ["#a7432f", "#d5693f", "#efac55"], "abyss", "Abyss", ["#302052", "#594083", "#2ac5b5"], "biolume", "Biolume", ["#0f7c78", "#28e66f", "#e8ff63"]) }),
+  animal("jellyfish", { title: "Jellyfish", file: "jellyfish.glb", habitat: "water", height: 0.6, radius: 0.4, walkSpeed: 0.4, turnRate: 1.5, hoverHeight: -0.2, palettes: petPalettes("sunset", "Sunset", ["#cb668f", "#ea95ad", "#f0b272"], "aurora", "Aurora", ["#2ebda9", "#527cdb", "#ce62d7"], "starborn", "Starborn", ["#5336d6", "#26e0d0", "#ff59c7"]) }),
 ]);
 
 export function findAnimal(id: unknown): AnimalDefinition | undefined {

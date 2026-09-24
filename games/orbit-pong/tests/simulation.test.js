@@ -68,6 +68,36 @@ test("swept boundary collision catches a fast ball and records last touch", () =
   assert.ok(Math.hypot(match.ball.x, match.ball.y) < GAME_CONFIG.arena.radius);
 });
 
+test("every successful return adds a noticeable fixed amount of ball speed", () => {
+  const match = forcePlaying(createMatch());
+  match.paddles[0].angle = 0;
+  match.paddles[1].angle = Math.PI;
+  Object.assign(match.ball, {
+    x: GAME_CONFIG.arena.radius - GAME_CONFIG.ball.radius - 2,
+    y: 0,
+    vx: GAME_CONFIG.ball.startSpeed,
+    vy: 0,
+    speed: GAME_CONFIG.ball.startSpeed,
+    lastTouchPlayerId: null,
+  });
+
+  const firstEvents = stepMatch(match, [idle, idle]);
+  const firstSpeed = match.ball.speed;
+  assert.equal(firstSpeed, GAME_CONFIG.ball.startSpeed + GAME_CONFIG.ball.hitSpeedIncrease);
+  assert.ok(firstEvents.some((event) => event.type === "BALL_HIT" && event.speed === firstSpeed));
+
+  Object.assign(match.ball, {
+    x: -(GAME_CONFIG.arena.radius - GAME_CONFIG.ball.radius - 2),
+    y: 0,
+    vx: -firstSpeed,
+    vy: 0,
+  });
+  const secondEvents = stepMatch(match, [idle, idle]);
+  const secondSpeed = match.ball.speed;
+  assert.equal(secondSpeed, firstSpeed + GAME_CONFIG.ball.hitSpeedIncrease);
+  assert.ok(secondEvents.some((event) => event.type === "BALL_HIT" && event.speed === secondSpeed));
+});
+
 test("a miss awards the point to the last toucher regardless of exit location", () => {
   const match = forcePlaying(createMatch());
   match.paddles[0].angle = Math.PI;

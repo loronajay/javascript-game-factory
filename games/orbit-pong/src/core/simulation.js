@@ -172,7 +172,7 @@ function returnBall(match, hit, occupancy) {
   const direction = normalizeVector(vx, vy, -normal.x, -normal.y);
   const speed = Math.min(
     GAME_CONFIG.ball.maxSpeed,
-    Math.max(ball.speed, Math.hypot(ball.vx, ball.vy)) * GAME_CONFIG.ball.hitSpeedMultiplier,
+    Math.max(ball.speed, Math.hypot(ball.vx, ball.vy)) + GAME_CONFIG.ball.hitSpeedIncrease,
   );
   const safeRadius = GAME_CONFIG.arena.radius - ball.radius - 0.5;
   ball.x = normal.x * safeRadius;

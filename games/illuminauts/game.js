@@ -23,6 +23,8 @@ import { loadAssets } from './scripts/assets.js';
 import { createOnlineClient } from './scripts/online.js';
 import { getLocalIdentity } from './scripts/online-identity.js';
 import { shouldQuitMatchOnKey } from './scripts/session-controls.js';
+import { buildTicketResult } from './scripts/ticket-result.js';
+import { createTicketReporter } from './scripts/ticket-reporter.js';
 
 const canvas = document.getElementById('gameCanvas');
 const backLinkEl = document.querySelector('.back-link');
@@ -187,6 +189,19 @@ function wireOnlineCallbacks() {
 
 wireOnlineCallbacks();
 
+// Platform tickets: a solo clear or a finished online race is filed once,
+// when it reaches the win screen. Playtests and abandoned races never are.
+const tickets = createTicketReporter();
+
+function reportTicketResult(localWon, durationMs) {
+  tickets.finish((resultId, elapsedMs) => buildTicketResult({
+    state,
+    localWon,
+    resultId,
+    durationMs: durationMs ?? elapsedMs,
+  }));
+}
+
 function _freshClient() {
   onlineClient.disconnect();
   onlineClient = createOnlineClient();
@@ -220,6 +235,7 @@ function handleRemoteEvent(value) {
     winnerIsLocal = false;
     winnerName    = remoteDisplayName || 'Opponent';
     phase         = 'win';
+    reportTicketResult(false);
   }
 }
 
@@ -413,6 +429,7 @@ function startSoloGame(mapIndex) {
   state.message = soloMode === 'sweep'
     ? `Collect all Data Cores (0/${state.solo.dataCoreTotal}), then reach the Beacon Core.`
     : 'Race to the Beacon Core.';
+  tickets.begin();
   input.held.clear();
   input.justPressed.clear();
   accumulator = 0;
@@ -432,6 +449,7 @@ function startOnlineGame() {
   state.online.localPlayerId = localIdentity?.playerId || '';
   state.remote.displayName  = remoteDisplayName;
   state.remote.playerId     = remotePlayerId;
+  tickets.begin();
   input.held.clear();
   input.justPressed.clear();
   accumulator  = 0;
@@ -490,6 +508,8 @@ function gameTick(now) {
       soloPbMs = soloIsNewPb ? soloTimeMs : stored;
     }
     phase = 'win';
+    // A solo clear is timed by the run clock the PB uses; a race by the reporter.
+    reportTicketResult(true, state.solo?.enabled ? soloTimeMs : undefined);
   }
 }
 

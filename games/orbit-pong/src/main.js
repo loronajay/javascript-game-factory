@@ -4,6 +4,7 @@ import { createInputManager } from "./input/input-manager.js";
 import { createNetClient } from "./network/net-client.js";
 import { normalizeSnapshot } from "./network/protocol.js";
 import { createRenderer } from "./render/renderer.js";
+import { createMatchEndView } from "./ui/match-end.js";
 
 const canvas = document.querySelector("#gameCanvas");
 const renderer = createRenderer(canvas);
@@ -23,8 +24,18 @@ const hud = {
   p2Score: document.querySelector('[data-hud="p2-score"]'),
   mode: document.querySelector('[data-hud="mode"]'),
   status: document.querySelector('[data-hud="status"]'),
+  speed: document.querySelector('[data-hud="speed"]'),
   announcement: document.querySelector('[data-hud="announcement"]'),
 };
+const matchEnd = {
+  root: document.querySelector("[data-match-end]"),
+  eyebrow: document.querySelector('[data-match-end="eyebrow"]'),
+  title: document.querySelector('[data-match-end="title"]'),
+  p1Score: document.querySelector('[data-match-end="p1-score"]'),
+  p2Score: document.querySelector('[data-match-end="p2-score"]'),
+  primary: document.querySelector('[data-action="match-end-primary"]'),
+};
+let matchEndPrimaryAction = "rematch";
 
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((screen) => {
@@ -54,6 +65,24 @@ function phaseLabel(match) {
   return match.phase.replaceAll("_", " ");
 }
 
+function hideMatchEnd() {
+  matchEnd.root.hidden = true;
+}
+
+function showMatchEnd(match, winnerId = match.winnerId) {
+  const winner = match.players.find((player) => player.id === winnerId);
+  const view = createMatchEndView(currentMode, winner?.displayName);
+  matchEnd.eyebrow.textContent = view.eyebrow;
+  matchEnd.title.textContent = view.title;
+  matchEnd.p1Score.textContent = match.players[0].score;
+  matchEnd.p2Score.textContent = match.players[1].score;
+  matchEnd.primary.textContent = view.primaryLabel;
+  matchEndPrimaryAction = view.primaryAction;
+  announce("");
+  matchEnd.root.hidden = false;
+  matchEnd.primary.focus();
+}
+
 function updateHud(match, events) {
   hud.p1Name.textContent = match.players[0].displayName;
   hud.p2Name.textContent = match.players[1].displayName;
@@ -61,6 +90,7 @@ function updateHud(match, events) {
   hud.p2Score.textContent = match.players[1].score;
   hud.mode.textContent = currentMode.toUpperCase();
   hud.status.textContent = phaseLabel(match);
+  hud.speed.textContent = `${match.phase === "SERVE_PREVIEW" ? "SERVE" : "SPEED"} ${Math.round(match.ball.speed)}`;
   for (const event of events) {
     if (event.type === "POINT_SCORED") {
       const scorer = match.players.find((player) => player.id === event.playerId);
@@ -69,8 +99,7 @@ function updateHud(match, events) {
       const offender = match.players.find((player) => player.id === event.playerId);
       announce(`Double touch — ${offender?.displayName || "Player"} fault`, 1100);
     } else if (event.type === "MATCH_ENDED") {
-      const winner = match.players.find((player) => player.id === event.winnerId);
-      announce(`${winner?.displayName || "Player"} wins`, 0);
+      showMatchEnd(match, event.winnerId);
     }
   }
 }
@@ -79,6 +108,8 @@ const game = new Game({ renderer, input, onUpdate: updateHud });
 
 function startOffline(mode) {
   currentMode = mode;
+  hideMatchEnd();
+  announce("");
   showScreen("game");
   const players = mode === "cpu"
     ? [{ displayName: factoryName }, { displayName: `${difficulty[0].toUpperCase()}${difficulty.slice(1)} CPU` }]
@@ -95,14 +126,30 @@ document.querySelectorAll("[data-difficulty]").forEach((button) => {
   });
 });
 
-document.querySelector('[data-action="quit-match"]').addEventListener("click", () => {
+function returnToMenu() {
   game.stop();
   if (currentMode === "online") net.leaveRoom();
+  hideMatchEnd();
   announce("");
   showScreen("menu");
+}
+
+document.querySelector('[data-action="quit-match"]').addEventListener("click", returnToMenu);
+document.querySelector('[data-action="match-end-menu"]').addEventListener("click", returnToMenu);
+document.querySelector('[data-action="match-end-primary"]').addEventListener("click", () => {
+  if (matchEndPrimaryAction === "rematch") {
+    startOffline(currentMode);
+    return;
+  }
+  game.stop();
+  net.leaveRoom();
+  hideMatchEnd();
+  showScreen("online");
+  showOnlinePanel("entry");
+  onlineStatus.textContent = net.isOpen() ? "Choose how to play." : "Connecting to match server…";
+  net.connect();
 });
 
-document.querySelector('[data-action="toggle-debug"]').addEventListener("click", () => renderer.toggleDebug());
 window.addEventListener("keydown", (event) => {
   if (event.code === "F3") {
     event.preventDefault();
@@ -175,6 +222,8 @@ net.on({
   lobby: renderLobby,
   matchStarted(payload) {
     currentMode = "online";
+    hideMatchEnd();
+    announce("");
     const players = Array.isArray(payload.players) ? payload.players : onlineLobby?.players;
     showScreen("game");
     game.start({
@@ -194,8 +243,7 @@ net.on({
   matchEnded(payload) {
     const snapshot = normalizeSnapshot(payload.snapshot);
     if (snapshot) game.applyAuthoritativeSnapshot({ ...snapshot, winnerId: payload.winnerId });
-    const winnerName = game.match.players.find((player) => player.id === payload.winnerId)?.displayName;
-    announce(`${winnerName || "Player"} wins`, 0);
+    showMatchEnd(game.match, payload.winnerId);
   },
   playerLeft() {
     if (currentMode === "online") announce("Opponent disconnected", 0);

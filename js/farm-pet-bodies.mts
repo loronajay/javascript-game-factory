@@ -16,6 +16,7 @@
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { findAnimal, findAnimalPalette, type AnimalDefinition } from "./farm-catalog/animals.mjs";
 import { animalTrack, splitAnimalClips, type AnimalClips } from "./farm-animal-clips.mjs";
+import { materialForAnimalPalette } from "./farm-pet-palettes.mjs";
 import type { PetBody as PetPose } from "./farm-pets.mjs";
 
 type ThreeNamespace = Record<string, any>;
@@ -165,13 +166,8 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
       body.model.traverse((node: any) => {
         if (node.isMesh) {
           const palette = findAnimalPalette(body.species.id, body.paletteId) ?? body.species.palettes[0];
-          const tint = (material: any): any => {
-            const copy = material.clone();
-            copy.color?.multiply?.(new THREE.Color(palette.tint));
-            copy.needsUpdate = true;
-            return copy;
-          };
-          node.material = Array.isArray(node.material) ? node.material.map(tint) : tint(node.material);
+          const paint = (material: any): any => materialForAnimalPalette(THREE, material, palette);
+          node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
           node.castShadow = true;
           node.frustumCulled = false;
         }

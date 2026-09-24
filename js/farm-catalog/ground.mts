@@ -19,15 +19,16 @@ export type GroundDefinition = Readonly<{
 }>;
 
 const STARTER = Object.freeze({ type: "starter", source: "The Farm" } as const);
+const PURCHASE = Object.freeze({ type: "purchase", source: "Farm Shop" } as const);
 
-function ground(id: string, title: string, swatch: readonly [string, string], style: SurfaceStyle): GroundDefinition {
-  return Object.freeze({ id: `ground.${id}`, title, swatch, style: Object.freeze({ ...style, colors: Object.freeze([...style.colors]) }), unlock: STARTER });
+function ground(id: string, title: string, swatch: readonly [string, string], style: SurfaceStyle, unlock: GroundDefinition["unlock"] = PURCHASE): GroundDefinition {
+  return Object.freeze({ id: `ground.${id}`, title, swatch, style: Object.freeze({ ...style, colors: Object.freeze([...style.colors]) }), unlock });
 }
 
 // `repeat` is tiles per 20 m; a 28 m field at 7 gives a 2.85 m tile, big
 // enough that blades and clods read as texture rather than noise underfoot.
 export const GROUND_CATALOG: readonly GroundDefinition[] = Object.freeze([
-  ground("meadow", "Meadow", ["#5f9a3c", "#3f7228"], { pattern: "grass", colors: ["#5f9a3c", "#3f7228", "#8dc45a", "#7a5a34"], repeat: 7, roughness: 0.95, metalness: 0 }),
+  ground("meadow", "Meadow", ["#5f9a3c", "#3f7228"], { pattern: "grass", colors: ["#5f9a3c", "#3f7228", "#8dc45a", "#7a5a34"], repeat: 7, roughness: 0.95, metalness: 0 }, STARTER),
   ground("clover", "Clover Field", ["#3f8a46", "#2b6331"], { pattern: "grass", colors: ["#3f8a46", "#2b6331", "#6fb56c", "#d9e6b2"], repeat: 7, roughness: 0.95, metalness: 0 }),
   ground("dry", "Dry Pasture", ["#a89a4e", "#7f7236"], { pattern: "grass", colors: ["#a89a4e", "#7f7236", "#c9bd6f", "#8a6a3f"], repeat: 7, roughness: 0.95, metalness: 0 }),
   ground("mud", "Mud Yard", ["#6b4b2c", "#4e351e"], { pattern: "dirt", colors: ["#6b4b2c", "#4e351e", "#86623c", "#5a7a34"], repeat: 6, roughness: 0.9, metalness: 0 }),

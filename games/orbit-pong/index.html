@@ -9,6 +9,7 @@
 </head>
 <body>
   <div class="stars" aria-hidden="true"></div>
+  <div class="cosmos" aria-hidden="true"><i></i><b></b><em></em></div>
   <a class="arcade-link" href="../../grid.html" aria-label="Back to arcade">← Arcade</a>
 
   <main id="app">
@@ -83,6 +84,7 @@
         <div class="match-status">
           <span data-hud="mode">LOCAL</span>
           <strong data-hud="status">GET READY</strong>
+          <small data-hud="speed">SERVE 315</small>
         </div>
         <div class="player-score p2"><b data-hud="p2-score">0</b><span data-hud="p2-name">Player 2</span></div>
       </header>
@@ -106,9 +108,19 @@
       </div>
 
       <div class="match-actions">
-        <button data-action="toggle-debug">F3 Debug</button>
-        <button data-action="quit-match">Exit Match</button>
+        <button data-action="quit-match">Menu</button>
       </div>
+
+      <section class="match-end" data-match-end hidden role="dialog" aria-modal="true" aria-labelledby="match-end-title">
+        <div class="match-end-card glass-panel">
+          <div class="result-orbit" aria-hidden="true"><i></i><b></b></div>
+          <p class="eyebrow" data-match-end="eyebrow">Match complete</p>
+          <h2 id="match-end-title" data-match-end="title">Player wins</h2>
+          <p class="final-score"><b data-match-end="p1-score">0</b><span>FINAL</span><b data-match-end="p2-score">0</b></p>
+          <button class="primary result-primary" data-action="match-end-primary">Play Again</button>
+          <button class="text-button" data-action="match-end-menu">Back to Main Menu</button>
+        </div>
+      </section>
     </section>
   </main>
 

@@ -27,6 +27,19 @@ async function get(app, url, token = "") {
   return { statusCode: res.statusCode, json: JSON.parse(res.body) };
 }
 
+async function post(app, url, value, token = "") {
+  const body = Buffer.from(JSON.stringify(value));
+  const req = {
+    method: "POST",
+    url,
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    async *[Symbol.asyncIterator]() { yield body; },
+  };
+  const res = responseSink();
+  await app(req, res);
+  return { statusCode: res.statusCode, json: JSON.parse(res.body) };
+}
+
 test("ticket wallet reads require the signed-in player", async () => {
   const calls = [];
   const app = createApp({
@@ -73,4 +86,37 @@ test("ticket wallet route reports an unwired backend instead of inventing a bala
 
   assert.equal(response.statusCode, 503);
   assert.equal(response.json.error, "tickets_not_configured");
+});
+
+test("the signed-in player can read and purchase from the arcade room shop", async () => {
+  const calls = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    getTicketShop: async (input) => ({ balance: 5000, ownedIds: [], items: [{ id: "decor.prop.claw", price: 1200 }], shopSlug: input.shopSlug }),
+    purchaseTicketShopItem: async (input) => {
+      calls.push(input);
+      return { ok: true, itemId: input.itemId, price: 1200, balance: 3800, alreadyOwned: false };
+    },
+  });
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+
+  const shop = await get(app, "/tickets/shops/arcade-room", token);
+  const purchase = await post(app, "/tickets/shops/arcade-room/purchases", { itemId: "decor.prop.claw", price: 1 }, token);
+
+  assert.equal(shop.statusCode, 200);
+  assert.equal(shop.json.shop.balance, 5000);
+  assert.equal(purchase.statusCode, 200);
+  assert.deepEqual(calls, [{ playerId: "player-1", shopSlug: "arcade-room", itemId: "decor.prop.claw" }]);
+  assert.equal(purchase.json.purchase.balance, 3800);
+});
+
+test("arcade room purchase errors preserve useful HTTP status", async () => {
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    purchaseTicketShopItem: async () => ({ ok: false, error: "insufficient_tickets", balance: 25, price: 1200 }),
+  });
+  const response = await post(app, "/tickets/shops/arcade-room/purchases", { itemId: "decor.prop.claw" }, token);
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.json.error, "insufficient_tickets");
 });

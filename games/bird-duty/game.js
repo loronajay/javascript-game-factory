@@ -26,6 +26,8 @@ import {
 import { createPlayerState, updatePlayer } from "./scripts/sim/player.js";
 import { createPoopState, spawnPoopFromPlayer, updatePoop } from "./scripts/sim/poop.js";
 import { clearPersonalBest, getPersonalBest, updatePersonalBest } from "./scripts/personal-best.js";
+import { buildOnlineTicketResult, buildSoloTicketResult } from "./scripts/ticket-result.js";
+import { createTicketReporter } from "./scripts/ticket-reporter.js";
 import { loadArcadeIdentity } from "./scripts/identity.js";
 import { createOnlineClient } from "./scripts/online-client.js";
 import {
@@ -105,6 +107,8 @@ export async function initGame() {
     // The client half of a server-authoritative match. It holds the last snapshot and this player's
     // intent, and nothing else; there is no local copy of the match to keep in step.
     const onlineSession = createOnlineSession({ sounds });
+    // Platform tickets: solo runs and online matches are filed when they end; hot seat never is.
+    const tickets = createTicketReporter();
     let lastTime = null;
     let accumulator = 0;
     let joinCodeInput = null;
@@ -171,6 +175,7 @@ export async function initGame() {
       onlineSession.reset();
       if (payload.matchState) onlineSession.applySnapshot(payload.matchState);
       gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
+      tickets.begin();
       sounds.startGameMusic();
     }
 
@@ -467,6 +472,7 @@ export async function initGame() {
         playSession = createPlaySession();
         npcState = createNpcState();
         inputState = createInputState();
+        tickets.begin();
         sounds.startGameMusic();
       }
       if (gameState.screen === SCREEN.HOTSEAT_PLAY) {
@@ -498,6 +504,14 @@ export async function initGame() {
         onlineSession.predict(inputState, onlineClient?.clientId || null);
 
         if (onlineSession.ended) {
+          if (onlineMatchOverTicks === 0) {
+            tickets.finish((resultId, durationMs) => buildOnlineTicketResult({
+              match: onlineSession.match,
+              clientId: onlineClient?.clientId || null,
+              resultId,
+              durationMs,
+            }));
+          }
           onlineMatchOverTicks += 1;
           if (inputState.dropRequested || onlineMatchOverTicks >= MATCH_OVER_LINGER_TICKS) {
             endOnlineMatch();
@@ -601,6 +615,7 @@ export async function initGame() {
         playSession = updatePlaySession(playSession, poopState);
         if (previousSessionPhase === "running" && playSession.phase === "game-over") {
           personalBest = updatePersonalBest(playSession.finalScore ?? playSession.score).value;
+          tickets.finish((resultId, durationMs) => buildSoloTicketResult({ playSession, resultId, durationMs }));
         }
         inputState = consumeDropRequest(inputState);
         if (shouldReturnToMenu(playSession)) {

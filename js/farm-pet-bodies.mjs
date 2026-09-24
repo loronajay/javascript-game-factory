@@ -15,6 +15,7 @@
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { findAnimal, findAnimalPalette } from "./farm-catalog/animals.mjs";
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
+import { materialForAnimalPalette } from "./farm-pet-palettes.mjs";
 /** The pack's models face +z at rest; the sim's yaw 0 faces −z. */
 export const MODEL_YAW_OFFSET = Math.PI;
 export const HEART_SECONDS = 1.4;
@@ -120,13 +121,8 @@ export function createPetBodies(THREE, scene) {
             body.model.traverse((node) => {
                 if (node.isMesh) {
                     const palette = findAnimalPalette(body.species.id, body.paletteId) ?? body.species.palettes[0];
-                    const tint = (material) => {
-                        const copy = material.clone();
-                        copy.color?.multiply?.(new THREE.Color(palette.tint));
-                        copy.needsUpdate = true;
-                        return copy;
-                    };
-                    node.material = Array.isArray(node.material) ? node.material.map(tint) : tint(node.material);
+                    const paint = (material) => materialForAnimalPalette(THREE, material, palette);
+                    node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
                     node.castShadow = true;
                     node.frustumCulled = false;
                 }

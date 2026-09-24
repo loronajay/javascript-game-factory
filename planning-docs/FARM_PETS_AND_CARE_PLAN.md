@@ -60,7 +60,7 @@
 - [x] Context prompts and the Pets panel distinguish Full, Content, Hungry, and Starving without exposing affection.
 - [~] The current adoption panel can create/rename/release pets. Ticket charging and lock rules remain off.
 - [x] All existing animal models use authoritative profile, food, dwelling, lifespan, and species-weight data.
-- [x] Every species has three named weighted visual palettes (70% classic, 24% uncommon, 6% rare); the persisted palette recolors the actual animated model and is identified in the Pets panel.
+- [x] Every species has four named weighted visual palettes (69% classic, 24% uncommon, 6% rare, 1% super rare); selective three-color ramps preserve eyes/facial details, super rares add a pearlescent finish, and persisted Rare/Super Rare identities grant one-time +8%/+15% Speed and Strength bonuses.
 - [x] All ten dwellings are placeable catalog props with distinct procedural models, species identity, and measured entrance contracts.
 - [x] Aquatic pets can be picked up like every other pet and can only be put down where their full body fits inside water.
 - [x] New owners see the farm introduction once and must atomically name/save their starter dog before normal play; visitors never receive the owner gate.

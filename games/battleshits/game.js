@@ -65,6 +65,9 @@ function createInitialState() {
     botDifficulty: null,  // 'easy'|'medium'|'hard'
     botFleet: null,       // FleetBoard for bot ships (hidden)
     botTarget: null,      // TargetBoard tracking bot's shots (for stats + AI)
+    // Tickets: minted when a battle starts, spent when it ends (match-flow.js)
+    ticketResultId: null,
+    battleStartedAt: null,
   };
 }
 

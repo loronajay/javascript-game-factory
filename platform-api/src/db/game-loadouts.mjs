@@ -88,18 +88,34 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
     if (!pool || !normalizedPlayerId || !catalog) {
         return { ok: false, statusCode: 400, error: "invalid_request" };
     }
+    let client = null;
     try {
-        const context = await getOwnershipContext(pool, normalizedPlayerId, slug, catalog);
+        client = typeof pool.connect === "function" ? await pool.connect() : null;
+        const db = client ?? pool;
+        if (client)
+            await client.query("begin");
+        const current = await db.query(`select garage from game_loadouts where player_id = $1 and game_slug = $2 for update`, [normalizedPlayerId, slug]);
+        const context = {
+            ...await getOwnershipContext(db, normalizedPlayerId, slug, catalog),
+            currentGarage: current.rows[0]?.garage ?? null,
+        };
         const normalized = catalog.normalizeGarage(garage, context);
-        await pool.query(`insert into game_loadouts (player_id, game_slug, garage, updated_at)
+        await db.query(`insert into game_loadouts (player_id, game_slug, garage, updated_at)
        values ($1, $2, $3::jsonb, now())
        on conflict (player_id, game_slug) do update
          set garage = excluded.garage, updated_at = now()`, [normalizedPlayerId, slug, JSON.stringify(normalized)]);
+        if (client)
+            await client.query("commit");
         return { ok: true, garage: normalized };
     }
     catch (err) {
+        if (client)
+            await client.query("rollback").catch(() => undefined);
         process.stderr.write(`[game-loadouts] saveGarage error: ${err?.message || err}\n`);
         return { ok: false, statusCode: 500, error: "save_failed" };
+    }
+    finally {
+        client?.release?.();
     }
 }
 /**

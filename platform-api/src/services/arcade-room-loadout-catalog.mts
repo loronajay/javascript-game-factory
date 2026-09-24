@@ -16,7 +16,8 @@
 // see, and no "active entry" to resolve to.
 //
 // WHAT IS VALIDATED, AND WHAT IS NOT. The server bounds the document (item
-// count, id shapes, finite coordinates inside a generous box) and nothing more.
+// count, ids, finite coordinates inside a generous box) and validates every
+// surface/decor id against the shared catalog and the owner's entitlements.
 // It does not know the room's exact walls or the cabinets' footprints: the
 // client already clamps every drag against those and refuses overlaps, and a
 // mirror of the footprint table here would be a second copy to drift for a
@@ -65,6 +66,8 @@
 // silence on the client, never an error here.
 
 export const ARCADE_ROOM_GAME_SLUG = "arcade-room";
+
+import { ARCADE_ROOM_CATALOG_IDS, ARCADE_ROOM_STARTER_IDS } from "./arcade-room-ticket-catalog.mjs";
 
 const LAYOUT_VERSION = 3;
 /** Plenty for a room that seats two cabinets today; a bound, not a plan. */
@@ -152,12 +155,25 @@ function normalizeMusic(value: any): Record<string, string> {
   return { defaultTrackId: TRACK_ID_PATTERN.test(trackId) ? trackId : "" };
 }
 
-function normalizeSurfaces(value: any): Record<string, string> {
+function ownership(context: any): { enforce: boolean; owned: Set<string> } {
+  return {
+    enforce: context?.ownedEntitlementIds instanceof Set,
+    owned: context?.ownedEntitlementIds instanceof Set ? context.ownedEntitlementIds : new Set(),
+  };
+}
+
+function mayUseCatalogId(id: string, context: any): boolean {
+  if (!ARCADE_ROOM_CATALOG_IDS.has(id)) return false;
+  const state = ownership(context);
+  return !state.enforce || ARCADE_ROOM_STARTER_IDS.has(id) || state.owned.has(id);
+}
+
+function normalizeSurfaces(value: any, context: any): Record<string, string> {
   const source = value && typeof value === "object" ? value : {};
   const surfaces: Record<string, string> = {};
   for (const kind of SURFACE_KINDS) {
     const id = cleanText(source[kind], 80);
-    surfaces[kind] = surfaceIdPattern(kind).test(id) ? id : "";
+    surfaces[kind] = surfaceIdPattern(kind).test(id) && mayUseCatalogId(id, context) ? id : "";
   }
   return surfaces;
 }
@@ -212,12 +228,12 @@ function normalizeDecorRow(raw: any): any | null {
  * player the rest of the room. Duplicate instance ids keep their first
  * occurrence, because the client keys everything by that id.
  */
-export function normalizeArcadeRoomGarage(value: any): any {
+export function normalizeArcadeRoomGarage(value: any, context: any = {}): any {
   const input = value && typeof value === "object" ? value : {};
   const rawItems = Array.isArray(input.items) ? input.items.slice(0, MAX_ITEMS) : [];
   const seen = new Set<string>();
   const items: any[] = [];
-  const surfaces = normalizeSurfaces(input.surfaces);
+  const surfaces = normalizeSurfaces(input.surfaces, context);
   const music = normalizeMusic(input.music);
 
   for (const raw of rawItems) {
@@ -246,6 +262,7 @@ export function normalizeArcadeRoomGarage(value: any): any {
     for (const raw of input.decor.slice(0, MAX_DECOR)) {
       const row = normalizeDecorRow(raw);
       if (!row || seen.has(row.instanceId)) continue;
+      if (!mayUseCatalogId(row.itemId, context)) continue;
       seen.add(row.instanceId);
       decor.push(row);
     }
@@ -255,14 +272,14 @@ export function normalizeArcadeRoomGarage(value: any): any {
 }
 
 /** What a visitor draws: the layout itself. See the note at the top of this file. */
-export function arcadeRoomLoadoutFromGarage(garage: any): any {
-  return { layout: normalizeArcadeRoomGarage(garage) };
+export function arcadeRoomLoadoutFromGarage(garage: any, context: any = {}): any {
+  return { layout: normalizeArcadeRoomGarage(garage, context) };
 }
 
 export const ARCADE_ROOM_LOADOUT_CATALOG = Object.freeze({
-  // Both starter cabinets are granted to everyone; the day a cabinet has to be
-  // earned, the owned-id test goes beside the namespace check above.
-  requiresEntitlements: false,
+  // Cabinets remain starter-owned. Decor and surfaces use the shared loadout
+  // entitlement context, with the starter collection admitted above.
+  requiresEntitlements: true,
   normalizeGarage: normalizeArcadeRoomGarage,
   loadoutFromGarage: arcadeRoomLoadoutFromGarage,
 });

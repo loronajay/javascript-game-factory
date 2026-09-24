@@ -10,6 +10,28 @@ import { publishBattleshitsMatchActivity } from '../../../js/platform/activity/a
 import { createPlatformApiClient } from '../../../js/platform/api/platform-api.mjs';
 import { createAuthApiClient } from '../../../js/platform/api/auth-api.mjs';
 import { describeOpponentFriendAction, loadOpponentFriendStatus } from '../../../js/platform/ui/opponent-friend-status.mjs';
+import { createGameResultId, createGameResultReporter } from '../../../js/platform/api/game-results-api.mjs';
+import { buildTicketResult, TICKET_GAME_SLUG, TICKET_RESULT_PREFIX } from './ticket-result.js';
+
+// Tickets: the finished battle is filed with the account and the server
+// decides the payout. Fire-and-forget — a signed-out player or an offline API
+// resolves to null and the ended screen never waits on it.
+const ticketReporter = createGameResultReporter();
+
+function reportTicketResult(gs, result) {
+  const payload = buildTicketResult({
+    result,
+    isSoloMode: gs.isSoloMode,
+    botDifficulty: gs.botDifficulty,
+    stats: buildMatchStats(gs.myTarget, gs.myFleet),
+    resultId: gs.ticketResultId,
+    durationMs: performance.now() - (gs.battleStartedAt ?? performance.now()),
+  });
+  // One report per battle: the id is spent even if the request fails, and a
+  // new one is minted when the next battle starts.
+  gs.ticketResultId = null;
+  if (payload) ticketReporter.report(TICKET_GAME_SLUG, payload);
+}
 
 // An opponent already on the player's friends list is shown as one rather than
 // offered again; the verdict itself comes from the shared platform helper.
@@ -47,6 +69,8 @@ export function transitionToBattle(gs, { clearAll, handleTargetClick }) {
   gs.turn = determineTurnOrder(gs);
   gs.pendingShot = null;
   gs.activeEmotes = { mine: null, theirs: null };
+  gs.ticketResultId = createGameResultId(TICKET_RESULT_PREFIX);
+  gs.battleStartedAt = performance.now();
 
   showScreen('battle');
 
@@ -69,6 +93,7 @@ export function transitionToMatchEnded(gs, result, { clearAll }) {
   clearAll();
   gs.phase = 'match_ended';
   gs.matchResult = result;
+  reportTicketResult(gs, result);
 
   if (gs.isSoloMode) {
     transitionToSoloEnded(gs, result);

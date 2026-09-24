@@ -12,6 +12,7 @@ import {
   visiblePetStats,
 } from "../farm-pet-care.mjs";
 import { ANIMAL_CATALOG, findAnimalPalette, pickAnimalPalette } from "../farm-catalog/animals.mjs";
+import { animalPaletteDisplayName, recolorPalettePixel } from "../farm-pet-palettes.mjs";
 import { findFarmDecor } from "../farm-catalog/decor.mjs";
 import { addPet, createDefaultFarmLayout, normalizeFarmLayout } from "../farm-layout.mjs";
 import { advancePetWellbeing, applyPetCareMilestones, petCareEnvironment, reactToPetInteraction } from "../farm-pet-happiness.mjs";
@@ -69,18 +70,41 @@ test("every species has its own sensible food and data-only dwelling", () => {
 test("every pet has a complete weighted visual palette set", () => {
   assert.equal(ANIMAL_CATALOG.length, 10);
   for (const species of ANIMAL_CATALOG) {
-    assert.ok(species.palettes.length >= 3, `${species.id} has standard, uncommon and rare looks`);
+    assert.equal(species.palettes.length, 4, `${species.id} has classic, uncommon, rare and super-rare looks`);
     assert.equal(species.palettes[0].id, "standard", `${species.id} keeps the source art as its common look`);
+    assert.deepEqual(species.palettes.map(({ tier, weight, statBoost }) => ({ tier, weight, statBoost })), [
+      { tier: "classic", weight: 69, statBoost: 0 },
+      { tier: "uncommon", weight: 24, statBoost: 0 },
+      { tier: "rare", weight: 6, statBoost: 0.08 },
+      { tier: "super-rare", weight: 1, statBoost: 0.15 },
+    ], `${species.id} uses the locked 69/24/6/1 distribution`);
     assert.equal(new Set(species.palettes.map((palette) => palette.id)).size, species.palettes.length, `${species.id} palette ids are unique`);
     assert.equal(species.palettes.reduce((sum, palette) => sum + palette.weight, 0), 100, `${species.id} weights are readable percentages`);
     for (const palette of species.palettes) {
       assert.match(palette.tint, /^#[0-9a-f]{6}$/i);
       assert.ok(palette.weight > 0);
       assert.equal(findAnimalPalette(species.id, palette.id), palette);
+      if (palette.id !== "standard") {
+        assert.equal(palette.colors.length, 3, `${species.id} ${palette.id} uses a deliberate three-color ramp`);
+        palette.colors.forEach((color) => assert.match(color, /^#[0-9a-f]{6}$/i));
+      }
     }
     assert.equal(pickAnimalPalette(species.id, () => 0)?.id, "standard");
+    assert.equal(pickAnimalPalette(species.id, () => 0.989999)?.tier, "rare");
+    assert.equal(pickAnimalPalette(species.id, () => 0.99)?.tier, "super-rare");
     assert.equal(pickAnimalPalette(species.id, () => 0.999999)?.id, species.palettes.at(-1).id);
+    assert.match(animalPaletteDisplayName(species.palettes.at(-1)), /Super Rare$/);
+    assert.equal(species.palettes.at(-1).finish, "pearl");
   }
+});
+
+test("pet palette recoloring protects eyes and other neutral facial details", () => {
+  const colors = ["#24345f", "#4e63a6", "#d08a4f"];
+  assert.deepEqual(recolorPalettePixel({ r: 0, g: 0, b: 0, a: 255 }, colors), { r: 0, g: 0, b: 0, a: 255 }, "black pupils remain black");
+  assert.deepEqual(recolorPalettePixel({ r: 255, g: 255, b: 255, a: 255 }, colors), { r: 255, g: 255, b: 255, a: 255 }, "eye whites remain white");
+  assert.deepEqual(recolorPalettePixel({ r: 240, g: 236, b: 225, a: 255 }, colors), { r: 240, g: 236, b: 225, a: 255 }, "warm white muzzle and eye pixels remain untouched");
+  assert.notDeepEqual(recolorPalettePixel({ r: 150, g: 150, b: 150, a: 255 }, colors), { r: 150, g: 150, b: 150, a: 255 }, "mid-tone neutral body colors can still become a rare coat");
+  assert.notDeepEqual(recolorPalettePixel({ r: 192, g: 112, b: 54, a: 255 }, colors), { r: 192, g: 112, b: 54, a: 255 }, "colored coat pixels use the rare ramp");
 });
 
 test("every pet dwelling is placeable, identifies its resident, and has a usable entrance", () => {
@@ -151,10 +175,25 @@ test("stored pet profiles are bounded and visible stats never expose affection",
 
 test("palette rarity is assigned at adoption and valid looks survive persistence", () => {
   const common = createPetProfile("pet.corgi", () => 0);
-  const rare = createPetProfile("pet.corgi", () => 0.999999);
+  const superRare = createPetProfile("pet.corgi", () => 0.999999);
   assert.equal(common.paletteId, "standard");
-  assert.equal(rare.paletteId, ANIMAL_CATALOG[0].palettes.at(-1).id);
-  assert.equal(normalizePetProfile("pet.corgi", rare).paletteId, rare.paletteId);
+  assert.equal(superRare.paletteId, ANIMAL_CATALOG[0].palettes.at(-1).id);
+  assert.equal(superRare.paletteBonus, 0.15);
+  assert.equal(superRare.stats.speed, 74.7);
+  assert.equal(superRare.stats.strength, 63.2);
+  assert.equal(normalizePetProfile("pet.corgi", superRare).paletteId, superRare.paletteId);
+});
+
+test("rare and super-rare palettes boost persisted base stats exactly once", () => {
+  const [rare, superRare] = ["rare", "super-rare"].map((tier) => ANIMAL_CATALOG[0].palettes.find((palette) => palette.tier === tier));
+  const base = { stats: { speed: 50, strength: 40 } };
+  const boostedRare = normalizePetProfile("pet.corgi", { ...base, paletteId: rare.id });
+  const boostedSuperRare = normalizePetProfile("pet.corgi", { ...base, paletteId: superRare.id });
+  assert.deepEqual(boostedRare.stats, { speed: 54, strength: 43.2 });
+  assert.equal(boostedRare.paletteBonus, 0.08);
+  assert.deepEqual(boostedSuperRare.stats, { speed: 57.5, strength: 46 });
+  assert.equal(boostedSuperRare.paletteBonus, 0.15);
+  assert.deepEqual(normalizePetProfile("pet.corgi", boostedSuperRare).stats, boostedSuperRare.stats, "reload does not compound the bonus");
 });
 
 test("every species uses the same randomized profile system with species-weighted physical stats", () => {

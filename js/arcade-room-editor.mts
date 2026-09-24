@@ -80,6 +80,7 @@ export type RoomEditorSaveResult = Readonly<{ ok: boolean; message: string }>;
 
 /** What comes back from hanging a picture: the platform URL and the picture's pixel size, or why not. */
 export type RoomEditorUploadResult = Readonly<{ ok: boolean; url: string; width: number; height: number; error: string }>;
+export type RoomEditorPurchaseResult = Readonly<{ ok: boolean; itemId: string; price?: number; balance?: number; alreadyOwned?: boolean; error?: string }>;
 
 type EditableCabinet = Readonly<{
   cabinet: CabinetDefinition;
@@ -110,6 +111,9 @@ type RoomEditorOptions = Readonly<{
    * offering a button that fails.
    */
   uploadPicture: ((file: File) => Promise<RoomEditorUploadResult>) | null;
+  ticketPrices?: ReadonlyMap<string, number>;
+  ticketBalance?: number | null;
+  purchaseItem?: ((itemId: string) => Promise<RoomEditorPurchaseResult | null>) | null;
   avatarPreview: ArcadeAvatarPreview;
   elements: RoomEditorElements;
   /** Lets the page refuse build mode while something else (a running cabinet) owns the screen. */
@@ -165,6 +169,8 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   let saving = false;
   // The custom poster whose picture is on its way up; one at a time keeps the story simple.
   let uploadingInstanceId = "";
+  let ticketBalance = Number.isSafeInteger(options.ticketBalance) ? Number(options.ticketBalance) : null;
+  let purchasingItemId = "";
   // A colour or slider drag is one gesture: the layout before it is remembered once, every
   // preview replaces the working layout without a panel re-render, and the commit closes it.
   const history = createEditHistory<RoomLayout>({ equal: roomLayoutsEqual });
@@ -256,6 +262,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     setDecorText: (instanceId, text, phase) => editDecor(setDecorText(layout, instanceId, text, room, catalog), "Words changed", phase),
     uploadDecorImage: (instanceId, file) => { void uploadDecorImage(instanceId, file); },
     clearDecorImage: (instanceId) => commitDecor(setDecorImage(layout, instanceId, "", 1, room, catalog).layout, "Picture removed"),
+    purchaseItem: (itemId) => { void purchaseItem(itemId); },
   }, { thumbnail: (definition) => thumbnails.get(definition), avatarThumbnail: (avatarId, onReady) => avatarThumbnails.get(avatarId, onReady) });
 
   function selectedCabinet(): RoomLayoutItem | undefined {
@@ -307,7 +314,12 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   }
 
   function renderPanel(): void {
-    panel.render({ tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory, canUpload: uploadPicture !== null, uploadingInstanceId });
+    panel.render({
+      tab, layout, selection, cabinets: cabinets.map((entry) => entry.cabinet), inventory, decorCategory,
+      canUpload: uploadPicture !== null, uploadingInstanceId,
+      ticketPrices: options.ticketPrices ?? new Map(), ticketBalance,
+      canPurchase: options.purchaseItem != null && purchasingItemId === "",
+    });
     if (tab === "avatar") avatarPreview.show(layout.avatarId);
     elements.undoButton.disabled = !history.canUndo();
   }
@@ -315,6 +327,26 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
   function setStatus(message: string, state = "ready"): void {
     elements.status.textContent = message;
     elements.status.dataset.state = state;
+  }
+
+  async function purchaseItem(itemId: string): Promise<void> {
+    if (!options.purchaseItem || purchasingItemId) {
+      setStatus("Sign in to buy permanent room unlocks.", "error");
+      return;
+    }
+    purchasingItemId = itemId;
+    renderPanel();
+    setStatus("Buying item…");
+    const result = await options.purchaseItem(itemId).catch(() => null);
+    purchasingItemId = "";
+    if (!result?.ok || !inventory.grant(result.itemId)) {
+      renderPanel();
+      setStatus(result?.error === "insufficient_tickets" ? "You do not have enough tickets for that yet." : "That purchase did not go through. Try again.", "error");
+      return;
+    }
+    if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0) ticketBalance = Number(result.balance);
+    renderPanel();
+    setStatus(result.alreadyOwned ? "Already owned · ready to place." : "Unlocked permanently · ready to place.");
   }
 
   /** Replace the layout, remembering the old one for undo, and redraw everything. */

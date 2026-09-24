@@ -22,6 +22,7 @@ test("the farm trust boundary preserves bounded pet profiles and supply stacks",
         traits: ["held.loves", "movement.fast"],
         milestones: ["dwelling:decor.prop.doghouse", "bad", "dwelling:decor.prop.doghouse"],
         paletteId: "midnight",
+        paletteBonus: 0.08,
       },
     }],
     agriculture: {
@@ -43,6 +44,7 @@ test("the farm trust boundary preserves bounded pet profiles and supply stacks",
     traits: ["held.loves", "movement.fast"],
     milestones: ["dwelling:decor.prop.doghouse"],
     paletteId: "midnight",
+    paletteBonus: 0.08,
   });
 });
 

@@ -54,11 +54,33 @@ export function createFarmInventoryPanel(elements, options = {}) {
         elements.suppliesGrid.replaceChildren(...PET_CARE.map((care) => {
             const food = document.createElement("div");
             food.className = "produce-row";
-            food.innerHTML = `<span>${care.food.title}</span><strong>${agriculture.inventory.supplies[care.food.itemId] ?? 0}</strong>`;
+            const title = document.createElement("span");
+            title.textContent = care.food.title;
+            const count = document.createElement("strong");
+            count.textContent = String(agriculture.inventory.supplies[care.food.itemId] ?? 0);
+            const buy = document.createElement("button");
+            buy.type = "button";
+            buy.className = "farm-button";
+            buy.textContent = `Buy · ${care.food.price} tickets`;
+            buy.disabled = !options.purchaseSupply || (agriculture.inventory.supplies[care.food.itemId] ?? 0) >= 99;
+            buy.addEventListener("click", async () => {
+                if (!options.purchaseSupply)
+                    return;
+                buy.disabled = true;
+                buy.textContent = "Buying…";
+                const message = await options.purchaseSupply(care.food.itemId, 1);
+                elements.selected.textContent = message;
+                if (buy.isConnected) {
+                    buy.disabled = false;
+                    buy.textContent = `Buy · ${care.food.price} tickets`;
+                }
+            });
+            food.replaceChildren(title, count, buy);
             return food;
         }));
         const selected = CROP_CATALOG.find((entry) => entry.id === selectedCropId);
-        elements.selected.textContent = `${selected.title} seeds × ${agriculture.inventory.seeds[selected.id] ?? 0}`;
+        if (!elements.selected.textContent?.includes("Purchased"))
+            elements.selected.textContent = `${selected.title} seeds × ${agriculture.inventory.seeds[selected.id] ?? 0}`;
     }
     elements.openButton.addEventListener("click", () => isOpen() ? close() : open());
     elements.closeButton.addEventListener("click", close);

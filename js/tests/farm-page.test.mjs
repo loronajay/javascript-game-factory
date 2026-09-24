@@ -203,3 +203,16 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);
 });
+
+test("farm build mode uses the shared ticket shop and permanent Farm inventory", () => {
+  const editorSource = readFileSync(resolve(repoRoot, "js", "farm-editor.mts"), "utf8");
+  const panelSource = readFileSync(resolve(repoRoot, "js", "farm-editor-panel.mts"), "utf8");
+  assert.match(source, /createTicketWalletClient\(\)/);
+  assert.match(source, /ticketClient\.getShop\("farm"\)/);
+  assert.match(source, /createFarmInventory\(\{ ownedIds: shop\?\.ownedIds \}\)/);
+  assert.match(source, /purchaseShopItem\("farm", itemId\)/);
+  assert.match(editorSource, /if \(!inventory\.owns\(id\)\)/);
+  assert.match(editorSource, /if \(!definition \|\| !inventory\.owns\(itemId\)\)/);
+  assert.match(panelSource, /dataset\.buyItem/);
+  assert.match(panelSource, /tickets available/);
+});

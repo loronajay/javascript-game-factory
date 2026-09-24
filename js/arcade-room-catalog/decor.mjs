@@ -66,6 +66,26 @@ export const NEON_TINTS = Object.freeze([
     { id: "white", title: "White", hex: "#f4f8ff" },
 ].map((tint) => Object.freeze(tint)));
 const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" });
+const PURCHASE = Object.freeze({ type: "purchase", source: "Arcade Shop" });
+export const STARTER_DECOR_IDS = new Set([
+    "decor.neon.strip",
+    "decor.sign.custom-block",
+    "decor.poster.custom",
+    "decor.rug.round",
+    "decor.light.spot",
+    "decor.light.tube",
+    "decor.furniture.bench",
+    "decor.furniture.stool",
+    "decor.furniture.table",
+    "decor.furniture.beanbag",
+    "decor.prop.jukebox",
+    "decor.prop.plant",
+    "decor.prop.trash-can",
+    "decor.wall.clock",
+    "decor.wall.shelf",
+    "decor.wall.exit-sign",
+    "decor.ceiling.fan",
+]);
 const NO_TINT = Object.freeze({ enabled: false, default: "" });
 const NO_LENGTH = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 const NO_SCALE = Object.freeze({ enabled: false, min: 1, max: 1 });
@@ -99,8 +119,9 @@ const SCALE_RANGES = Object.freeze({
     ceiling: Object.freeze({ min: 0.6, max: 2 }),
 });
 function decor(input) {
+    const id = `decor.${input.category}.${input.slug}`;
     return Object.freeze({
-        id: `decor.${input.category}.${input.slug}`,
+        id,
         category: input.category,
         title: input.title,
         mounts: Object.freeze([...input.mounts]),
@@ -116,7 +137,7 @@ function decor(input) {
         image: input.image ? Object.freeze({ enabled: true }) : NO_IMAGE,
         model: Object.freeze({ ...input.model }),
         interaction: input.interaction ? Object.freeze({ ...input.interaction }) : null,
-        unlock: STARTER,
+        unlock: STARTER_DECOR_IDS.has(id) ? STARTER : PURCHASE,
     });
 }
 const NEON_LIGHT = { intensity: 2.2, distance: 5.5 };

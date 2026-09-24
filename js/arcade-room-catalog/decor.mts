@@ -140,6 +140,26 @@ export type DecorInteraction = Readonly<{
 }>;
 
 const STARTER = Object.freeze({ type: "starter", source: "Arcade Room" } as const);
+const PURCHASE = Object.freeze({ type: "purchase", source: "Arcade Shop" } as const);
+export const STARTER_DECOR_IDS: ReadonlySet<string> = new Set([
+  "decor.neon.strip",
+  "decor.sign.custom-block",
+  "decor.poster.custom",
+  "decor.rug.round",
+  "decor.light.spot",
+  "decor.light.tube",
+  "decor.furniture.bench",
+  "decor.furniture.stool",
+  "decor.furniture.table",
+  "decor.furniture.beanbag",
+  "decor.prop.jukebox",
+  "decor.prop.plant",
+  "decor.prop.trash-can",
+  "decor.wall.clock",
+  "decor.wall.shelf",
+  "decor.wall.exit-sign",
+  "decor.ceiling.fan",
+]);
 const NO_TINT = Object.freeze({ enabled: false, default: "" });
 const NO_LENGTH = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 const NO_SCALE = Object.freeze({ enabled: false, min: 1, max: 1 });
@@ -195,8 +215,9 @@ type DecorInput = Readonly<{
 }>;
 
 function decor(input: DecorInput): DecorDefinition {
+  const id = `decor.${input.category}.${input.slug}`;
   return Object.freeze({
-    id: `decor.${input.category}.${input.slug}`,
+    id,
     category: input.category,
     title: input.title,
     mounts: Object.freeze([...input.mounts]),
@@ -212,7 +233,7 @@ function decor(input: DecorInput): DecorDefinition {
     image: input.image ? Object.freeze({ enabled: true }) : NO_IMAGE,
     model: Object.freeze({ ...input.model }) as DecorModelSpec,
     interaction: input.interaction ? Object.freeze({ ...input.interaction }) : null,
-    unlock: STARTER,
+    unlock: STARTER_DECOR_IDS.has(id) ? STARTER : PURCHASE,
   });
 }
 

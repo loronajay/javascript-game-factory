@@ -33,6 +33,12 @@ export function createRoomInventory(options = {}) {
     return Object.freeze({
         grantAll,
         owns,
+        grant: (id) => {
+            if (!known.has(id))
+                return false;
+            granted.add(id);
+            return true;
+        },
         resolveSurfaceId: (kind, id) => (owns(id) && findSurface(kind, id) ? id : DEFAULT_SURFACE_IDS[kind]),
     });
 }

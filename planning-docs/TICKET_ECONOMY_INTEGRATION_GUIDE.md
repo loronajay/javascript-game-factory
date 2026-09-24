@@ -1,6 +1,23 @@
 # Ticket Economy Integration Guide
 
-Status: the platform wallet and Lovers Lost reference integration are shipped. This document is the contract for adding ticket payouts to another cabinet.
+Status: the platform wallet is shipped with six cabinets paying out: Lovers Lost (through its achievement run) and Battleshits, Sumorai, Mini-Tactics, Bird Duty and Illuminauts (through the generic result route, below). Next in grid order: Creature Battler and Cockpit Swarm (whose campaign clears want a `campaign-clear:` key of their own). This document is the contract for adding ticket payouts to another cabinet. Tactical Arena is deliberately a separate pass: its campaign, competitive and CPU modes need a richer formula, and its Valor is a TA-only currency unrelated to tickets.
+
+## The fast path: `POST /games/:slug/results`
+
+A cabinet with no achievement run to ride on uses the generic result path. This is the default now, and adding a game is four small pieces:
+
+1. `platform-api/src/services/<slug>-ticket-rewards.mts`: export `normalize<Game>Result(raw)` (returns `{ result }` or `{ error }`; build it on `game-result-shared.mts`, and the result must carry `resultId` and `durationMs`) and a pure `calculate<Game>TicketReward({ result })`.
+2. Register the normalizer in `services/game-result-catalog.mts` and the formula in `services/ticket-reward-catalog.mts`.
+3. `games/<slug>/scripts/ticket-result.js`: a pure builder from match state to the result payload (no amount, and `null` for modes that pay nothing).
+4. In the cabinet, `createGameResultId(prefix)` when the match starts and `createGameResultReporter().report(slug, payload)` once when it ends (`js/platform/api/game-results-api.mjs`). Spend the id on report.
+
+The route, settlement, ledger, dedupe, replay and balance publish are shared; `db/game-results.mts` is the reference. References: `battleshits-ticket-rewards.mts` and `sumorai-ticket-rewards.mts` plus their tests, `game-result-settlement.test.mjs`. A cabinet that imports platform code lazily so it can boot standalone (Bird Duty, Illuminauts) uses a small `scripts/ticket-reporter.js` that wraps the reporter behind a dynamic `import()`.
+
+**Rules learned the hard way:**
+- **Completion must be earned by time.** Measure how fast a player can *throw* a match (stand still against the hardest CPU). If a flat completion payout divided by that time beats the hourly target, accrue completion per second of match instead (Sumorai: 1 per 15 s; Battleshits: 1 per 9 s).
+- **So must any bonus worth more than the fence can bound.** A win bonus can stay flat only if the normalizer's duration floor makes a forged win cost real time. Mini-Tactics' floor is loose (a quarter second a turn), so a faked 4-second win paid 25 until its win bonus accrued at 1 per 12 s too. Bird Duty solo is score-driven, and ten blind drops scored 35, so its total is capped at 1 per 7 s. Before settling a formula, play the laziest possible run and a forged one through the real normalizer.
+- **The page must load `js/platform-config.mjs`.** Without it the client's API URL is empty everywhere except localhost, so `canReport()` is false in production and nothing is filed, silently. A localhost test will not catch this; check the cabinet's `index.html`.
+- **The time-budget fence** in `db/game-results.mts` rejects any result claiming more play time than has elapsed since the player's previous result on this path. It is the only thing bounding a forger, so every normalizer must require an honest `durationMs` and refuse durations faster than the game's own floor (shot animations, round banners).
 
 ## Start here
 
@@ -156,6 +173,17 @@ A completeness test must compare the reward-map keys with the cabinet's achievem
 - Client failure never blocks the cabinet's end-of-match flow.
 - Shared balance UI updates after a successful settlement.
 - Median tickets/hour estimate is recorded for later telemetry comparison.
+- The cabinet's `index.html` loads `js/platform-config.mjs`.
+
+## Median tickets/hour estimates (to compare against telemetry)
+
+| Cabinet | Estimate |
+|---|---|
+| Battleshits | CPU Medium ~5-min win 35 → ~420/h |
+| Sumorai | fast flawless Hard Bo5 ~700/h (strong band) |
+| Mini-Tactics | 10-min Normal CPU win 75 → ~450/h; Hard ~510/h; ending every turn untouched ≤360/h |
+| Bird Duty | careful 50 s solo run scoring 60 → 7 (~500/h); blind spray ~420/h; online 2P 2.5 min → 20 (~480/h) |
+| Illuminauts | 90 s Sprint under par 14 → ~560/h; 4-min Sweep under par 34 → ~510/h |
 
 ## Lovers Lost reference behavior
 

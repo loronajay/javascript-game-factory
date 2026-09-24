@@ -25,6 +25,7 @@
 
 /* — Decor — */
 .category-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.ticket-shop-balance { display: block; margin: 0 0 8px; color: #f3c951; font: 800 10px/1.3 ui-monospace, monospace; letter-spacing: .05em; text-transform: uppercase; }
 .category-chip { padding: 6px 10px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(255,255,255,.05); color: #b8cada; font: 800 10px/1 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .category-chip:hover { border-color: rgba(112, 232, 255, .6); color: #fff; }
 .category-chip[aria-pressed="true"] { border-color: #70e8ff; background: rgba(112, 232, 255, .16); color: #fff; }
