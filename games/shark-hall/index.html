@@ -515,6 +515,10 @@
       </div>
     </div>
 
+    <!-- The platform API's base URL. Without it every account call — saved
+         tables and ticket results alike — silently resolves to nothing off
+         localhost. -->
+    <script type="module" src="../../js/platform-config.mjs"></script>
     <script type="module">
       import { bootGame } from "./scripts/init-game.js";
       bootGame();

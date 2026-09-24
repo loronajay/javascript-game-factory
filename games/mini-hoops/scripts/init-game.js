@@ -67,7 +67,9 @@ import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
 import { createMiniHoopsOnlineClient } from "./multiplayer/online-client.js";
 import { createHotseatDuel, completeHotseatTurn, resumeHotseatDuel } from "./multiplayer/hotseat-duel.js";
 import { normalizeMatchConfig } from "./multiplayer/match-config.js";
+import { TICKET_GAME_SLUG, TICKET_RESULT_PREFIX, buildTicketResult } from "./multiplayer/ticket-result.js";
 import { createPlatformApiClient } from "../../../js/platform/api/platform-api.mjs";
+import { createGameResultId, createGameResultReporter } from "../../../js/platform/api/game-results-api.mjs";
 import {
   SCREEN_BOARDS,
   SCREEN_CUSTOMIZE,
@@ -122,6 +124,11 @@ export function boot(root) {
   let onlineEndsLocal = 0;
   let onlineResultShown = false;
   let reportedOnlineSession = "";
+  // Tickets: an id is minted when a round starts and spent when it ends, so a
+  // retried submission replays the server's verdict instead of paying twice.
+  // What gets filed at all is decided by the pure builder in ticket-result.js.
+  const ticketReporter = createGameResultReporter();
+  let ticketRun = null;
 
   // The live pull, or null when the player is not touching the ball.
   let pull = null;
@@ -406,6 +413,7 @@ export function boot(root) {
       run.status = RUN_RUNNING;
       run.remaining = run.duration;
     }
+    ticketRun = { resultId: createGameResultId(TICKET_RESULT_PREFIX), startedAt: performance.now() };
 
     overlays.hideAll();
     audio.runStarted();
@@ -423,6 +431,7 @@ export function boot(root) {
     resultsShown = true;
     const summary = runSummary(run);
     run.recorded = true;
+    fileTicketResult(summary);
     if (playMode === "hotseat") {
       completeHotseatTurn(hotseat, summary);
       if (hotseat.phase === "pass") {
@@ -734,6 +743,22 @@ export function boot(root) {
       replayable: false,
     });
     reportOnlineResult(state, me, opponent, draw ? "draw" : won ? "win" : "loss");
+    fileTicketResult(runSummary(run), { outcome: draw ? "draw" : won ? "win" : "loss", forfeit });
+  }
+
+  /** Spend the round's ticket id. Fire-and-forget: the reporter never throws or blocks. */
+  function fileTicketResult(summary, online = {}) {
+    const ticket = ticketRun;
+    ticketRun = null;
+    if (!ticket) return;
+    const payload = buildTicketResult({
+      playMode,
+      summary,
+      ...online,
+      resultId: ticket.resultId,
+      durationMs: performance.now() - ticket.startedAt,
+    });
+    if (payload) void ticketReporter.report(TICKET_GAME_SLUG, payload);
   }
 
   async function reportOnlineResult(state, me, opponent, outcome) {

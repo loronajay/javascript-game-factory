@@ -181,5 +181,9 @@ function startBattle() {
   if (state.isOnlineMatch && typeof resetOnlineBattleSync === 'function') {
     resetOnlineBattleSync();
   }
+  // The platform wiring in index.html starts the battle's ticket result here.
+  if (typeof window !== 'undefined' && typeof window.__onBattleStart === 'function') {
+    window.__onBattleStart();
+  }
   setScreen('battle');
 }

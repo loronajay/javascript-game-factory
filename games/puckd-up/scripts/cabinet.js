@@ -12,6 +12,7 @@ import { createOnlineClient } from './online/client.js';
 import { createOnlineSync } from './online/sync.js';
 import { createGarageStore } from './garage/garage-store.js';
 import { createGarageScreen } from './garage/garage-screen.js';
+import { createTicketReporter } from './platform/ticket-reporter.js';
 // Composition/lifecycle boundary for a future platform adapter. No singleton state.
 export function createCabinet({ THREE, CANNON, account, onlineClient, doc = document }) {
     const win = doc.defaultView, disposers = [], handlers = [];
@@ -72,6 +73,7 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
             ui.refreshGarage();
         }).catch(() => { /* The cabinet plays on the factory loadout. */ });
         const online = own(createOnlineController({ doc, match, account, client }));
+        const tickets = createTicketReporter();
         const clock = createFixedStep(dt => {
             const input = controls.sample();
             if (match.state.mode === 'online') sync.tick(dt, input);
@@ -79,7 +81,7 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
             Object.assign(metrics, activeSimulation().metrics);
             view.tick(dt, activeSimulation(), match);
         });
-        handlers.push(event => { if (match.state.mode !== 'online') simulation.handle(event); }, controls.handle, view.handle, audio.handle, ui.handle, garageScreen.handle, online.handle, event => {
+        handlers.push(event => { if (match.state.mode !== 'online') simulation.handle(event); }, controls.handle, view.handle, audio.handle, ui.handle, garageScreen.handle, online.handle, event => tickets.handle(event, match.state), event => {
             if (event.type === 'screen') {
                 clock.reset();
                 lastTime = null;

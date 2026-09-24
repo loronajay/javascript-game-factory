@@ -196,7 +196,14 @@ function _renderEndPortraits(side) {
 
 function renderBattleEndOverlay(winner, reason) {
   if (typeof window.__publishBattleResult === 'function') {
-    window.__publishBattleResult(winner);
+    // `state` is a classic-script lexical global, never a property of window,
+    // so the module wiring in index.html is handed the facts it needs.
+    window.__publishBattleResult(winner, reason, {
+      isOnline:     state.isOnlineMatch === true,
+      rounds:       state.battleState?.round,
+      playerTeam:   state.playerTeam || [],
+      opponentTeam: state.opponentTeam || [],
+    });
   }
   stopBattleMusic();
   if (winner === 'player' || reason === 'disconnect') playWinnerMusic();

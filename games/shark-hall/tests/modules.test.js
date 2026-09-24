@@ -162,18 +162,19 @@ test("the multiplayer layer draws nothing and decides nothing", () => {
   }
 });
 
-test("only the account gate and the cosmetics store reach outside the cabinet", () => {
-  // Shark Hall is otherwise self-contained. TWO files import the shared platform
-  // layer — the online sign-in gate, and the store that keeps a player's saved
-  // tables on their Factory account — and between them they are the reason this
+test("only the account gate, the cosmetics store and the ticket reporter reach outside the cabinet", () => {
+  // Shark Hall is otherwise self-contained. THREE files import the shared
+  // platform layer — the online sign-in gate, the store that keeps a player's
+  // saved tables on their Factory account, and the reporter that files a
+  // decided match for tickets — and between them they are the reason this
   // cabinet is served from the repo root rather than from its own folder. The
-  // list is asserted by name so a third cannot appear unnoticed.
+  // list is asserted by name so a fourth cannot appear unnoticed.
   const reaching = FILES.filter((file) =>
     importsOf(code(file)).some((specifier) => specifier.includes("/js/platform/")));
   assertEqual(
     reaching.join(","),
-    "scripts/multiplayer/account-access.js,scripts/store/cosmetics-store.js",
-    "only the sign-in gate and the cosmetics store may import the shared platform layer",
+    "scripts/multiplayer/account-access.js,scripts/store/cosmetics-store.js,scripts/store/ticket-reporter.js",
+    "only the sign-in gate, the cosmetics store and the ticket reporter may import the shared platform layer",
   );
 });
 

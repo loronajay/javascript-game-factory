@@ -19,6 +19,7 @@ import { createGameAudio } from "./audio/game-audio.js";
 import { createTableEditor } from "./cosmetics/editor.js";
 import { DEVELOPMENT_INVENTORY } from "./cosmetics/inventory.js";
 import { MODE_CPU, createMatch } from "./match/match.js";
+import { buildTicketResult } from "./match/ticket-result.js";
 import { createAccountAccess } from "./multiplayer/account-access.js";
 import { createOnlineClient } from "./multiplayer/online-client.js";
 import { MODE_ONLINE, createOnlineMatch } from "./multiplayer/online-match.js";
@@ -30,6 +31,7 @@ import { describeBall } from "./sim/rules.js";
 import { ZONE_NONE } from "./sim/placement.js";
 import { createCosmeticsStore } from "./store/cosmetics-store.js";
 import { loadSettings, saveSettings } from "./store/settings.js";
+import { createTicketReporter } from "./store/ticket-reporter.js";
 import { createControls } from "./ui/controls.js";
 import { findElements } from "./ui/elements.js";
 import { createFullscreen, fullscreenLabel } from "./ui/fullscreen.js";
@@ -91,6 +93,10 @@ export async function bootGame() {
   sceneRef = scene;
   const hud = createHud(elements);
   const match = createMatch({ mode: MODE_CPU, difficulty: settings.difficulty });
+  // One ticket per match: begun on every fresh local rack and on every online
+  // match (a rematch included), spent on the win. Hotseat and a walked-out
+  // online table begin one too; the builder is what declines to file them.
+  const tickets = createTicketReporter();
 
   let cameraMode = settings.camera;
 
@@ -179,7 +185,10 @@ export async function bootGame() {
     // holding the first one would resume a match nobody is playing.
     onOpenTable: () => void editorView.show(),
     onResume: () => live.resume(),
-    onRestart: () => live.rack(),
+    onRestart: () => {
+      live.rack();
+      if (live.mode !== MODE_ONLINE) tickets.begin();
+    },
     onQuit: () => {
       live.quit();
       audio.silence();
@@ -205,7 +214,10 @@ export async function bootGame() {
     for (const off of unsubscribe) off();
     unsubscribe = [
       target.on("physics", (event) => audio.handlePhysics(event)),
-      target.on("shot", () => scene.strike()),
+      target.on("shot", () => {
+        scene.strike();
+        tickets.stroke();
+      }),
       target.on("rack", (balls) => scene.reset(balls)),
       target.on("message", (text) => hud.message(text)),
       target.on("turn-card", (card) => hud.turnCard(card)),
@@ -213,7 +225,9 @@ export async function bootGame() {
       target.on("settled", (outcome) => {
         if (outcome.foul) audio.reject();
       }),
-      target.on("win", ({ name }) => {
+      target.on("win", ({ seat, name }) => {
+        tickets.finish(({ resultId, durationMs, strokes }) =>
+          buildTicketResult({ snapshot: live.snapshot(), winnerSeat: seat, resultId, durationMs, strokes }));
         audio.silence();
         menu.showResult({
           title: `${name} wins`,
@@ -235,6 +249,7 @@ export async function bootGame() {
     subscribe(live);
     scene.reset(live.world.balls);
     live.start();
+    tickets.begin();
     menu.showTable();
     refresh();
   }
@@ -372,6 +387,9 @@ export async function bootGame() {
     if (snapshot.mode === MODE_ONLINE && snapshot.started && snapshot.winner === null && menu.layer === "result") {
       menu.showTable();
     }
+    // An online match (the first, or an accepted rematch) is live and undecided
+    // with no ticket running: this is where it starts.
+    if (snapshot.mode === MODE_ONLINE && snapshot.started && snapshot.winner === null && !tickets.active) tickets.begin();
     hud.render(snapshot);
     hud.shootLabel(shootLabel(snapshot));
     spinDial.draw(snapshot.spinX, snapshot.spinY);

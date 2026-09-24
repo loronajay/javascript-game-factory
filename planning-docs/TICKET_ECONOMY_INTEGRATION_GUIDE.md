@@ -1,6 +1,6 @@
 # Ticket Economy Integration Guide
 
-Status: the platform wallet is shipped with six cabinets paying out: Lovers Lost (through its achievement run) and Battleshits, Sumorai, Mini-Tactics, Bird Duty and Illuminauts (through the generic result route, below). Next in grid order: Creature Battler and Cockpit Swarm (whose campaign clears want a `campaign-clear:` key of their own). This document is the contract for adding ticket payouts to another cabinet. Tactical Arena is deliberately a separate pass: its campaign, competitive and CPU modes need a richer formula, and its Valor is a TA-only currency unrelated to tickets.
+Status: the platform wallet is shipped with ten cabinets paying out: Lovers Lost (through its achievement run) and Battleshits, Sumorai, Mini-Tactics, Bird Duty, Illuminauts, Creature Battler, Shark Hall, Mini Hoops and Puck'd Up (through the generic result route, below). Still to do: Echo Duel (its online session controller is a known hotspot — extract first), Cockpit Swarm (campaign clears want a `campaign-clear:` key of their own), then Build Buddy, Circuit Siege, Speed Demon, Yam Bowling, Hide and Seek and Orbit Pong. This document is the contract for adding ticket payouts to another cabinet. Tactical Arena is deliberately a separate pass: its campaign, competitive and CPU modes need a richer formula, and its Valor is a TA-only currency unrelated to tickets.
 
 ## The fast path: `POST /games/:slug/results`
 
@@ -16,7 +16,9 @@ The route, settlement, ledger, dedupe, replay and balance publish are shared; `d
 **Rules learned the hard way:**
 - **Completion must be earned by time.** Measure how fast a player can *throw* a match (stand still against the hardest CPU). If a flat completion payout divided by that time beats the hourly target, accrue completion per second of match instead (Sumorai: 1 per 15 s; Battleshits: 1 per 9 s).
 - **So must any bonus worth more than the fence can bound.** A win bonus can stay flat only if the normalizer's duration floor makes a forged win cost real time. Mini-Tactics' floor is loose (a quarter second a turn), so a faked 4-second win paid 25 until its win bonus accrued at 1 per 12 s too. Bird Duty solo is score-driven, and ten blind drops scored 35, so its total is capped at 1 per 7 s. Before settling a formula, play the laziest possible run and a forged one through the real normalizer.
-- **The page must load `js/platform-config.mjs`.** Without it the client's API URL is empty everywhere except localhost, so `canReport()` is false in production and nothing is filed, silently. A localhost test will not catch this; check the cabinet's `index.html`.
+- **The page must load `js/platform-config.mjs`.** Without it the client's API URL is empty everywhere except localhost, so `canReport()` is false in production and nothing is filed, silently. A localhost test will not catch this; check the cabinet's `index.html`, and add a test that reads it (Shark Hall and Puck'd Up do).
+- **A server-decided forfeit can look like an ordinary win.** Shark Hall's network server ends a match for whoever stayed when a seat walks, and the cabinet hears a normal `win` event. Find how *this* cabinet surfaces a forfeit (a disconnected seat, a `reason: 'forfeit'`, a `'disconnect'` overlay) and have the pure builder decline it.
+- **A classic-script global is not on `window`.** `const state` at the top of a classic script is a lexical global; a module reading `window.state` gets `undefined`. Creature Battler's end hook now passes the facts explicitly.
 - **The time-budget fence** in `db/game-results.mts` rejects any result claiming more play time than has elapsed since the player's previous result on this path. It is the only thing bounding a forger, so every normalizer must require an honest `durationMs` and refuse durations faster than the game's own floor (shot animations, round banners).
 
 ## Start here
@@ -184,6 +186,10 @@ A completeness test must compare the reward-map keys with the cabinet's achievem
 | Mini-Tactics | 10-min Normal CPU win 75 → ~450/h; Hard ~510/h; ending every turn untouched ≤360/h |
 | Bird Duty | careful 50 s solo run scoring 60 → 7 (~500/h); blind spray ~420/h; online 2P 2.5 min → 20 (~480/h) |
 | Illuminauts | 90 s Sprint under par 14 → ~560/h; 4-min Sweep under par 34 → ~510/h |
+| Creature Battler | 4-min training win 34 (held by the 7 s ceiling) → ~510/h; loss 24 → ~360/h; 6-min online win 45 → ~450/h |
+| Shark Hall | 4-min Sharp CPU rack win 34 → ~510/h; 5-min Club win 35 → ~420/h; online race to 3 in 15 min, win 100 → ~400/h, loss 75 → ~300/h |
+| Mini Hoops | 30 s run with 12 made → 6 per ~40 s cycle → ~540/h; 7 made → ~360/h; blind spam (2 made) → ~180/h |
+| Puck'd Up | 3.5-min win vs Viper 27 → ~460/h; 4-min win vs the Ace 35 → ~525/h; loss 20 → ~300/h |
 
 ## Lovers Lost reference behavior
 

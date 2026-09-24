@@ -81,6 +81,7 @@ const MODULES = [
   "scripts/store/preferences.js",
   "scripts/store/trick-shots-store.js",
   "scripts/multiplayer/online-client.js",
+  "scripts/multiplayer/ticket-result.js",
   "scripts/multiplayer/tic-tac-toe-online-client.js",
   "scripts/multiplayer/horse-online-client.js",
   "scripts/render/scene.js",

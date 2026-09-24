@@ -13,8 +13,12 @@
 // time-budget fence checks against the wall clock).
 import { normalizeBattleshitsResult } from "./battleshits-ticket-rewards.mjs";
 import { normalizeBirdDutyResult } from "./bird-duty-ticket-rewards.mjs";
+import { normalizeCreatureBattlerResult } from "./creature-battler-ticket-rewards.mjs";
 import { normalizeIlluminautsResult } from "./illuminauts-ticket-rewards.mjs";
+import { normalizeMiniHoopsResult } from "./mini-hoops-ticket-rewards.mjs";
 import { normalizeMiniTacticsResult } from "./mini-tactics-ticket-rewards.mjs";
+import { normalizePuckdUpResult } from "./puckd-up-ticket-rewards.mjs";
+import { normalizeSharkHallResult } from "./shark-hall-ticket-rewards.mjs";
 import { normalizeSumoraiResult } from "./sumorai-ticket-rewards.mjs";
 const NORMALIZERS = Object.freeze({
     battleshits: normalizeBattleshitsResult,
@@ -22,6 +26,10 @@ const NORMALIZERS = Object.freeze({
     "mini-tactics": normalizeMiniTacticsResult,
     illuminauts: normalizeIlluminautsResult,
     "bird-duty": normalizeBirdDutyResult,
+    "creature-battler": normalizeCreatureBattlerResult,
+    "mini-hoops": normalizeMiniHoopsResult,
+    "puckd-up": normalizePuckdUpResult,
+    "shark-hall": normalizeSharkHallResult,
 });
 function cleanSlug(value) {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
