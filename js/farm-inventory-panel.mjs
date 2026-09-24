@@ -1,6 +1,6 @@
 import { CROP_CATALOG } from "./farm-crops.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
-export function createFarmInventoryPanel(elements) {
+export function createFarmInventoryPanel(elements, options = {}) {
     let agriculture;
     let selectedCropId = CROP_CATALOG[0].id;
     function isOpen() { return !elements.root.hidden; }
@@ -25,7 +25,20 @@ export function createFarmInventoryPanel(elements) {
             button.dataset.cropId = crop.id;
             button.setAttribute("aria-pressed", String(crop.id === selectedCropId));
             button.disabled = (agriculture.inventory.seeds[crop.id] ?? 0) <= 0;
-            button.innerHTML = `<span class="seed-card__icon" aria-hidden="true">${crop.title.slice(0, 2).toUpperCase()}</span><strong>${crop.title}</strong><small>${agriculture.inventory.seeds[crop.id]} seeds</small>`;
+            const portrait = document.createElement("span");
+            portrait.className = "seed-card__image";
+            portrait.setAttribute("aria-hidden", "true");
+            const image = document.createElement("img");
+            image.alt = "";
+            const show = (url) => { image.src = url; portrait.replaceChildren(image); };
+            const ready = options.thumbnail?.(crop.id, show);
+            if (ready)
+                show(ready);
+            const title = document.createElement("strong");
+            title.textContent = crop.title;
+            const count = document.createElement("small");
+            count.textContent = `${agriculture.inventory.seeds[crop.id]} seeds`;
+            button.replaceChildren(portrait, title, count);
             button.addEventListener("click", () => {
                 selectedCropId = crop.id;
                 render(agriculture);

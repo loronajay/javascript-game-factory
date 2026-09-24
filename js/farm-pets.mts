@@ -48,6 +48,12 @@ export type PetBody = Readonly<{
   yaw: number;
   /** Metres above the ground; air species hover, everyone else is 0. */
   hover: number;
+  /** Individual profile multiplier shared by rendering and physical bounds. */
+  sizeMultiplier: number;
+  /** Persisted visual variant; bodies resolve this through the species palette table. */
+  paletteId: string;
+  /** Species personal-space radius after applying `sizeMultiplier`. */
+  radius: number;
   state: PetState;
   /** True on a tick the pet actually covered ground: what picks the walk clip. */
   moving: boolean;
@@ -62,6 +68,9 @@ type Pet = {
   z: number;
   yaw: number;
   hover: number;
+  sizeMultiplier: number;
+  paletteId: string;
+  radius: number;
   state: PetState;
   moving: boolean;
   /** Seconds left in the current state. */
@@ -97,7 +106,7 @@ export type PetSim = Readonly<{
   /** Set a carried pet down at `spot`, facing `yaw`; false (and still carried) when a body its size does not fit there. */
   putDown: (instanceId: string, spot: Readonly<{ x: number; z: number; yaw: number }>) => boolean;
   /** True when a pet of this species could stand at the spot right now: inside the field, out of every solid, clear of the others. */
-  canStand: (speciesId: string, spot: Readonly<{ x: number; z: number }>) => boolean;
+  canStand: (speciesId: string, spot: Readonly<{ x: number; z: number }>, sizeMultiplier?: number) => boolean;
   /** The pet in the player's arms, if any. */
   carried: () => PetBody | null;
   find: (instanceId: string) => PetBody | null;
@@ -179,7 +188,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
   }
 
   function blockedByPet(x: number, z: number, self: Pet | null, radius: number): boolean {
-    return pets.some((other) => other !== self && other.state !== "carried" && Math.hypot(other.x - x, other.z - z) < other.species.radius + radius);
+    return pets.some((other) => other !== self && other.state !== "carried" && Math.hypot(other.x - x, other.z - z) < other.radius + radius);
   }
 
   /** True when nothing solid stands between the pet and the target: the segment is sampled every `SIGHT_STEP` at the pet's own radius. */
@@ -191,7 +200,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     const solids = obstacles();
     for (let index = 1; index <= steps; index += 1) {
       const point = { x: pet.x + dx * (index / steps), z: pet.z + dz * (index / steps) };
-      if (solids.some((obstacle) => obstacleBlocks(point, obstacle, pet.species.radius * 0.6))) return false;
+      if (solids.some((obstacle) => obstacleBlocks(point, obstacle, pet.radius * 0.6))) return false;
     }
     return true;
   }
@@ -209,35 +218,33 @@ export function createPetSim(options: PetSimOptions): PetSim {
    * A spot the pet may stand on. On land: inside the field, out of every solid, out of
    * the keep-out boxes, clear of the others. In water: inside a pond, clear of the others.
    */
-  function standable(x: number, z: number, self: Pet | null, species: AnimalDefinition): boolean {
-    const radius = species.radius;
+  function standable(x: number, z: number, self: Pet | null, species: AnimalDefinition, radius = species.radius): boolean {
     if (species.habitat === "water") return inWater(x, z, radius) && !blockedByPet(x, z, self, radius);
     return inField(x, z, radius) && !blockedBySolid(x, z, radius) && !blockedByKeepOut(x, z, radius) && !blockedByPet(x, z, self, radius);
   }
 
   /** Player placement may deliberately put a ground/air pet inside a building; swimmers still require actual water. */
-  function placeable(x: number, z: number, self: Pet | null, species: AnimalDefinition): boolean {
-    const radius = species.radius;
+  function placeable(x: number, z: number, self: Pet | null, species: AnimalDefinition, radius = species.radius): boolean {
     if (species.habitat === "water") return inWater(x, z, radius) && !blockedByPet(x, z, self, radius);
     return inField(x, z, radius) && !blockedBySolid(x, z, radius) && !blockedByPet(x, z, self, radius);
   }
 
-  function spawnSpot(species: AnimalDefinition): Readonly<{ x: number; z: number }> {
+  function spawnSpot(species: AnimalDefinition, radius = species.radius): Readonly<{ x: number; z: number }> {
     if (species.habitat === "water") {
       const ponds = water();
       for (let attempt = 0; attempt < SPAWN_TRIES && ponds.length > 0; attempt += 1) {
         const pond = ponds[Math.min(ponds.length - 1, Math.floor(random() * ponds.length))];
         const x = pond.x + (random() * 2 - 1) * pond.footprint.width / 2;
         const z = pond.z + (random() * 2 - 1) * pond.footprint.depth / 2;
-        if (standable(x, z, null, species)) return { x, z };
+        if (standable(x, z, null, species, radius)) return { x, z };
       }
       // No room in any pond: the middle of the first one, or the field's centre if there is none.
       return ponds[0] ? { x: ponds[0].x, z: ponds[0].z } : { x: 0, z: 0 };
     }
     for (let attempt = 0; attempt < SPAWN_TRIES; attempt += 1) {
-      const x = (random() * 2 - 1) * (halfWidth - species.radius - 1);
-      const z = (random() * 2 - 1) * (halfDepth - species.radius - 1);
-      if (standable(x, z, null, species)) return { x, z };
+      const x = (random() * 2 - 1) * (halfWidth - radius - 1);
+      const z = (random() * 2 - 1) * (halfDepth - radius - 1);
+      if (standable(x, z, null, species, radius)) return { x, z };
     }
     // A crowded field: the middle of the south half is always open ground.
     return { x: (random() - 0.5) * 4, z: halfDepth * 0.5 };
@@ -259,10 +266,10 @@ export function createPetSim(options: PetSimOptions): PetSim {
       const x = pet.x + Math.cos(angle) * range;
       const z = pet.z + Math.sin(angle) * range;
       if (pet.species.habitat === "water") {
-        if (!standable(x, z, pet, pet.species)) continue;
+        if (!standable(x, z, pet, pet.species, pet.radius)) continue;
       } else {
-        if (!inField(x, z, pet.species.radius) || blockedBySolid(x, z, pet.species.radius) || blockedByPet(x, z, pet, pet.species.radius)) continue;
-        if (!inside && blockedByKeepOut(x, z, pet.species.radius)) continue;
+        if (!inField(x, z, pet.radius) || blockedBySolid(x, z, pet.radius) || blockedByPet(x, z, pet, pet.radius)) continue;
+        if (!inside && blockedByKeepOut(x, z, pet.radius)) continue;
         if (!canSee(pet, { x, z })) continue;
       }
       pet.targetX = x;
@@ -291,13 +298,13 @@ export function createPetSim(options: PetSimOptions): PetSim {
       const x = pet.x + direction.x * distance;
       const z = pet.z + direction.z * distance;
       if (pet.species.habitat === "water") {
-        if (!inWater(x, z, pet.species.radius)) continue;
+        if (!inWater(x, z, pet.radius)) continue;
       } else {
-        if (!inField(x, z, pet.species.radius)) continue;
-        if (blockedBySolid(x, z, pet.species.radius)) continue;
+        if (!inField(x, z, pet.radius)) continue;
+        if (blockedBySolid(x, z, pet.radius)) continue;
       }
-      if (blockedByPet(x, z, pet, pet.species.radius)) continue;
-      if (blockedByPlayer(x, z, player, pet.species.radius)) continue;
+      if (blockedByPet(x, z, pet, pet.radius)) continue;
+      if (blockedByPlayer(x, z, player, pet.radius)) continue;
       pet.x = x;
       pet.z = z;
       return true;
@@ -371,6 +378,9 @@ export function createPetSim(options: PetSimOptions): PetSim {
       z: pet.z,
       yaw: pet.yaw,
       hover: pet.hover,
+      sizeMultiplier: pet.sizeMultiplier,
+      paletteId: pet.paletteId,
+      radius: pet.radius,
       state: pet.state,
       moving: pet.moving,
     })),
@@ -379,12 +389,17 @@ export function createPetSim(options: PetSimOptions): PetSim {
       for (let index = pets.length - 1; index >= 0; index -= 1) {
         const row = rows.get(pets[index].instanceId);
         if (!row || row.speciesId !== pets[index].speciesId) pets.splice(index, 1);
-        else pets[index].name = row.name;
+        else {
+          pets[index].name = row.name;
+          pets[index].sizeMultiplier = row.profile?.size.current ?? 1;
+          pets[index].paletteId = row.profile?.paletteId ?? "standard";
+          pets[index].radius = pets[index].species.radius * pets[index].sizeMultiplier;
+        }
       }
       // A pond that moved or went while a swimmer was in it: find the swimmer new water.
       for (const pet of pets) {
-        if (pet.state === "carried" || pet.species.habitat !== "water" || inWater(pet.x, pet.z, pet.species.radius)) continue;
-        const spot = spawnSpot(pet.species);
+        if (pet.state === "carried" || pet.species.habitat !== "water" || inWater(pet.x, pet.z, pet.radius)) continue;
+        const spot = spawnSpot(pet.species, pet.radius);
         pet.x = spot.x;
         pet.z = spot.z;
         pet.targetX = spot.x;
@@ -395,7 +410,9 @@ export function createPetSim(options: PetSimOptions): PetSim {
         if (pets.some((pet) => pet.instanceId === row.instanceId)) continue;
         const species = findAnimal(row.speciesId);
         if (!species) continue;
-        const spot = spawnSpot(species);
+        const sizeMultiplier = row.profile?.size.current ?? 1;
+        const radius = species.radius * sizeMultiplier;
+        const spot = spawnSpot(species, radius);
         const pet: Pet = {
           instanceId: row.instanceId,
           speciesId: row.speciesId,
@@ -405,6 +422,9 @@ export function createPetSim(options: PetSimOptions): PetSim {
           z: spot.z,
           yaw: random() * Math.PI * 2,
           hover: species.habitat === "ground" ? 0 : species.hoverHeight,
+          sizeMultiplier,
+          paletteId: row.profile?.paletteId ?? "standard",
+          radius,
           state: "idle",
           moving: false,
           timer: 0,
@@ -430,7 +450,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     putDown(instanceId, spot) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
       if (!pet || pet.state !== "carried") return false;
-      if (!placeable(spot.x, spot.z, pet, pet.species)) return false;
+      if (!placeable(spot.x, spot.z, pet, pet.species, pet.radius)) return false;
       pet.x = spot.x;
       pet.z = spot.z;
       pet.yaw = spot.yaw;
@@ -440,13 +460,13 @@ export function createPetSim(options: PetSimOptions): PetSim {
       startIdle(pet);
       return true;
     },
-    canStand(speciesId, spot) {
+    canStand(speciesId, spot, sizeMultiplier = 1) {
       const species = findAnimal(speciesId);
-      return Boolean(species && placeable(spot.x, spot.z, null, species));
+      return Boolean(species && placeable(spot.x, spot.z, null, species, species.radius * sizeMultiplier));
     },
     carried() {
       const pet = pets.find((candidate) => candidate.state === "carried");
-      return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, state: pet.state, moving: pet.moving } : null;
+      return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, sizeMultiplier: pet.sizeMultiplier, paletteId: pet.paletteId, radius: pet.radius, state: pet.state, moving: pet.moving } : null;
     },
     attention(instanceId) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
@@ -458,7 +478,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     },
     find(instanceId) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-      return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, state: pet.state, moving: pet.moving } : null;
+      return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, sizeMultiplier: pet.sizeMultiplier, paletteId: pet.paletteId, radius: pet.radius, state: pet.state, moving: pet.moving } : null;
     },
   });
 }

@@ -10,7 +10,7 @@
 // their picture swapped in when it arrives; the pet rows are rebuilt on every
 // layout change because they are few and carry live inputs.
 
-import { adoptableAnimals, findAnimal, type AnimalDefinition } from "./farm-catalog/animals.mjs";
+import { adoptableAnimals, findAnimal, findAnimalPalette, type AnimalDefinition } from "./farm-catalog/animals.mjs";
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats, type FarmLayout } from "./farm-layout.mjs";
 import { PET_TRAITS, visiblePetStats } from "./farm-pet-care.mjs";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
@@ -111,11 +111,12 @@ export function createPetsPanel(elements: PetsPanelElements, actions: PetsPanelA
       row.className = "pet-row";
       row.dataset.instanceId = pet.instanceId;
       const profile = pet.profile;
+      const palette = findAnimalPalette(pet.speciesId, profile?.paletteId);
       const stats = profile ? visiblePetStats(profile) : null;
       const needs = profile ? petNeedStatus(profile) : null;
       const statMarkup = stats ? `<dl class="pet-row__stats">
         <div><dt>Gender</dt><dd>${escapeHtml(String(stats.gender))}</dd></div>
-        <div><dt>Age</dt><dd>${stats.ageDays} days</dd></div>
+        <div><dt>Age</dt><dd>${Number(stats.ageDays).toFixed(1)} days</dd></div>
         <div><dt>Size</dt><dd>${Number(stats.size).toFixed(2)}×</dd></div>
         <div class="pet-row__need pet-row__need--${needs?.level ?? "content"}"><dt>Hunger</dt><dd>${stats.hunger}% · ${needs?.label ?? "Unknown"}</dd></div>
         <div><dt>Happiness</dt><dd>${stats.happiness}%</dd></div>
@@ -126,7 +127,7 @@ export function createPetsPanel(elements: PetsPanelElements, actions: PetsPanelA
         const trait = PET_TRAITS.find((entry) => entry.id === id);
         return trait ? `<li title="${escapeHtml(trait.description)}">${escapeHtml(trait.title)}</li>` : "";
       }).join("")}</ul>` : "";
-      row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}</span>`
+      row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}${palette && palette.id !== "standard" ? ` · ${escapeHtml(palette.title)}` : ""}</span>`
         + `<input class="pet-row__name" type="text" maxlength="${PET_NAME_MAX_LENGTH}" value="${escapeHtml(pet.name)}" aria-label="Name of ${escapeHtml(pet.name)}">`
         + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button></div>`
         + statMarkup + traitMarkup;

@@ -4,6 +4,8 @@
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
 import { PET_TRAITS, findPetCare } from "./farm-pet-care.mjs";
 import { withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
+import { advancePetWellbeing } from "./farm-pet-happiness.mjs";
+import { advancePetLifecycle } from "./farm-pet-lifecycle.mjs";
 export const HUNGRY_THRESHOLD = 40;
 export const STARVATION_GRACE_MINUTES = FARM_DAY_MINUTES;
 export const HUNGRY_AFFECTION_LOSS_PER_DAY = 2;
@@ -31,7 +33,7 @@ export function petNeedStatus(profile) {
     });
 }
 /** Advance one profile by elapsed farm minutes, including partial threshold crossings. */
-export function advancePetProfile(profile, speciesId, elapsedFarmMinutes) {
+export function advancePetProfile(profile, speciesId, elapsedFarmMinutes, decor = []) {
     const care = findPetCare(speciesId);
     const elapsed = Number.isFinite(elapsedFarmMinutes) ? Math.max(0, elapsedFarmMinutes) : 0;
     if (!care || elapsed <= 0)
@@ -47,12 +49,13 @@ export function advancePetProfile(profile, speciesId, elapsedFarmMinutes) {
         : 0;
     const affectionLoss = (hungryMinutes / FARM_DAY_MINUTES) * HUNGRY_AFFECTION_LOSS_PER_DAY
         + (starvingMinutesAdded / FARM_DAY_MINUTES) * STARVING_AFFECTION_LOSS_PER_DAY;
-    return Object.freeze({
+    const hungryProfile = Object.freeze({
         ...profile,
         hunger,
         starvingMinutes,
         affection: roundedNeed(Math.max(0, profile.affection - affectionLoss)),
     });
+    return advancePetLifecycle(advancePetWellbeing(hungryProfile, speciesId, decor, elapsed), speciesId, elapsed);
 }
 /** Checkpoint every pet from layout.clock.farmMinutes to targetFarmMinute. Rollback is a no-op. */
 export function advancePetNeeds(layout, targetFarmMinute) {
@@ -61,7 +64,7 @@ export function advancePetNeeds(layout, targetFarmMinute) {
     if (elapsed <= 0)
         return layout;
     const pets = layout.pets.map((pet) => pet.profile
-        ? { ...pet, profile: advancePetProfile(pet.profile, pet.speciesId, elapsed) }
+        ? { ...pet, profile: advancePetProfile(pet.profile, pet.speciesId, elapsed, layout.decor) }
         : pet);
     return withFarmClock(withFarmPets(layout, pets), target, layout.clock.updatedAt);
 }

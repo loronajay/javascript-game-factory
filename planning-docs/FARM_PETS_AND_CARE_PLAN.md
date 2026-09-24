@@ -20,7 +20,7 @@
 - Visible stats: gender, age, size, hunger, happiness, speed, and strength. Affection is stored but hidden from the stats UI.
 - Everything stays unlocked during development. Unlock and purchase enforcement comes only after tickets are designed.
 - Every species uses the same full individual profile system: gender, age, relative size/growth, affection, hunger, happiness, speed, strength, compatible traits, and palette identity. Speed and strength ranges are weighted by species; the rest follows the same randomized pipeline.
-- Every species has a food and dwelling data row. Non-dog dwellings remain data only until their 3D models and placement behavior are designed.
+- Every species has a food and a placeable procedural dwelling with an entrance sized from that species' authoritative body measurements.
 - Tricks, pet minigames, and breeding are deferred until their animation and gameplay passes are scoped.
 - Pet needs use the existing farm clock without a second time scale: one pet day is one 1,440-minute farm day, including ordinary play, naps, and elapsed time away.
 - Hunger drains by **25 points per farm day** before traits; Big Appetite multiplies drain by 1.5 and Light Eater by 0.65. One correct species serving restores 35 hunger.
@@ -49,12 +49,17 @@
 - [x] New/default inventory contains **20 Dog Food** and zero-count stacks for every other species food.
 - [x] The inventory panel displays every species food stack.
 - [x] The Pets panel displays gender, age, size, hunger, happiness, speed, strength, and trait labels for every pet.
+- [x] Profiles saved before the trait rollout deterministically gain compatible traits without rerolling their existing stats.
 - [x] Affection is absent from the visible-stats view model and panel.
 - [x] Hunger advances from persisted farm minutes during play, naps, and time away; quarter-hour checkpoints and clock-rollback protection keep render rate and wall-clock rollback from creating extra decay.
+- [x] Age and individual growth advance through that same persisted farm-time checkpoint; partial days survive API round-trips, Fast Grower accelerates growth, and both values stop at their species/individual caps.
+- [x] Individual size scales the visible animal and the same multiplier drives collision, water fit, carry/drop spacing, and interaction reach.
 - [x] Owners can press G near a hungry pet to consume one matching species food; full pets and missing-food attempts consume nothing.
 - [x] Context prompts and the Pets panel distinguish Full, Content, Hungry, and Starving without exposing affection.
 - [~] The current adoption panel can create/rename/release pets. Ticket charging and lock rules remain off.
 - [x] All existing animal models use authoritative profile, food, dwelling, lifespan, and species-weight data.
+- [x] Every species has three named weighted visual palettes (70% classic, 24% uncommon, 6% rare); the persisted palette recolors the actual animated model and is identified in the Pets panel.
+- [x] All ten dwellings are placeable catalog props with distinct procedural models, species identity, and measured entrance contracts.
 - [x] Aquatic pets can be picked up like every other pet and can only be put down where their full body fits inside water.
 - [x] New owners see the farm introduction once and must atomically name/save their starter dog before normal play; visitors never receive the owner gate.
 - [x] New farms persist one growing plot, one seed from six randomly chosen unique crops, and 20 Dog Food without rerolling or re-granting on reload.
@@ -132,22 +137,22 @@ These are balancing rows, not claims about real-world animal biology. Food price
 ### Phase 3 — happiness, handling, dwelling, and toys
 
 - [x] Name one data-only dwelling for every species.
-- [ ] Add dwelling catalog assets and species-appropriate entrances after their 3D models are designed.
-- [ ] Add Tennis Ball, Rope Toy, and Bone as data-driven owned/placed items.
-- [ ] Define the immediate affection award for buying/placing the first Dog House.
-- [ ] Define ongoing happiness/affection effects for having a valid dwelling and toys.
-- [ ] Connect Cuddly/Independent to carrying and petting reactions.
-- [ ] Add refusal/jump-from-arms/bite behavior with readable warnings; avoid surprise punishment without feedback.
-- [ ] Define play interactions separately from future animated tricks.
+- [x] Add dwelling catalog assets and species-appropriate entrances after their 3D models are designed.
+- [x] Add Tennis Ball, Rope Toy, and Bone as data-driven owned/placed items.
+- [x] The first valid species dwelling grants a one-time persisted +10 affection award; replacing it cannot farm the bonus.
+- [x] Happiness loses 8/day, offset by 5/day for a valid dwelling and 2/day per distinct compatible toy; those items also build affection by 1/day and 0.5/day respectively.
+- [x] Connect Cuddly/Independent to carrying and petting reactions.
+- [x] Add readable refusal/bite warnings and a warned jump-from-arms timer; punishment never arrives without feedback.
+- [x] Y Play is a separate interaction from future animated tricks and requires a compatible placed toy.
 
 ### Phase 4 — age, growth, palette rarity, and lifespan
 
-- [ ] Advance age in farm days from persisted time.
-- [ ] Grow current size toward the individual cap; apply Fast Grower.
-- [ ] Feed the size multiplier into visuals and hitbox/interaction reach together.
-- [ ] Add weighted palette variants only after actual palettes/assets exist.
-- [ ] Decide natural-aging rules and whether excellent care always reaches exactly day 100 or can only approach it.
-- [ ] Expose age/size updates in the stats panel without exposing affection.
+- [x] Advance age in farm days from persisted time.
+- [x] Grow current size toward the individual cap; apply Fast Grower.
+- [x] Feed the size multiplier into visuals and hitbox/interaction reach together.
+- [x] Add weighted palette variants only after actual palettes/assets exist.
+- [x] Natural aging is deterministic: excellent care reaches the species maximum exactly (day 100 for a corgi); Phase 5 outcomes may still end a life earlier, but care never extends the natural cap or creates an asymptotic lifespan.
+- [x] Expose age/size updates in the stats panel without exposing affection.
 
 ### Phase 5 — affection/happiness outcomes and death
 
@@ -166,7 +171,7 @@ These are balancing rows, not claims about real-world animal biology. Food price
 - [ ] Charge 1,200 tickets only for adoptions after the starter dog.
 - [ ] Sell species foods at their catalog prices with atomic spend + inventory grant.
 - [ ] Keep developer/test unlock controls separate from production progression.
-- [~] Create one care definition per species: lifespan, food/price, dwelling, stat ranges and traits are present; species-specific toys, behavior modifiers, animations, and palette plans remain.
+- [~] Create one care definition per species: lifespan, food/price, placeable dwelling, stat ranges, traits, and palette plans are present; species-specific toys, behavior modifiers, and animations remain.
 - [ ] Do not enable live needs until the shared elapsed-time rules and each food path are complete.
 
 ## Explicitly deferred
@@ -181,7 +186,7 @@ These are balancing rows, not claims about real-world animal biology. Food price
 2. A pet dies after remaining at zero hunger for one complete farm day.
 3. No push/in-app-away notification system is needed; farm progression is shown in the farm.
 4. Runaways are gone forever.
-5. Removing a tombstone permanently deletes that tombstone and its history.
+5. Removing a tombstone permanently deletes that tombstone but the history remains in data for later prop ideas.
 6. Gender values are female/male only.
 
 ## Definition of done for the current pet-care pass

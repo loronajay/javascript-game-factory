@@ -3,7 +3,7 @@
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { SOIL_CELL_LAYOUT, cropStatus, findCrop } from "./farm-crops.mjs";
 const CROP_ASSET_ROOT = new URL("../farm/assets/crops/", import.meta.url);
-function assetUrl(file) {
+export function cropAssetUrl(file) {
     const url = new URL(file, CROP_ASSET_ROOT);
     // The original Grimnir GLBs embedded a white placeholder image. Keep one
     // explicit revision on the normalized files so browsers do not reuse that
@@ -69,7 +69,7 @@ export function createFarmCropsView(THREE, scene) {
             const definition = crop ? findCrop(crop.cropId) : undefined;
             if (!crop || !definition || !status)
                 continue;
-            loader.load(assetUrl(definition.models[status.stage]), (gltf) => {
+            loader.load(cropAssetUrl(definition.models[status.stage]), (gltf) => {
                 if (token !== view.loadToken)
                     return;
                 const plant = fittedModel(gltf.scene, { width: 0.68, depth: 0.62, height: 0.48 + status.stage * 0.2 });

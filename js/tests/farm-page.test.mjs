@@ -10,13 +10,22 @@ const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
 const source = readFileSync(resolve(repoRoot, "js", "farm.mts"), "utf8");
 const worldSource = readFileSync(resolve(repoRoot, "js", "farm-world.mts"), "utf8");
 
-test("pet, feed and carry remain separate registered interactions", () => {
-  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["feed", "KeyG"], ["pick-up", "KeyC"]]);
+test("pet, feed, carry and play remain separate registered interactions", () => {
+  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["feed", "KeyG"], ["pick-up", "KeyC"], ["play", "KeyY"]]);
   assert.equal(getPetInteraction("KeyE")?.id, "pet");
   assert.equal(getPetInteraction("KeyG")?.id, "feed");
   assert.equal(getPetInteraction("KeyC")?.id, "pick-up");
-  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true, canFeed: true }), "E Pet Biscuit · G Feed · C Pick up");
-  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: true, canFeed: false }), "E Pet Bubbles · C Pick up", "aquatic pets can be carried too");
+  assert.equal(getPetInteraction("KeyY")?.id, "play");
+  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true, canFeed: true, canPlay: true }), "E Pet Biscuit · G Feed · C Pick up · Y Play");
+  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: true, canFeed: false, canPlay: false }), "E Pet Bubbles · C Pick up", "aquatic pets can be carried too");
+});
+
+test("seed cards request fully grown crop portraits instead of text glyphs", () => {
+  const inventorySource = readFileSync(resolve(repoRoot, "js", "farm-inventory-panel.mts"), "utf8");
+  assert.match(source, /createCropThumbnails\(THREE\)/);
+  assert.match(source, /thumbnail: cropThumbnails\.get/);
+  assert.match(inventorySource, /seed-card__image/);
+  assert.doesNotMatch(inventorySource, /crop\.title\.slice/);
 });
 
 test("the farm page ships the shell the composition root requires", () => {
@@ -111,22 +120,25 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
   assert.match(source, /if \(!farmEntered \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
-  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed \}\)/);
+  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay \}\)/);
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
   assert.match(source, /function interactWithPet\(action: PetInteractionId\)/);
-  assert.match(source, /if \(action === "pet"\) \{\s*petBodies\.showHeart\(nearbyPet\.instanceId\);\s*petSim\.attention\(nearbyPet\.instanceId\)/, "petting owns the heart and attention response");
+  assert.match(source, /const checkpoint = advancePetNeeds\(layout, clockMinutes\)/, "handling checkpoints elapsed care before changing a profile");
+  assert.match(source, /reactToPetInteraction\(pet\.profile, pet\.speciesId, action === "pick-up" \? "carry" : action, checkpoint\.decor\)/, "handling is decided by the pure trait-aware reaction rule");
+  assert.match(source, /if \(action === "pet" \|\| action === "play"\) \{\s*petBodies\.showHeart\(nearbyPet\.instanceId\);\s*petSim\.attention\(nearbyPet\.instanceId\)/, "accepted petting and play own the heart and attention response");
   assert.match(source, /getPetInteraction\(event\.code\)/, "keyboard dispatch comes from the pet interaction registry");
   assert.match(source, /feedPet\(layout, nearbyPet\.instanceId, clockMinutes\)/, "feeding advances and persists through the pure needs action");
   assert.match(source, /petSim\.pickUp\(nearbyPet\.instanceId\)/);
   assert.doesNotMatch(source, /petBodies\.showHeart\(held\.instanceId\)/, "putting a pet down is not secretly the pet interaction");
   assert.match(source, /petSim\.putDown\(held\.instanceId, spot\)/);
-  assert.match(source, /findPutDownSpot\(pose, findAnimal\(held\.speciesId\)\?\.radius \?\? 0\.5, \(spot\) => petSim\.canStand\(held\.speciesId, spot\)\)/, "the drop spot comes from the pure rule at the species' own radius, the sim saying what fits");
+  assert.match(source, /findPutDownSpot\(pose, held\.radius, \(spot\) => petSim\.canStand\(held\.speciesId, spot, held\.sizeMultiplier\)\)/, "the drop spot and collision check use the pet's grown radius");
   assert.match(source, /if \(editing\) dropCarried\(\)/, "build mode empties the arms");
   assert.match(source, /if \(held && putDownFits && doorInReach && openDoors\.has\(doorInReach\.doorId\)\) doorInReach = null/, "an open door yields to the put-down; a shut one is opened first");
   assert.match(source, /petSim\.tick\(TICK_SECONDS, player\)/, "the sim gets the whole pose, so a carried pet rides the yaw");
+  assert.match(source, /liveNeedsCheckpoint = \(\) => \{[\s\S]*?advancePetNeeds\(layout, clockMinutes\)[\s\S]*?petSim\.sync\(layout\)/, "each lifecycle checkpoint immediately gives grown size to the sim and renderer");
   // Every layout change goes through one path that applies, syncs and saves.
   assert.match(source, /async function persistLayout/);
-  assert.match(source, /applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\.";\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
+  assert.match(source, /next = applyPetCareMilestones\(next\);\s*applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\.";\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
 });
 
 test("first-farm onboarding blocks entry until the required named dog is saved", () => {

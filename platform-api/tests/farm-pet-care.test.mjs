@@ -12,7 +12,7 @@ test("the farm trust boundary preserves bounded pet profiles and supply stacks",
       name: "Biscuit",
       profile: {
         gender: "female",
-        ageDays: 12,
+        ageDays: 12.25,
         affection: 50,
         hunger: 80,
         starvingMinutes: 90,
@@ -20,7 +20,8 @@ test("the farm trust boundary preserves bounded pet profiles and supply stacks",
         size: { current: 0.75, max: 1.05, growthPerDay: 0.004 },
         stats: { speed: 48, strength: 37 },
         traits: ["held.loves", "movement.fast"],
-        paletteId: "standard",
+        milestones: ["dwelling:decor.prop.doghouse", "bad", "dwelling:decor.prop.doghouse"],
+        paletteId: "midnight",
       },
     }],
     agriculture: {
@@ -32,7 +33,7 @@ test("the farm trust boundary preserves bounded pet profiles and supply stacks",
   assert.deepEqual(garage.agriculture.inventory.supplies, { "food.dog-food": 20 });
   assert.deepEqual(garage.pets[0].profile, {
     gender: "female",
-    ageDays: 12,
+    ageDays: 12.25,
     affection: 50,
     hunger: 80,
     starvingMinutes: 90,
@@ -40,7 +41,8 @@ test("the farm trust boundary preserves bounded pet profiles and supply stacks",
     size: { current: 0.75, max: 1.05, growthPerDay: 0.004 },
     stats: { speed: 48, strength: 37 },
     traits: ["held.loves", "movement.fast"],
-    paletteId: "standard",
+    milestones: ["dwelling:decor.prop.doghouse"],
+    paletteId: "midnight",
   });
 });
 

@@ -10,7 +10,7 @@ type PlotView = { group: any; content: any; key: string; loadToken: number };
 
 const CROP_ASSET_ROOT = new URL("../farm/assets/crops/", import.meta.url);
 
-function assetUrl(file: string): string {
+export function cropAssetUrl(file: string): string {
   const url = new URL(file, CROP_ASSET_ROOT);
   // The original Grimnir GLBs embedded a white placeholder image. Keep one
   // explicit revision on the normalized files so browsers do not reuse that
@@ -88,7 +88,7 @@ export function createFarmCropsView(THREE: ThreeNamespace, scene: any): FarmCrop
       cellTile(holder, cell, crop, Boolean(crop && !status?.thirsty));
       const definition = crop ? findCrop(crop.cropId) : undefined;
       if (!crop || !definition || !status) continue;
-      loader.load(assetUrl(definition.models[status.stage]), (gltf: any) => {
+      loader.load(cropAssetUrl(definition.models[status.stage]), (gltf: any) => {
         if (token !== view.loadToken) return;
         const plant = fittedModel(gltf.scene, { width: 0.68, depth: 0.62, height: 0.48 + status.stage * 0.2 });
         plant.position.x += cell.x;

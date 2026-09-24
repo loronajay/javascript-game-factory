@@ -11,6 +11,10 @@ type Elements = Readonly<{
   selected: HTMLElement;
 }>;
 
+type Options = Readonly<{
+  thumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
+}>;
+
 export type FarmInventoryPanel = Readonly<{
   open: () => void;
   close: () => void;
@@ -20,7 +24,7 @@ export type FarmInventoryPanel = Readonly<{
   selectedCropId: () => string;
 }>;
 
-export function createFarmInventoryPanel(elements: Elements): FarmInventoryPanel {
+export function createFarmInventoryPanel(elements: Elements, options: Options = {}): FarmInventoryPanel {
   let agriculture: FarmAgriculture;
   let selectedCropId = CROP_CATALOG[0]!.id;
 
@@ -47,7 +51,19 @@ export function createFarmInventoryPanel(elements: Elements): FarmInventoryPanel
       button.dataset.cropId = crop.id;
       button.setAttribute("aria-pressed", String(crop.id === selectedCropId));
       button.disabled = (agriculture.inventory.seeds[crop.id] ?? 0) <= 0;
-      button.innerHTML = `<span class="seed-card__icon" aria-hidden="true">${crop.title.slice(0, 2).toUpperCase()}</span><strong>${crop.title}</strong><small>${agriculture.inventory.seeds[crop.id]} seeds</small>`;
+      const portrait = document.createElement("span");
+      portrait.className = "seed-card__image";
+      portrait.setAttribute("aria-hidden", "true");
+      const image = document.createElement("img");
+      image.alt = "";
+      const show = (url: string): void => { image.src = url; portrait.replaceChildren(image); };
+      const ready = options.thumbnail?.(crop.id, show);
+      if (ready) show(ready);
+      const title = document.createElement("strong");
+      title.textContent = crop.title;
+      const count = document.createElement("small");
+      count.textContent = `${agriculture.inventory.seeds[crop.id]} seeds`;
+      button.replaceChildren(portrait, title, count);
       button.addEventListener("click", () => {
         selectedCropId = crop.id;
         render(agriculture);

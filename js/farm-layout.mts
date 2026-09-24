@@ -152,9 +152,16 @@ function normalizePet(value: unknown): FarmPet | null {
   if (!species) return null;
   if (typeof source.instanceId !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.instanceId)) return null;
   const storedProfile = (source as Partial<FarmPet>).profile;
-  const profile = storedProfile && typeof storedProfile === "object"
+  const migratedProfile = createPetProfile(species.id, legacyPetRandom(`${species.id}:${source.instanceId}`));
+  let profile = storedProfile && typeof storedProfile === "object"
     ? normalizePetProfile(species.id, storedProfile)
-    : createPetProfile(species.id, legacyPetRandom(`${species.id}:${source.instanceId}`));
+    : migratedProfile;
+  // Profiles saved during the identity rollout can have every stat but no traits.
+  // An empty trait set is not a supported individual, so repair only that field from
+  // stable row identity and preserve the pet's already-persisted stats and needs.
+  if (profile && profile.traits.length === 0 && migratedProfile) {
+    profile = normalizePetProfile(species.id, { ...profile, traits: migratedProfile.traits });
+  }
   return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile };
 }
 

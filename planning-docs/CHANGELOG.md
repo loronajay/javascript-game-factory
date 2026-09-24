@@ -1,5 +1,21 @@
 # Changelog
 
+## The Farm: Every Pet Has a Home and a Look (2026-09-23)
+
+**The visual loose ends in Phases 3 and 4 are closed for all ten species.** The build catalog now includes a distinct procedural home for every pet: Doghouse, Duck Coop, Treetop Den, Burrow Lodge, Mud-Wallow Shelter, Rhino Shade, Roosting Box, Reef Grotto, Darkwater Cave, and Jellyfish Lagoon. Each is ordinary placeable farm decor, identifies the species it supports, and records a visible entrance sized against that species' actual height and personal-space radius. The nine new models live in their own dwelling module instead of expanding the already-large general props file.
+
+**Palette identity is visible now.** Every animal has a species-specific Classic, uncommon, and rare palette weighted 70/24/6. Adoption assigns one through the existing injectable random pipeline, valid palette ids survive client and API normalization, the pet sim carries that identity to rendering, and the GLB body clones and tints its materials while preserving the source atlas and animations. Non-classic palette names appear in the Pets panel. Catalog-wide tests enforce ten covered species, ten unique dwelling models, usable entrances, complete 100-point palette tables, persistence, and substantial procedural geometry.
+
+## The Farm: Pet Age and Growth (2026-09-23)
+
+**Phase 4 now has a live lifecycle instead of static profile fields.** Pet age and current size advance through the same persisted farm-time checkpoint as hunger and happiness, including naps and elapsed time away. Partial days survive the API trust boundary, Fast Grower reaches the individual adult cap sooner, and natural age stops exactly at each species maximum pending the atomic death work in Phase 5. The individual size multiplier now drives the rendered animal, collision/personal space, pond fit, carry/drop spacing, and surface-based interaction reach together; the Pets panel shows age to one decimal and current size without exposing affection. Palette rarity remains deliberately gated on real palette assets, and species dwelling models remain a separate Phase 3 asset pass rather than a Phase 4 dependency.
+
+## The Farm: Pet Happiness and Real Seed Portraits (2026-09-23)
+
+**Phase 3 care now changes the pet instead of merely decorating the field.** A species-appropriate dwelling grants its pet a persisted one-time +10 affection award, then offsets five points of the daily eight-point happiness drain and adds one affection per day. Each distinct compatible placed toy offsets two more happiness points and adds half an affection point per day. Cuddly and Independent now change petting and carrying responses; low-trust Independent pets visibly refuse, severely distressed pets warn and snap, and a pet with limited carrying patience warns before wriggling free. Y is a separate Play action that requires a compatible placed toy and improves happiness and affection. The API trust boundary preserves the one-time milestone so removing and replacing a dwelling cannot farm the award.
+
+**Seed cards show the crop, not initials.** The inventory lazily renders each catalog crop's actual fully-grown GLB into a cached portrait and uses that image on the seed card. The old two-letter glyph is gone.
+
 ## The Farm: Feeding and the Shared Farm Clock (2026-09-23)
 
 **Pet care now moves with the farm instead of the frame loop.** Every profile checkpoints hunger and its zero-hunger grace against the existing persisted farm-minute clock, so normal play, naps, leaving, and returning all advance the same timeline while clock rollback cannot replay elapsed time. Hunger drains 25 points per farm day before data-driven Big Appetite (1.5×) and Light Eater (0.65×) modifiers; time below 40 lowers hidden affection, and a full farm day at zero records that starvation death is due for the later atomic death/tombstone transition.

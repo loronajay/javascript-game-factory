@@ -231,7 +231,8 @@ button, a { font: inherit; }
 .seed-card:hover { border-color: var(--farm-leaf); }
 .seed-card[aria-pressed="true"] { border-color: var(--farm-accent); background: rgba(255,211,61,.15); }
 .seed-card:disabled { opacity: .4; cursor: not-allowed; }
-.seed-card__icon { grid-row: 1 / 3; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50% 45% 48% 44%; background: radial-gradient(circle at 35% 30%, #d8e992, #71943b 52%, #334c21); color: #fff9d5; font: 900 11px ui-monospace, monospace; box-shadow: inset 0 0 0 2px rgba(255,255,255,.13); }
+.seed-card__image { grid-row: 1 / 3; display: grid; place-items: center; width: 42px; height: 42px; overflow: hidden; border-radius: 10px; background: radial-gradient(circle at 50% 65%, rgba(112,148,59,.35), rgba(20,35,18,.2) 66%, transparent 67%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.seed-card__image img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
 .seed-card strong { font-size: 13px; }
 .seed-card small { color: #b9c9ad; }
 .produce-grid { display: grid; gap: 5px; }

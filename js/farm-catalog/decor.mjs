@@ -60,6 +60,7 @@ function item(variant, spec) {
         gate: spec.gate ? Object.freeze({ ...spec.gate }) : null,
         doors: Boolean(spec.shell?.door) || Boolean(spec.gate),
         interior: spec.interior ?? false,
+        dwelling: spec.dwelling ? Object.freeze({ speciesId: spec.dwelling.speciesId, entrance: Object.freeze({ ...spec.dwelling.entrance }) }) : null,
         snapDegrees: spec.snapDegrees ?? 15,
         swatch: Object.freeze([spec.swatch[0], spec.swatch[1]]),
         model: spec.model,
@@ -126,7 +127,24 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("bench", { title: "Garden Bench", category: "prop", footprint: { width: 1.6, depth: 0.6 }, swatch: ["#8a5a34", "#5d3a1f"], model: "bench" }),
     item("bed", { title: "Farmhouse Bed", category: "prop", footprint: { width: 1.35, depth: 2.1 }, interior: true, swatch: ["#f2e5ca", "#7d9bb8"], model: "bed" }),
     item("lamp-post", { title: "Lamp Post", category: "prop", footprint: { width: 0.3, depth: 0.3 }, swatch: ["#2b2b2b", "#ffd9a0"], model: "lamp-post" }),
-    item("doghouse", { title: "Doghouse", category: "prop", footprint: { width: 1.2, depth: 1.4 }, swatch: ["#a8312b", "#4a3a33"], model: "doghouse" }),
+    // Pet dwellings are regular placeable props. `keepOut` keeps random wandering from
+    // clipping through their art; the entrance dimensions remain the contract for a
+    // later deliberate sleep/enter action.
+    item("doghouse", { title: "Doghouse", category: "prop", footprint: { width: 1.2, depth: 1.4 }, keepOut: true, dwelling: { speciesId: "pet.corgi", entrance: { width: 0.78, height: 0.72 } }, swatch: ["#a8312b", "#4a3a33"], model: "doghouse" }),
+    item("duck-coop", { title: "Duck Coop", category: "prop", footprint: { width: 1.5, depth: 1.4 }, keepOut: true, dwelling: { speciesId: "pet.duck", entrance: { width: 0.7, height: 0.65 } }, swatch: ["#d6a35d", "#5d3a1f"], model: "dwelling-duck-coop" }),
+    item("treetop-den", { title: "Treetop Den", category: "prop", footprint: { width: 2.2, depth: 1.8 }, keepOut: true, dwelling: { speciesId: "pet.red-panda", entrance: { width: 0.85, height: 0.85 } }, swatch: ["#8a5a34", "#5f8f48"], model: "dwelling-treetop-den" }),
+    item("burrow-lodge", { title: "Burrow Lodge", category: "prop", footprint: { width: 1.8, depth: 1.5 }, keepOut: true, dwelling: { speciesId: "pet.platypus", entrance: { width: 0.75, height: 0.55 } }, swatch: ["#6f8f4e", "#6d4b2f"], model: "dwelling-burrow-lodge" }),
+    item("mud-wallow-shelter", { title: "Mud-Wallow Shelter", category: "prop", footprint: { width: 3.4, depth: 2.8 }, keepOut: true, dwelling: { speciesId: "pet.hippo", entrance: { width: 1.55, height: 1.35 } }, swatch: ["#8b6548", "#c8ab78"], model: "dwelling-mud-wallow" }),
+    item("rhino-shade", { title: "Rhino Shade", category: "prop", footprint: { width: 3.6, depth: 2.8 }, keepOut: true, dwelling: { speciesId: "pet.rhino", entrance: { width: 1.65, height: 1.55 } }, swatch: ["#d1ba83", "#75634b"], model: "dwelling-rhino-shade" }),
+    item("roosting-box", { title: "Roosting Box", category: "prop", footprint: { width: 1.5, depth: 1.2 }, keepOut: true, dwelling: { speciesId: "pet.bat", entrance: { width: 0.7, height: 0.8 } }, swatch: ["#5d3a1f", "#30263f"], model: "dwelling-roosting-box" }),
+    item("reef-grotto", { title: "Reef Grotto", category: "prop", footprint: { width: 3.4, depth: 2.5 }, keepOut: true, dwelling: { speciesId: "pet.shark", entrance: { width: 1.45, height: 1.2 } }, swatch: ["#5d7180", "#d77858"], model: "dwelling-reef-grotto" }),
+    item("darkwater-cave", { title: "Darkwater Cave", category: "prop", footprint: { width: 2.1, depth: 1.7 }, keepOut: true, dwelling: { speciesId: "pet.anglerfish", entrance: { width: 0.75, height: 0.7 } }, swatch: ["#343247", "#5f7f92"], model: "dwelling-darkwater-cave" }),
+    item("jellyfish-lagoon", { title: "Jellyfish Lagoon", category: "prop", footprint: { width: 2.4, depth: 2.4 }, keepOut: true, dwelling: { speciesId: "pet.jellyfish", entrance: { width: 0.9, height: 0.9 } }, swatch: ["#67b6c7", "#d99ac6"], model: "dwelling-jellyfish-lagoon" }),
+    // Dog toys are ordinary placed rows: owned from the start while progression is unlocked,
+    // and cross-referenced by the corgi care row instead of being special-cased in the editor.
+    item("tennis-ball", { title: "Tennis Ball", category: "prop", footprint: { width: 0.24, depth: 0.24 }, solid: false, snapDegrees: 45, swatch: ["#cbea45", "#f5f0d0"], model: "tennis-ball" }),
+    item("rope-toy", { title: "Rope Toy", category: "prop", footprint: { width: 0.55, depth: 0.18 }, solid: false, snapDegrees: 45, swatch: ["#d9b36c", "#8c5638"], model: "rope-toy" }),
+    item("bone", { title: "Bone", category: "prop", footprint: { width: 0.48, depth: 0.2 }, solid: false, snapDegrees: 45, swatch: ["#eee5ce", "#b8a98c"], model: "bone" }),
     item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
     item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),
     item("barrel", { title: "Barrel", category: "prop", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#7a4a2a", "#3b3b3b"], model: "barrel" }),

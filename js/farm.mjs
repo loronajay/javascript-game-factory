@@ -17,7 +17,7 @@ import { createFarmWorld } from "./farm-world.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions } from "./farm-scene.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody } from "./farm-body.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot } from "./farm-interaction.mjs";
-import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock } from "./farm-layout.mjs";
+import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -31,9 +31,11 @@ import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmT
 import { SOIL_CELL_LAYOUT, advanceAgriculture, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop } from "./farm-crops.mjs";
 import { createFarmCropsView } from "./farm-crops-view.mjs";
 import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
+import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
 import { completeFarmOnboarding, markFarmIntroSeen } from "./farm-onboarding.mjs";
 import { advancePetNeeds, advancePetProfile, feedPet, petNeedStatus } from "./farm-pet-needs.mjs";
 import { findPetCare } from "./farm-pet-care.mjs";
+import { applyPetCareMilestones, petCareEnvironment, reactToPetInteraction } from "./farm-pet-happiness.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -209,6 +211,7 @@ let bedInReach = null;
 let soilInReach = null;
 let nearbyPetCanPickUp = false;
 let nearbyPetCanFeed = false;
+let nearbyPetCanPlay = false;
 const keys = new Set();
 let farmEntered = false;
 let draggingLook = false;
@@ -227,6 +230,7 @@ const petBodies = createPetBodies(THREE, scene);
 let nearbyPet = null;
 // The pet in the player's arms, by instance id, and the spot ahead it would be set down on right now (null: no room).
 let carrying = "";
+let carryPatienceSeconds = null;
 let putDownAt = null;
 function applyCamera() {
     camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
@@ -303,16 +307,18 @@ function updateInteraction() {
     const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
     const nearbyPetRow = nearbyPet ? layout.pets.find((pet) => pet.instanceId === nearbyPet.instanceId) : null;
     const nearbyPetProfile = nearbyPetRow?.profile
-        ? advancePetProfile(nearbyPetRow.profile, nearbyPetRow.speciesId, clockMinutes - layout.clock.farmMinutes)
+        ? advancePetProfile(nearbyPetRow.profile, nearbyPetRow.speciesId, clockMinutes - layout.clock.farmMinutes, layout.decor)
         : null;
     const nearbyPetCare = nearbyPetRow ? findPetCare(nearbyPetRow.speciesId) : null;
     const canPickUp = Boolean(nearbyPetState);
     const canFeed = Boolean(canManageFarm && nearbyPetProfile && nearbyPetProfile.hunger < 100 && nearbyPetCare
         && (layout.agriculture.inventory.supplies[nearbyPetCare.food.itemId] ?? 0) > 0);
+    const canPlay = Boolean(canManageFarm && nearbyPetRow && petCareEnvironment(nearbyPetRow.speciesId, layout.decor).toyCount > 0);
     nearbyPetCanPickUp = canPickUp;
     nearbyPetCanFeed = canFeed;
+    nearbyPetCanPlay = canPlay;
     const held = carrying ? petSim.find(carrying) : null;
-    putDownAt = held && body.y < 0.3 ? findPutDownSpot(pose, findAnimal(held.speciesId)?.radius ?? 0.5, (spot) => petSim.canStand(held.speciesId, spot)) : null;
+    putDownAt = held && body.y < 0.3 ? findPutDownSpot(pose, held.radius, (spot) => petSim.canStand(held.speciesId, spot, held.sizeMultiplier)) : null;
     const putDownFits = putDownAt !== null;
     // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
     if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId))
@@ -376,7 +382,7 @@ function updateInteraction() {
     if (nearbyPet) {
         const needs = nearbyPetProfile ? petNeedStatus(nearbyPetProfile) : null;
         const feedback = needs && nearbyPetProfile ? `${needs.label} · hunger ${Math.round(nearbyPetProfile.hunger)}% · ` : "";
-        setPrompt(feedback + getPetInteractionPrompt(nearbyPet.name, { canPickUp, canFeed }));
+        setPrompt(feedback + getPetInteractionPrompt(nearbyPet.name, { canPickUp, canFeed, canPlay }));
         return;
     }
     setPrompt("");
@@ -459,11 +465,6 @@ function workSoilPlot() {
 function interactWithPet(action) {
     if (!nearbyPet)
         return false;
-    if (action === "pet") {
-        petBodies.showHeart(nearbyPet.instanceId);
-        petSim.attention(nearbyPet.instanceId);
-        return true;
-    }
     if (action === "feed") {
         if (!nearbyPetCanFeed)
             return false;
@@ -478,13 +479,42 @@ function interactWithPet(action) {
         });
         return true;
     }
+    if (action === "play" && !nearbyPetCanPlay)
+        return false;
+    const checkpoint = advancePetNeeds(layout, clockMinutes);
+    const pet = checkpoint.pets.find((row) => row.instanceId === nearbyPet.instanceId);
+    if (!pet?.profile)
+        return false;
+    const reaction = reactToPetInteraction(pet.profile, pet.speciesId, action === "pick-up" ? "carry" : action, checkpoint.decor);
+    const name = nearbyPet.name;
+    if (!reaction.ok) {
+        status.textContent = `${name}: ${reaction.message}`;
+        petSim.attention(nearbyPet.instanceId);
+        return true;
+    }
+    if (reaction.profile !== pet.profile) {
+        const next = withFarmPets(checkpoint, checkpoint.pets.map((row) => row.instanceId === pet.instanceId ? { ...row, profile: reaction.profile } : row));
+        void persistLayout(withFarmClock(next, clockMinutes, Date.now())).then((saved) => {
+            status.textContent = `${name}: ${reaction.message} ${saved}`;
+        });
+    }
+    else {
+        status.textContent = `${name}: ${reaction.message}`;
+    }
+    if (action === "pet" || action === "play") {
+        petBodies.showHeart(nearbyPet.instanceId);
+        petSim.attention(nearbyPet.instanceId);
+        return true;
+    }
     if (!nearbyPetCanPickUp || !petSim.pickUp(nearbyPet.instanceId))
         return false;
     carrying = nearbyPet.instanceId;
+    carryPatienceSeconds = reaction.carrySeconds;
     petBodies.setTagVisible(carrying, false);
     nearbyPet = null;
     nearbyPetCanPickUp = false;
     nearbyPetCanFeed = false;
+    nearbyPetCanPlay = false;
     return true;
 }
 /** E with a pet in hand: set it down ahead if it fits; otherwise the prompt has already said why not and E does nothing. */
@@ -497,14 +527,27 @@ function putPetDown() {
         return false;
     petBodies.setTagVisible(held.instanceId, true);
     carrying = "";
+    carryPatienceSeconds = null;
     return true;
+}
+/** Independent or distressed pets visibly wriggle free after the warned handling window. */
+function updateCarryPatience(dt) {
+    if (!carrying || carryPatienceSeconds === null)
+        return;
+    carryPatienceSeconds -= dt;
+    if (carryPatienceSeconds > 0 || !putDownAt)
+        return;
+    const held = petSim.find(carrying);
+    if (!held || !putPetDown())
+        return;
+    status.textContent = `${held.name} wriggled free and jumped down.`;
 }
 /** Build mode takes the pet out of the arms: ahead, else at the player's feet, else where a turn finds room; last resort, it stays carried. */
 function dropCarried() {
     const held = carrying ? petSim.find(carrying) : null;
     if (!held)
         return;
-    const radius = findAnimal(held.speciesId)?.radius ?? 0.5;
+    const radius = held.radius;
     for (let index = 0; index < 8; index += 1) {
         const yaw = player.yaw + index * Math.PI / 4;
         const forward = forwardOf(yaw);
@@ -743,6 +786,7 @@ function describeSave(result) {
 async function persistLayout(next) {
     if (!canManageFarm)
         return "This farm is read-only while visiting.";
+    next = applyPetCareMilestones(next);
     applyLayout(next);
     farmEditor.replaceLayout(next);
     if (!canPersistFarm)
@@ -810,6 +854,7 @@ const petsPanel = createPetsPanel({
 petsPanel.render(layout);
 if (visiting)
     openPetsButton.hidden = true;
+const cropThumbnails = createCropThumbnails(THREE);
 const inventoryPanel = createFarmInventoryPanel({
     root: requiredElement("#inventoryPanel"),
     openButton: openInventoryButton,
@@ -818,7 +863,7 @@ const inventoryPanel = createFarmInventoryPanel({
     produceGrid: requiredElement("#produceGrid"),
     suppliesGrid: requiredElement("#suppliesGrid"),
     selected: requiredElement("#selectedSeed"),
-});
+}, { thumbnail: cropThumbnails.get });
 inventoryPanel.render(layout.agriculture);
 if (visiting)
     openInventoryButton.hidden = true;
@@ -835,7 +880,12 @@ const farmEditor = createFarmEditor({
     persist: async (next) => {
         if (!canPersistFarm)
             return { ok: false, message: "Session only · reload when the farm database is available to save safely." };
-        const result = await layoutStore.save(next);
+        const cared = applyPetCareMilestones(next);
+        if (cared !== next) {
+            applyLayout(cared);
+            farmEditor.replaceLayout(cared);
+        }
+        const result = await layoutStore.save(cared);
         return { ok: result.ok, message: describeSave(result) };
     },
     thumbnail: (definition) => decorThumbnails.get(definition),
@@ -883,6 +933,7 @@ liveNeedsCheckpoint = () => {
     if (!canManageFarm)
         return;
     layout = withFarmClock(advancePetNeeds(layout, clockMinutes), clockMinutes, Date.now());
+    petSim.sync(layout);
     petsPanel.render(layout);
     farmEditor.replaceLayout(layout);
 };
@@ -898,6 +949,7 @@ function frame(now) {
         updatePlayer(TICK_SECONDS);
         petSim.tick(TICK_SECONDS, player);
         updateInteraction();
+        updateCarryPatience(TICK_SECONDS);
         accumulator -= TICK_SECONDS;
     }
     world.update(frameSeconds);

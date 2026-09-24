@@ -9,7 +9,6 @@
 // knows about THREE, the DOM or who is asking.
 import { BARN, seatPoint } from "./farm-scene.mjs";
 import { LEVEL_TOLERANCE } from "./farm-body.mjs";
-import { findVisitorInReach } from "./arcade-room-interaction.mjs";
 export const DOOR_FACING_THRESHOLD = 0.35;
 /** Inside this distance the player is AT the door and facing no longer matters — a thin door plane makes the dot meaningless up close. */
 export const DOOR_TOUCH_DISTANCE = 0.9;
@@ -122,9 +121,28 @@ export function findBedInReach(decor, player) {
     return best;
 }
 export const BED_PROMPT = "Press E to nap";
-/** Pets are bodies with a pose; the nearest one in reach is the one E strokes. */
-export function findPetInReach(pets, player, reach = 2.2) {
-    return findVisitorInReach(player, pets, { radius: reach, facingThreshold: 0.4 });
+/** Hand reach measured from a pet's visible body surface, not its centre. */
+export const PET_SURFACE_REACH = 1.75;
+/** Pets are scaled bodies; the nearest visible surface in reach is the one E strokes. */
+export function findPetInReach(pets, player, reach = PET_SURFACE_REACH) {
+    let best = null;
+    let bestSurfaceDistance = Infinity;
+    for (const pet of pets) {
+        const dx = pet.pose.x - player.x;
+        const dz = pet.pose.z - player.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 1e-6 || distance > reach + (pet.radius ?? 0.45))
+            continue;
+        const forwardLength = Math.hypot(player.forward.x, player.forward.z) || 1;
+        if ((player.forward.x * dx + player.forward.z * dz) / (forwardLength * distance) < 0.4)
+            continue;
+        const surfaceDistance = distance - (pet.radius ?? 0.45);
+        if (surfaceDistance < bestSurfaceDistance) {
+            best = pet;
+            bestSurfaceDistance = surfaceDistance;
+        }
+    }
+    return best;
 }
 /**
  * Pet actions live in one registry so adding Feed does not displace Pet or
@@ -136,6 +154,7 @@ export const PET_INTERACTIONS = Object.freeze([
     // G = give food; F remains the farm-wide fullscreen key.
     Object.freeze({ id: "feed", code: "KeyG", key: "G", label: "Feed", available: "canFeed" }),
     Object.freeze({ id: "pick-up", code: "KeyC", key: "C", label: "Pick up", available: "canPickUp" }),
+    Object.freeze({ id: "play", code: "KeyY", key: "Y", label: "Play", available: "canPlay" }),
 ]);
 export function getPetInteraction(code) {
     return PET_INTERACTIONS.find((interaction) => interaction.code === code) ?? null;
@@ -145,7 +164,8 @@ export function getPetInteractionPrompt(name, capabilities) {
     return PET_INTERACTIONS
         .filter((interaction) => interaction.available === "always"
         || interaction.available === "canPickUp" && capabilities.canPickUp
-        || interaction.available === "canFeed" && capabilities.canFeed)
+        || interaction.available === "canFeed" && capabilities.canFeed
+        || interaction.available === "canPlay" && capabilities.canPlay)
         .map((interaction) => `${interaction.key} ${interaction.label}${interaction.id === "pet" ? ` ${name}` : ""}`)
         .join(" · ");
 }

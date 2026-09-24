@@ -14,13 +14,13 @@
 // freshly adopted pet is never invisible.
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
-import { findAnimal, type AnimalDefinition } from "./farm-catalog/animals.mjs";
+import { findAnimal, findAnimalPalette, type AnimalDefinition } from "./farm-catalog/animals.mjs";
 import { animalTrack, splitAnimalClips, type AnimalClips } from "./farm-animal-clips.mjs";
 import type { PetBody as PetPose } from "./farm-pets.mjs";
 
 type ThreeNamespace = Record<string, any>;
 
-export type PetBodyView = Readonly<{ instanceId: string; name: string; pose: Readonly<{ x: number; z: number }> }>;
+export type PetBodyView = Readonly<{ instanceId: string; name: string; radius: number; pose: Readonly<{ x: number; z: number }> }>;
 
 export type PetBodies = Readonly<{
   sync: (pets: readonly PetPose[], dt: number) => void;
@@ -43,7 +43,10 @@ const EASE_RATE = 14;
 type Body = {
   instanceId: string;
   species: AnimalDefinition;
+  paletteId: string;
   group: any;
+  /** Scaled animal art only; tags and feedback stay legible at every age. */
+  visual: any;
   model: any | null;
   placeholder: any;
   tag: any;
@@ -161,11 +164,19 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
       fitModel(body, body.model);
       body.model.traverse((node: any) => {
         if (node.isMesh) {
+          const palette = findAnimalPalette(body.species.id, body.paletteId) ?? body.species.palettes[0];
+          const tint = (material: any): any => {
+            const copy = material.clone();
+            copy.color?.multiply?.(new THREE.Color(palette.tint));
+            copy.needsUpdate = true;
+            return copy;
+          };
+          node.material = Array.isArray(node.material) ? node.material.map(tint) : tint(node.material);
           node.castShadow = true;
           node.frustumCulled = false;
         }
       });
-      body.group.add(body.model);
+      body.visual.add(body.model);
       body.placeholder.visible = false;
       body.clips = splitAnimalClips(THREE, animalTrack(gltf), body.species.clips);
       body.mixer = body.clips.idle ? new THREE.AnimationMixer(body.model) : null;
@@ -181,11 +192,14 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
     const group = new THREE.Group();
     group.position.set(pet.x, pet.hover, pet.z);
     group.rotation.y = pet.yaw;
+    const visual = new THREE.Group();
+    visual.scale.setScalar(pet.sizeMultiplier);
+    group.add(visual);
     const size = species.radius;
     const placeholder = new THREE.Mesh(new THREE.SphereGeometry(size, 12, 10), placeholderMaterial);
     placeholder.position.y = size;
     placeholder.castShadow = true;
-    group.add(placeholder);
+    visual.add(placeholder);
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }));
     tag.position.y = size * 2 + TAG_HEIGHT_PADDING;
     tag.renderOrder = 10;
@@ -199,7 +213,9 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
     const body: Body = {
       instanceId: pet.instanceId,
       species,
+      paletteId: pet.paletteId,
       group,
+      visual,
       model: null,
       placeholder,
       tag,
@@ -247,7 +263,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
       for (const pet of pets) {
         seen.add(pet.instanceId);
         let body = bodies.get(pet.instanceId);
-        if (body && body.species.id !== pet.speciesId) {
+        if (body && (body.species.id !== pet.speciesId || body.paletteId !== pet.paletteId)) {
           removeBody(body);
           bodies.delete(pet.instanceId);
           body = undefined;
@@ -259,6 +275,8 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
           bodies.set(pet.instanceId, body);
         }
         paintTag(body, pet.name);
+        body.visual.scale.setScalar(pet.sizeMultiplier);
+        body.tag.position.y = body.height * pet.sizeMultiplier + TAG_HEIGHT_PADDING;
         ease(body, pet, dt);
         play(body, pet.moving ? body.clips.walk : body.clips.idle);
         body.mixer?.update(dt);
@@ -269,7 +287,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
             body.heart.visible = false;
           } else {
             const progress = 1 - left / HEART_SECONDS;
-            body.heart.position.y = body.height + 0.7 + progress * 0.9;
+            body.heart.position.y = body.height * pet.sizeMultiplier + 0.7 + progress * 0.9;
             body.heart.material.opacity = progress < 0.7 ? 1 : (1 - progress) / 0.3;
           }
         }
@@ -280,7 +298,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
         bodies.delete(instanceId);
       }
     },
-    views: () => [...bodies.values()].map((body) => ({ instanceId: body.instanceId, name: body.tagText, pose: { x: body.x, z: body.z } })),
+    views: () => [...bodies.values()].map((body) => ({ instanceId: body.instanceId, name: body.tagText, radius: body.species.radius * body.visual.scale.x, pose: { x: body.x, z: body.z } })),
     setTagVisible(instanceId, visible) {
       const body = bodies.get(instanceId);
       if (body) body.tag.visible = visible;
@@ -290,7 +308,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
       if (!body) return;
       body.heart.visible = true;
       body.heartUntil = body.clock + HEART_SECONDS;
-      body.heart.position.y = body.height + 0.7;
+      body.heart.position.y = body.tag.position.y + 0.4;
       body.heart.material.opacity = 1;
     },
     dispose() {

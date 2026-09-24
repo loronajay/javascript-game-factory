@@ -1,8 +1,9 @@
 // Persistent pet identity and care data. Every species uses the same complete
 // individual profile pipeline; species rows weight physical stats and name the
 // food/dwelling that later care slices will use. The animal catalog remains the
-// owner of render and locomotion values. Dwelling ids are data only until their
-// models and placement rules are designed.
+// owner of render, locomotion and palette values. Dwelling ids cross-reference
+// ordinary placeable farm decor so care never owns a second asset registry.
+import { findAnimalPalette, pickAnimalPalette } from "./farm-catalog/animals.mjs";
 const trait = (id, title, description, conflicts = [], hungerDrainMultiplier = 1) => Object.freeze({ id, title, description, conflicts: Object.freeze([...conflicts]), hungerDrainMultiplier });
 export const PET_TRAITS = Object.freeze([
     trait("held.dislikes", "Independent", "Does not like to be held.", ["held.loves"]),
@@ -22,7 +23,7 @@ function care(spec) {
         adoptionPrice: 1200,
         food: Object.freeze({ itemId: `food.${spec.food.id}`, title: spec.food.title, price: spec.food.price, starterQuantity: spec.food.starter ?? 0 }),
         needs: Object.freeze({ hungerPerDay: 25, hungerPerServing: 35 }),
-        dwelling: Object.freeze({ itemId: spec.speciesId === "pet.corgi" ? "decor.building.dog-house" : `dwelling.${spec.dwelling.id}`, title: spec.dwelling.title }),
+        dwelling: Object.freeze({ itemId: `decor.prop.${spec.dwelling.id}`, title: spec.dwelling.title }),
         toys: Object.freeze([...(spec.toys ?? [])].map((toy) => Object.freeze({ ...toy }))),
         // Relative multipliers: the catalog's world-space height remains the species' base size.
         size: COMMON_SIZE,
@@ -32,10 +33,10 @@ function care(spec) {
     });
 }
 export const PET_CARE = Object.freeze([
-    care({ speciesId: "pet.corgi", maxLifeDays: 100, food: { id: "dog-food", title: "Dog Food", price: 15, starter: 20 }, dwelling: { id: "dog-house", title: "Dog House" }, speed: { min: 35, max: 65 }, strength: { min: 25, max: 55 }, toys: [
-            { itemId: "toy.tennis-ball", title: "Tennis Ball" },
-            { itemId: "toy.rope", title: "Rope Toy" },
-            { itemId: "toy.bone", title: "Bone" },
+    care({ speciesId: "pet.corgi", maxLifeDays: 100, food: { id: "dog-food", title: "Dog Food", price: 15, starter: 20 }, dwelling: { id: "doghouse", title: "Dog House" }, speed: { min: 35, max: 65 }, strength: { min: 25, max: 55 }, toys: [
+            { itemId: "decor.prop.tennis-ball", title: "Tennis Ball" },
+            { itemId: "decor.prop.rope-toy", title: "Rope Toy" },
+            { itemId: "decor.prop.bone", title: "Bone" },
         ] }),
     care({ speciesId: "pet.duck", maxLifeDays: 80, food: { id: "waterfowl-feed", title: "Waterfowl Feed", price: 12 }, dwelling: { id: "duck-coop", title: "Duck Coop" }, speed: { min: 28, max: 55 }, strength: { min: 15, max: 35 } }),
     care({ speciesId: "pet.red-panda", maxLifeDays: 90, food: { id: "bamboo-bites", title: "Bamboo Bites", price: 24 }, dwelling: { id: "treetop-den", title: "Treetop Den" }, speed: { min: 30, max: 60 }, strength: { min: 20, max: 42 } }),
@@ -88,7 +89,8 @@ export function createPetProfile(speciesId, random) {
         happiness: 100,
         stats: Object.freeze({ speed: round(randomIn(care.stats.speed, random), 1), strength: round(randomIn(care.stats.strength, random), 1) }),
         traits: Object.freeze(chooseTraits(care, random)),
-        paletteId: "standard",
+        milestones: Object.freeze([]),
+        paletteId: pickAnimalPalette(speciesId, random)?.id ?? "standard",
     });
 }
 export function normalizePetProfile(speciesId, value) {
@@ -109,7 +111,7 @@ export function normalizePetProfile(speciesId, value) {
     }
     return Object.freeze({
         gender: source.gender === "male" ? "male" : "female",
-        ageDays: Math.floor(clamp(source.ageDays, 0, care.maxLifeDays, 0)),
+        ageDays: round(clamp(source.ageDays, 0, care.maxLifeDays, 0), 4),
         size: Object.freeze({ current: currentSize, max: maxSize, growthPerDay: round(clamp(size.growthPerDay, 0, 0.02, 0), 4) }),
         affection: round(clamp(source.affection, 0, 100, 50), 4),
         hunger: round(clamp(source.hunger, 0, 100, 100), 4),
@@ -120,7 +122,10 @@ export function normalizePetProfile(speciesId, value) {
             strength: round(clamp(stats.strength, care.stats.strength.min, care.stats.strength.max, (care.stats.strength.min + care.stats.strength.max) / 2), 1),
         }),
         traits: Object.freeze(selected),
-        paletteId: source.paletteId === "standard" ? "standard" : "standard",
+        milestones: Object.freeze(Array.from(new Set((Array.isArray(source.milestones) ? source.milestones : [])
+            .filter((id) => typeof id === "string" && /^dwelling:decor\.[a-z0-9.-]+$/.test(id))
+            .slice(0, 16)))),
+        paletteId: findAnimalPalette(speciesId, source.paletteId)?.id ?? "standard",
     });
 }
 /** The UI contract: affection remains in persistence but never joins this view. */

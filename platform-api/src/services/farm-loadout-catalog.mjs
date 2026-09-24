@@ -127,7 +127,7 @@ function normalizePetProfile(value) {
     const profile = {
         gender: value.gender === "male" ? "male" : "female",
         // Species tuning currently reaches 150 days; this is a trust bound, not a shared lifespan rule.
-        ageDays: Math.floor(Math.max(0, boundedNumber(value.ageDays, 200) ?? 0)),
+        ageDays: Math.max(0, boundedNumber(value.ageDays, 200) ?? 0),
         affection: Math.max(0, boundedNumber(value.affection, 100) ?? 50),
         hunger: Math.max(0, boundedNumber(value.hunger, 100) ?? 100),
         starvingMinutes: Math.floor(Math.max(0, boundedNumber(value.starvingMinutes, 52560000) ?? 0)),
@@ -142,6 +142,8 @@ function normalizePetProfile(value) {
             strength: Math.max(0, boundedNumber(stats.strength, 100) ?? 50),
         },
         traits: Array.from(new Set((Array.isArray(value.traits) ? value.traits : []).filter((id) => typeof id === "string" && TRAIT_ID_PATTERN.test(id)).slice(0, 5))),
+        milestones: Array.from(new Set((Array.isArray(value.milestones) ? value.milestones : [])
+            .filter((id) => typeof id === "string" && /^dwelling:decor\.[a-z0-9.-]+$/.test(id)).slice(0, 16))),
         paletteId: cleanText(value.paletteId, 40) || "standard",
     };
     return profile;
