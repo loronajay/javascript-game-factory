@@ -76,6 +76,29 @@
   min-width: 0;
 }
 
+.session-nav__tickets {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 214, 74, 0.34);
+  border-radius: var(--profile-radius-sm, 12px);
+  background: rgba(255, 190, 38, 0.1);
+  color: #ffe68a;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.session-nav__ticket-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.32));
+}
+
 .session-nav__eyebrow {
   color: rgba(255, 255, 255, 0.42);
   font-size: 0.6rem;

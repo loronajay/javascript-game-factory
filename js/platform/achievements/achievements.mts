@@ -14,6 +14,7 @@
 
 import { createAchievementsApi, type AchievementsApi, type AchievementRunResponse } from "./achievements-api.mjs";
 import { createAchievementToaster, type AchievementToaster } from "./unlock-toast.mjs";
+import { publishTicketBalance } from "../api/ticket-wallet.mjs";
 
 export { createAchievementsApi } from "./achievements-api.mjs";
 export type { AchievementsApi, AchievementCollection, AchievementGameSummary, AchievementRunResponse, AchievementView } from "./achievements-api.mjs";
@@ -25,6 +26,7 @@ export type { AchievementToaster } from "./unlock-toast.mjs";
 export interface AchievementReporterOptions {
   api?: AchievementsApi;
   toaster?: AchievementToaster;
+  onTicketBalance?: (balance: number) => void;
 }
 
 export interface AchievementReporter {
@@ -35,6 +37,7 @@ export interface AchievementReporter {
 export function createAchievementReporter(options: AchievementReporterOptions = {}): AchievementReporter {
   const api = options.api ?? createAchievementsApi();
   const toaster = options.toaster ?? createAchievementToaster();
+  const onTicketBalance = options.onTicketBalance ?? ((balance: number) => { publishTicketBalance(balance); });
   return {
     canReport() {
       return api.canSubmit();
@@ -44,6 +47,9 @@ export function createAchievementReporter(options: AchievementReporterOptions = 
         const response = await api.submitRun(gameSlug, run);
         if (response && Array.isArray(response.unlocked) && response.unlocked.length > 0) {
           toaster.show(gameSlug, response.progress?.title || gameSlug, response.unlocked);
+        }
+        if (Number.isSafeInteger(response?.tickets?.balance) && Number(response?.tickets?.balance) >= 0) {
+          onTicketBalance(Number(response!.tickets!.balance));
         }
         return response;
       } catch {

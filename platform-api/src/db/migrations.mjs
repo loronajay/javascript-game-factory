@@ -48,6 +48,8 @@ export const MIGRATION_FILES = Object.freeze([
     "046-calendar-orders.sql",
     "047-cabinet-catalog-metadata.sql",
     "048-player-achievements.sql",
+    "049-ticket-wallets.sql",
+    "050-achievement-run-ticket-rewards.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

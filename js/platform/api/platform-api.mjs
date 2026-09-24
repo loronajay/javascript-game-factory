@@ -542,6 +542,11 @@ export function createPlatformApiClient(options = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? get(`/game-progress/${encoded}`, "progress") : Promise.resolve(null);
         },
+        // Factory-wide ticket balance. Awards are deliberately absent from the browser
+        // client: only server-side result validators are allowed to mint currency.
+        fetchTicketWallet() {
+            return get("/tickets/wallet", "wallet");
+        },
         recordGameProgressClaim(gameSlug, claim = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);

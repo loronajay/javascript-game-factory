@@ -29,6 +29,7 @@ The served site loads compiled `.mjs` directly — `tsc` emits each `.mts` to a 
 - Shared social and profile behavior should usually land in `js/platform/`, route-level page modules, or `platform-api/src/`.
 - The non-game TypeScript migration (platform frontend + backend, Phases 0–9) is **complete as of 2026-05-30** — all of `js/**` and `platform-api/src/**` are `.mts` under `strict: true`. Game cabinets are migrated last, per-cabinet, after each one's own seam cleanup. The current shared frontend/backend seams and migration history live in `planning-docs/ARCHITECTURE_HANDOFF.md` and `planning-docs/TYPESCRIPT_MIGRATION_PLAN.md`.
 - Some online-authoritative cabinets also depend on matching handlers in the separate `factory-network-server` repo. Circuit Siege is one of those games, so client-side board or rules changes may require a coordinated server deploy before website testing is valid.
+- Ticket payouts use the factory-wide server wallet and per-cabinet reward registry. Read `planning-docs/TICKET_ECONOMY_INTEGRATION_GUIDE.md` before adding payouts to another game; Lovers Lost is the reference integration, and clients must never submit currency amounts.
 
 ## Testing
 

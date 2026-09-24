@@ -49,6 +49,7 @@ js/tests/*
 !js/tests/readme-freshness.test.mjs
 # Session durability is a production deploy invariant, not a local-only harness.
 !js/tests/arcade-session-nav.test.mjs
+!js/tests/ticket-wallet.test.mjs
 !js/tests/auth-api.test.mjs
 !js/tests/deployment-config.test.mjs
 !js/tests/farm-crops.test.mjs
@@ -83,6 +84,10 @@ platform-api/tests/*
 !platform-api/tests/cabinet-overrides.test.mjs
 !platform-api/tests/farm-pet-care.test.mjs
 !platform-api/tests/farm-loadout-catalog.test.mjs
+!platform-api/tests/ticket-routes.test.mjs
+!platform-api/tests/tickets-db.test.mjs
+!platform-api/tests/lovers-lost-ticket-rewards.test.mjs
+!platform-api/tests/lovers-lost-ticket-settlement.test.mjs
 !platform-api/tests/yam-bowling-tournament-db.test.mjs
 
 # Echo Duel keeps its local regression tests out of shipped game builds.

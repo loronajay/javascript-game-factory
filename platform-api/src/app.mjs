@@ -15,6 +15,7 @@ import { handleLeaderboardRoute } from "./routes/leaderboard-routes.mjs";
 import { handleAchievementRoute } from "./routes/achievement-routes.mjs";
 import { handleProgressionRoute } from "./routes/progression-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
+import { handleTicketRoute } from "./routes/ticket-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
@@ -310,6 +311,9 @@ export function createApp(options = {}) {
     // unconfigured backend must say 503, not "you earned nothing".
     const submitAchievementRun = typeof options?.submitAchievementRun === "function" ? options.submitAchievementRun : null;
     const getPlayerAchievements = typeof options?.getPlayerAchievements === "function" ? options.getPlayerAchievements : null;
+    // Factory-wide tickets. Reads create the welcome wallet exactly once in the
+    // database; awards have no public route and are made only by server validators.
+    const getTicketWallet = typeof options?.getTicketWallet === "function" ? options.getTicketWallet : null;
     // Earned advancement, read-only. Null for the leaderboards' reason: an
     // unconfigured backend must answer 503 rather than report a level-1 document a
     // client would cache as the truth. There is no write service — XP is awarded
@@ -642,6 +646,7 @@ export function createApp(options = {}) {
         submitAchievementRun,
         getPlayerAchievements,
     };
+    const ticketServices = { getTicketWallet };
     const progressionServices = {
         getGameXpProgress,
     };
@@ -1008,6 +1013,18 @@ export function createApp(options = {}) {
                 requestOrigin,
                 timestamp,
                 services: gameProgressServices,
+            })) {
+                return;
+            }
+            if (await handleTicketRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: ticketServices,
             })) {
                 return;
             }

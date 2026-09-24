@@ -25,6 +25,8 @@ import {
   listAchievementGames,
   presentAchievement,
 } from "../services/achievement-catalog.mjs";
+import { evaluateTicketReward, type TicketRewardBreakdown } from "../services/ticket-reward-catalog.mjs";
+import { awardTicketsInTransaction, getTicketWalletInTransaction } from "./tickets.mjs";
 
 function cleanText(value: unknown, maxLength = 120): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -56,6 +58,18 @@ function summarize(game: any, owned: Map<string, string>): any {
   };
 }
 
+function storedBreakdown(value: unknown): TicketRewardBreakdown {
+  const source: any = value && typeof value === "object" ? value : {};
+  const repeatable: any = source.repeatable && typeof source.repeatable === "object" ? source.repeatable : { total: 0 };
+  const achievements = Array.isArray(source.achievements) ? source.achievements : [];
+  return {
+    repeatable: { ...repeatable, total: Math.max(0, Number(repeatable.total) || 0) },
+    achievements,
+    achievementTotal: Math.max(0, Number(source.achievementTotal) || 0),
+    total: Math.max(0, Number(source.total) || 0),
+  };
+}
+
 /**
  * Submits one run. Returns `{ unlocked, owned, progress }` where `unlocked`
  * are the definitions this submission earned (masked never — the player just
@@ -82,15 +96,19 @@ export async function submitAchievementRun(pool: any, params: any = {}): Promise
     await client.query(`select pg_advisory_xact_lock(hashtext($1))`, [`achievements:${playerId}:${gameSlug}`]);
 
     const prior = await client.query(
-      `select unlocked_ids from game_achievement_runs where player_id = $1 and game_slug = $2 and run_id = $3`,
+      `select unlocked_ids, ticket_awarded, ticket_breakdown from game_achievement_runs where player_id = $1 and game_slug = $2 and run_id = $3`,
       [playerId, gameSlug, runId],
     );
     const owned = await readOwned(client, playerId, gameSlug);
     let unlockedIds: string[];
+    let reward: TicketRewardBreakdown;
+    let ticketAwarded: number;
 
     if (prior.rows?.length) {
       // Retry: replay the recorded verdict, evaluate nothing.
       unlockedIds = Array.isArray(prior.rows[0].unlocked_ids) ? prior.rows[0].unlocked_ids.filter((id: any) => typeof id === "string") : [];
+      reward = storedBreakdown(prior.rows[0].ticket_breakdown);
+      ticketAwarded = Math.max(0, Number(prior.rows[0].ticket_awarded) || 0);
     } else {
       const earned = evaluateAchievementRun(game, run, owned.keys());
       unlockedIds = [];
@@ -107,13 +125,26 @@ export async function submitAchievementRun(pool: any, params: any = {}): Promise
           owned.set(id, toIso(inserted.rows[0].unlocked_at) || new Date().toISOString());
         }
       }
+      reward = evaluateTicketReward(gameSlug, { run, unlockedIds });
+      ticketAwarded = reward.total;
+      if (ticketAwarded > 0) {
+        await awardTicketsInTransaction(client, {
+          playerId,
+          transactionKey: `achievement-run:${gameSlug}:${runId}`,
+          amount: ticketAwarded,
+          reason: "game_result",
+          metadata: { gameSlug, runId, reward },
+        });
+      }
       await client.query(
-        `insert into game_achievement_runs (player_id, game_slug, run_id, unlocked_ids, submitted_at)
-         values ($1, $2, $3, $4::jsonb, now())
+        `insert into game_achievement_runs
+           (player_id, game_slug, run_id, unlocked_ids, ticket_awarded, ticket_breakdown, submitted_at)
+         values ($1, $2, $3, $4::jsonb, $5, $6::jsonb, now())
          on conflict (player_id, game_slug, run_id) do nothing`,
-        [playerId, gameSlug, runId, JSON.stringify(unlockedIds)],
+        [playerId, gameSlug, runId, JSON.stringify(unlockedIds), ticketAwarded, JSON.stringify(reward)],
       );
     }
+    const wallet = await getTicketWalletInTransaction(client, playerId);
     await client.query("commit");
 
     const unlocked = unlockedIds
@@ -126,6 +157,13 @@ export async function submitAchievementRun(pool: any, params: any = {}): Promise
       unlocked,
       owned: [...owned.keys()],
       progress: { gameSlug: game.gameSlug, title: game.title, unlocked: summary.unlocked, total: summary.total },
+      tickets: {
+        awarded: ticketAwarded,
+        balance: wallet?.balance ?? null,
+        repeatable: reward.repeatable.total,
+        achievements: reward.achievementTotal,
+        breakdown: reward,
+      },
     };
   } catch (err: any) {
     try { await client.query("rollback"); } catch { /* connection already gone */ }

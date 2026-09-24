@@ -45,6 +45,13 @@ export interface AchievementRunResponse {
   unlocked: AchievementView[];
   owned: string[];
   progress: { gameSlug: string; title: string; unlocked: number; total: number };
+  tickets?: {
+    awarded: number;
+    balance: number | null;
+    repeatable: number;
+    achievements: number;
+    breakdown: unknown;
+  };
 }
 
 function encode(value: unknown): string {

@@ -75,6 +75,16 @@ test("primary app nav markup marks the current page and includes a session mount
   assert(markup.includes('app-shell-nav__session-slot'), "expected session slot wrapper");
 });
 
+test("the signed-in shell reserves an accessible server-backed ticket balance", async () => {
+  const source = await import("node:fs/promises").then(({ readFile }) => readFile(
+    new URL("../arcade-session-nav.mjs", import.meta.url),
+    "utf8",
+  ));
+  assert(source.includes("session-nav__tickets"), "expected a shared ticket counter");
+  assert(source.includes("/assets/ticket.png"), "expected the supplied ticket art");
+  assert(source.includes("getWallet"), "expected the balance to come from the wallet API");
+});
+
 test("only a definite authentication rejection invalidates a stored session", () => {
   assertEq(shouldInvalidateStoredSession({ ok: false, httpStatus: 401, error: "not_authenticated" }), true);
   assertEq(shouldInvalidateStoredSession({ ok: false, error: "not_authenticated" }), true);

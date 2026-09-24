@@ -28,6 +28,7 @@ import { getGameXpProgress } from "./db/game-xp.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-records.mjs";
 import { getPlayerAchievements, submitAchievementRun } from "./db/achievements.mjs";
+import { getTicketWallet } from "./db/tickets.mjs";
 import {
   getAccountSuspension,
   isAdminPlayer,
@@ -421,6 +422,7 @@ async function bootstrap(): Promise<void> {
     recordRun: (params: any) => recordRun(pool, params),
     submitAchievementRun: (params: any) => submitAchievementRun(pool, params),
     getPlayerAchievements: (params: any) => getPlayerAchievements(pool, params),
+    getTicketWallet: (playerId: any) => getTicketWallet(pool, playerId),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     spendValor: (params: any) => spendValorForEntitlement(pool, params),
     resetCampaign: (params: any) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

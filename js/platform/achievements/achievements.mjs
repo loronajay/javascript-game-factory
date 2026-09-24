@@ -13,12 +13,14 @@
 // through the profile's achievements page.
 import { createAchievementsApi } from "./achievements-api.mjs";
 import { createAchievementToaster } from "./unlock-toast.mjs";
+import { publishTicketBalance } from "../api/ticket-wallet.mjs";
 export { createAchievementsApi } from "./achievements-api.mjs";
 export { createUnlockQueue, unlockKey } from "./unlock-queue.mjs";
 export { createAchievementToaster, ACHIEVEMENT_TOAST_LAYER_ID } from "./unlock-toast.mjs";
 export function createAchievementReporter(options = {}) {
     const api = options.api ?? createAchievementsApi();
     const toaster = options.toaster ?? createAchievementToaster();
+    const onTicketBalance = options.onTicketBalance ?? ((balance) => { publishTicketBalance(balance); });
     return {
         canReport() {
             return api.canSubmit();
@@ -28,6 +30,9 @@ export function createAchievementReporter(options = {}) {
                 const response = await api.submitRun(gameSlug, run);
                 if (response && Array.isArray(response.unlocked) && response.unlocked.length > 0) {
                     toaster.show(gameSlug, response.progress?.title || gameSlug, response.unlocked);
+                }
+                if (Number.isSafeInteger(response?.tickets?.balance) && Number(response?.tickets?.balance) >= 0) {
+                    onTicketBalance(Number(response.tickets.balance));
                 }
                 return response;
             }

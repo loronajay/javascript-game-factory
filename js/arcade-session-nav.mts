@@ -3,8 +3,10 @@ import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { clearPlatformStorage, getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { clearAuthToken, getStoredAuthToken } from "./platform/api/auth-token.mjs";
 import { initNotificationBell } from "./arcade-notifications.mjs";
+import { createTicketWalletClient, formatTicketBalance, TICKET_BALANCE_UPDATED_EVENT } from "./platform/api/ticket-wallet.mjs";
 
 const auth = createAuthApiClient();
+const tickets = createTicketWalletClient();
 const SIGNED_OUT_QUERY_KEY = "signedOut";
 const PRIMARY_APP_NAV_ITEMS = [
   { key: "home", label: "Home", path: "index.html" },
@@ -178,6 +180,10 @@ export async function initSessionNav(containerEl: HTMLElement | null, {
       : "";
 
     containerEl.innerHTML = `
+      <span class="session-nav__tickets" aria-label="Ticket balance">
+        <img class="session-nav__ticket-icon" src="/assets/ticket.png" alt="" aria-hidden="true">
+        <span class="session-nav__ticket-balance" data-ticket-balance>—</span>
+      </span>
       <div class="session-nav__identity">
         <span class="session-nav__eyebrow">Signed in as</span>
         <span class="session-nav__name">${escapeHtml(displayName)}</span>
@@ -185,6 +191,15 @@ export async function initSessionNav(containerEl: HTMLElement | null, {
       ${adminLink}
       <button class="session-nav__signout app-shell-nav__utility-link" type="button">Sign Out</button>
     `;
+
+    void tickets.getWallet().then((result: any) => {
+      const balanceEl = containerEl.querySelector("[data-ticket-balance]");
+      if (balanceEl && result) balanceEl.textContent = formatTicketBalance(result.balance);
+    });
+    globalThis.document?.addEventListener?.(TICKET_BALANCE_UPDATED_EVENT, ((event: CustomEvent) => {
+      const balanceEl = containerEl.querySelector("[data-ticket-balance]");
+      if (balanceEl) balanceEl.textContent = formatTicketBalance(event.detail?.balance);
+    }) as EventListener, { once: false });
 
     containerEl.querySelector(".session-nav__signout")?.addEventListener("click", async () => {
       await auth.logout();
