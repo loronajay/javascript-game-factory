@@ -257,10 +257,19 @@ export function createPetSim(options) {
             }
         }
         else {
+            if (pet.state === "called") {
+                pet.targetX = player.x;
+                pet.targetZ = player.z;
+            }
             const target = { x: pet.targetX, z: pet.targetZ };
             const remaining = Math.hypot(target.x - pet.x, target.z - pet.z);
             if (remaining <= ARRIVE_DISTANCE) {
-                startIdle(pet);
+                if (pet.state === "called") {
+                    pet.state = "attention";
+                    pet.timer = ATTENTION_SECONDS;
+                }
+                else
+                    startIdle(pet);
             }
             else {
                 const wanted = yawToward(pet, target);
@@ -404,6 +413,17 @@ export function createPetSim(options) {
                 return false;
             pet.state = "attention";
             pet.timer = ATTENTION_SECONDS;
+            pet.moving = false;
+            return true;
+        },
+        call(instanceId, player) {
+            const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+            if (!pet || pet.state === "carried")
+                return false;
+            pet.state = "called";
+            pet.targetX = player.x;
+            pet.targetZ = player.z;
+            pet.timer = 0;
             pet.moving = false;
             return true;
         },

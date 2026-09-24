@@ -252,6 +252,8 @@ export function createFarmEditor(options) {
         const row = layout.decor.find((candidate) => candidate.instanceId === instanceId);
         if (!row)
             return;
+        if (row.itemId === "decor.prop.pet-tombstone" && !confirm("Remove this memorial stone permanently? The pet's history will stay in your farm records, but the stone cannot be restored."))
+            return;
         const result = removeFarmDecor(layout, instanceId);
         if (!result.valid) {
             setStatus(explain(result.reason), "error");
@@ -262,6 +264,10 @@ export function createFarmEditor(options) {
         commit(result.layout, `${findFarmDecor(row.itemId)?.title ?? "Item"} removed · unsaved`);
     }
     function duplicate(instanceId) {
+        if (layout.decor.find((row) => row.instanceId === instanceId)?.memorialId) {
+            setStatus("A pet memorial is unique and cannot be copied.", "error");
+            return;
+        }
         const result = duplicateFarmDecor(layout, instanceId);
         if (!result.valid) {
             setStatus(result.reason === "full" ? "The field is full." : "No room beside it for a copy.", "error");

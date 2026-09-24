@@ -1,5 +1,11 @@
 # Changelog
 
+## The Farm: Pet Outcomes and Memorials (2026-09-23)
+
+**Phase 5 closes the care loop.** The Pets panel now escalates readable care warnings without exposing affection, severely unhappy pets refuse food and handling, and H whistles every sufficiently bonded, happy pet toward the player. Low affection and happiness receive deterministic once-per-farm-day outcome rolls, with permanent runaway checked before the rarer neglect-death rule, so reloading cannot reroll fate.
+
+**Death is an atomic persisted transition.** A pet that exhausts its starvation grace or reaches its natural lifespan leaves the live pet list and creates a unique procedural memorial stone plus a durable history record containing its name, species, final visible stats, traits, lifespan, outcome, and future accomplishment slots. Memorials can be moved and rotated, cannot be copied or added from the catalog, and require an explicit permanent-removal warning; removing the stone keeps the history. The browser and API trust boundaries normalize and preserve both records.
+
 ## The Farm: Every Pet Has a Home and a Look (2026-09-23)
 
 **The visual loose ends in Phases 3 and 4 are closed for all ten species.** The build catalog now includes a distinct procedural home for every pet: Doghouse, Duck Coop, Treetop Den, Burrow Lodge, Mud-Wallow Shelter, Rhino Shade, Roosting Box, Reef Grotto, Darkwater Cave, and Jellyfish Lagoon. Each is ordinary placeable farm decor, identifies the species it supports, and records a visible entrance sized against that species' actual height and personal-space radius. The nine new models live in their own dwelling module instead of expanding the already-large general props file.

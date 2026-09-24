@@ -893,6 +893,17 @@ export function createBeehive(THREE) {
     }
     return group;
 }
+/** A small stone marker; its durable inscription lives in layout.petHistory. */
+export function createPetTombstone(THREE) {
+    const group = new THREE.Group();
+    const stone = standard(THREE, "#8f8c86", 0.95, 0);
+    const dark = standard(THREE, "#5d5952", 1, 0);
+    box(THREE, group, [0.72, 0.12, 0.34], [0, 0.06, 0], dark);
+    box(THREE, group, [0.56, 0.72, 0.18], [0, 0.48, 0], stone);
+    sphere(THREE, group, 0.28, [0, 0.84, 0], stone).scale.set(1, 0.72, 0.34);
+    box(THREE, group, [0.28, 0.035, 0.02], [0, 0.55, 0.101], dark, false);
+    return group;
+}
 const still = (group) => ({ group, doors: null, fixtureDoors: {}, animate: null });
 /**
  * Every builder by the catalog's `model` name. A row whose model is missing
@@ -940,6 +951,7 @@ export const FARM_PROP_BUILDERS = Object.freeze({
     "tennis-ball": (THREE) => still(createTennisBall(THREE)),
     "rope-toy": (THREE) => still(createRopeToy(THREE)),
     bone: (THREE) => still(createBone(THREE)),
+    "pet-tombstone": (THREE) => still(createPetTombstone(THREE)),
     wheelbarrow: (THREE) => still(createWheelbarrow(THREE)),
     wagon: (THREE) => still(createWagon(THREE)),
     barrel: (THREE) => still(createBarrel(THREE)),

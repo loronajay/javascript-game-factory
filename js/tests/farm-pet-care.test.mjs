@@ -16,8 +16,10 @@ import { findFarmDecor } from "../farm-catalog/decor.mjs";
 import { addPet, createDefaultFarmLayout, normalizeFarmLayout } from "../farm-layout.mjs";
 import { advancePetWellbeing, applyPetCareMilestones, petCareEnvironment, reactToPetInteraction } from "../farm-pet-happiness.mjs";
 import { FAST_GROWTH_MULTIPLIER, advancePetLifecycle } from "../farm-pet-lifecycle.mjs";
-import { advancePetProfile } from "../farm-pet-needs.mjs";
+import { advancePetProfile, feedPet } from "../farm-pet-needs.mjs";
 import { farmPropNames } from "../farm-props.mjs";
+import { removeFarmDecor } from "../farm-decor-layout.mjs";
+import { AFFECTION_CALL_THRESHOLD, petOutcomeWarning, reactToPetCall, resolvePetOutcomes } from "../farm-pet-outcomes.mjs";
 
 function sequence(values) {
   let index = 0;
@@ -343,4 +345,57 @@ test("handling reactions are trait-aware, readable, and play requires a compatib
   assert.equal(played.profile.happiness, 62);
   assert.equal(played.profile.affection, 53);
   assert.match(played.message, /Tennis Ball/);
+});
+
+test("a severely unhappy pet refuses food without consuming a serving", () => {
+  let layout = addPet(createDefaultFarmLayout(), "pet.corgi", "Biscuit", () => 0.5).layout;
+  layout = { ...layout, pets: layout.pets.map((pet) => ({ ...pet, profile: { ...pet.profile, hunger: 50, happiness: 10 } })) };
+  const before = layout.agriculture.inventory.supplies["food.dog-food"];
+  const fed = feedPet(layout, "corgi-1", layout.clock.farmMinutes);
+  assert.equal(fed.ok, false);
+  assert.equal(fed.reason, "refused");
+  assert.equal(fed.layout.agriculture.inventory.supplies["food.dog-food"], before);
+});
+
+test("Phase-5 warnings escalate and only a trusted, happy pet answers a call", () => {
+  assert.equal(petOutcomeWarning(dogProfile(), "pet.corgi").stage, "safe");
+  assert.equal(petOutcomeWarning(dogProfile({ affection: 35 }), "pet.corgi").stage, "watch");
+  assert.equal(petOutcomeWarning(dogProfile({ happiness: 18 }), "pet.corgi").stage, "urgent");
+  assert.equal(petOutcomeWarning(dogProfile({ hunger: 0, starvingMinutes: 1440 }), "pet.corgi").stage, "critical");
+  assert.equal(reactToPetCall(dogProfile({ affection: AFFECTION_CALL_THRESHOLD, happiness: 60 })).ok, true);
+  assert.equal(reactToPetCall(dogProfile({ affection: AFFECTION_CALL_THRESHOLD - 1 })).ok, false);
+  assert.equal(reactToPetCall(dogProfile({ affection: 100, happiness: 10 })).ok, false);
+});
+
+test("starvation atomically creates a movable memorial and durable final history", () => {
+  let layout = addPet(createDefaultFarmLayout(), "pet.corgi", "Biscuit", () => 0.5).layout;
+  layout = { ...layout, pets: layout.pets.map((pet) => ({ ...pet, profile: { ...pet.profile, hunger: 0, starvingMinutes: 1440, ageDays: 22.5, traits: ["held.loves"] } })) };
+  const resolved = resolvePetOutcomes(layout, layout.clock.farmMinutes, layout.clock.farmMinutes, () => 0.99);
+  assert.equal(resolved.pets.length, 0);
+  assert.equal(resolved.petHistory[0].outcome, "starvation");
+  assert.equal(resolved.petHistory[0].lifespanDays, 22.5);
+  assert.deepEqual(resolved.petHistory[0].traits, ["held.loves"]);
+  assert.deepEqual(resolved.petHistory[0].accomplishments, []);
+  const stone = resolved.decor.find((row) => row.itemId === "decor.prop.pet-tombstone");
+  assert.equal(stone.memorialId, resolved.petHistory[0].id);
+  const moved = normalizeFarmLayout({ ...resolved, decor: resolved.decor.map((row) => row.instanceId === stone.instanceId ? { ...row, x: 3, z: 4, rotationY: 1 } : row) });
+  assert.equal(moved.decor.find((row) => row.instanceId === stone.instanceId).x, 3);
+  const removed = removeFarmDecor(moved, stone.instanceId).layout;
+  assert.equal(removed.decor.some((row) => row.instanceId === stone.instanceId), false);
+  assert.equal(removed.petHistory.length, 1, "removing the prop never erases history");
+});
+
+test("natural lifespan and low-happiness daily outcomes use the intended order", () => {
+  let old = addPet(createDefaultFarmLayout(), "pet.corgi", "Biscuit", () => 0.5).layout;
+  old = { ...old, pets: old.pets.map((pet) => ({ ...pet, profile: { ...pet.profile, ageDays: 100 } })) };
+  assert.equal(resolvePetOutcomes(old, old.clock.farmMinutes, old.clock.farmMinutes, () => 0.99).petHistory[0].outcome, "old_age");
+
+  let unhappy = addPet(createDefaultFarmLayout(), "pet.corgi", "Biscuit", () => 0.5).layout;
+  unhappy = { ...unhappy, pets: unhappy.pets.map((pet) => ({ ...pet, profile: { ...pet.profile, happiness: 5, affection: 50 } })) };
+  const nextDay = unhappy.clock.farmMinutes + 1440;
+  assert.equal(resolvePetOutcomes(unhappy, unhappy.clock.farmMinutes, nextDay, () => 0.01).petHistory[0].outcome, "runaway");
+  const rolls = [0.99, 0.001];
+  const rareDeath = resolvePetOutcomes(unhappy, unhappy.clock.farmMinutes, nextDay, () => rolls.shift() ?? 0.99);
+  assert.equal(rareDeath.petHistory[0].outcome, "neglect", "rare death is rolled only after runaway fails");
+  assert.equal(rareDeath.decor.some((row) => row.itemId === "decor.prop.pet-tombstone"), true);
 });

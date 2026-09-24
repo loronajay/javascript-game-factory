@@ -168,6 +168,7 @@ export const PET_INTERACTIONS = Object.freeze([
   Object.freeze({ id: "feed", code: "KeyG", key: "G", label: "Feed", available: "canFeed" }),
   Object.freeze({ id: "pick-up", code: "KeyC", key: "C", label: "Pick up", available: "canPickUp" }),
   Object.freeze({ id: "play", code: "KeyY", key: "Y", label: "Play", available: "canPlay" }),
+  Object.freeze({ id: "call", code: "KeyH", key: "H", label: "Call", available: "always" }),
 ] as const);
 
 export type PetInteraction = typeof PET_INTERACTIONS[number];

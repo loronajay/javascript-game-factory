@@ -36,7 +36,7 @@ import type { FarmLayout } from "./farm-layout.mjs";
 import type { FloorObstacle, RoomBounds } from "./arcade-room-layout.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 
-export type PetState = "idle" | "wander" | "attention" | "carried";
+export type PetState = "idle" | "wander" | "called" | "attention" | "carried";
 
 export type PetBody = Readonly<{
   instanceId: string;
@@ -101,6 +101,8 @@ export type PetSim = Readonly<{
   tick: (dt: number, player: Readonly<{ x: number; z: number; yaw?: number }>) => void;
   /** Make a pet turn to the player and hold still for a moment; false if no such pet. */
   attention: (instanceId: string) => boolean;
+  /** Ask a trusted pet to approach the player's current position. */
+  call: (instanceId: string, player: Readonly<{ x: number; z: number }>) => boolean;
   /** Lift a pet into the player's arms; false for a swimmer (it stays in its pond) or a pet that is not there. */
   pickUp: (instanceId: string) => boolean;
   /** Set a carried pet down at `spot`, facing `yaw`; false (and still carried) when a body its size does not fit there. */
@@ -338,10 +340,17 @@ export function createPetSim(options: PetSimOptions): PetSim {
         }
       }
     } else {
+      if (pet.state === "called") {
+        pet.targetX = player.x;
+        pet.targetZ = player.z;
+      }
       const target = { x: pet.targetX, z: pet.targetZ };
       const remaining = Math.hypot(target.x - pet.x, target.z - pet.z);
       if (remaining <= ARRIVE_DISTANCE) {
-        startIdle(pet);
+        if (pet.state === "called") {
+          pet.state = "attention";
+          pet.timer = ATTENTION_SECONDS;
+        } else startIdle(pet);
       } else {
         const wanted = yawToward(pet, target);
         pet.yaw = turnToward(pet.yaw, wanted, species.turnRate, dt);
@@ -473,6 +482,16 @@ export function createPetSim(options: PetSimOptions): PetSim {
       if (!pet) return false;
       pet.state = "attention";
       pet.timer = ATTENTION_SECONDS;
+      pet.moving = false;
+      return true;
+    },
+    call(instanceId, player) {
+      const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+      if (!pet || pet.state === "carried") return false;
+      pet.state = "called";
+      pet.targetX = player.x;
+      pet.targetZ = player.z;
+      pet.timer = 0;
       pet.moving = false;
       return true;
     },

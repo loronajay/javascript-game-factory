@@ -50,6 +50,7 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/;
 const CROP_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ITEM_ID_PATTERN = /^(?:food|toy)\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const TRAIT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+$/;
+const OUTCOMES = new Set(["runaway", "starvation", "old_age", "neglect"]);
 function cleanText(value, maxLength) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -160,6 +161,28 @@ function normalizePetRow(raw) {
         row.profile = profile;
     return row;
 }
+function normalizePetHistoryRow(raw) {
+    const source = raw && typeof raw === "object" ? raw : {};
+    const stats = source.finalStats && typeof source.finalStats === "object" ? source.finalStats : {};
+    const id = cleanText(source.id, 40);
+    const instanceId = cleanText(source.instanceId, 40);
+    const speciesId = cleanText(source.speciesId, 80);
+    if (!INSTANCE_ID_PATTERN.test(id) || !INSTANCE_ID_PATTERN.test(instanceId) || !SPECIES_ID_PATTERN.test(speciesId) || !OUTCOMES.has(source.outcome))
+        return null;
+    return {
+        id, instanceId, speciesId, name: cleanName(source.name, NAME_LIMIT), outcome: source.outcome,
+        departedAtFarmMinute: Math.max(0, boundedNumber(source.departedAtFarmMinute, 1000000000) ?? 0),
+        lifespanDays: Math.max(0, boundedNumber(source.lifespanDays, 200) ?? 0),
+        finalStats: {
+            gender: stats.gender === "male" ? "male" : "female",
+            ageDays: Math.max(0, boundedNumber(stats.ageDays, 200) ?? 0), size: Math.max(0, boundedNumber(stats.size, 5) ?? 1),
+            hunger: Math.max(0, boundedNumber(stats.hunger, 100) ?? 0), happiness: Math.max(0, boundedNumber(stats.happiness, 100) ?? 0),
+            speed: Math.max(0, boundedNumber(stats.speed, 100) ?? 0), strength: Math.max(0, boundedNumber(stats.strength, 100) ?? 0),
+        },
+        traits: Array.from(new Set((Array.isArray(source.traits) ? source.traits : []).filter((value) => typeof value === "string" && TRAIT_ID_PATTERN.test(value)).slice(0, 5))),
+        accomplishments: (Array.isArray(source.accomplishments) ? source.accomplishments : []).filter((value) => typeof value === "string").map((value) => value.slice(0, 80)).slice(0, 32),
+    };
+}
 /** A placed item: the room's decor row shape, bounded the same way. Optional finish fields pass through when well-formed. */
 function normalizeDecorRow(raw) {
     const source = raw && typeof raw === "object" ? raw : {};
@@ -182,6 +205,9 @@ function normalizeDecorRow(raw) {
     const color = cleanText(source.color, 7).toLowerCase();
     if (HEX_COLOR.test(color))
         row.color = color;
+    const memorialId = cleanText(source.memorialId, 40);
+    if (itemId === "decor.prop.pet-tombstone" && INSTANCE_ID_PATTERN.test(memorialId))
+        row.memorialId = memorialId;
     return row;
 }
 export function normalizeFarmGarage(value) {
@@ -204,6 +230,17 @@ export function normalizeFarmGarage(value) {
         ground: GROUND_ID_PATTERN.test(submittedGround) ? submittedGround : "",
         pets,
     };
+    if (Array.isArray(input.petHistory)) {
+        const historySeen = new Set();
+        garage.petHistory = [];
+        for (const raw of input.petHistory.slice(0, 100)) {
+            const entry = normalizePetHistoryRow(raw);
+            if (!entry || historySeen.has(entry.id))
+                continue;
+            historySeen.add(entry.id);
+            garage.petHistory.push(entry);
+        }
+    }
     const onboarding = input.onboarding && typeof input.onboarding === "object" ? input.onboarding : null;
     if (onboarding?.status === "needs_name") {
         garage.onboarding = { status: "needs_name", introSeen: onboarding.introSeen === true };

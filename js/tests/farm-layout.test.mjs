@@ -225,6 +225,7 @@ test("equality is structural and the cache key is per player", () => {
   const b = addPet(createDefaultFarmLayout(() => 0.5), "pet.corgi", "Biscuit", () => 0.5).layout;
   assert.ok(farmLayoutsEqual(a, b));
   assert.ok(!farmLayoutsEqual(a, renamePet(b, "corgi-1", "Waffle")));
+  assert.ok(!farmLayoutsEqual(a, { ...b, petHistory: [{ id: "memory-corgi-1", instanceId: "corgi-1", speciesId: "pet.corgi", name: "Biscuit", outcome: "runaway", departedAtFarmMinute: 1000, lifespanDays: 1, finalStats: { gender: "female", ageDays: 1, size: 1, hunger: 50, happiness: 5, speed: 50, strength: 40 }, traits: [], accomplishments: [] }] }), "durable history is part of layout identity");
   assert.equal(farmCacheKey("p1"), `${FARM_LAYOUT_STORAGE_KEY}:p1`);
   assert.equal(farmCacheKey(""), `${FARM_LAYOUT_STORAGE_KEY}:guest`);
 });

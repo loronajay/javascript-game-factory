@@ -11,13 +11,14 @@ const source = readFileSync(resolve(repoRoot, "js", "farm.mts"), "utf8");
 const worldSource = readFileSync(resolve(repoRoot, "js", "farm-world.mts"), "utf8");
 
 test("pet, feed, carry and play remain separate registered interactions", () => {
-  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["feed", "KeyG"], ["pick-up", "KeyC"], ["play", "KeyY"]]);
+  assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["feed", "KeyG"], ["pick-up", "KeyC"], ["play", "KeyY"], ["call", "KeyH"]]);
   assert.equal(getPetInteraction("KeyE")?.id, "pet");
   assert.equal(getPetInteraction("KeyG")?.id, "feed");
   assert.equal(getPetInteraction("KeyC")?.id, "pick-up");
   assert.equal(getPetInteraction("KeyY")?.id, "play");
-  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true, canFeed: true, canPlay: true }), "E Pet Biscuit · G Feed · C Pick up · Y Play");
-  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: true, canFeed: false, canPlay: false }), "E Pet Bubbles · C Pick up", "aquatic pets can be carried too");
+  assert.equal(getPetInteraction("KeyH")?.id, "call");
+  assert.equal(getPetInteractionPrompt("Biscuit", { canPickUp: true, canFeed: true, canPlay: true }), "E Pet Biscuit · G Feed · C Pick up · Y Play · H Call");
+  assert.equal(getPetInteractionPrompt("Bubbles", { canPickUp: true, canFeed: false, canPlay: false }), "E Pet Bubbles · C Pick up · H Call", "aquatic pets can be carried too");
 });
 
 test("seed cards request fully grown crop portraits instead of text glyphs", () => {
@@ -191,7 +192,7 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(panelSource, /addEventListener\("input", \(event\) => lengthEdit\(event, "preview"\)\)/);
   assert.match(panelSource, /addEventListener\("change", \(event\) => lengthEdit\(event, "commit"\)\)/);
   // The inspector is built once per selection and patched; the panel never touches THREE.
-  assert.match(panelSource, /if \(!inspector \|\| inspector\.instanceId !== row\.instanceId\) inspector = buildInspector\(row, definition\)/);
+  assert.match(panelSource, /if \(!inspector \|\| inspector\.instanceId !== row\.instanceId\) inspector = buildInspector\(row, definition, state\)/);
   assert.doesNotMatch(panelSource, /^import[^;]*three|new THREE\./im);
   assert.match(panelSource, /data-clear-selection/);
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.

@@ -27,7 +27,9 @@
 - Hunger at or below 40 is Hungry; zero is Starving. A pet that remains at zero for one complete farm day is due to die. The grace timer is live now; the death transition ships with the tombstone slice so the pet and its history change atomically.
 - Feeding at 100 has no effect and consumes nothing. Feeding below 100 consumes one serving and caps hunger at 100.
 - Farm progression is visible in the farm; there are no away/push notifications.
-- A runaway is gone forever. Removing a tombstone permanently deletes it and its stored history.
+- A runaway is gone forever. Removing a tombstone permanently deletes the prop, while its durable history remains for later record/prop ideas.
+- Outcome warnings use four stages: Doing well, Needs care (hunger ≤40, affection ≤35, or happiness ≤40), Distressed (zero hunger, affection ≤15, or happiness ≤20), and Life at risk / At life's end.
+- Distressed pets get one deterministic outcome roll per crossed farm day: happiness ≤20 adds a 20% runaway chance, affection ≤15 adds another 10%, and only after the runaway roll fails can happiness ≤5 cause the 1% rare neglect death. The pet/day roll is stable across reloads.
 - Persisted gender values are limited to female/male for this game.
 
 ## Current implementation snapshot
@@ -63,6 +65,7 @@
 - [x] Aquatic pets can be picked up like every other pet and can only be put down where their full body fits inside water.
 - [x] New owners see the farm introduction once and must atomically name/save their starter dog before normal play; visitors never receive the owner gate.
 - [x] New farms persist one growing plot, one seed from six randomly chosen unique crops, and 20 Dog Food without rerolling or re-granting on reload.
+- [x] Phase-5 outcomes are live: H calls trusted pets, care warnings escalate, low-care departures roll deterministically, and starvation/natural/rare deaths atomically create durable history plus a memorial prop.
 
 ## Universal profile values — current tuning baseline
 
@@ -156,14 +159,14 @@ These are balancing rows, not claims about real-world animal biology. Food price
 
 ### Phase 5 — affection/happiness outcomes and death
 
-- [ ] Define warning stages before running away forever or dying.
-- [ ] High affection: whistle/call response.
-- [ ] Low affection: refusal, bite, jump from arms, and possible runaway behavior.
-- [ ] Low happiness: refusal to eat/carry, runaway chance, and only then the rare-death rule.
-- [ ] Starvation death after the defined grace period.
-- [ ] Replace a dead pet with a movable/rotatable/removable tombstone decor row.
-- [ ] Tombstone stores name, final visible stats, traits, lifespan, and future competition accomplishments.
-- [ ] Confirm whether removing a tombstone is permanent and add a warning if so.
+- [x] Define warning stages before running away forever or dying.
+- [x] High affection: whistle/call response (H calls every pet at or above 70 affection unless severely unhappy).
+- [x] Low affection: refusal, bite, jump from arms, and possible runaway behavior.
+- [x] Low happiness: refusal to eat/carry, runaway chance, and only then the rare-death rule.
+- [x] Starvation death after the defined grace period.
+- [x] Replace a dead pet with a movable/rotatable/removable tombstone decor row.
+- [x] Tombstone references durable history containing name, final visible stats, traits, lifespan, and future competition accomplishments.
+- [x] Removing a tombstone is permanent and requires a warning; durable pet history remains for later prop/history ideas.
 
 ### Phase 6 — economy and additional species
 
@@ -198,3 +201,4 @@ These are balancing rows, not claims about real-world animal biology. Food price
 - [x] Focused browser/API tests pass.
 - [x] First-farm dog naming and starter-farm grants ship (Phase 1).
 - [x] Feeding changes hunger and consumes food (Phase 2).
+- [x] Permanent outcomes, pet history, and movable memorial stones ship (Phase 5).

@@ -13,6 +13,7 @@ import { adoptableAnimals, findAnimal, findAnimalPalette } from "./farm-catalog/
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats } from "./farm-layout.mjs";
 import { PET_TRAITS, visiblePetStats } from "./farm-pet-care.mjs";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
+import { petOutcomeWarning } from "./farm-pet-outcomes.mjs";
 function escapeHtml(value) {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
 }
@@ -81,6 +82,7 @@ export function createPetsPanel(elements, actions, options = {}) {
             const palette = findAnimalPalette(pet.speciesId, profile?.paletteId);
             const stats = profile ? visiblePetStats(profile) : null;
             const needs = profile ? petNeedStatus(profile) : null;
+            const warning = profile ? petOutcomeWarning(profile, pet.speciesId) : null;
             const statMarkup = stats ? `<dl class="pet-row__stats">
         <div><dt>Gender</dt><dd>${escapeHtml(String(stats.gender))}</dd></div>
         <div><dt>Age</dt><dd>${Number(stats.ageDays).toFixed(1)} days</dd></div>
@@ -97,7 +99,9 @@ export function createPetsPanel(elements, actions, options = {}) {
             row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}${palette && palette.id !== "standard" ? ` · ${escapeHtml(palette.title)}` : ""}</span>`
                 + `<input class="pet-row__name" type="text" maxlength="${PET_NAME_MAX_LENGTH}" value="${escapeHtml(pet.name)}" aria-label="Name of ${escapeHtml(pet.name)}">`
                 + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button></div>`
-                + statMarkup + traitMarkup;
+                + statMarkup
+                + (warning && warning.stage !== "safe" ? `<p class="pet-row__warning pet-row__warning--${warning.stage}"><strong>${escapeHtml(warning.label)}:</strong> ${escapeHtml(warning.message)}</p>` : "")
+                + traitMarkup;
             const input = row.querySelector(".pet-row__name");
             const commit = async () => {
                 const next = input.value.trim();

@@ -7,6 +7,7 @@ import { PET_TRAITS, findPetCare, type PetProfile } from "./farm-pet-care.mjs";
 import { withFarmAgriculture, withFarmClock, withFarmPets, type FarmLayout, type FarmPet } from "./farm-layout.mjs";
 import { advancePetWellbeing } from "./farm-pet-happiness.mjs";
 import { advancePetLifecycle } from "./farm-pet-lifecycle.mjs";
+import { resolvePetOutcomes } from "./farm-pet-outcomes.mjs";
 
 export const HUNGRY_THRESHOLD = 40;
 export const STARVATION_GRACE_MINUTES = FARM_DAY_MINUTES;
@@ -19,7 +20,7 @@ export type PetNeedStatus = Readonly<{
   label: string;
   starvationDue: boolean;
 }>;
-export type FeedPetResult = Readonly<{ ok: boolean; reason: "" | "unknown_pet" | "no_profile" | "no_food" | "full"; layout: FarmLayout; foodTitle: string }>;
+export type FeedPetResult = Readonly<{ ok: boolean; reason: "" | "unknown_pet" | "no_profile" | "no_food" | "full" | "refused"; layout: FarmLayout; foodTitle: string }>;
 
 const roundedNeed = (value: number): number => Number(value.toFixed(4));
 
@@ -80,7 +81,8 @@ export function advancePetNeeds(layout: FarmLayout, targetFarmMinute: number): F
   const pets = layout.pets.map((pet): FarmPet => pet.profile
     ? { ...pet, profile: advancePetProfile(pet.profile, pet.speciesId, elapsed, layout.decor) }
     : pet);
-  return withFarmClock(withFarmPets(layout, pets), target, layout.clock.updatedAt);
+  const checkpoint = withFarmClock(withFarmPets(layout, pets), target, layout.clock.updatedAt);
+  return resolvePetOutcomes(checkpoint, layout.clock.farmMinutes, target);
 }
 
 function withSupplies(layout: FarmLayout, supplies: Readonly<Record<string, number>>): FarmLayout {
@@ -93,9 +95,11 @@ export function feedPet(layout: FarmLayout, instanceId: string, targetFarmMinute
   const original = layout.pets.find((pet) => pet.instanceId === instanceId);
   if (!original) return Object.freeze({ ok: false, reason: "unknown_pet", layout, foodTitle: "" });
   let checkpoint = advancePetNeeds(layout, targetFarmMinute);
-  const pet = checkpoint.pets.find((row) => row.instanceId === instanceId)!;
+  const pet = checkpoint.pets.find((row) => row.instanceId === instanceId);
+  if (!pet) return Object.freeze({ ok: false, reason: "unknown_pet", layout: checkpoint, foodTitle: "" });
   const care = findPetCare(pet.speciesId);
   if (!pet.profile || !care) return Object.freeze({ ok: false, reason: "no_profile", layout: checkpoint, foodTitle: care?.food.title ?? "food" });
+  if (pet.profile.happiness <= 10) return Object.freeze({ ok: false, reason: "refused", layout: checkpoint, foodTitle: care.food.title });
   if (pet.profile.hunger >= 100) return Object.freeze({ ok: false, reason: "full", layout: checkpoint, foodTitle: care.food.title });
   const count = checkpoint.agriculture.inventory.supplies[care.food.itemId] ?? 0;
   if (count <= 0) return Object.freeze({ ok: false, reason: "no_food", layout: checkpoint, foodTitle: care.food.title });

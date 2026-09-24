@@ -37,6 +37,7 @@ import { completeFarmOnboarding, markFarmIntroSeen } from "./farm-onboarding.mjs
 import { advancePetNeeds, advancePetProfile, feedPet, petNeedStatus } from "./farm-pet-needs.mjs";
 import { findPetCare } from "./farm-pet-care.mjs";
 import { applyPetCareMilestones, petCareEnvironment, reactToPetInteraction } from "./farm-pet-happiness.mjs";
+import { reactToPetCall } from "./farm-pet-outcomes.mjs";
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -471,6 +472,7 @@ function workSoilPlot(): void {
 
 /** Run one available pet action through the shared registry. */
 function interactWithPet(action: PetInteractionId): boolean {
+  if (action === "call") return false;
   if (!nearbyPet) return false;
   if (action === "feed") {
     if (!nearbyPetCanFeed) return false;
@@ -517,6 +519,23 @@ function interactWithPet(action: PetInteractionId): boolean {
   nearbyPetCanFeed = false;
   nearbyPetCanPlay = false;
   return true;
+}
+
+/** H whistles once; every trusted, happy pet answers from wherever it is. */
+function callPets(): boolean {
+  const checkpoint = advancePetNeeds(layout, clockMinutes);
+  let answered = 0;
+  let refused = 0;
+  for (const pet of checkpoint.pets) {
+    if (!pet.profile) continue;
+    const reaction = reactToPetCall(pet.profile);
+    if (reaction.ok && petSim.call(pet.instanceId, player)) answered += 1;
+    else refused += 1;
+  }
+  layout = checkpoint;
+  if (answered > 0) status.textContent = answered === 1 ? "A trusted pet comes when called." : `${answered} trusted pets come when called.`;
+  else if (refused > 0) status.textContent = "No pet feels ready to answer the call yet.";
+  return answered + refused > 0;
 }
 
 /** E with a pet in hand: set it down ahead if it fits; otherwise the prompt has already said why not and E does nothing. */
@@ -662,6 +681,10 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   const petInteraction = !event.repeat && farmEntered ? getPetInteraction(event.code) : null;
+  if (petInteraction?.id === "call" && callPets()) {
+    event.preventDefault();
+    return;
+  }
   if (petInteraction && nearbyPet && interactWithPet(petInteraction.id)) {
     event.preventDefault();
     return;

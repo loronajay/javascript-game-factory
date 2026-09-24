@@ -161,7 +161,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         row.append(text, field, element("small", "inspector__hint", hint));
         return { row, input };
     }
-    function buildInspector(row, definition) {
+    function buildInspector(row, definition, state) {
         const heading = element("div", "inspector__heading");
         const where = element("small", "", placementLabel(row, definition));
         const close = element("button", "inspector__close", "×");
@@ -187,6 +187,9 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         const duplicate = element("button", "inspector__tool", "Copy");
         duplicate.type = "button";
         duplicate.dataset.duplicateDecor = row.instanceId;
+        duplicate.disabled = Boolean(row.memorialId);
+        if (row.memorialId)
+            duplicate.title = "Pet memorials cannot be copied";
         tools.append(left, right, duplicate);
         const remove = element("button", "inspector__tool inspector__tool--danger", "Remove");
         remove.type = "button";
@@ -194,6 +197,10 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         const removeHint = element("small", "inspector__hint");
         const removeRow = element("div", "inspector__tools");
         removeRow.append(remove);
+        const memorial = row.memorialId ? state.layout.petHistory.find((entry) => entry.id === row.memorialId) : undefined;
+        if (memorial) {
+            nodes.push(element("div", "inspector__memorial", `${memorial.name} · ${memorial.lifespanDays.toFixed(1)} days · ${memorial.traits.length ? memorial.traits.join(", ") : "No recorded traits"}`));
+        }
         const hint = element("small", "inspector__hint", definition.doors
             ? `Walk up to the ${definition.title.toLowerCase()} and press E to open the door${definition.shell?.door?.leaves === 2 ? "s" : ""}, then step inside. Animals stay out.`
             : definition.shell
@@ -202,7 +209,9 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
                     ? "Swimmers live inside this pond. It cannot be removed while any of them do."
                     : definition.length.enabled
                         ? "Fences pass through other fences, so corners and crossings are fine."
-                        : "Drag it in the field, arrows to nudge, Q/R to turn.");
+                        : row.memorialId
+                            ? "Drag or rotate this memorial like any prop. Removing it is permanent, though its history remains in farm records."
+                            : "Drag it in the field, arrows to nudge, Q/R to turn.");
         nodes.push(tools, removeRow, removeHint, hint);
         elements.inspector.replaceChildren(...nodes);
         return { instanceId: row.instanceId, where, lengthInput, remove, removeHint };
@@ -217,7 +226,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             return;
         }
         if (!inspector || inspector.instanceId !== row.instanceId)
-            inspector = buildInspector(row, definition);
+            inspector = buildInspector(row, definition, state);
         inspector.where.textContent = placementLabel(row, definition);
         if (inspector.lengthInput && document.activeElement !== inspector.lengthInput)
             inspector.lengthInput.value = String(row.length);

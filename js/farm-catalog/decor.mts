@@ -109,6 +109,8 @@ export type FarmDecorDefinition = Readonly<{
   /** The builder in `farm-props.mts` that draws it. */
   model: string;
   unlock: Readonly<{ type: "starter" | "achievement" | "purchase"; source: string }>;
+  /** Outcome-created props remain valid placed rows but do not appear in the add catalog. */
+  catalogVisible: boolean;
 }>;
 
 const STARTER = Object.freeze({ type: "starter", source: "The Farm" } as const);
@@ -129,6 +131,7 @@ type Spec = Readonly<{
   snapDegrees?: number;
   swatch: readonly [string, string];
   model: string;
+  catalogVisible?: boolean;
 }>;
 
 function item(variant: string, spec: Spec): FarmDecorDefinition {
@@ -150,6 +153,7 @@ function item(variant: string, spec: Spec): FarmDecorDefinition {
     swatch: Object.freeze([spec.swatch[0], spec.swatch[1]] as const),
     model: spec.model,
     unlock: STARTER,
+    catalogVisible: spec.catalogVisible ?? true,
   });
 }
 
@@ -233,6 +237,7 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("tennis-ball", { title: "Tennis Ball", category: "prop", footprint: { width: 0.24, depth: 0.24 }, solid: false, snapDegrees: 45, swatch: ["#cbea45", "#f5f0d0"], model: "tennis-ball" }),
   item("rope-toy", { title: "Rope Toy", category: "prop", footprint: { width: 0.55, depth: 0.18 }, solid: false, snapDegrees: 45, swatch: ["#d9b36c", "#8c5638"], model: "rope-toy" }),
   item("bone", { title: "Bone", category: "prop", footprint: { width: 0.48, depth: 0.2 }, solid: false, snapDegrees: 45, swatch: ["#eee5ce", "#b8a98c"], model: "bone" }),
+  item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", catalogVisible: false }),
   item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
   item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),
   item("barrel", { title: "Barrel", category: "prop", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#7a4a2a", "#3b3b3b"], model: "barrel" }),
@@ -251,7 +256,7 @@ export function findFarmDecor(id: unknown): FarmDecorDefinition | undefined {
 }
 
 export function farmDecorByCategory(category: FarmDecorCategory): readonly FarmDecorDefinition[] {
-  return FARM_DECOR_CATALOG.filter((entry) => entry.category === category);
+  return FARM_DECOR_CATALOG.filter((entry) => entry.category === category && entry.catalogVisible);
 }
 
 export function allFarmDecorIds(): string[] {

@@ -6,6 +6,7 @@ import { PET_TRAITS, findPetCare } from "./farm-pet-care.mjs";
 import { withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
 import { advancePetWellbeing } from "./farm-pet-happiness.mjs";
 import { advancePetLifecycle } from "./farm-pet-lifecycle.mjs";
+import { resolvePetOutcomes } from "./farm-pet-outcomes.mjs";
 export const HUNGRY_THRESHOLD = 40;
 export const STARVATION_GRACE_MINUTES = FARM_DAY_MINUTES;
 export const HUNGRY_AFFECTION_LOSS_PER_DAY = 2;
@@ -66,7 +67,8 @@ export function advancePetNeeds(layout, targetFarmMinute) {
     const pets = layout.pets.map((pet) => pet.profile
         ? { ...pet, profile: advancePetProfile(pet.profile, pet.speciesId, elapsed, layout.decor) }
         : pet);
-    return withFarmClock(withFarmPets(layout, pets), target, layout.clock.updatedAt);
+    const checkpoint = withFarmClock(withFarmPets(layout, pets), target, layout.clock.updatedAt);
+    return resolvePetOutcomes(checkpoint, layout.clock.farmMinutes, target);
 }
 function withSupplies(layout, supplies) {
     const inventory = Object.freeze({ ...layout.agriculture.inventory, supplies: Object.freeze({ ...supplies }) });
@@ -79,9 +81,13 @@ export function feedPet(layout, instanceId, targetFarmMinute) {
         return Object.freeze({ ok: false, reason: "unknown_pet", layout, foodTitle: "" });
     let checkpoint = advancePetNeeds(layout, targetFarmMinute);
     const pet = checkpoint.pets.find((row) => row.instanceId === instanceId);
+    if (!pet)
+        return Object.freeze({ ok: false, reason: "unknown_pet", layout: checkpoint, foodTitle: "" });
     const care = findPetCare(pet.speciesId);
     if (!pet.profile || !care)
         return Object.freeze({ ok: false, reason: "no_profile", layout: checkpoint, foodTitle: care?.food.title ?? "food" });
+    if (pet.profile.happiness <= 10)
+        return Object.freeze({ ok: false, reason: "refused", layout: checkpoint, foodTitle: care.food.title });
     if (pet.profile.hunger >= 100)
         return Object.freeze({ ok: false, reason: "full", layout: checkpoint, foodTitle: care.food.title });
     const count = checkpoint.agriculture.inventory.supplies[care.food.itemId] ?? 0;
