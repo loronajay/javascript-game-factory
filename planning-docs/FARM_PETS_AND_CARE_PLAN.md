@@ -194,7 +194,7 @@ Speed and Strength are no longer fixed at adoption. `js/farm-pet-growth.mts` is 
 ## Explicitly deferred
 
 - [ ] **Tricks:** roll over, backflip, run in a circle, play dead, and teaching progression. Scope with bespoke animations.
-- [ ] **Minigames/competitive trials:** racing and strength competitions, player control, scoring, network authority, rewards, and accomplishment records.
+- [~] **Minigames/competitive trials:** the first offline Barnyard Dash slice now provides player-controlled racing versus CPU and reads canonical farm pets without taking ownership of them. Network authority, rewards, accomplishment records, and the other event concepts remain deferred; see `planning-docs/PET_MINIGAMES_PLAN.md`.
 - [ ] **Breeding:** inheritance, capacity, lifecycle, consent/pairing rules, economy, and UI all require a separate design.
 
 ## Resolved decisions for later outcome slices

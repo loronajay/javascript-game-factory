@@ -39,6 +39,11 @@ test("the farm page ships the shell the composition root requires", () => {
   assert.match(html, /id="farmOwnerLink"[^>]*hidden/);
 });
 
+test("the farm links owners directly to the first pet game", () => {
+  assert.match(html, /id="openPetGames"/);
+  assert.match(html, /href="\.\.\/games\/barnyard-dash\/index\.html"/);
+});
+
 test("the farm is playable signed in or out, saves locally or to a loaded account, and keeps visits read-only", () => {
   assert.match(source, /createLayoutStore\(FARM_LAYOUT_SPEC, \{ visitPlayerId \}\)/, "signed-out farms use the store's device persistence while signed-in farms remain account-backed");
   assert.match(source, /slug: "farm"/);

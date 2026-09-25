@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17382d">
+  <title>Barnyard Dash | Javascript Game Factory</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="cabinet">
+    <header class="topbar">
+      <a class="back-link" href="../../farm/">← Farm</a>
+      <div>
+        <p class="eyebrow">PET GAMES · EVENT 01</p>
+        <h1>Barnyard Dash</h1>
+      </div>
+      <button id="fullscreen" class="icon-button" type="button">Fullscreen</button>
+    </header>
+
+    <section id="gameStage" class="game-stage" aria-label="Barnyard Dash 3D race course">
+      <canvas id="raceCanvas" width="960" height="640" tabindex="0" aria-label="Third-person 3D pet race"></canvas>
+
+      <aside id="raceHud" class="race-hud" hidden>
+        <div><small>YOU</small><strong id="playerPlace">1st</strong></div>
+        <div class="race-hud__middle"><small id="raceLap">Lap 1 / 3</small><strong id="raceProgress">Checkpoint 0 / 7</strong></div>
+        <div><small>TIME</small><strong id="raceTime">0:00.00</strong></div>
+      </aside>
+
+      <section id="setupPanel" class="panel setup-panel">
+        <p class="kicker">Choose your racer</p>
+        <h2>Your pet. Your line.</h2>
+        <p class="lede">Race your actual 3D farm pet for three laps through mud, hurdles, hay and sweeping turns. Choose a 1v1 duel or fill the course with up to eight pets.</p>
+        <div id="petChoices" class="pet-choices" role="radiogroup" aria-label="Farm pets"></div>
+        <label class="race-options" for="fieldSize">
+          <span>Race field</span>
+          <select id="fieldSize">
+            <option value="2">1v1 · 2 pets</option>
+            <option value="4" selected>Pack race · 4 pets</option>
+            <option value="6">Stampede · 6 pets</option>
+            <option value="8">Full field · 8 pets</option>
+          </select>
+        </label>
+        <div class="briefing">
+          <span><kbd>W</kbd> accelerate</span>
+          <span><kbd>S</kbd> brake</span>
+          <span><kbd>A</kbd><kbd>D</kbd> steer</span>
+          <span><kbd>Space</kbd> jump</span>
+        </div>
+        <button id="startRace" class="primary" type="button" disabled>Loading your farm…</button>
+        <p id="loadNote" class="load-note" aria-live="polite"></p>
+      </section>
+
+      <section id="raceResult" class="panel result-panel" hidden>
+        <p id="resultKicker" class="kicker">Finish</p>
+        <h2 id="resultTitle">Photo finish!</h2>
+        <p id="resultCopy" class="lede"></p>
+        <div class="result-times">
+          <span>You <strong id="playerResultTime">—</strong></span>
+          <span>Field <strong id="fieldResult">—</strong></span>
+        </div>
+        <ol id="resultStandings" class="result-standings"></ol>
+        <button id="raceAgain" class="primary" type="button">Race again</button>
+        <button id="changePet" class="secondary" type="button">Change pet</button>
+      </section>
+
+      <div id="countdown" class="countdown" aria-live="assertive"></div>
+
+      <div id="touchControls" class="touch-controls" aria-label="Touch race controls">
+        <div class="touch-cluster">
+          <button type="button" data-control="left" aria-label="Steer left">←</button>
+          <button type="button" data-control="right" aria-label="Steer right">→</button>
+        </div>
+        <div class="touch-cluster">
+          <button type="button" data-control="brake" aria-label="Brake">BRAKE</button>
+          <button type="button" data-control="jump" aria-label="Jump">JUMP</button>
+          <button type="button" data-control="throttle" aria-label="Accelerate">GO</button>
+        </div>
+      </div>
+    </section>
+
+    <footer><span>Stats stay narrow by design: Speed is 90–110% pace.</span><span>Strength preserves momentum through rough terrain and impacts.</span></footer>
+  </main>
+  <script type="module" src="../../js/platform-config.mjs"></script>
+  <script type="module" src="scripts/main.js?v=20260925-hurdle-upgrade-2"></script>
+</body>
+</html>
