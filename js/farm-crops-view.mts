@@ -2,7 +2,7 @@
 // where soil exists; agriculture owns what grows there and which GLB stage is shown.
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
-import { SOIL_CELL_LAYOUT, cropStatus, findCrop, type FarmAgriculture, type FarmCrop } from "./farm-crops.mjs";
+import { cropStatus, farmPlantingCells, findCrop, type FarmAgriculture, type FarmCrop } from "./farm-crops.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 
 type ThreeNamespace = Record<string, any>;
@@ -61,7 +61,7 @@ export function createFarmCropsView(THREE: ThreeNamespace, scene: any): FarmCrop
     return model;
   }
 
-  function cellTile(holder: any, cell: typeof SOIL_CELL_LAYOUT[number], crop: FarmCrop | undefined, wet: boolean): void {
+  function cellTile(holder: any, cell: Readonly<{ x: number; z: number }>, crop: FarmCrop | undefined, wet: boolean): void {
     const border = new THREE.Mesh(
       new THREE.BoxGeometry(0.92, 0.025, 0.82),
       new THREE.MeshStandardMaterial({ color: crop ? 0xc39a52 : 0x9a7845, roughness: 1 }),
@@ -78,40 +78,45 @@ export function createFarmCropsView(THREE: ThreeNamespace, scene: any): FarmCrop
     holder.add(earth);
   }
 
-  function loadContent(view: PlotView, crops: readonly FarmCrop[], farmMinutes: number): void {
+  function loadContent(view: PlotView, itemId: string, crops: readonly FarmCrop[], farmMinutes: number): void {
     const token = ++view.loadToken;
     const holder = new THREE.Group();
     view.content.add(holder);
-    for (const cell of SOIL_CELL_LAYOUT) {
+    const cells = farmPlantingCells(itemId);
+    for (const cell of cells) {
       const crop = crops.find((entry) => entry.cellId === cell.id);
       const status = crop ? cropStatus(crop, farmMinutes) : null;
-      cellTile(holder, cell, crop, Boolean(crop && !status?.thirsty));
+      if (itemId === "decor.plant.soil-patch") cellTile(holder, cell, crop, Boolean(crop && !status?.thirsty));
       const definition = crop ? findCrop(crop.cropId) : undefined;
       if (!crop || !definition || !status) continue;
       loader.load(cropAssetUrl(definition.models[status.stage]), (gltf: any) => {
         if (token !== view.loadToken) return;
-        const plant = fittedModel(gltf.scene, { width: 0.68, depth: 0.62, height: 0.48 + status.stage * 0.2 });
+        const greenhouse = itemId === "decor.building.greenhouse";
+        const plant = fittedModel(gltf.scene, greenhouse
+          ? { width: 0.42, depth: 0.42, height: 0.34 + status.stage * 0.14 }
+          : { width: 0.68, depth: 0.62, height: 0.48 + status.stage * 0.2 });
         plant.position.x += cell.x;
-        plant.position.y += 0.11;
+        plant.position.y += cell.y;
         plant.position.z += cell.z;
-        plant.rotation.y = (SOIL_CELL_LAYOUT.indexOf(cell) % 3 - 1) * 0.08;
+        plant.rotation.y = (cells.indexOf(cell) % 3 - 1) * 0.08;
         holder.add(plant);
       }, undefined, () => undefined);
     }
   }
 
-  function rebuild(view: PlotView, key: string, crops: readonly FarmCrop[], farmMinutes: number): void {
+  function rebuild(view: PlotView, itemId: string, key: string, crops: readonly FarmCrop[], farmMinutes: number): void {
     view.loadToken += 1;
     for (const child of [...view.content.children]) disposeObject(child);
     view.key = key;
-    loadContent(view, crops, farmMinutes);
+    loadContent(view, itemId, crops, farmMinutes);
   }
 
   return Object.freeze({
     sync(layout, agriculture, farmMinutes) {
       const wanted = new Set<string>();
       for (const row of layout.decor) {
-        if (row.itemId !== "decor.plant.soil-patch") continue;
+        const cells = farmPlantingCells(row.itemId);
+        if (!cells.length) continue;
         wanted.add(row.instanceId);
         let view = plots.get(row.instanceId);
         if (!view) {
@@ -125,13 +130,13 @@ export function createFarmCropsView(THREE: ThreeNamespace, scene: any): FarmCrop
         view.group.position.set(row.x, 0.12, row.z);
         view.group.rotation.y = row.rotationY;
         const planted = agriculture.crops.filter((crop) => crop.plotId === row.instanceId);
-        const key = SOIL_CELL_LAYOUT.map((cell) => {
+        const key = cells.map((cell) => {
           const crop = planted.find((entry) => entry.cellId === cell.id);
           if (!crop) return "empty";
           const status = cropStatus(crop, farmMinutes);
           return `${crop.cropId}:${status.stage}:${status.thirsty ? "dry" : "wet"}`;
         }).join("|");
-        if (key !== view.key) rebuild(view, key, planted, farmMinutes);
+        if (key !== view.key) rebuild(view, row.itemId, key, planted, farmMinutes);
       }
       for (const [id, view] of plots) {
         if (wanted.has(id)) continue;

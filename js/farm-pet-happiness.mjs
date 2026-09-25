@@ -3,7 +3,7 @@
 // needs and explicit interaction outcomes. Rendering and key handling stay in
 // the farm composition root.
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare } from "./farm-pet-care.mjs";
+import { findPetCare, treatPet } from "./farm-pet-care.mjs";
 import { withFarmPets } from "./farm-layout.mjs";
 export const HAPPINESS_DRAIN_PER_DAY = 8;
 export const DWELLING_HAPPINESS_PER_DAY = 5;
@@ -65,11 +65,21 @@ export function applyPetCareMilestones(layout) {
     });
     return changed ? withFarmPets(layout, pets) : layout;
 }
-function result(profile, ok, reason, reaction, message, carrySeconds = null) {
-    return Object.freeze({ ok, reason, reaction, message, profile, carrySeconds });
+function result(profile, ok, reason, reaction, message, carrySeconds = null, treatment = 0) {
+    return Object.freeze({ ok, reason, reaction, message, profile, carrySeconds, treatment });
+}
+/** Record how the pet felt about this handling. Attempts count too: picking up an Independent pet is the mistake, not its escape. */
+function treated(outcome, kind, farmMinute) {
+    const { profile, applied } = treatPet(outcome.profile, kind, farmMinute / FARM_DAY_MINUTES);
+    return Object.freeze({ ...outcome, profile, treatment: applied });
 }
 /** Trait-aware handling and play. Refusals are returned as readable outcomes before the caller animates anything. */
-export function reactToPetInteraction(profile, speciesId, kind, decor) {
+export function reactToPetInteraction(profile, speciesId, kind, decor, farmMinute = 0) {
+    const outcome = reactWithoutTreatment(profile, speciesId, kind, decor);
+    // A distressed snap or a missing toy is not treatment; everything else is how this pet was handled.
+    return outcome.reaction === "bite" || outcome.reason === "no_toy" || outcome.reason === "no_profile" ? outcome : treated(outcome, kind, farmMinute);
+}
+function reactWithoutTreatment(profile, speciesId, kind, decor) {
     const care = findPetCare(speciesId);
     if (!care)
         return result(profile, false, "no_profile", "refuse", "This pet cannot be handled right now.");

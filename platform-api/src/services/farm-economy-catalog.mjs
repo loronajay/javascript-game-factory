@@ -1,3 +1,4 @@
+import { paletteTier, rollFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
 export const FARM_ADOPTION_PRICE = 1200;
 const paletteIds = Object.freeze({
     "pet.corgi": ["sable", "midnight", "cosmic"], "pet.duck": ["mallard", "lavender", "prism"],
@@ -37,13 +38,21 @@ const supplyPrices = Object.freeze({
     "food.river-hay": 30, "food.browse-bundle": 35, "food.deep-sea-feed": 40,
     "food.shark-feed": 45,
 });
+const seedPrices = Object.freeze({
+    bean: 10, beetroot: 7, cabbage: 12, carrot: 8,
+    cauliflower: 14, garlic: 7, potato: 11, radish: 6,
+});
 export function findFarmSpecies(value) {
     return typeof value === "string" ? FARM_SPECIES.find((row) => row.id === value.trim()) ?? null : null;
 }
 export function findFarmSupply(value) {
     const id = typeof value === "string" ? value.trim() : "";
     const price = supplyPrices[id];
-    return price ? Object.freeze({ id, price }) : null;
+    if (price)
+        return Object.freeze({ id, price, kind: "supply" });
+    const cropId = id.startsWith("seed.") ? id.slice(5) : "";
+    const seedPrice = seedPrices[cropId];
+    return seedPrice ? Object.freeze({ id, price: seedPrice, kind: "seed", cropId }) : null;
 }
 const TRAITS = Object.freeze(["held.dislikes", "held.loves", "movement.fast", "appetite.frequent", "appetite.rare", "growth.fast"]);
 const conflicts = (first, second) => (first === "held.dislikes" && second === "held.loves")
@@ -75,10 +84,14 @@ export function createFarmPetProfile(speciesId, random = Math.random) {
     const roll = unit(random()) * 100;
     let cursor = 0;
     const palette = row.palettes.find((entry) => (cursor += entry.weight) > roll) ?? row.palettes.at(-1);
+    // Potential is rolled last, in the client's order, so the stat progression is pinned from adoption.
+    const growth = rollFarmPetGrowth(row, { speed, strength }, paletteTier(row, palette.id), random);
+    const stat = (base) => round(Math.min(100, base * (1 + palette.statBoost)), 1);
     return {
         gender, ageDays: 0, affection: 50, hunger: 100, starvingMinutes: 0, happiness: 100,
         size: { current, max: maxSize, growthPerDay: round((maxSize - current) / 70, 4) },
-        stats: { speed: round(Math.min(100, speed * (1 + palette.statBoost)), 1), strength: round(Math.min(100, strength * (1 + palette.statBoost)), 1) },
+        stats: { speed: stat(growth?.base.speed ?? speed), strength: stat(growth?.base.strength ?? strength) },
         traits, milestones: [], paletteId: palette.id, paletteBonus: palette.statBoost,
+        ...(growth ? { growth } : {}),
     };
 }

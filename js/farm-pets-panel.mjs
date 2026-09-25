@@ -12,7 +12,8 @@
 import { adoptableAnimals, findAnimal, findAnimalPalette } from "./farm-catalog/animals.mjs";
 import { animalPaletteDisplayName } from "./farm-pet-palettes.mjs";
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats } from "./farm-layout.mjs";
-import { PET_TRAITS, findPetCare, visiblePetStats } from "./farm-pet-care.mjs";
+import { PET_TRAITS, findPetCare, petGrowthView, visiblePetStats } from "./farm-pet-care.mjs";
+const gainedMarkup = (gained) => gained && gained >= 0.1 ? ` <span class="pet-row__gained" title="Earned by growing up">+${gained.toFixed(1)}</span>` : "";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { petOutcomeWarning } from "./farm-pet-outcomes.mjs";
 function escapeHtml(value) {
@@ -83,6 +84,7 @@ export function createPetsPanel(elements, actions, options = {}) {
             const profile = pet.profile;
             const palette = findAnimalPalette(pet.speciesId, profile?.paletteId);
             const stats = profile ? visiblePetStats(profile) : null;
+            const growth = profile ? petGrowthView(profile, pet.speciesId) : null;
             const needs = profile ? petNeedStatus(profile) : null;
             const warning = profile ? petOutcomeWarning(profile, pet.speciesId) : null;
             const statMarkup = stats ? `<dl class="pet-row__stats">
@@ -91,8 +93,9 @@ export function createPetsPanel(elements, actions, options = {}) {
         <div><dt>Size</dt><dd>${Number(stats.size).toFixed(2)}×</dd></div>
         <div class="pet-row__need pet-row__need--${needs?.level ?? "content"}"><dt>Hunger</dt><dd>${stats.hunger}% · ${needs?.label ?? "Unknown"}</dd></div>
         <div><dt>Happiness</dt><dd>${stats.happiness}%</dd></div>
-        <div><dt>Speed</dt><dd>${stats.speed}</dd></div>
-        <div><dt>Strength</dt><dd>${stats.strength}</dd></div>
+        <div><dt>Speed</dt><dd>${stats.speed}${gainedMarkup(growth?.gained.speed)}</dd></div>
+        <div><dt>Strength</dt><dd>${stats.strength}${gainedMarkup(growth?.gained.strength)}</dd></div>
+        ${growth ? `<div class="pet-row__growth pet-row__growth--${growth.outlook.level}"><dt>Growth</dt><dd title="Speed and Strength grow every day until old age. Potential is rolled at adoption (rarer looks roll higher more often); food, happiness, trust and treating it the way its traits like decide how much of it is reached."><span class="pet-row__potential" aria-label="${growth.stars} of 4 stars">${"★".repeat(growth.stars)}<span class="pet-row__potential-empty">${"★".repeat(4 - growth.stars)}</span></span> ${escapeHtml(growth.gradeTitle)} potential · ${escapeHtml(growth.stageTitle)} · ${escapeHtml(growth.outlook.label)}</dd></div>` : ""}
       </dl>` : `<p class="pet-row__unscoped">This pet's profile could not be loaded.</p>`;
             const traitMarkup = profile?.traits.length ? `<ul class="pet-row__traits">${profile.traits.map((id) => {
                 const trait = PET_TRAITS.find((entry) => entry.id === id);

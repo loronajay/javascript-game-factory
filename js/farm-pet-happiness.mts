@@ -4,7 +4,7 @@
 // the farm composition root.
 
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare, type PetProfile } from "./farm-pet-care.mjs";
+import { findPetCare, treatPet, type PetProfile } from "./farm-pet-care.mjs";
 import { withFarmPets, type FarmDecorRow, type FarmLayout, type FarmPet } from "./farm-layout.mjs";
 
 export const HAPPINESS_DRAIN_PER_DAY = 8;
@@ -23,6 +23,8 @@ export type PetInteractionResult = Readonly<{
   message: string;
   profile: PetProfile;
   carrySeconds: number | null;
+  /** Rapport actually applied by this interaction (0 when none was recorded). */
+  treatment: number;
 }>;
 
 const rounded = (value: number): number => Number(value.toFixed(4));
@@ -79,12 +81,24 @@ export function applyPetCareMilestones(layout: FarmLayout): FarmLayout {
   return changed ? withFarmPets(layout, pets) : layout;
 }
 
-function result(profile: PetProfile, ok: boolean, reason: PetInteractionResult["reason"], reaction: PetInteractionResult["reaction"], message: string, carrySeconds: number | null = null): PetInteractionResult {
-  return Object.freeze({ ok, reason, reaction, message, profile, carrySeconds });
+function result(profile: PetProfile, ok: boolean, reason: PetInteractionResult["reason"], reaction: PetInteractionResult["reaction"], message: string, carrySeconds: number | null = null, treatment = 0): PetInteractionResult {
+  return Object.freeze({ ok, reason, reaction, message, profile, carrySeconds, treatment });
+}
+
+/** Record how the pet felt about this handling. Attempts count too: picking up an Independent pet is the mistake, not its escape. */
+function treated(outcome: PetInteractionResult, kind: PetInteractionKind, farmMinute: number): PetInteractionResult {
+  const { profile, applied } = treatPet(outcome.profile, kind, farmMinute / FARM_DAY_MINUTES);
+  return Object.freeze({ ...outcome, profile, treatment: applied });
 }
 
 /** Trait-aware handling and play. Refusals are returned as readable outcomes before the caller animates anything. */
-export function reactToPetInteraction(profile: PetProfile, speciesId: string, kind: PetInteractionKind, decor: readonly FarmDecorRow[]): PetInteractionResult {
+export function reactToPetInteraction(profile: PetProfile, speciesId: string, kind: PetInteractionKind, decor: readonly FarmDecorRow[], farmMinute = 0): PetInteractionResult {
+  const outcome = reactWithoutTreatment(profile, speciesId, kind, decor);
+  // A distressed snap or a missing toy is not treatment; everything else is how this pet was handled.
+  return outcome.reaction === "bite" || outcome.reason === "no_toy" || outcome.reason === "no_profile" ? outcome : treated(outcome, kind, farmMinute);
+}
+
+function reactWithoutTreatment(profile: PetProfile, speciesId: string, kind: PetInteractionKind, decor: readonly FarmDecorRow[]): PetInteractionResult {
   const care = findPetCare(speciesId);
   if (!care) return result(profile, false, "no_profile", "refuse", "This pet cannot be handled right now.");
   const cuddly = profile.traits.includes("held.loves");

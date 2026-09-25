@@ -121,20 +121,24 @@ export async function purchaseFarmSupply(pool, input) {
             return { ok: true, duplicate: true, price: 0, quantity, balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
         }
         const agriculture = farm.layout.agriculture;
-        const current = Number(agriculture?.inventory?.supplies?.[supply.id]) || 0;
+        const stack = supply.kind === "seed" ? agriculture?.inventory?.seeds : agriculture?.inventory?.supplies;
+        const stackId = supply.cropId ?? supply.id;
+        const current = Number(stack?.[stackId]) || 0;
         if (current + quantity > MAX_STACK)
             return { ok: false, error: "inventory_full" };
         const total = supply.price * quantity;
         const spend = await spendTicketsInTransaction(client, {
             playerId, transactionKey, amount: total, reason: "farm_supply_purchase",
-            metadata: { itemId: supply.id, quantity },
+            metadata: { itemId: supply.id, quantity, kind: supply.kind },
         });
         if (!spend.ok)
             return { ok: false, error: spend.error, balance: spend.balance, price: total, quantity };
-        const supplies = { ...agriculture.inventory.supplies, [supply.id]: current + quantity };
+        const inventory = supply.kind === "seed"
+            ? { ...agriculture.inventory, seeds: { ...agriculture.inventory.seeds, [stackId]: current + quantity } }
+            : { ...agriculture.inventory, supplies: { ...agriculture.inventory.supplies, [stackId]: current + quantity } };
         const next = normalizeFarmGarage({
             ...farm.layout,
-            agriculture: { ...agriculture, inventory: { ...agriculture.inventory, supplies } },
+            agriculture: { ...agriculture, inventory },
         }, { ownedEntitlementIds: farm.owned });
         await saveFarm(client, playerId, next);
         return { ok: true, duplicate: false, price: total, quantity, balance: spend.balance, layout: next };

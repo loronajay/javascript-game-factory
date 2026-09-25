@@ -125,7 +125,8 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
   assert.match(source, /function interactWithPet\(action: PetInteractionId\)/);
   assert.match(source, /const checkpoint = advancePetNeeds\(layout, clockMinutes\)/, "handling checkpoints elapsed care before changing a profile");
-  assert.match(source, /reactToPetInteraction\(pet\.profile, pet\.speciesId, action === "pick-up" \? "carry" : action, checkpoint\.decor\)/, "handling is decided by the pure trait-aware reaction rule");
+  assert.match(source, /reactToPetInteraction\(pet\.profile, pet\.speciesId, action === "pick-up" \? "carry" : action, checkpoint\.decor, clockMinutes\)/, "handling is decided by the pure trait-aware reaction rule, dated for the daily treatment allowance");
+  assert.match(source, /A refusal can still change rapport[\s\S]*?if \(reaction\.profile !== pet\.profile\)[\s\S]*?if \(!reaction\.ok\)/, "a refused handling still persists its rapport change before bailing out");
   assert.match(source, /if \(action === "pet" \|\| action === "play"\) \{\s*petBodies\.showHeart\(nearbyPet\.instanceId\);\s*petSim\.attention\(nearbyPet\.instanceId\)/, "accepted petting and play own the heart and attention response");
   assert.match(source, /getPetInteraction\(event\.code\)/, "keyboard dispatch comes from the pet interaction registry");
   assert.match(source, /feedPet\(layout, nearbyPet\.instanceId, clockMinutes\)/, "feeding advances and persists through the pure needs action");
@@ -178,7 +179,9 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
     assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
     assert.match(source, new RegExp(`#${id}"`), `farm.mts reads #${id}`);
   }
-  for (const tab of ["ground", "fence", "building", "plant", "water", "prop"]) assert.match(html, new RegExp(`data-tab="${tab}"`));
+  for (const tab of ["ground", "fence", "building", "plant", "seeds", "water", "prop"]) assert.match(html, new RegExp(`data-tab="${tab}"`));
+  assert.match(html, /id="farmSeedCatalog"/);
+  assert.match(source, /purchaseFarmSupply\(`seed\.\$\{cropId\}`/);
   // The editor is built on the shared camera controller, history and gizmos; the farm supplies only its rules and panel.
   assert.match(editorSource, /createEditorCameraController\(\{/);
   assert.match(editorSource, /createEditHistory<FarmLayout>\(\{ equal: farmLayoutsEqual \}\)/);

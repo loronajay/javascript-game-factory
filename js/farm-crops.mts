@@ -11,23 +11,24 @@ const MAX_STACK = 99;
 export type CropDefinition = Readonly<{
   id: string;
   title: string;
+  seedPrice: number;
   growMinutes: number;
   yield: number;
   models: readonly [string, string, string, string];
 }>;
 
-const crop = (id: string, title: string, days: number, yieldCount: number, models: readonly [string, string, string, string]): CropDefinition =>
-  Object.freeze({ id, title, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) as unknown as readonly [string, string, string, string] });
+const crop = (id: string, title: string, seedPrice: number, days: number, yieldCount: number, models: readonly [string, string, string, string]): CropDefinition =>
+  Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) as unknown as readonly [string, string, string, string] });
 
 export const CROP_CATALOG: readonly CropDefinition[] = Object.freeze([
-  crop("bean", "Bean", 3, 4, ["Crop_Bean_STAGE_1_01.glb", "Crop_Bean_STAGE_2_01.glb", "Crop_Bean_STAGE_3_01.glb", "Crop_Bean_STAGE_4_01.glb"]),
-  crop("beetroot", "Beetroot", 2, 3, ["Crop_Beetroot_STAGE_1_01.glb", "Crop_Beetroot_STAGE_2_01.glb", "Crop_Beetroot_STAGE_3_01.glb", "Crop_Beetroot_01.glb"]),
-  crop("cabbage", "Cabbage", 3, 2, ["Crop_Cabbage_STAGE_1_01.glb", "Crop_Cabbage_STAGE_1_02.glb", "Crop_Cabbage_STAGE_1_03.glb", "Crop_Cabbage_01.glb"]),
-  crop("carrot", "Carrot", 2, 3, ["Crop_Carrot_STAGE_1_01.glb", "Crop_Carrot_STAGE_2_01.glb", "Crop_Carrot_STAGE_3_01.glb", "Crop_Carrot_01.glb"]),
-  crop("cauliflower", "Cauliflower", 4, 2, ["Crop_Cauliflower_STAGE_1_01.glb", "Crop_Cauliflower_STAGE_2_01.glb", "Crop_Cauliflower_STAGE_3_01.glb", "Crop_Cauliflower_01.glb"]),
-  crop("garlic", "Garlic", 2.5, 4, ["Crop_Garlic_STAGE_1_01.glb", "Crop_Garlic_STAGE_2_01.glb", "Crop_Garlic_STAGE_3_01.glb", "Crop_Garlic_01.glb"]),
-  crop("potato", "Potato", 3.5, 5, ["Crop_Potato_STAGE_1_01.glb", "Crop_Potato_STAGE_2_01.glb", "Crop_Potato_STAGE_3_01.glb", "Crop_Potato_01.glb"]),
-  crop("radish", "Radish", 2, 3, ["Crop_Radish_STAGE_1_01.glb", "Crop_Radish_STAGE_2_01.glb", "Crop_Radish_STAGE_3_01.glb", "Crop_Radish_01.glb"]),
+  crop("bean", "Bean", 10, 3, 4, ["Crop_Bean_STAGE_1_01.glb", "Crop_Bean_STAGE_2_01.glb", "Crop_Bean_STAGE_3_01.glb", "Crop_Bean_STAGE_4_01.glb"]),
+  crop("beetroot", "Beetroot", 7, 2, 3, ["Crop_Beetroot_STAGE_1_01.glb", "Crop_Beetroot_STAGE_2_01.glb", "Crop_Beetroot_STAGE_3_01.glb", "Crop_Beetroot_01.glb"]),
+  crop("cabbage", "Cabbage", 12, 3, 2, ["Crop_Cabbage_STAGE_1_01.glb", "Crop_Cabbage_STAGE_1_02.glb", "Crop_Cabbage_STAGE_1_03.glb", "Crop_Cabbage_01.glb"]),
+  crop("carrot", "Carrot", 8, 2, 3, ["Crop_Carrot_STAGE_1_01.glb", "Crop_Carrot_STAGE_2_01.glb", "Crop_Carrot_STAGE_3_01.glb", "Crop_Carrot_01.glb"]),
+  crop("cauliflower", "Cauliflower", 14, 4, 2, ["Crop_Cauliflower_STAGE_1_01.glb", "Crop_Cauliflower_STAGE_2_01.glb", "Crop_Cauliflower_STAGE_3_01.glb", "Crop_Cauliflower_01.glb"]),
+  crop("garlic", "Garlic", 7, 2.5, 4, ["Crop_Garlic_STAGE_1_01.glb", "Crop_Garlic_STAGE_2_01.glb", "Crop_Garlic_STAGE_3_01.glb", "Crop_Garlic_01.glb"]),
+  crop("potato", "Potato", 11, 3.5, 5, ["Crop_Potato_STAGE_1_01.glb", "Crop_Potato_STAGE_2_01.glb", "Crop_Potato_STAGE_3_01.glb", "Crop_Potato_01.glb"]),
+  crop("radish", "Radish", 6, 2, 3, ["Crop_Radish_STAGE_1_01.glb", "Crop_Radish_STAGE_2_01.glb", "Crop_Radish_STAGE_3_01.glb", "Crop_Radish_01.glb"]),
 ]);
 
 export type FarmInventory = Readonly<{
@@ -63,22 +64,37 @@ export const SOIL_CELL_LAYOUT = Object.freeze([
   Object.freeze({ id: "cell-4", x: 0, z: 0.5 }),
   Object.freeze({ id: "cell-5", x: 1, z: 0.5 }),
 ] as const);
+export const GREENHOUSE_CELL_LAYOUT = Object.freeze([
+  Object.freeze({ id: "cell-0", x: -1.9, y: 0.96, z: -1 }),
+  Object.freeze({ id: "cell-1", x: -1.9, y: 0.96, z: 0 }),
+  Object.freeze({ id: "cell-2", x: -1.9, y: 0.96, z: 1 }),
+  Object.freeze({ id: "cell-3", x: 1.9, y: 0.96, z: -1 }),
+  Object.freeze({ id: "cell-4", x: 1.9, y: 0.96, z: 0 }),
+  Object.freeze({ id: "cell-5", x: 1.9, y: 0.96, z: 1 }),
+] as const);
 export type SoilCellId = typeof SOIL_CELL_LAYOUT[number]["id"];
 const SOIL_CELL_IDS = new Set<string>(SOIL_CELL_LAYOUT.map((cell) => cell.id));
 
 export type SoilPlotRow = Readonly<{ instanceId: string; itemId: string; x: number; z: number; rotationY: number }>;
 export type CropPlayerPose = Readonly<{ x: number; z: number; forward: Readonly<{ x: number; z: number }> }>;
-export type SoilCellTarget<T extends SoilPlotRow = SoilPlotRow> = Readonly<{ plot: T; cellId: SoilCellId; x: number; z: number }>;
+export type SoilCellTarget<T extends SoilPlotRow = SoilPlotRow> = Readonly<{ plot: T; cellId: SoilCellId; x: number; y: number; z: number }>;
+
+export function farmPlantingCells(itemId: string): readonly Readonly<{ id: SoilCellId; x: number; y: number; z: number }>[] {
+  if (itemId === "decor.building.greenhouse") return GREENHOUSE_CELL_LAYOUT;
+  if (itemId === "decor.plant.soil-patch") return SOIL_CELL_LAYOUT.map((cell) => ({ ...cell, y: 0.11 }));
+  return [];
+}
 
 /** The nearest actual planting cell close enough and in front of the walking player. */
 export function findSoilCellInReach<T extends SoilPlotRow>(decor: readonly T[], player: CropPlayerPose, reach = 2.65): SoilCellTarget<T> | null {
   let best: SoilCellTarget<T> | null = null;
   let bestDistance = Infinity;
   for (const row of decor) {
-    if (row.itemId !== "decor.plant.soil-patch") continue;
+    const cells = farmPlantingCells(row.itemId);
+    if (!cells.length) continue;
     const cosine = Math.cos(row.rotationY);
     const sine = Math.sin(row.rotationY);
-    for (const cell of SOIL_CELL_LAYOUT) {
+    for (const cell of cells) {
       const x = Number((row.x + cell.x * cosine + cell.z * sine).toFixed(4));
       const z = Number((row.z - cell.x * sine + cell.z * cosine).toFixed(4));
       const dx = x - player.x;
@@ -87,7 +103,7 @@ export function findSoilCellInReach<T extends SoilPlotRow>(decor: readonly T[], 
       const forwardLength = Math.hypot(player.forward.x, player.forward.z) || 1;
       const facing = distance < 0.001 ? 1 : (player.forward.x * dx + player.forward.z * dz) / (forwardLength * distance);
       if (distance <= reach && facing >= 0.2 && distance < bestDistance) {
-        best = { plot: row, cellId: cell.id, x, z };
+        best = { plot: row, cellId: cell.id, x, y: cell.y, z };
         bestDistance = distance;
       }
     }

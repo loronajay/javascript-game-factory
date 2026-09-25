@@ -89,7 +89,8 @@ export function createFarmEditor(options) {
         rotateDecor: (instanceId, direction) => { select(instanceId, true); rotate(direction); },
         setDecorLength: (instanceId, length, phase) => editLength(setFarmDecorLength(layout, instanceId, length), phase),
         purchaseItem: (itemId) => { void purchaseItem(itemId); },
-    }, { thumbnail: options.thumbnail });
+        purchaseSeeds: (cropId, quantity) => { void purchaseSeeds(cropId, quantity); },
+    }, { thumbnail: options.thumbnail, cropThumbnail: options.cropThumbnail });
     function selected() {
         return selection ? layout.decor.find((row) => row.instanceId === selection) : undefined;
     }
@@ -122,6 +123,7 @@ export function createFarmEditor(options) {
             tab, layout, selection, removeBlockedReason: removeBlockedReason(), inventory,
             ticketPrices: options.ticketPrices ?? new Map(), ticketBalance,
             canPurchase: options.purchaseItem != null && purchasingItemId === "",
+            canPurchaseSeeds: options.purchaseSeeds != null && purchasingItemId === "",
         });
         elements.undoButton.disabled = !history.canUndo();
     }
@@ -148,6 +150,28 @@ export function createFarmEditor(options) {
             ticketBalance = Number(result.balance);
         renderPanel();
         setStatus(result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
+    }
+    async function purchaseSeeds(cropId, quantity) {
+        if (!options.purchaseSeeds || purchasingItemId) {
+            setStatus("Sign in to buy seeds with tickets.", "error");
+            return;
+        }
+        purchasingItemId = `seed.${cropId}`;
+        renderPanel();
+        setStatus("Buying seeds…");
+        const result = await options.purchaseSeeds(cropId, quantity).catch(() => null);
+        purchasingItemId = "";
+        if (!result?.ok || !result.layout) {
+            renderPanel();
+            setStatus(result?.error === "insufficient_tickets" ? "You do not have enough tickets for those seeds." : result?.error === "inventory_full" ? "That seed stack is full." : "That seed purchase did not go through. Try again.", "error");
+            return;
+        }
+        if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0)
+            ticketBalance = Number(result.balance);
+        setLayout(normalizeFarmLayout(result.layout));
+        renderScene();
+        renderPanel();
+        setStatus(`${quantity} seeds purchased · ready in Inventory.`);
     }
     function setLayout(next) {
         layout = next;

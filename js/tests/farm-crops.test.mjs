@@ -7,6 +7,7 @@ import {
   CARE_GATE,
   CROP_CATALOG,
   MOISTURE_CAPACITY_MINUTES,
+  GREENHOUSE_CELL_LAYOUT,
   SOIL_CELL_LAYOUT,
   advanceAgriculture,
   createStarterAgriculture,
@@ -90,6 +91,24 @@ test("a growing plot exposes six evenly spaced cells and reach selects the cell 
   assert.equal(target?.plot.instanceId, "soil-1");
   assert.equal(target?.cellId, "cell-5");
   assert.deepEqual({ x: target?.x, z: target?.z }, { x: 5.5, z: 4 });
+});
+
+test("a greenhouse exposes six bench planting positions and reach targets the chosen bench pot", () => {
+  assert.deepEqual(GREENHOUSE_CELL_LAYOUT.map(({ id, x, y, z }) => ({ id, x, y, z })), [
+    { id: "cell-0", x: -1.9, y: 0.96, z: -1 },
+    { id: "cell-1", x: -1.9, y: 0.96, z: 0 },
+    { id: "cell-2", x: -1.9, y: 0.96, z: 1 },
+    { id: "cell-3", x: 1.9, y: 0.96, z: -1 },
+    { id: "cell-4", x: 1.9, y: 0.96, z: 0 },
+    { id: "cell-5", x: 1.9, y: 0.96, z: 1 },
+  ]);
+  const target = findSoilCellInReach(
+    [{ instanceId: "glass-1", itemId: "decor.building.greenhouse", x: 5, z: 5, rotationY: 0 }],
+    { x: 1, z: 4, forward: { x: 1, z: 0 } },
+  );
+  assert.equal(target?.plot.instanceId, "glass-1");
+  assert.equal(target?.cellId, "cell-0");
+  assert.deepEqual({ x: target?.x, y: target?.y, z: target?.z }, { x: 3.1, y: 0.96, z: 4 });
 });
 
 test("one seed creates one plant and all six cells in the same plot can be planted independently", () => {

@@ -156,6 +156,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-7M12 14c-4 0-6-3-6-7 3 0 6 2 6 7zM12 14c4 0 6-3 6-7-3 0-6 2-6 7z" /></svg>
           <span>Plants</span>
         </button>
+        <button type="button" role="tab" data-tab="seeds" aria-selected="false" title="Buy crop seeds">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-8M12 13c-4 0-7-2-7-6 4 0 7 2 7 6zM12 16c4 0 7-2 7-6-4 0-7 2-7 6zM8 21h8" /></svg>
+          <span>Seeds</span>
+        </button>
         <button type="button" role="tab" data-tab="water" aria-selected="false" title="Ponds">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c3-2 6-2 9 0s6 2 9 0M3 19c3-2 6-2 9 0s6 2 9 0M12 4l3 5a3 3 0 1 1-6 0z" /></svg>
           <span>Water</span>
@@ -182,6 +186,13 @@
             </header>
             <div id="farmCatalog" class="decor-grid" role="group" aria-label="Catalog"></div>
             <div id="farmPlaced" class="placed-list" role="group" aria-label="Placed items"></div>
+          </section>
+          <section data-tab-panel="seeds" class="editor-tab-panel" hidden>
+            <header class="drawer-head">
+              <h2>Seeds</h2>
+              <p>Buy seed packs now, then choose what to plant from Inventory while walking the farm.</p>
+            </header>
+            <div id="farmSeedCatalog" class="seed-grid editor-seed-grid" role="group" aria-label="Seed shop"></div>
           </section>
         </div>
       </section>

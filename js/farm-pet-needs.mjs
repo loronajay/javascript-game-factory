@@ -2,7 +2,8 @@
 // minutes: play, naps and time away all enter through the same elapsed value.
 // This module owns no timer, DOM, storage or rendering state.
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { PET_TRAITS, findPetCare } from "./farm-pet-care.mjs";
+import { EARLY_FEED_HUNGER, PET_TRAITS, findPetCare, treatPet } from "./farm-pet-care.mjs";
+import { HUNGRY_GROWTH_WEIGHT, advancePetGrowth, statsFromGrowth } from "./farm-pet-growth.mjs";
 import { withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
 import { advancePetWellbeing } from "./farm-pet-happiness.mjs";
 import { advancePetLifecycle } from "./farm-pet-lifecycle.mjs";
@@ -33,10 +34,24 @@ export function petNeedStatus(profile) {
         starvationDue: profile.starvingMinutes >= STARVATION_GRACE_MINUTES,
     });
 }
-/** Advance one profile by elapsed farm minutes, including partial threshold crossings. */
+/**
+ * Advance one profile by elapsed farm minutes, including partial threshold
+ * crossings. A long absence is walked in steps of at most one farm day so stat
+ * growth sees the care the pet actually had along the way (a pet that went
+ * hungry on day three stops growing on day three, not averaged over a week).
+ */
 export function advancePetProfile(profile, speciesId, elapsedFarmMinutes, decor = []) {
+    let remaining = Number.isFinite(elapsedFarmMinutes) ? Math.max(0, elapsedFarmMinutes) : 0;
+    let next = profile;
+    while (remaining > 0) {
+        const step = Math.min(FARM_DAY_MINUTES, remaining);
+        next = advancePetProfileStep(next, speciesId, step, decor);
+        remaining -= step;
+    }
+    return next;
+}
+function advancePetProfileStep(profile, speciesId, elapsed, decor) {
     const care = findPetCare(speciesId);
-    const elapsed = Number.isFinite(elapsedFarmMinutes) ? Math.max(0, elapsedFarmMinutes) : 0;
     if (!care || elapsed <= 0)
         return profile;
     const drainPerMinute = care.needs.hungerPerDay * appetiteMultiplier(profile) / FARM_DAY_MINUTES;
@@ -56,7 +71,20 @@ export function advancePetProfile(profile, speciesId, elapsedFarmMinutes, decor 
         starvingMinutes,
         affection: roundedNeed(Math.max(0, profile.affection - affectionLoss)),
     });
-    return advancePetLifecycle(advancePetWellbeing(hungryProfile, speciesId, decor, elapsed), speciesId, elapsed);
+    const lived = advancePetLifecycle(advancePetWellbeing(hungryProfile, speciesId, decor, elapsed), speciesId, elapsed);
+    const fedMinutes = Math.min(elapsed, minutesToHungry);
+    const growth = advancePetGrowth(profile.growth, {
+        species: care,
+        fromAge: profile.ageDays,
+        toAge: lived.ageDays,
+        elapsedDays: elapsed / FARM_DAY_MINUTES,
+        hungerWeight: (fedMinutes + hungryMinutes * HUNGRY_GROWTH_WEIGHT) / elapsed,
+        happiness: [profile.happiness, lived.happiness],
+        affection: [profile.affection, lived.affection],
+        fastGrower: profile.traits.includes("growth.fast"),
+        paletteBonus: profile.paletteBonus,
+    });
+    return Object.freeze({ ...lived, growth, stats: statsFromGrowth(growth, profile.paletteBonus) });
 }
 /** Checkpoint every pet from layout.clock.farmMinutes to targetFarmMinute. Rollback is a no-op. */
 export function advancePetNeeds(layout, targetFarmMinute) {
@@ -93,12 +121,14 @@ export function feedPet(layout, instanceId, targetFarmMinute) {
     const count = checkpoint.agriculture.inventory.supplies[care.food.itemId] ?? 0;
     if (count <= 0)
         return Object.freeze({ ok: false, reason: "no_food", layout: checkpoint, foodTitle: care.food.title });
+    // Judged on hunger BEFORE the serving: a Light Eater dislikes being fed when it is not hungry.
+    const treated = treatPet(pet.profile, pet.profile.hunger > EARLY_FEED_HUNGER ? "feed-early" : "feed", checkpoint.clock.farmMinutes / FARM_DAY_MINUTES);
     const profile = Object.freeze({
-        ...pet.profile,
+        ...treated.profile,
         hunger: roundedNeed(Math.min(100, pet.profile.hunger + care.needs.hungerPerServing)),
         starvingMinutes: 0,
     });
     checkpoint = withFarmPets(checkpoint, checkpoint.pets.map((row) => row.instanceId === instanceId ? { ...row, profile } : row));
     checkpoint = withSupplies(checkpoint, { ...checkpoint.agriculture.inventory.supplies, [care.food.itemId]: count - 1 });
-    return Object.freeze({ ok: true, reason: "", layout: checkpoint, foodTitle: care.food.title });
+    return Object.freeze({ ok: true, reason: "", layout: checkpoint, foodTitle: care.food.title, treatment: treated.applied });
 }

@@ -46,6 +46,7 @@ export type FarmEditorElements = FarmPanelElements & Readonly<{
 
 export type FarmEditorSaveResult = Readonly<{ ok: boolean; message: string }>;
 export type FarmEditorPurchaseResult = Readonly<{ ok: boolean; itemId: string; price?: number; balance?: number; alreadyOwned?: boolean; error?: string }>;
+export type FarmSeedPurchaseResult = Readonly<{ ok: boolean; layout?: FarmLayout; price?: number; balance?: number; error?: string }>;
 
 export type FarmEditorOptions = Readonly<{
   THREE: ThreeNamespace;
@@ -58,10 +59,12 @@ export type FarmEditorOptions = Readonly<{
   ticketPrices?: ReadonlyMap<string, number>;
   ticketBalance?: number | null;
   purchaseItem?: ((itemId: string) => Promise<FarmEditorPurchaseResult | null>) | null;
+  purchaseSeeds?: ((cropId: string, quantity: number) => Promise<FarmSeedPurchaseResult | null>) | null;
   /** Where a save goes; the store decides account or device and reports the true thing to say. */
   persist: (layout: FarmLayout) => Promise<FarmEditorSaveResult>;
   elements: FarmEditorElements;
   thumbnail?: (definition: FarmDecorDefinition) => string | null;
+  cropThumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
   canEnter: () => boolean;
   onEditingChange: (editing: boolean) => void;
   /** The page hears every layout change (from the panel or a drag) so the sim and the pets panel follow. */
@@ -147,7 +150,8 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     rotateDecor: (instanceId, direction) => { select(instanceId, true); rotate(direction); },
     setDecorLength: (instanceId, length, phase) => editLength(setFarmDecorLength(layout, instanceId, length), phase),
     purchaseItem: (itemId) => { void purchaseItem(itemId); },
-  }, { thumbnail: options.thumbnail });
+    purchaseSeeds: (cropId, quantity) => { void purchaseSeeds(cropId, quantity); },
+  }, { thumbnail: options.thumbnail, cropThumbnail: options.cropThumbnail });
 
   function selected(): FarmDecorRow | undefined {
     return selection ? layout.decor.find((row) => row.instanceId === selection) : undefined;
@@ -184,6 +188,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
       tab, layout, selection, removeBlockedReason: removeBlockedReason(), inventory,
       ticketPrices: options.ticketPrices ?? new Map(), ticketBalance,
       canPurchase: options.purchaseItem != null && purchasingItemId === "",
+      canPurchaseSeeds: options.purchaseSeeds != null && purchasingItemId === "",
     });
     elements.undoButton.disabled = !history.canUndo();
   }
@@ -211,6 +216,28 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0) ticketBalance = Number(result.balance);
     renderPanel();
     setStatus(result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
+  }
+
+  async function purchaseSeeds(cropId: string, quantity: number): Promise<void> {
+    if (!options.purchaseSeeds || purchasingItemId) {
+      setStatus("Sign in to buy seeds with tickets.", "error");
+      return;
+    }
+    purchasingItemId = `seed.${cropId}`;
+    renderPanel();
+    setStatus("Buying seeds…");
+    const result = await options.purchaseSeeds(cropId, quantity).catch(() => null);
+    purchasingItemId = "";
+    if (!result?.ok || !result.layout) {
+      renderPanel();
+      setStatus(result?.error === "insufficient_tickets" ? "You do not have enough tickets for those seeds." : result?.error === "inventory_full" ? "That seed stack is full." : "That seed purchase did not go through. Try again.", "error");
+      return;
+    }
+    if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0) ticketBalance = Number(result.balance);
+    setLayout(normalizeFarmLayout(result.layout));
+    renderScene();
+    renderPanel();
+    setStatus(`${quantity} seeds purchased · ready in Inventory.`);
   }
 
   function setLayout(next: FarmLayout): void {

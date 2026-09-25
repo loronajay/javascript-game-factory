@@ -15,7 +15,8 @@
 // to tuck the catalog away, press it again to bring it back.
 import { GROUND_CATALOG } from "./farm-catalog/ground.mjs";
 import { FARM_DECOR_CATEGORIES, FARM_DECOR_CATEGORY_TITLES, farmDecorByCategory, farmDecorFootprint, findFarmDecor } from "./farm-catalog/decor.mjs";
-export const FARM_EDITOR_TABS = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES]);
+import { CROP_CATALOG } from "./farm-crops.mjs";
+export const FARM_EDITOR_TABS = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES, "seeds"]);
 const CATEGORY_HINTS = Object.freeze({
     fence: "Click a fence to place a run, then pull its end arrows to stretch it. Runs cross and meet freely, so pens are easy.",
     building: "Every building can be walked into: press E at its door and step inside. Animals keep out of every building's box.",
@@ -65,10 +66,32 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         for (const button of elements.tabs.querySelectorAll("[data-tab]")) {
             button.setAttribute("aria-selected", String(button.dataset.tab === state.tab));
         }
-        const panel = state.tab === "ground" ? "ground" : "decor";
+        const panel = state.tab === "ground" ? "ground" : state.tab === "seeds" ? "seeds" : "decor";
         for (const section of elements.tabPanels.querySelectorAll("[data-tab-panel]")) {
             section.hidden = section.dataset.tabPanel !== panel;
         }
+    }
+    function renderSeeds(state) {
+        if (state.tab !== "seeds")
+            return;
+        const balance = element("small", "ticket-shop-balance", state.ticketBalance === null
+            ? "Sign in to buy seeds with tickets"
+            : `${state.ticketBalance.toLocaleString()} tickets available`);
+        elements.seedCatalog.replaceChildren(balance, ...CROP_CATALOG.map((crop) => {
+            const button = element("button", "seed-card");
+            button.type = "button";
+            button.dataset.buySeed = crop.id;
+            button.disabled = !state.canPurchaseSeeds || (state.layout.agriculture.inventory.seeds[crop.id] ?? 0) >= 95;
+            const portrait = element("span", "seed-card__image");
+            const image = element("img");
+            image.alt = "";
+            const show = (url) => { image.src = url; portrait.replaceChildren(image); };
+            const ready = options.cropThumbnail?.(crop.id, show);
+            if (ready)
+                show(ready);
+            button.append(portrait, element("strong", "", crop.title), element("small", "", `${state.layout.agriculture.inventory.seeds[crop.id] ?? 0} owned`), element("small", "seed-card__buy", `Buy 5 · ${(crop.seedPrice * 5).toLocaleString()} tickets`));
+            return button;
+        }));
     }
     function buildGroundPicker() {
         if (groundBuilt)
@@ -114,7 +137,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         }
     }
     function renderCatalog(state) {
-        if (state.tab === "ground")
+        if (state.tab === "ground" || state.tab === "seeds")
             return;
         const category = state.tab;
         elements.catalogTitle.textContent = FARM_DECOR_CATEGORY_TITLES[category];
@@ -144,7 +167,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         }));
     }
     function renderPlaced(state) {
-        if (state.tab === "ground")
+        if (state.tab === "ground" || state.tab === "seeds")
             return;
         const rows = state.layout.decor.filter((row) => findFarmDecor(row.itemId)?.category === state.tab);
         const nodes = [];
@@ -265,6 +288,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         renderTabs(state);
         renderGround(state);
         renderCatalog(state);
+        renderSeeds(state);
         renderPlaced(state);
         renderInspector(state);
     }
@@ -303,6 +327,11 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         const card = event.target.closest("[data-add-decor]");
         if (card?.dataset.addDecor)
             actions.addDecor(card.dataset.addDecor);
+    });
+    elements.seedCatalog.addEventListener("click", (event) => {
+        const card = event.target.closest("[data-buy-seed]");
+        if (card?.dataset.buySeed)
+            actions.purchaseSeeds(card.dataset.buySeed, 5);
     });
     elements.placed.addEventListener("click", (event) => {
         const target = event.target;

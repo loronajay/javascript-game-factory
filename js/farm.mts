@@ -37,7 +37,7 @@ import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
 import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
 import { completeFarmOnboarding, markFarmIntroSeen } from "./farm-onboarding.mjs";
 import { advancePetNeeds, advancePetProfile, feedPet, petNeedStatus } from "./farm-pet-needs.mjs";
-import { findPetCare } from "./farm-pet-care.mjs";
+import { findPetCare, treatmentNote } from "./farm-pet-care.mjs";
 import { applyPetCareMilestones, petCareEnvironment, reactToPetInteraction } from "./farm-pet-happiness.mjs";
 import { reactToPetCall } from "./farm-pet-outcomes.mjs";
 
@@ -495,8 +495,9 @@ function interactWithPet(action: PetInteractionId): boolean {
     const name = nearbyPet.name;
     petBodies.showHeart(nearbyPet.instanceId);
     petSim.attention(nearbyPet.instanceId);
+    const note = treatmentNote(result.treatment ?? 0);
     void persistLayout(withFarmClock(result.layout, clockMinutes, Date.now())).then((saved) => {
-      status.textContent = `${name} ate one serving of ${result.foodTitle}. ${saved}`;
+      status.textContent = `${name} ate one serving of ${result.foodTitle}. ${note ? `${note} ` : ""}${saved}`;
     });
     return true;
   }
@@ -504,20 +505,22 @@ function interactWithPet(action: PetInteractionId): boolean {
   const checkpoint = advancePetNeeds(layout, clockMinutes);
   const pet = checkpoint.pets.find((row) => row.instanceId === nearbyPet!.instanceId);
   if (!pet?.profile) return false;
-  const reaction = reactToPetInteraction(pet.profile, pet.speciesId, action === "pick-up" ? "carry" : action, checkpoint.decor);
+  const reaction = reactToPetInteraction(pet.profile, pet.speciesId, action === "pick-up" ? "carry" : action, checkpoint.decor, clockMinutes);
   const name = nearbyPet.name;
-  if (!reaction.ok) {
-    status.textContent = `${name}: ${reaction.message}`;
-    petSim.attention(nearbyPet.instanceId);
-    return true;
-  }
+  const note = treatmentNote(reaction.treatment);
+  const message = `${name}: ${reaction.message}${note ? ` ${note}` : ""}`;
+  // A refusal can still change rapport (an Independent pet remembers being grabbed), so persist either way.
   if (reaction.profile !== pet.profile) {
     const next = withFarmPets(checkpoint, checkpoint.pets.map((row) => row.instanceId === pet.instanceId ? { ...row, profile: reaction.profile } : row));
     void persistLayout(withFarmClock(next, clockMinutes, Date.now())).then((saved) => {
-      status.textContent = `${name}: ${reaction.message} ${saved}`;
+      status.textContent = `${message} ${saved}`;
     });
   } else {
-    status.textContent = `${name}: ${reaction.message}`;
+    status.textContent = message;
+  }
+  if (!reaction.ok) {
+    petSim.attention(nearbyPet.instanceId);
+    return true;
   }
   if (action === "pet" || action === "play") {
     petBodies.showHeart(nearbyPet.instanceId);
@@ -914,6 +917,11 @@ const farmEditor = createFarmEditor({
     if (Number.isSafeInteger(result?.balance)) publishTicketBalance(result.balance);
     return result;
   } : null,
+  purchaseSeeds: layoutStore.accountBacked ? async (cropId, quantity) => {
+    const result = await ticketClient.purchaseFarmSupply(`seed.${cropId}`, quantity, farmPurchaseId("seed"));
+    if (Number.isSafeInteger(result?.balance)) publishTicketBalance(result.balance);
+    return result;
+  } : null,
   persist: async (next) => {
     if (!canPersistFarm) return { ok: false, message: "Session only · reload when the farm database is available to save safely." };
     const cared = applyPetCareMilestones(next);
@@ -925,6 +933,7 @@ const farmEditor = createFarmEditor({
     return { ok: result.ok, message: describeSave(result) };
   },
   thumbnail: (definition) => decorThumbnails.get(definition),
+  cropThumbnail: cropThumbnails.get,
   elements: {
     panel: editorPanel,
     editButton,
@@ -940,6 +949,7 @@ const farmEditor = createFarmEditor({
     tabPanels: requiredElement<HTMLElement>("#farmEditorTabPanels"),
     drawer: editorDrawer,
     groundPicker: requiredElement<HTMLElement>("#groundPicker"),
+    seedCatalog: requiredElement<HTMLElement>("#farmSeedCatalog"),
     catalogTitle: requiredElement<HTMLElement>("#farmCatalogTitle"),
     catalogHint: requiredElement<HTMLElement>("#farmCatalogHint"),
     catalog: requiredElement<HTMLElement>("#farmCatalog"),

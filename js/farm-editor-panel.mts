@@ -16,12 +16,13 @@
 
 import { GROUND_CATALOG, type GroundDefinition } from "./farm-catalog/ground.mjs";
 import { FARM_DECOR_CATEGORIES, FARM_DECOR_CATEGORY_TITLES, farmDecorByCategory, farmDecorFootprint, findFarmDecor, type FarmDecorCategory, type FarmDecorDefinition } from "./farm-catalog/decor.mjs";
+import { CROP_CATALOG } from "./farm-crops.mjs";
 import type { FarmInventory } from "./farm-catalog/inventory.mjs";
 import type { FarmDecorRow, FarmLayout } from "./farm-layout.mjs";
 import type { EditPhase } from "./arcade-room-editor-panel.mjs";
 
-export type FarmEditorTab = "ground" | FarmDecorCategory;
-export const FARM_EDITOR_TABS: readonly FarmEditorTab[] = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES]);
+export type FarmEditorTab = "ground" | "seeds" | FarmDecorCategory;
+export const FARM_EDITOR_TABS: readonly FarmEditorTab[] = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES, "seeds"]);
 
 export type FarmPanelState = Readonly<{
   tab: FarmEditorTab;
@@ -34,6 +35,7 @@ export type FarmPanelState = Readonly<{
   ticketPrices: ReadonlyMap<string, number>;
   ticketBalance: number | null;
   canPurchase: boolean;
+  canPurchaseSeeds: boolean;
 }>;
 
 export type FarmPanelActions = Readonly<{
@@ -47,11 +49,13 @@ export type FarmPanelActions = Readonly<{
   rotateDecor: (instanceId: string, direction: -1 | 1) => void;
   setDecorLength: (instanceId: string, length: number, phase: EditPhase) => void;
   purchaseItem: (itemId: string) => void;
+  purchaseSeeds: (cropId: string, quantity: number) => void;
 }>;
 
 export type FarmPanelOptions = Readonly<{
   /** A picture of the catalog item for its card, or null to fall back to a two-colour chip. */
   thumbnail?: (definition: FarmDecorDefinition) => string | null;
+  cropThumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
 }>;
 
 export type FarmPanelElements = Readonly<{
@@ -59,6 +63,7 @@ export type FarmPanelElements = Readonly<{
   tabPanels: HTMLElement;
   drawer?: HTMLElement;
   groundPicker: HTMLElement;
+  seedCatalog: HTMLElement;
   catalogTitle: HTMLElement;
   catalogHint: HTMLElement;
   catalog: HTMLElement;
@@ -130,10 +135,36 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
     for (const button of elements.tabs.querySelectorAll<HTMLButtonElement>("[data-tab]")) {
       button.setAttribute("aria-selected", String(button.dataset.tab === state.tab));
     }
-    const panel = state.tab === "ground" ? "ground" : "decor";
+    const panel = state.tab === "ground" ? "ground" : state.tab === "seeds" ? "seeds" : "decor";
     for (const section of elements.tabPanels.querySelectorAll<HTMLElement>("[data-tab-panel]")) {
       section.hidden = section.dataset.tabPanel !== panel;
     }
+  }
+
+  function renderSeeds(state: FarmPanelState): void {
+    if (state.tab !== "seeds") return;
+    const balance = element("small", "ticket-shop-balance", state.ticketBalance === null
+      ? "Sign in to buy seeds with tickets"
+      : `${state.ticketBalance.toLocaleString()} tickets available`);
+    elements.seedCatalog.replaceChildren(balance, ...CROP_CATALOG.map((crop) => {
+      const button = element("button", "seed-card");
+      button.type = "button";
+      button.dataset.buySeed = crop.id;
+      button.disabled = !state.canPurchaseSeeds || (state.layout.agriculture.inventory.seeds[crop.id] ?? 0) >= 95;
+      const portrait = element("span", "seed-card__image");
+      const image = element("img");
+      image.alt = "";
+      const show = (url: string): void => { image.src = url; portrait.replaceChildren(image); };
+      const ready = options.cropThumbnail?.(crop.id, show);
+      if (ready) show(ready);
+      button.append(
+        portrait,
+        element("strong", "", crop.title),
+        element("small", "", `${state.layout.agriculture.inventory.seeds[crop.id] ?? 0} owned`),
+        element("small", "seed-card__buy", `Buy 5 · ${(crop.seedPrice * 5).toLocaleString()} tickets`),
+      );
+      return button;
+    }));
   }
 
   function buildGroundPicker(): void {
@@ -177,7 +208,7 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
   }
 
   function renderCatalog(state: FarmPanelState): void {
-    if (state.tab === "ground") return;
+    if (state.tab === "ground" || state.tab === "seeds") return;
     const category = state.tab;
     elements.catalogTitle.textContent = FARM_DECOR_CATEGORY_TITLES[category];
     elements.catalogHint.textContent = CATEGORY_HINTS[category];
@@ -205,7 +236,7 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
   }
 
   function renderPlaced(state: FarmPanelState): void {
-    if (state.tab === "ground") return;
+    if (state.tab === "ground" || state.tab === "seeds") return;
     const rows = state.layout.decor.filter((row) => findFarmDecor(row.itemId)?.category === state.tab);
     const nodes: HTMLElement[] = [];
     if (rows.length) nodes.push(element("span", "surface-section__group", `ON THE FIELD · ${rows.length}`));
@@ -325,6 +356,7 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
     renderTabs(state);
     renderGround(state);
     renderCatalog(state);
+    renderSeeds(state);
     renderPlaced(state);
     renderInspector(state);
   }
@@ -357,6 +389,10 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
     if (buy?.dataset.buyItem) { actions.purchaseItem(buy.dataset.buyItem); return; }
     const card = (event.target as HTMLElement).closest<HTMLElement>("[data-add-decor]");
     if (card?.dataset.addDecor) actions.addDecor(card.dataset.addDecor);
+  });
+  elements.seedCatalog.addEventListener("click", (event) => {
+    const card = (event.target as HTMLElement).closest<HTMLElement>("[data-buy-seed]");
+    if (card?.dataset.buySeed) actions.purchaseSeeds(card.dataset.buySeed, 5);
   });
   elements.placed.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;

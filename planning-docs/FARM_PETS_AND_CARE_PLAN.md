@@ -77,8 +77,8 @@ These are implementation values, not promises that balancing is final.
 | Starting affection | 50 / 100 | Neutral bond; hidden from the player |
 | Starting hunger | 100 / 100 | A new pet does not arrive in distress |
 | Starting happiness | 100 / 100 | Onboarding begins positively |
-| Speed | Random within species range | Individuals vary while bats/sharks skew faster than hippos/jellyfish |
-| Strength | Random within species range | Body type matters; rhinos/hippos/sharks skew stronger than small pets |
+| Speed | Random base within species range, then grows (see Stat progression) | Individuals vary while bats/sharks skew faster than hippos/jellyfish |
+| Strength | Random base within species range, then grows (see Stat progression) | Body type matters; rhinos/hippos/sharks skew stronger than small pets |
 | Starting size | Random 0.62–0.90× | Visible puppy/adolescent variation |
 | Adult size cap | Random 0.90–1.12× | Each pet has its own cap relative to species base height |
 | Growth target | Individual cap over ~70 well-handled days | Stored as growth/day; aging/growth behavior is not active yet |
@@ -112,7 +112,21 @@ These are balancing rows, not claims about real-world animal biology. Food price
 - [x] **Light Eater** — hunger drains slower; conflicts with Big Appetite.
 - [x] **Fast Grower** — reaches adult size sooner.
 - [~] Appetite modifiers affect hunger now; movement, handling, and growth modifiers remain for their respective passes.
+- [x] Every trait also declares how it wants to be treated (rapport deltas per pet/carry/play/feed/early-feed), which drives stat growth.
 - [ ] Add rarity/weight data after the first behavior tuning pass; current selection is uniform.
+
+## Stat progression (shipped 2026-09-25)
+
+Speed and Strength are no longer fixed at adoption. `js/farm-pet-growth.mts` is pure (species data passed in) and runs inside the same persisted farm-time checkpoint as hunger, happiness and age; long absences are integrated in ≤1-day steps so growth sees the care the pet actually had.
+
+- **Profile shape**: `profile.growth = { grade, base, rates, gained, rapport, treatDay, treats }`. `stats` is always derived: `min(100, (base + gained) × (1 + paletteBonus))`.
+- **Potential** is rolled once at adoption: Steady ×1.0 / Gifted ×1.35 / Exceptional ×1.8 / Prodigy ×2.5, per-stat jitter 0.85–1.15. Palette rarity shifts the odds — classic 72/21/6/1, uncommon 64/26/8/2, rare 45/33/17/5, super rare 25/35/28/12.
+- **Rate**: a Steady pet at perfect care gains 90% of its species stat range over a lifetime. Life stage weights each day: Youth (first 40% of life) ×1.2, Adult (to 75%) ×0.8, Elder ×0 — elders keep their peak. Fast Grower ×1.25 during youth.
+- **Care multiplier** (0–1.69) per day = hunger (fed 1, hungry 0.5, starving 0) × happiness (0 at ≤10, full at ≥80) × affection 0.6–1.3 × rapport 0.7–1.3.
+- **Rapport** is hidden like affection: 0–100, starts 50, drifts back toward 50 at 3/day. Every handling adds `BASE_TREATMENT` + each trait's preference (Cuddly loves carry/petting, Independent hates being grabbed even when it escapes, Zoomies loves play, Big Appetite loves meals, Light Eater dislikes being fed above 60 hunger, Fast Grower likes meals). The 1st/2nd/3rd of one kind per farm day count 100/60/30%, later ones nothing. Strong reactions show a status note ("It loved being treated this way." / "It did not like that.").
+- **Panel**: stars + grade, life stage and a trend (Thriving / Growing well / Growing slowly / Not growing / At peak) plus `+N` earned per stat. Affection and rapport never appear as numbers.
+- **Migration**: profiles saved before progression take their stored stats as base, get a stable seeded potential roll, and are credited for the days already lived at 0.8 care.
+- **Server** (`platform-api/src/services/farm-pet-growth-policy.mts`, mirror of the client maths with a parity test): adoption rolls growth in the client's random order; on save the rolled grade/base/rates are pinned from the stored row, `gained` is bounded by what the rates could produce by that age at perfect care, and `stats` is recomputed server-side — the client's stats are ignored. Pre-progression stored pets get their stored stats as the pinned base and species-bounded rates.
 
 ## Work queue
 

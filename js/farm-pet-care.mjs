@@ -4,14 +4,24 @@
 // owner of render, locomotion and palette values. Dwelling ids cross-reference
 // ordinary placeable farm decor so care never owns a second asset registry.
 import { findAnimalPalette, pickAnimalPalette } from "./farm-catalog/animals.mjs";
-const trait = (id, title, description, conflicts = [], hungerDrainMultiplier = 1) => Object.freeze({ id, title, description, conflicts: Object.freeze([...conflicts]), hungerDrainMultiplier });
+import { applyPetTreatment, findGrowthGrade, growthStage, legacyPetGrowth, normalizePetGrowth, petGrowthOutlook, rollPetGrowth, statsFromGrowth, HUNGRY_GROWTH_WEIGHT, } from "./farm-pet-growth.mjs";
+const trait = (id, title, description, spec = {}) => Object.freeze({
+    id, title, description,
+    conflicts: Object.freeze([...(spec.conflicts ?? [])]),
+    hungerDrainMultiplier: spec.hungerDrainMultiplier ?? 1,
+    treatment: Object.freeze({ ...(spec.treatment ?? {}) }),
+});
+/** Every pet's rapport response before its traits: attention is welcome, a serving when not hungry is neutral. */
+export const BASE_TREATMENT = Object.freeze({ pet: 2, carry: 1, play: 3, feed: 1, "feed-early": 0 });
+/** Feeding a pet above this hunger counts as `feed-early`, which Light Eaters dislike. */
+export const EARLY_FEED_HUNGER = 60;
 export const PET_TRAITS = Object.freeze([
-    trait("held.dislikes", "Independent", "Does not like to be held.", ["held.loves"]),
-    trait("held.loves", "Cuddly", "Likes to be held often.", ["held.dislikes"]),
-    trait("movement.fast", "Zoomies", "Moves unusually fast around the farm."),
-    trait("appetite.frequent", "Big Appetite", "Gets hungry more often.", ["appetite.rare"], 1.5),
-    trait("appetite.rare", "Light Eater", "Gets hungry less often.", ["appetite.frequent"], 0.65),
-    trait("growth.fast", "Fast Grower", "Reaches adult size sooner."),
+    trait("held.dislikes", "Independent", "Does not like to be held. Grows best when given space and toys.", { conflicts: ["held.loves"], treatment: { pet: -1, carry: -8, play: 3 } }),
+    trait("held.loves", "Cuddly", "Likes to be held often. Grows best with cuddles and carrying.", { conflicts: ["held.dislikes"], treatment: { pet: 4, carry: 6 } }),
+    trait("movement.fast", "Zoomies", "Moves unusually fast. Grows best with play, and would rather run than be carried.", { treatment: { play: 6, carry: -2 } }),
+    trait("appetite.frequent", "Big Appetite", "Gets hungry more often, and loves every meal.", { conflicts: ["appetite.rare"], hungerDrainMultiplier: 1.5, treatment: { feed: 4, "feed-early": 3 } }),
+    trait("appetite.rare", "Light Eater", "Gets hungry less often, and dislikes being fed when it is not hungry.", { conflicts: ["appetite.frequent"], hungerDrainMultiplier: 0.65, treatment: { feed: 1, "feed-early": -5 } }),
+    trait("growth.fast", "Fast Grower", "Reaches adult size sooner and grows fastest while young.", { treatment: { feed: 2 } }),
 ]);
 const COMMON_SIZE = Object.freeze({ min: 0.62, adultMin: 0.9, max: 1.12 });
 const COMMON_TRAIT_COUNT = Object.freeze({ min: 1, max: 3 });
@@ -85,6 +95,8 @@ export function createPetProfile(speciesId, random) {
     const traits = chooseTraits(care, random);
     const palette = pickAnimalPalette(speciesId, random);
     const paletteBonus = palette?.statBoost ?? 0;
+    // Rolled last so every earlier draw (and every existing seeded test) is unchanged.
+    const growth = rollPetGrowth(care, { speed: baseSpeed, strength: baseStrength }, palette?.tier ?? "classic", random);
     return Object.freeze({
         gender,
         ageDays: 0,
@@ -93,11 +105,12 @@ export function createPetProfile(speciesId, random) {
         hunger: 100,
         starvingMinutes: 0,
         happiness: 100,
-        stats: Object.freeze({ speed: round(Math.min(100, baseSpeed * (1 + paletteBonus)), 1), strength: round(Math.min(100, baseStrength * (1 + paletteBonus)), 1) }),
+        stats: statsFromGrowth(growth, paletteBonus),
         traits: Object.freeze(traits),
         milestones: Object.freeze([]),
         paletteId: palette?.id ?? "standard",
         paletteBonus,
+        growth,
     });
 }
 export function normalizePetProfile(speciesId, value) {
@@ -120,24 +133,85 @@ export function normalizePetProfile(speciesId, value) {
             continue;
         selected.push(id);
     }
+    const ageDays = round(clamp(source.ageDays, 0, care.maxLifeDays, 0), 4);
+    const gender = source.gender === "male" ? "male" : "female";
+    // A profile saved before progression: its stored stats (bonus included) become
+    // the base, a stable seeded roll supplies potential, and the days it already
+    // lived are credited. Also the fallback for any malformed growth field.
+    const legacyStat = (id) => {
+        const range = care.stats[id];
+        const middle = (range.min + range.max) / 2;
+        const stored = clamp((typeof stats[id] === "number" ? stats[id] : middle) * bonusMigration, range.min, Math.min(100, range.max * (1 + paletteBonus)), middle);
+        return Math.min(range.max, Math.max(range.min, stored / (1 + paletteBonus)));
+    };
+    const legacyBase = { speed: legacyStat("speed"), strength: legacyStat("strength") };
+    const legacyRoll = rollPetGrowth(care, legacyBase, palette?.tier ?? "classic", seededRandom(`${speciesId}:${gender}:${round(legacyBase.speed, 3)}:${round(legacyBase.strength, 3)}:${palette?.id ?? "standard"}`));
+    const legacy = legacyPetGrowth(care, legacyRoll, ageDays, selected.includes("growth.fast"), paletteBonus);
+    const growth = source.growth && typeof source.growth === "object"
+        ? normalizePetGrowth(care, source.growth, legacy, ageDays, paletteBonus)
+        : legacy;
     return Object.freeze({
-        gender: source.gender === "male" ? "male" : "female",
-        ageDays: round(clamp(source.ageDays, 0, care.maxLifeDays, 0), 4),
+        gender,
+        ageDays,
         size: Object.freeze({ current: currentSize, max: maxSize, growthPerDay: round(clamp(size.growthPerDay, 0, 0.02, 0), 4) }),
         affection: round(clamp(source.affection, 0, 100, 50), 4),
         hunger: round(clamp(source.hunger, 0, 100, 100), 4),
         starvingMinutes: Math.floor(clamp(source.starvingMinutes, 0, 100 * 365 * 24 * 60, 0)),
         happiness: round(clamp(source.happiness, 0, 100, 100), 1),
-        stats: Object.freeze({
-            speed: round(clamp((typeof stats.speed === "number" ? stats.speed : (care.stats.speed.min + care.stats.speed.max) / 2) * bonusMigration, care.stats.speed.min, Math.min(100, care.stats.speed.max * (1 + paletteBonus)), (care.stats.speed.min + care.stats.speed.max) / 2), 1),
-            strength: round(clamp((typeof stats.strength === "number" ? stats.strength : (care.stats.strength.min + care.stats.strength.max) / 2) * bonusMigration, care.stats.strength.min, Math.min(100, care.stats.strength.max * (1 + paletteBonus)), (care.stats.strength.min + care.stats.strength.max) / 2), 1),
-        }),
+        stats: statsFromGrowth(growth, paletteBonus),
         traits: Object.freeze(selected),
         milestones: Object.freeze(Array.from(new Set((Array.isArray(source.milestones) ? source.milestones : [])
             .filter((id) => typeof id === "string" && /^dwelling:decor\.[a-z0-9.-]+$/.test(id))
             .slice(0, 16)))),
         paletteId: palette?.id ?? "standard",
         paletteBonus,
+        growth,
+    });
+}
+/** Stable entropy for migrating pre-progression profiles without rerolling on every load. */
+function seededRandom(identity) {
+    let state = 2166136261;
+    for (let index = 0; index < identity.length; index += 1) {
+        state ^= identity.charCodeAt(index);
+        state = Math.imul(state, 16777619) >>> 0;
+    }
+    return () => {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 0x100000000;
+    };
+}
+/** This pet's full rapport response to one kind of treatment: the baseline plus every trait's preference. */
+export function petTreatmentDelta(profile, kind) {
+    return profile.traits.reduce((sum, id) => sum + (PET_TRAITS.find((entry) => entry.id === id)?.treatment[kind] ?? 0), BASE_TREATMENT[kind]);
+}
+/** Record one treatment against the pet's rapport, faded by how often this kind already happened today. */
+export function treatPet(profile, kind, farmDay) {
+    const result = applyPetTreatment(profile.growth, kind, petTreatmentDelta(profile, kind), farmDay);
+    return Object.freeze({ applied: result.applied, profile: Object.freeze({ ...profile, growth: result.growth }) });
+}
+/** Status-line wording for a treatment's effect; silent when it barely registered. */
+export function treatmentNote(applied) {
+    if (applied >= 4)
+        return "It loved being treated this way.";
+    if (applied <= -3)
+        return "It did not like that.";
+    return "";
+}
+/** What the Pets panel may show about progression: potential, life stage, trend and earned points — never affection or rapport. */
+export function petGrowthView(profile, speciesId) {
+    const care = findPetCare(speciesId);
+    if (!care)
+        return null;
+    const grade = findGrowthGrade(profile.growth.grade);
+    const hungerWeight = profile.hunger <= 0 ? 0 : profile.hunger <= 40 ? HUNGRY_GROWTH_WEIGHT : 1;
+    const sample = { hungerWeight, happiness: profile.happiness, affection: profile.affection, rapport: profile.growth.rapport };
+    const earned = (id) => round(Math.max(0, profile.stats[id] - Math.min(100, profile.growth.base[id] * (1 + profile.paletteBonus))), 1);
+    return Object.freeze({
+        gradeTitle: grade.title,
+        stars: grade.stars,
+        stageTitle: growthStage(profile.ageDays, care.maxLifeDays).title,
+        outlook: petGrowthOutlook(profile.growth, sample, profile.ageDays, care.maxLifeDays, profile.paletteBonus),
+        gained: Object.freeze({ speed: earned("speed"), strength: earned("strength") }),
     });
 }
 /** The UI contract: affection remains in persistence but never joins this view. */

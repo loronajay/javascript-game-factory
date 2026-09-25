@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt } from "../farm-building-geometry.mjs";
 import { SCENERY } from "../farm-scenery.mjs";
 import { FARM_BOUNDS } from "../farm-layout.mjs";
+import { TREE_ARCHETYPES } from "../farm-props-plants.mjs";
 
 test("the nearest possible hill stays beyond the whole farm instead of clipping the property", () => {
   const propertyRadius = Math.hypot(FARM_BOUNDS.width / 2, FARM_BOUNDS.depth / 2);
@@ -31,4 +32,15 @@ test("the gazebo canopy base and its support header meet at the same height", ()
   assert.equal(canopy.roofBaseY, 2.6);
   assert.equal(canopy.roofCentreY, 3.3);
   assert.equal(canopy.headerCentreY + canopy.headerHeight / 2, canopy.roofBaseY);
+});
+
+test("farm trees have species-specific silhouettes instead of sharing one lollipop canopy", () => {
+  assert.deepEqual(Object.keys(TREE_ARCHETYPES), ["oak", "birch", "apple", "willow", "pine"]);
+  assert.ok(TREE_ARCHETYPES.oak.branchCount >= 9);
+  assert.ok(TREE_ARCHETYPES.birch.trunkCount >= 3);
+  assert.ok(TREE_ARCHETYPES.apple.fruitCount >= 18);
+  assert.ok(TREE_ARCHETYPES.willow.branchCount >= 12);
+  assert.ok(TREE_ARCHETYPES.willow.drapeCount >= 48);
+  assert.ok(TREE_ARCHETYPES.willow.crownWidth > TREE_ARCHETYPES.willow.crownHeight * 1.5);
+  assert.ok(TREE_ARCHETYPES.pine.tierCount >= 6);
 });

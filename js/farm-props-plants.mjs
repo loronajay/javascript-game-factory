@@ -26,6 +26,23 @@ const WOOD_DARK = "#5d3a1f";
 const LEAF = "#3f7f34";
 const LEAF_LIGHT = "#5ca34a";
 const LEAF_DEEP = "#2f6428";
+/** Testable silhouette targets used by the procedural builders below. */
+export const TREE_ARCHETYPES = Object.freeze({
+    oak: Object.freeze({ branchCount: 10, crownWidth: 4.2, crownHeight: 3.0 }),
+    birch: Object.freeze({ trunkCount: 3, branchCount: 12, crownWidth: 2.5, crownHeight: 3.4 }),
+    apple: Object.freeze({ branchCount: 8, fruitCount: 20, crownWidth: 3.3, crownHeight: 2.5 }),
+    willow: Object.freeze({ branchCount: 12, drapeCount: 48, crownWidth: 5.4, crownHeight: 3.2 }),
+    pine: Object.freeze({ tierCount: 6, crownWidth: 3.7, crownHeight: 5.1 }),
+});
+function branchBetween(THREE, group, from, to, radius, material, radialSegments = 7) {
+    const start = new THREE.Vector3(...from);
+    const end = new THREE.Vector3(...to);
+    const direction = end.clone().sub(start);
+    const limb = tcylinder(THREE, group, radius * 0.68, radius, direction.length(), [0, 0, 0], material, radialSegments);
+    limb.position.copy(start).add(end).multiplyScalar(0.5);
+    limb.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    return limb;
+}
 /** Canonical empty farmland. Crop GLBs are layered over this plot by the crop view. */
 export function createSoilPatch(THREE) {
     const group = new THREE.Group();
@@ -93,13 +110,16 @@ export function createTree(THREE, seed = 1) {
         root.rotation.z = -Math.cos(angle) * 1.3;
         root.rotation.x = Math.sin(angle) * 1.3;
     }
-    const spin = seed * 1.7;
-    for (const sign of [1, -1]) {
-        const limb = tcylinder(THREE, group, 0.09, 0.15, 1.4, [Math.cos(spin) * sign * 0.45, 2.9, Math.sin(spin) * sign * 0.45], trunk, 8);
-        limb.rotation.z = -sign * Math.cos(spin) * 0.55;
-        limb.rotation.x = sign * Math.sin(spin) * 0.55;
+    const random = seeded(seed * 17 + 2);
+    for (let index = 0; index < TREE_ARCHETYPES.oak.branchCount; index += 1) {
+        const angle = index / TREE_ARCHETYPES.oak.branchCount * Math.PI * 2 + seed * 0.7;
+        const fromY = 1.65 + (index % 4) * 0.28;
+        const reach = 0.85 + random() * 0.75;
+        const tip = [Math.cos(angle) * reach, 2.75 + random() * 0.75, Math.sin(angle) * reach];
+        branchBetween(THREE, group, [0, fromY, 0], tip, 0.14 - (index % 3) * 0.018, trunk, 8);
+        tsphere(THREE, group, 0.66 + random() * 0.22, [tip[0], tip[1] + 0.42, tip[2]], index % 3 === 0 ? foliage(THREE, [LEAF_LIGHT, "#75b85b", LEAF]) : foliage(THREE, [LEAF, LEAF_LIGHT, LEAF_DEEP]));
     }
-    canopy(THREE, group, 1.6, 3.6, seed);
+    canopy(THREE, group, 1.35, 3.55, seed);
     return group;
 }
 /** A birch: a slim pale trunk with dark bands and a small light canopy. */
@@ -107,14 +127,26 @@ export function createBirch(THREE, seed = 1) {
     const group = new THREE.Group();
     const paper = farmMaterial(THREE, "bark", { colors: ["#e8e4d8", "#c9c4b4", "#ffffff"], metresPerTile: 0.6, bumpScale: 0.01 });
     const band = standard(THREE, "#3a3530", 0.95, 0);
-    tcylinder(THREE, group, 0.1, 0.16, 4.2, [0, 2.1, 0], paper, 10);
     const random = seeded(seed * 7 + 3);
-    for (let index = 0; index < 7; index += 1) {
-        const y = 0.4 + random() * 3.4;
-        const ring = cylinder(THREE, group, 0.165 - y * 0.012, 0.165 - y * 0.012, 0.06 + random() * 0.08, [0, y, 0], band, 10);
-        ring.scale.x = 0.7 + random() * 0.4;
+    for (let trunkIndex = 0; trunkIndex < TREE_ARCHETYPES.birch.trunkCount; trunkIndex += 1) {
+        const baseX = (trunkIndex - 1) * 0.18;
+        const tipX = baseX + (trunkIndex - 1) * 0.25;
+        branchBetween(THREE, group, [baseX, 0, 0], [tipX, 4.35 - Math.abs(trunkIndex - 1) * 0.35, (trunkIndex - 1) * 0.12], 0.13 - Math.abs(trunkIndex - 1) * 0.015, paper, 9);
+        for (let mark = 0; mark < 4; mark += 1) {
+            const y = 0.7 + mark * 0.85 + trunkIndex * 0.08;
+            const ring = cylinder(THREE, group, 0.135 - y * 0.012, 0.135 - y * 0.012, 0.055, [baseX + (tipX - baseX) * y / 4.35, y, 0], band, 9);
+            ring.scale.x = 0.72 + random() * 0.35;
+        }
     }
-    canopy(THREE, group, 1.0, 4.4, seed, ["#7fb35a", "#a6d47a", "#5a8a3f"]);
+    for (let index = 0; index < TREE_ARCHETYPES.birch.branchCount; index += 1) {
+        const angle = index * 2.399 + seed;
+        const y = 2.1 + (index % 5) * 0.42;
+        const reach = 0.65 + random() * 0.45;
+        const tip = [Math.cos(angle) * reach, y + 0.18, Math.sin(angle) * reach];
+        branchBetween(THREE, group, [0, y, 0], tip, 0.045, paper, 6);
+        const spray = tsphere(THREE, group, 0.52 + random() * 0.18, [tip[0], tip[1] + 0.22, tip[2]], foliage(THREE, ["#7fb35a", "#b5dc83", "#5a8a3f"]));
+        spray.scale.set(0.78, 1.25, 0.78);
+    }
     return group;
 }
 /** An apple tree: a short gnarled trunk, a round canopy, and red apples in it. */
@@ -123,16 +155,14 @@ export function createAppleTree(THREE, seed = 1) {
     const trunk = bark(THREE, "#6a4a2a");
     tcylinder(THREE, group, 0.16, 0.26, 1.7, [0, 0.85, 0], trunk, 10);
     const spin = seed * 2.3;
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < TREE_ARCHETYPES.apple.branchCount; index += 1) {
         const angle = spin + index * 2.1;
-        const limb = tcylinder(THREE, group, 0.06, 0.1, 1.1, [Math.cos(angle) * 0.4, 2.05, Math.sin(angle) * 0.4], trunk, 8);
-        limb.rotation.z = -Math.cos(angle) * 0.6;
-        limb.rotation.x = Math.sin(angle) * 0.6;
+        branchBetween(THREE, group, [0, 1.25 + (index % 3) * 0.18, 0], [Math.cos(angle) * 1.05, 2.25 + (index % 2) * 0.35, Math.sin(angle) * 1.05], 0.085, trunk, 7);
     }
     canopy(THREE, group, 1.25, 2.9, seed, ["#4f9a3a", "#74b85a", "#3a7a2e"]);
     const apple = standard(THREE, "#d43a3a", 0.5, 0);
     const random = seeded(seed * 11 + 1);
-    for (let index = 0; index < 14; index += 1) {
+    for (let index = 0; index < TREE_ARCHETYPES.apple.fruitCount; index += 1) {
         const angle = random() * Math.PI * 2;
         const pitch = random() * Math.PI - Math.PI / 2;
         const r = 1.2 + random() * 0.25;
@@ -144,21 +174,30 @@ export function createAppleTree(THREE, seed = 1) {
 export function createWillow(THREE, seed = 1) {
     const group = new THREE.Group();
     const trunk = bark(THREE);
-    const lean = tcylinder(THREE, group, 0.2, 0.36, 3.2, [0, 1.6, 0], trunk, 10);
-    lean.rotation.z = 0.12;
-    const strand = standard(THREE, "#7fb35a", 0.9, 0);
-    const strandDark = standard(THREE, "#5a8a3f", 0.9, 0);
-    canopy(THREE, group, 1.3, 3.6, seed, ["#7fb35a", "#9ccc70", "#5a8a3f"]);
     const random = seeded(seed * 5 + 9);
-    for (let index = 0; index < 34; index += 1) {
-        const angle = random() * Math.PI * 2;
-        const r = 1.1 + random() * 0.9;
-        const length = 1.6 + random() * 1.6;
-        const x = Math.cos(angle) * r;
-        const z = Math.sin(angle) * r;
-        const drop = cylinder(THREE, group, 0.03, 0.05, length, [x, 3.4 - length / 2, z], index % 2 ? strand : strandDark, 5);
-        drop.rotation.z = -Math.cos(angle) * 0.06;
-        drop.rotation.x = Math.sin(angle) * 0.06;
+    branchBetween(THREE, group, [0, 0, 0], [0.22, 2.15, 0.04], 0.34, trunk, 11);
+    branchBetween(THREE, group, [0.22, 1.75, 0.04], [-0.18, 3.25, 0.18], 0.23, trunk, 9);
+    const leaf = foliage(THREE, ["#79a94d", "#aed176", "#426b2d"], 0.55);
+    const lightLeaf = foliage(THREE, ["#94bd62", "#c2dc8b", "#5e873d"], 0.5);
+    for (let index = 0; index < TREE_ARCHETYPES.willow.branchCount; index += 1) {
+        const angle = index / TREE_ARCHETYPES.willow.branchCount * Math.PI * 2 + seed * 0.37;
+        const reach = 1.45 + random() * 0.85;
+        const shoulder = [0.05, 2.55 + (index % 3) * 0.18, 0.08];
+        const tip = [Math.cos(angle) * reach, 3.45 + random() * 0.45, Math.sin(angle) * reach];
+        branchBetween(THREE, group, shoulder, tip, 0.095 - (index % 3) * 0.012, trunk, 7);
+        const crown = tsphere(THREE, group, 0.7 + random() * 0.16, [tip[0] * 0.75, tip[1] + 0.12, tip[2] * 0.75], index % 3 ? leaf : lightLeaf);
+        crown.scale.set(1.35, 0.72, 1.1);
+        for (let ribbon = 0; ribbon < TREE_ARCHETYPES.willow.drapeCount / TREE_ARCHETYPES.willow.branchCount; ribbon += 1) {
+            const spread = (ribbon - 1.5) * 0.18;
+            const anchorX = tip[0] + Math.cos(angle + Math.PI / 2) * spread;
+            const anchorZ = tip[2] + Math.sin(angle + Math.PI / 2) * spread;
+            const length = 1.55 + random() * 1.25;
+            for (let segment = 0; segment < 3; segment += 1) {
+                const t = (segment + 0.5) / 3;
+                const frond = tsphere(THREE, group, 0.23 - segment * 0.035, [anchorX + Math.cos(angle) * 0.12 * t, tip[1] - length * t, anchorZ + Math.sin(angle) * 0.12 * t], (index + ribbon) % 3 ? leaf : lightLeaf, 8, 6);
+                frond.scale.set(0.55, 1.65, 0.55);
+            }
+        }
     }
     return group;
 }
@@ -169,7 +208,7 @@ export function createPine(THREE, seed = 1) {
     const needles = farmMaterial(THREE, "foliage", { colors: ["#2f6b3a", "#1c4224", "#3f8a48"], metresPerTile: 0.7 });
     const light = farmMaterial(THREE, "foliage", { colors: ["#3f8a48", "#24522c", "#5aa85a"], metresPerTile: 0.7 });
     tcylinder(THREE, group, 0.16, 0.28, 2, [0, 1, 0], trunk, 10);
-    const tiers = [[1.6, 1.9, 1.7], [1.25, 3.0, 1.5], [0.85, 4.0, 1.3], [0.45, 4.8, 1]];
+    const tiers = [[1.85, 1.55, 1.45], [1.62, 2.25, 1.45], [1.35, 2.95, 1.4], [1.05, 3.6, 1.3], [0.76, 4.2, 1.2], [0.46, 4.72, 1.0]];
     tiers.forEach(([radius, y, height], index) => {
         const cone = new THREE.Mesh(scaleUvs(new THREE.ConeGeometry(radius, height, 12), 0.7, Math.PI * 2 * radius, height), index % 2 ? light : needles);
         cone.position.set(0, y, 0);

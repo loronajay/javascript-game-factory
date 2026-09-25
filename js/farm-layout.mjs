@@ -241,7 +241,7 @@ export function normalizeFarmLayout(value) {
         if (petHistory.length >= 100)
             break;
     }
-    const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
+    const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => row.instanceId));
     // Old documents are established farms. Only a document created with the explicit
     // marker may enter onboarding; absence must never re-grant or force-name a dog.
     const rawOnboarding = source.onboarding && typeof source.onboarding === "object"
@@ -335,7 +335,7 @@ export function setFarmGround(layout, id) {
 }
 /** Replace the decor list wholesale; the placement rules call this after they have decided. */
 export function withFarmDecor(layout, decor) {
-    const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => row.instanceId));
+    const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => row.instanceId));
     return freezeLayout({ ...layout, decor: [...decor], agriculture: normalizeAgriculture(layout.agriculture, plotIds) });
 }
 export function withFarmAgriculture(layout, agriculture) {

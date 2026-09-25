@@ -1112,29 +1112,16 @@ export function createGreenhouse(THREE, definition) {
         const board = tbox(THREE, group, [run * 2 - 0.2, 0.07, 0.08], [0, shell.wallHeight + 0.02, side * halfD], frame, false);
         board.castShadow = false;
     }
-    // Benches of pots down both long walls, in the fixtures' boxes (the box reaches the top of the plants).
+    // Two working benches with six empty pots. The crop view owns what grows in
+    // these pots, so the greenhouse reflects the player's chosen seeds instead
+    // of shipping with permanent cosmetic plants.
     const bench = timber(THREE, WOOD);
     const pot = farmMaterial(THREE, "brick", { colors: ["#b8623a", "#8a4a2a", "#d8825a", "#a8583a"], metresPerTile: 0.4 });
-    const leaf = farmMaterial(THREE, "foliage", { colors: ["#4f9a3a", "#2f6428", "#7fc45a"], metresPerTile: 0.5 });
-    const tomato = standard(THREE, "#d43a3a", 0.5, 0);
-    let n = 0;
     for (const name of ["bench-west", "bench-east"]) {
         const entry = fixtureNamed(definition, name);
         drawWorkbench(THREE, group, { ...entry, top: 0.83 }, bench);
-        for (let z = entry.z - entry.depth / 2 + 0.15; z < entry.z + entry.depth / 2 - 0.05; z += 0.42) {
+        for (const z of [-1, 0, 1]) {
             tcylinder(THREE, group, 0.13, 0.1, 0.24, [entry.x, 0.95, z], pot, 10);
-            if (n % 3 === 2) {
-                // A tomato cane with fruit.
-                cylinder(THREE, group, 0.012, 0.012, 0.8, [entry.x, 1.45, z], timber(THREE), 5, false);
-                for (const y of [1.2, 1.45, 1.7])
-                    tsphere(THREE, group, 0.12, [entry.x + (y % 2 ? 0.05 : -0.05), y, z], leaf, 10, 8);
-                sphere(THREE, group, 0.04, [entry.x + 0.1, 1.35, z + 0.06], tomato);
-                sphere(THREE, group, 0.04, [entry.x - 0.09, 1.58, z - 0.05], tomato);
-            }
-            else {
-                tsphere(THREE, group, 0.16, [entry.x, 1.17, z], leaf, 10, 8);
-            }
-            n += 1;
         }
     }
     // A watering can on the floor by the door and seed trays under the east bench.

@@ -41,21 +41,22 @@ test("paid ground and decor require server-owned Farm entitlements", () => {
   assert.deepEqual(owned.decor.map((row) => row.itemId), ["decor.building.barn", "decor.building.windmill"]);
 });
 
-test("ordinary farm saves cannot mint paid pets or increase paid supplies", () => {
+test("ordinary farm saves cannot mint paid pets, seeds, or supplies", () => {
   const existing = normalizeFarmGarage({
     version: 3,
     onboarding: { status: "complete" },
     pets: [pet()],
-    agriculture: { inventory: { supplies: { "food.dog-food": 2 } }, crops: [] },
+    agriculture: { inventory: { seeds: { carrot: 2 }, supplies: { "food.dog-food": 2 } }, crops: [] },
   });
   const submitted = normalizeFarmGarage({
     ...existing,
     pets: [pet({ name: "Renamed" }), pet({ instanceId: "shark-1", speciesId: "pet.shark", name: "Free Shark" })],
-    agriculture: { ...existing.agriculture, inventory: { ...existing.agriculture.inventory, supplies: { "food.dog-food": 99, "food.shark-feed": 99 } } },
+    agriculture: { ...existing.agriculture, inventory: { ...existing.agriculture.inventory, seeds: { carrot: 99, bean: 99 }, supplies: { "food.dog-food": 99, "food.shark-feed": 99 } } },
   }, { currentGarage: existing });
 
   assert.deepEqual(submitted.pets.map((row) => [row.instanceId, row.name]), [["corgi-1", "Renamed"]]);
   assert.deepEqual(submitted.agriculture.inventory.supplies, { "food.dog-food": 2 });
+  assert.deepEqual(submitted.agriculture.inventory.seeds, { carrot: 2 });
 });
 
 test("ordinary saves cannot reroll a server-created pet's identity", () => {
@@ -118,7 +119,8 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     agriculture: {
       inventory: { seeds: { bean: 4, radish: 999, "bad id": 2 }, produce: { bean: 1 }, supplies: { "food.dog-food": 20, "bad item!": 2 } },
       crops: [
-        { plotId: "plot-1", cropId: "bean", growthMinutes: 100, moistureMinutes: 20, tended: true, lastFarmMinute: 600 },
+        { plotId: "plot-1", cellId: "cell-0", cropId: "bean", growthMinutes: 100, moistureMinutes: 20, tended: true, lastFarmMinute: 600 },
+        { plotId: "plot-1", cellId: "cell-1", cropId: "radish", growthMinutes: 50, moistureMinutes: 10, tended: false, lastFarmMinute: 600 },
         { plotId: "bench-1", cropId: "radish", growthMinutes: 1, moistureMinutes: 1, tended: false, lastFarmMinute: 1 },
         { plotId: "missing-plot", cropId: "potato", growthMinutes: 1, moistureMinutes: 1, tended: false, lastFarmMinute: 1 },
       ],
@@ -133,10 +135,19 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
   });
   assert.deepEqual(garage.agriculture.crops, [{
     plotId: "plot-1",
+    cellId: "cell-0",
     cropId: "bean",
     growthMinutes: 100,
     moistureMinutes: 20,
     tended: true,
+    lastFarmMinute: 600,
+  }, {
+    plotId: "plot-1",
+    cellId: "cell-1",
+    cropId: "radish",
+    growthMinutes: 50,
+    moistureMinutes: 10,
+    tended: false,
     lastFarmMinute: 600,
   }]);
   assert.deepEqual(garage.clock, { farmMinutes: 612.5, updatedAt: 1_800_000_000_000 });

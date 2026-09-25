@@ -31,6 +31,8 @@
 // stored as sent and migrated by the client's normalizer, which seeds the
 // starter field for it.
 import { FARM_CATALOG_IDS, FARM_STARTER_IDS } from "./farm-ticket-catalog.mjs";
+import { findFarmSpecies } from "./farm-economy-catalog.mjs";
+import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
 export const FARM_GAME_SLUG = "farm";
 const LAYOUT_VERSIONS = new Set([1, 2, 3]);
 const LAYOUT_VERSION = 3;
@@ -107,11 +109,14 @@ function normalizeAgriculture(value, decorIds) {
         const row = raw && typeof raw === "object" ? raw : {};
         const plotId = cleanText(row.plotId, 40);
         const cropId = cleanText(row.cropId, 40);
-        if (!INSTANCE_ID_PATTERN.test(plotId) || !decorIds.has(plotId) || seen.has(plotId) || !CROP_ID_PATTERN.test(cropId))
+        const cellId = /^cell-[0-5]$/.test(row.cellId) ? row.cellId : "cell-0";
+        const plantingId = `${plotId}:${cellId}`;
+        if (!INSTANCE_ID_PATTERN.test(plotId) || !decorIds.has(plotId) || seen.has(plantingId) || !CROP_ID_PATTERN.test(cropId))
             continue;
-        seen.add(plotId);
+        seen.add(plantingId);
         crops.push({
             plotId,
+            cellId,
             cropId,
             growthMinutes: Math.max(0, boundedNumber(row.growthMinutes, 100000) ?? 0),
             moistureMinutes: Math.max(0, boundedNumber(row.moistureMinutes, 100000) ?? 0),
@@ -149,7 +154,9 @@ function normalizePetProfile(value) {
         paletteId: cleanText(value.paletteId, 40) || "standard",
         paletteBonus: Math.max(0, boundedNumber(value.paletteBonus, 0.5) ?? 0),
     };
-    return profile;
+    // Stat progression: shape-bounded here, species-bounded and pinned against the stored row below.
+    const growth = normalizeFarmPetGrowthShape(value.growth);
+    return growth ? { ...profile, growth } : profile;
 }
 function normalizePetRow(raw) {
     const source = raw && typeof raw === "object" ? raw : {};
@@ -282,16 +289,21 @@ export function normalizeFarmGarage(value, context = {}) {
             const stored = currentPets.get(row.instanceId);
             if (!stored?.profile || !row.profile)
                 return row;
+            // Stats grow now: the roll (grade/base/rates) is pinned from the stored row, the
+            // earned part is bounded by age, and `stats` is recomputed — never taken from the client.
+            const grown = pinFarmPetGrowth(findFarmSpecies(row.speciesId), row.profile, stored.profile);
+            const { growth: _submittedGrowth, ...submitted } = row.profile;
             return {
                 ...row,
                 profile: {
-                    ...row.profile,
+                    ...submitted,
                     gender: stored.profile.gender,
                     size: { ...row.profile.size, max: stored.profile.size.max, growthPerDay: stored.profile.size.growthPerDay },
-                    stats: stored.profile.stats,
+                    stats: grown ? grown.stats : stored.profile.stats,
                     traits: stored.profile.traits,
                     paletteId: stored.profile.paletteId,
                     paletteBonus: stored.profile.paletteBonus,
+                    ...(grown ? { growth: grown.growth } : stored.profile.growth ? { growth: stored.profile.growth } : {}),
                 },
             };
         });
@@ -314,12 +326,18 @@ export function normalizeFarmGarage(value, context = {}) {
         garage.decor = decor;
     }
     if (garage.version === 3) {
-        const decorIds = new Set((garage.decor ?? []).filter((row) => row.itemId === "decor.plant.soil-patch").map((row) => String(row.instanceId)));
+        const decorIds = new Set((garage.decor ?? []).filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => String(row.instanceId)));
         garage.agriculture = normalizeAgriculture(input.agriculture, decorIds);
         if (current?.agriculture?.inventory?.supplies) {
             const stored = current.agriculture.inventory.supplies;
             const submitted = garage.agriculture.inventory.supplies;
             garage.agriculture.inventory.supplies = Object.fromEntries(Object.entries(stored)
+                .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted[id]) || 0)]));
+        }
+        if (current?.agriculture?.inventory?.seeds) {
+            const stored = current.agriculture.inventory.seeds;
+            const submitted = garage.agriculture.inventory.seeds;
+            garage.agriculture.inventory.seeds = Object.fromEntries(Object.entries(stored)
                 .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted[id]) || 0)]));
         }
         const clock = input.clock && typeof input.clock === "object" ? input.clock : {};
