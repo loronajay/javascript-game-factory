@@ -1,4 +1,4 @@
-export const DEFAULT_TRACK = Object.freeze({
+const COURSE = {
   start: Object.freeze({ x: 133, y: 490, angle: -Math.PI / 2 }),
   finish: Object.freeze({ x: 130, y: 450, angle: -Math.PI / 2 }),
   roadWidth: 132,
@@ -17,14 +17,17 @@ export const DEFAULT_TRACK = Object.freeze({
     Object.freeze({ x: 205, y: 545 }),
     Object.freeze({ x: 135, y: 510 }),
   ]),
+  // Each checkpoint is a GATE: a line across the whole fenced course at that
+  // point (see withCheckpointGates), so a lap counts no matter which part of
+  // the track's width the racer used.
   checkpoints: Object.freeze([
-    Object.freeze({ x: 130, y: 260, radius: 80 }),
-    Object.freeze({ x: 265, y: 115, radius: 72 }),
-    Object.freeze({ x: 650, y: 115, radius: 72 }),
-    Object.freeze({ x: 835, y: 370, radius: 72 }),
-    Object.freeze({ x: 760, y: 515, radius: 72 }),
-    Object.freeze({ x: 370, y: 590, radius: 72 }),
-    Object.freeze({ x: 130, y: 450, radius: 64 }),
+    Object.freeze({ x: 130, y: 260 }),
+    Object.freeze({ x: 265, y: 115 }),
+    Object.freeze({ x: 650, y: 115 }),
+    Object.freeze({ x: 835, y: 370 }),
+    Object.freeze({ x: 760, y: 515 }),
+    Object.freeze({ x: 370, y: 590 }),
+    Object.freeze({ x: 130, y: 450 }),
   ]),
   mud: Object.freeze([
     Object.freeze({ x: 475, y: 96, width: 145, height: 82 }),
@@ -41,7 +44,7 @@ export const DEFAULT_TRACK = Object.freeze({
     Object.freeze({ id: "hurdle-6", kind: "hurdle", x: 555, y: 586, length: 116, thickness: 4, angle: 1.55 }),
     Object.freeze({ id: "hurdle-7", kind: "hurdle", x: 285, y: 567, length: 116, thickness: 4, angle: 1.84 }),
   ]),
-});
+};
 
 /** Tile a broad checkered band perpendicular to the starting heading. */
 export function startLineTiles(track, columns = 12, rows = 3) {
@@ -172,27 +175,140 @@ export function segmentCapsuleIntersection(start, end, capsuleStart, capsuleEnd,
   };
 }
 
-/** Build fence runs that stop short of each bend, leaving the racing line open at corners. */
+/** The fence stands this far outside the road edge; racers are held inside it. */
+export const FENCE_OFFSET = 8;
+/** A gate reaches this far past the fence so no corner of the corridor slips around it. */
+const GATE_OVERHANG = 36;
+
+function roadVertices(road) {
+  const first = road[0];
+  const last = road[road.length - 1];
+  const closed = road.length > 2 && Math.hypot(first.x - last.x, first.y - last.y) < 1e-6;
+  return { points: closed ? road.slice(0, -1) : road.slice(), closed };
+}
+
+function unit(dx, dy) {
+  const length = Math.hypot(dx, dy) || 1;
+  return { x: dx / length, y: dy / length };
+}
+
+/** Build the fence on both sides as one continuous mitered line, bends included. */
 export function roadEdgeSegments(track) {
+  const { points, closed } = roadVertices(track.road);
+  const count = points.length;
+  if (count < 2) return [];
+  const offset = track.roadWidth / 2 + FENCE_OFFSET;
+  const direction = (index) => {
+    const from = points[index];
+    const to = points[(index + 1) % count];
+    return unit(to.x - from.x, to.y - from.y);
+  };
+  const segmentCount = closed ? count : count - 1;
   const result = [];
-  for (let index = 1; index < track.road.length; index += 1) {
-    const from = track.road[index - 1];
-    const to = track.road[index];
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const sourceLength = Math.hypot(dx, dy);
-    if (!sourceLength) continue;
-    const ux = dx / sourceLength;
-    const uy = dy / sourceLength;
-    const trim = Math.min(track.roadWidth * 0.18, sourceLength * 0.2);
-    const offset = track.roadWidth / 2 + 8;
-    for (const side of [-1, 1]) {
-      const normalX = -uy * offset * side;
-      const normalY = ux * offset * side;
-      const start = { x: from.x + ux * trim + normalX, y: from.y + uy * trim + normalY };
-      const end = { x: to.x - ux * trim + normalX, y: to.y - uy * trim + normalY };
-      result.push({ start, end, length: sourceLength - trim * 2, sourceLength });
+  for (const side of [-1, 1]) {
+    const offsetVertex = (index) => {
+      const previous = closed || index > 0 ? direction((index - 1 + count) % count) : direction(index);
+      const next = closed || index < count - 1 ? direction(index) : previous;
+      const normalPrevious = { x: -previous.y * side, y: previous.x * side };
+      const normalNext = { x: -next.y * side, y: next.x * side };
+      const miter = unit(normalPrevious.x + normalNext.x, normalPrevious.y + normalNext.y);
+      const scale = offset / Math.max(0.35, miter.x * normalNext.x + miter.y * normalNext.y);
+      return { x: points[index].x + miter.x * scale, y: points[index].y + miter.y * scale };
+    };
+    for (let index = 0; index < segmentCount; index += 1) {
+      const start = offsetVertex(index);
+      const end = offsetVertex((index + 1) % count);
+      const from = points[index];
+      const to = points[(index + 1) % count];
+      result.push({
+        start,
+        end,
+        side,
+        length: Math.hypot(end.x - start.x, end.y - start.y),
+        sourceLength: Math.hypot(to.x - from.x, to.y - from.y),
+      });
     }
   }
   return result;
 }
+
+/** Direction of travel at a road point: the segment's heading, or the bisector at a bend. */
+export function roadTangentAt(point, track) {
+  let best = null;
+  for (let index = 1; index < track.road.length; index += 1) {
+    const candidate = closestPointOnSegment(point, track.road[index - 1], track.road[index]);
+    if (!best || candidate.distance < best.distance) best = { ...candidate, index: index - 1 };
+  }
+  const { points, closed } = roadVertices(track.road);
+  const count = points.length;
+  const segment = (index) => {
+    const wrapped = ((index % count) + count) % count;
+    const from = points[wrapped];
+    const to = points[(wrapped + 1) % count];
+    return unit(to.x - from.x, to.y - from.y);
+  };
+  const lastSegment = closed ? count - 1 : count - 2;
+  if (best.amount <= 1e-3 && (closed || best.index > 0)) {
+    const previous = segment(best.index - 1);
+    const next = segment(best.index);
+    return unit(previous.x + next.x, previous.y + next.y);
+  }
+  if (best.amount >= 1 - 1e-3 && (closed || best.index < lastSegment)) {
+    const current = segment(best.index);
+    const next = segment(best.index + 1);
+    return unit(current.x + next.x, current.y + next.y);
+  }
+  return segment(best.index);
+}
+
+/** Give every checkpoint a gate spanning the whole fenced course, facing the direction of travel. */
+export function withCheckpointGates(track) {
+  const halfLength = track.roadWidth / 2 + FENCE_OFFSET + GATE_OVERHANG;
+  return Object.freeze({
+    ...track,
+    checkpoints: Object.freeze(track.checkpoints.map((checkpoint) => {
+      const tangent = roadTangentAt(checkpoint, track);
+      return Object.freeze({
+        ...checkpoint,
+        gate: Object.freeze({ tangentX: tangent.x, tangentY: tangent.y, halfLength }),
+      });
+    })),
+  });
+}
+
+/**
+ * True when a move from start to end crosses the checkpoint's gate line going
+ * forwards. Half-open (behind -> on/ahead), so one crossing counts exactly once.
+ */
+export function crossesGate(start, end, checkpoint) {
+  const gate = checkpoint.gate;
+  const before = (start.x - checkpoint.x) * gate.tangentX + (start.y - checkpoint.y) * gate.tangentY;
+  const after = (end.x - checkpoint.x) * gate.tangentX + (end.y - checkpoint.y) * gate.tangentY;
+  if (!(before < 0 && after >= 0)) return false;
+  const amount = before / (before - after);
+  const x = start.x + (end.x - start.x) * amount;
+  const y = start.y + (end.y - start.y) * amount;
+  const lateral = (x - checkpoint.x) * -gate.tangentY + (y - checkpoint.y) * gate.tangentX;
+  return Math.abs(lateral) <= gate.halfLength;
+}
+
+/** How far from the road's centre line a racer of this radius may stand: its body touches the fence. */
+export function courseLimit(track, radius = 0) {
+  return Math.max(0, track.roadWidth / 2 + FENCE_OFFSET - radius);
+}
+
+/** Where a racer outside the fence must be put back, or null when it is inside. */
+export function confineToCourse(point, track, radius = 0) {
+  if (!Array.isArray(track.road) || track.road.length < 2) return null;
+  const closest = closestPointOnRoad(point, track);
+  const limit = courseLimit(track, radius);
+  if (closest.distance <= limit) return null;
+  return {
+    x: closest.x + closest.normalX * limit,
+    y: closest.y + closest.normalY * limit,
+    normalX: closest.normalX,
+    normalY: closest.normalY,
+  };
+}
+
+export const DEFAULT_TRACK = withCheckpointGates(COURSE);

@@ -1,6 +1,6 @@
 import { racePetProfile } from "./balance.js?v=20260925-track-fix-2";
-import { cpuControls } from "./cpu.js?v=20260925-hurdle-upgrade-2";
-import { distanceFromRoad, pointInRect, segmentCapsuleIntersection, segmentCircleIntersection } from "./track.js?v=20260925-hurdle-upgrade-2";
+import { cpuControls } from "./cpu.js?v=20260926-course-walls";
+import { confineToCourse, crossesGate, distanceFromRoad, pointInRect, segmentCapsuleIntersection, segmentCircleIntersection } from "./track.js?v=20260926-course-walls";
 
 const BASE_TOP_SPEED = 165;
 const ACCELERATION = 100;
@@ -74,6 +74,13 @@ function obstacleHit(start, end, obstacle, racerRadius) {
   const radius = racerRadius + Math.max(0, Number(obstacle.radius) || 0);
   const hit = segmentCircleIntersection(start, end, obstacle, radius);
   return hit ? { ...hit, closestX: obstacle.x, closestY: obstacle.y } : null;
+}
+
+/** A gate checkpoint spans the course; a bare {x, y, radius} one is a circle (small test tracks). */
+function checkpointReached(start, end, checkpoint) {
+  return checkpoint.gate
+    ? crossesGate(start, end, checkpoint)
+    : Boolean(segmentCircleIntersection(start, end, checkpoint, checkpoint.radius));
 }
 
 function separateRacers(entries) {
@@ -156,8 +163,19 @@ function advanceRacer(source, rawControls, dt, track, brokenObstacles, totalLaps
     racer.y = hit.closestY + ny * clearance;
   }
 
+  // The course fence is a wall: nothing, jumping included, leaves the track.
+  // Head-on contact costs most of the speed, a glancing scrape very little.
+  const wall = confineToCourse(racer, track, racer.profile.radius);
+  if (wall) {
+    racer.x = wall.x;
+    racer.y = wall.y;
+    const into = Math.max(0, Math.cos(racer.angle) * wall.normalX + Math.sin(racer.angle) * wall.normalY);
+    racer.speed *= 1 - 0.6 * into;
+    racer.lastImpact = racer.lastImpact ?? "fence";
+  }
+
   const checkpoint = track.checkpoints[racer.checkpoint];
-  if (checkpoint && segmentCircleIntersection(previous, racer, checkpoint, checkpoint.radius)) {
+  if (checkpoint && checkpointReached(previous, racer, checkpoint)) {
     if (racer.checkpoint === track.checkpoints.length - 1 && racer.lap < totalLaps) {
       racer.lap += 1;
       racer.checkpoint = 0;

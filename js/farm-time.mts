@@ -10,14 +10,15 @@ export const NAP_MINUTES_PER_REAL_SECOND = 144;
 
 export type PersistedFarmClock = Readonly<{ farmMinutes: number; updatedAt: number }>;
 
-/** Restore absolute farm time. Whole days are retained for crop growth; display helpers wrap them. */
+/**
+ * Restore absolute farm time. The farm is PAUSED while the player is away: the
+ * clock resumes exactly where it was saved, so no hunger, aging, crop moisture or
+ * growth happens off-screen. Only time actually spent on the farm (and naps) moves it.
+ */
 export function resumeFarmClock(clock: PersistedFarmClock, now: number): PersistedFarmClock {
   const current = Number.isFinite(now) ? Math.max(0, now) : 0;
   const savedMinutes = Number.isFinite(clock.farmMinutes) ? Math.max(0, clock.farmMinutes) : 8 * 60;
-  const savedAt = Number.isFinite(clock.updatedAt) ? Math.max(0, clock.updatedAt) : 0;
-  if (savedAt <= 0) return Object.freeze({ farmMinutes: savedMinutes, updatedAt: current });
-  if (current <= savedAt) return Object.freeze({ farmMinutes: savedMinutes, updatedAt: savedAt });
-  return Object.freeze({ farmMinutes: savedMinutes + ((current - savedAt) / 1000) * FARM_MINUTES_PER_REAL_SECOND, updatedAt: current });
+  return Object.freeze({ farmMinutes: savedMinutes, updatedAt: current });
 }
 
 function wrapMinutes(minutes: number): number {

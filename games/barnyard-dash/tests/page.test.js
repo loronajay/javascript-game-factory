@@ -11,7 +11,7 @@ test("the 3D cabinet exposes pet and field-size selection, race HUD, controls, a
     assert.match(html, new RegExp(`id=["']${id}["']`));
   }
   assert.match(html, /\.\.\/\.\.\/farm\//);
-  assert.match(html, /platform-config\.mjs"><\/script>\s*<script type="module" src="scripts\/main\.js\?v=20260925-hurdle-upgrade-2"/);
+  assert.match(html, /platform-config\.mjs"><\/script>\s*<script type="module" src="scripts\/main\.js\?v=20260926-course-walls"/);
   assert.match(html, /id="raceProgress">Checkpoint 0 \/ 7/);
   assert.doesNotMatch(html, /id="raceProgress">Gate/);
 });

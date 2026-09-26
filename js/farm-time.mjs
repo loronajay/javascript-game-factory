@@ -6,16 +6,15 @@ export const CLOCK_QUARTER_MINUTES = 15;
 export const FARM_MINUTES_PER_REAL_SECOND = DAY_MINUTES / (60 * 60);
 /** A six-hour nap completes in 2.5 seconds, long enough to watch the sky move. */
 export const NAP_MINUTES_PER_REAL_SECOND = 144;
-/** Restore absolute farm time. Whole days are retained for crop growth; display helpers wrap them. */
+/**
+ * Restore absolute farm time. The farm is PAUSED while the player is away: the
+ * clock resumes exactly where it was saved, so no hunger, aging, crop moisture or
+ * growth happens off-screen. Only time actually spent on the farm (and naps) moves it.
+ */
 export function resumeFarmClock(clock, now) {
     const current = Number.isFinite(now) ? Math.max(0, now) : 0;
     const savedMinutes = Number.isFinite(clock.farmMinutes) ? Math.max(0, clock.farmMinutes) : 8 * 60;
-    const savedAt = Number.isFinite(clock.updatedAt) ? Math.max(0, clock.updatedAt) : 0;
-    if (savedAt <= 0)
-        return Object.freeze({ farmMinutes: savedMinutes, updatedAt: current });
-    if (current <= savedAt)
-        return Object.freeze({ farmMinutes: savedMinutes, updatedAt: savedAt });
-    return Object.freeze({ farmMinutes: savedMinutes + ((current - savedAt) / 1000) * FARM_MINUTES_PER_REAL_SECOND, updatedAt: current });
+    return Object.freeze({ farmMinutes: savedMinutes, updatedAt: current });
 }
 function wrapMinutes(minutes) {
     const finite = Number.isFinite(minutes) ? minutes : 0;

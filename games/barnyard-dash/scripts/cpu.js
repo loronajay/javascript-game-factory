@@ -1,4 +1,4 @@
-import { closestPointOnRoad } from "./track.js?v=20260925-hurdle-upgrade-2";
+import { closestPointOnRoad } from "./track.js?v=20260926-course-walls";
 
 const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
 

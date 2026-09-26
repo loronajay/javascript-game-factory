@@ -7,8 +7,8 @@ import { createFenceRun, createHayBale, createTree } from "../../../js/farm-prop
 import { farmMaterial } from "../../../js/farm-materials.mjs";
 import { loadFarmPets } from "./farm-source.js?v=20260925-track-fix-2";
 import { cpuFieldFor, speciesStyle } from "./pets.js?v=20260925-track-fix-2";
-import { createRace, raceOrder, stepRace } from "./race.js?v=20260925-hurdle-upgrade-2";
-import { DEFAULT_TRACK, roadEdgeSegments, startLineTiles } from "./track.js?v=20260925-hurdle-upgrade-2";
+import { createRace, raceOrder, stepRace } from "./race.js?v=20260926-course-walls";
+import { DEFAULT_TRACK, roadEdgeSegments, startLineTiles } from "./track.js?v=20260926-course-walls";
 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 640;

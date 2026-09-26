@@ -22,7 +22,7 @@
 - Every species uses the same full individual profile system: gender, age, relative size/growth, affection, hunger, happiness, speed, strength, compatible traits, and palette identity. Speed and strength ranges are weighted by species; the rest follows the same randomized pipeline.
 - Every species has a food and a placeable procedural dwelling with an entrance sized from that species' authoritative body measurements.
 - Tricks, pet minigames, and breeding are deferred until their animation and gameplay passes are scoped.
-- Pet needs use the existing farm clock without a second time scale: one pet day is one 1,440-minute farm day, including ordinary play, naps, and elapsed time away.
+- Pet needs use the existing farm clock without a second time scale: one pet day is one 1,440-minute farm day, during play and naps only. The farm is PAUSED while the player is away (owner decision 2026-09-26): nothing drains, ages or grows off-screen.
 - Hunger drains by **25 points per farm day** before traits; Big Appetite multiplies drain by 1.5 and Light Eater by 0.65. One correct species serving restores 35 hunger.
 - Hunger at or below 40 is Hungry; zero is Starving. A pet that remains at zero for one complete farm day is due to die. The grace timer is live now; the death transition ships with the tombstone slice so the pet and its history change atomically.
 - Feeding at 100 has no effect and consumes nothing. Feeding below 100 consumes one serving and caps hunger at 100.
@@ -53,7 +53,7 @@
 - [x] The Pets panel displays gender, age, size, hunger, happiness, speed, strength, and trait labels for every pet.
 - [x] Profiles saved before the trait rollout deterministically gain compatible traits without rerolling their existing stats.
 - [x] Affection is absent from the visible-stats view model and panel.
-- [x] Hunger advances from persisted farm minutes during play, naps, and time away; quarter-hour checkpoints and clock-rollback protection keep render rate and wall-clock rollback from creating extra decay.
+- [x] Hunger advances from persisted farm minutes during play and naps (never while away); quarter-hour checkpoints and clock-rollback protection keep render rate and wall-clock rollback from creating extra decay.
 - [x] Age and individual growth advance through that same persisted farm-time checkpoint; partial days survive API round-trips, Fast Grower accelerates growth, and both values stop at their species/individual caps.
 - [x] Individual size scales the visible animal and the same multiplier drives collision, water fit, carry/drop spacing, and interaction reach.
 - [x] Owners can press G near a hungry pet to consume one matching species food; full pets and missing-food attempts consume nothing.

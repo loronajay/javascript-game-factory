@@ -1,5 +1,6 @@
 // Pure persisted pet-needs rules. Time is always expressed in the farm clock's
-// minutes: play, naps and time away all enter through the same elapsed value.
+// minutes: play and naps enter through the same elapsed value. The farm is paused
+// while the player is away (see resumeFarmClock), so time away never drains needs.
 // This module owns no timer, DOM, storage or rendering state.
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
 import { EARLY_FEED_HUNGER, PET_TRAITS, findPetCare, treatPet } from "./farm-pet-care.mjs";
