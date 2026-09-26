@@ -16,10 +16,14 @@
 // new row a free spot and keeps the spot of a row it already knows, so a rename
 // or a save never teleports anybody.
 //
-// HABITAT DECIDES THE GROUND. A ground or air animal walks the field and keeps
-// out of every solid thing and every pond; a water animal lives INSIDE a pond
-// — its whole world is the ellipse inscribed in a pond row's box — and only a
-// pond that moves out from under it makes `sync` find it a new one.
+// HABITAT DECIDES THE GROUND. A ground animal walks the field and keeps out
+// of every solid thing and every pond's dug ground; an air animal may fly over
+// the water; a water animal lives INSIDE a pond, and its world is the water's
+// VOLUME (`farm-pond.mts`): anywhere the bed is deep enough under its whole
+// body, at any height between the bed and just under the surface. A swimmer
+// picks a depth with every stroll and glides up or down to it, so it dives
+// to the bed, noses along the bottom and comes back up to show a fin. Only a
+// pond that moves out from under it makes `sync` find it new water.
 //
 // A PET CAN BE CARRIED. `pickUp` puts a ground or air animal in the player's
 // arms — the `carried` state rides the player's pose each tick, a hand's
@@ -35,6 +39,7 @@ import { findAnimal, type AnimalDefinition } from "./farm-catalog/animals.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 import type { FloorObstacle, RoomBounds } from "./arcade-room-layout.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
+import { WATER_LEVEL, groundHeightAt, insidePondWater, pondAt, type PondRegion } from "./farm-pond.mjs";
 
 export type PetState = "idle" | "wander" | "called" | "attention" | "carried";
 
@@ -46,7 +51,7 @@ export type PetBody = Readonly<{
   z: number;
   /** Facing, the walker's convention: yaw 0 looks down −z. */
   yaw: number;
-  /** Metres above the ground; air species hover, everyone else is 0. */
+  /** Height of the body's feet above the field: 0 for ground species, the hover for air ones, and for a swimmer where it is in the water (below 0). */
   hover: number;
   /** Individual profile multiplier shared by rendering and physical bounds. */
   sizeMultiplier: number;
@@ -79,6 +84,9 @@ type Pet = {
   targetZ: number;
   /** Bob phase for air species. */
   phase: number;
+  /** A swimmer's height in the water (its feet), and the height it is gliding to; unused on land. */
+  swimY: number;
+  targetY: number;
 };
 
 export type PetSimOptions = Readonly<{
@@ -89,16 +97,16 @@ export type PetSimOptions = Readonly<{
   obstacles: () => readonly FloorObstacle[];
   /** Places a pet must not pick as a destination even if walkable (the barn's whole box), so animals stay outdoors. */
   keepOut?: () => readonly FloorObstacle[];
-  /** The ponds: the boxes whose inscribed ellipses are where water species live. */
-  water?: () => readonly FloorObstacle[];
+  /** The ponds: the dug ellipses inscribed in these boxes are where water species live and where ground ones never go. */
+  water?: () => readonly PondRegion[];
 }>;
 
 export type PetSim = Readonly<{
   pets: () => readonly PetBody[];
   /** Match the bodies to the layout's rows: new rows spawn, gone rows leave, known rows keep their spot. */
   sync: (layout: FarmLayout) => void;
-  /** The player's pose; `yaw` is what a carried pet rides along. */
-  tick: (dt: number, player: Readonly<{ x: number; z: number; yaw?: number }>) => void;
+  /** The player's pose; `yaw` is what a carried pet rides along, `y` (the feet) how high the arms are. */
+  tick: (dt: number, player: Readonly<{ x: number; z: number; yaw?: number; y?: number }>) => void;
   /** Make a pet turn to the player and hold still for a moment; false if no such pet. */
   attention: (instanceId: string) => boolean;
   /** Ask a trusted pet to approach the player's current position. */
@@ -132,21 +140,21 @@ const WALK_CONE = 0.6;
 const FEELERS = Object.freeze([0, 0.55, -0.55, 1.1, -1.1]);
 const BOB_RATE = 2.2;
 const BOB_HEIGHT = 0.12;
-/** Water species stay this far, in ellipse fraction, inside the bank so a fin never crosses the shore. */
-const WATER_MARGIN = 0.08;
+/** A swimmer keeps its feet this far off the bed. */
+const BED_CLEARANCE = 0.06;
+/** How much of a swimmer's radius is the full depth of its body: the rest tapers. */
+const BELLY = 0.6;
+/** How fast a swimmer rises or sinks, as a fraction of its swim speed. */
+const DIVE_RATE = 0.45;
 
-/** True when the point is inside the ellipse inscribed in the box, shrunk by `margin` metres. */
+/** True when the point is inside the pond's water surface, `margin` metres in from the waterline. */
 export function insideWaterRegion(point: Readonly<{ x: number; z: number }>, region: FloorObstacle, margin = 0): boolean {
-  const dx = point.x - region.x;
-  const dz = point.z - region.z;
-  const cosine = Math.cos(region.rotationY);
-  const sine = Math.sin(region.rotationY);
-  const localX = dx * cosine - dz * sine;
-  const localZ = dx * sine + dz * cosine;
-  const radiusX = region.footprint.width / 2 - margin;
-  const radiusZ = region.footprint.depth / 2 - margin;
-  if (radiusX <= 0 || radiusZ <= 0) return false;
-  return (localX * localX) / (radiusX * radiusX) + (localZ * localZ) / (radiusZ * radiusZ) <= (1 - WATER_MARGIN) * (1 - WATER_MARGIN);
+  return insidePondWater(region, point, margin);
+}
+
+/** The highest a swimmer's feet go: just under the surface, by the species' `hoverHeight` (negative) at its size, so a fin or a back breaks the water. */
+export function swimCeiling(species: AnimalDefinition, sizeMultiplier = 1): number {
+  return WATER_LEVEL + species.hoverHeight * sizeMultiplier;
 }
 
 export function petForward(yaw: number): Readonly<{ x: number; z: number }> {
@@ -200,9 +208,12 @@ export function createPetSim(options: PetSimOptions): PetSim {
     const distance = Math.hypot(dx, dz);
     const steps = Math.max(1, Math.ceil(distance / SIGHT_STEP));
     const solids = obstacles();
+    const wades = pet.species.habitat === "ground";
     for (let index = 1; index <= steps; index += 1) {
       const point = { x: pet.x + dx * (index / steps), z: pet.z + dz * (index / steps) };
       if (solids.some((obstacle) => obstacleBlocks(point, obstacle, pet.radius * 0.6))) return false;
+      // A ground animal does not see a way across the water: it walks round.
+      if (wades && inPond(point.x, point.z, pet.radius * 0.6)) return false;
     }
     return true;
   }
@@ -211,9 +222,36 @@ export function createPetSim(options: PetSimOptions): PetSim {
     return Math.hypot(player.x - x, player.z - z) < PLAYER_CLEARANCE + radius * 0.5;
   }
 
-  function inWater(x: number, z: number, radius: number): boolean {
+  /**
+   * The bed under a swimmer at (x, z): the highest ground under its centre and
+   * round its belly — `BELLY` of its radius, since a fish tapers to its tail
+   * and fins — so the body never sinks into the bank.
+   */
+  function bedUnder(x: number, z: number, radius: number): number {
+    const ponds = water();
+    let bed = groundHeightAt(ponds, { x, z });
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (index / 8) * Math.PI * 2;
+      bed = Math.max(bed, groundHeightAt(ponds, { x: x + Math.cos(angle) * radius * BELLY, z: z + Math.sin(angle) * radius * BELLY }));
+    }
+    return bed;
+  }
+
+  /** Water deep enough under the whole body for this species to swim there. */
+  function inWater(x: number, z: number, radius: number, species: AnimalDefinition, sizeMultiplier = 1): boolean {
     const point = { x, z };
-    return water().some((region) => insideWaterRegion(point, region, radius));
+    if (!water().some((region) => insideWaterRegion(point, region, radius))) return false;
+    return bedUnder(x, z, radius) + BED_CLEARANCE <= swimCeiling(species, sizeMultiplier);
+  }
+
+  /** In a pond's dug ground (widened by `radius`): where a ground animal never sets foot. */
+  function inPond(x: number, z: number, radius: number): boolean {
+    return pondAt(water(), { x, z }, radius) !== null;
+  }
+
+  /** The size a spot is judged at: the pet's own, or the one its radius implies for a pet not yet on the farm. */
+  function sizeOf(self: Pet | null, species: AnimalDefinition, radius: number): number {
+    return self ? self.sizeMultiplier : radius / species.radius;
   }
 
   /**
@@ -221,13 +259,15 @@ export function createPetSim(options: PetSimOptions): PetSim {
    * the keep-out boxes, clear of the others. In water: inside a pond, clear of the others.
    */
   function standable(x: number, z: number, self: Pet | null, species: AnimalDefinition, radius = species.radius): boolean {
-    if (species.habitat === "water") return inWater(x, z, radius) && !blockedByPet(x, z, self, radius);
+    if (species.habitat === "water") return inWater(x, z, radius, species, sizeOf(self, species, radius)) && !blockedBySolid(x, z, radius) && !blockedByPet(x, z, self, radius);
     return inField(x, z, radius) && !blockedBySolid(x, z, radius) && !blockedByKeepOut(x, z, radius) && !blockedByPet(x, z, self, radius);
   }
 
   /** Player placement may deliberately put a ground/air pet inside a building; swimmers still require actual water. */
   function placeable(x: number, z: number, self: Pet | null, species: AnimalDefinition, radius = species.radius): boolean {
-    if (species.habitat === "water") return inWater(x, z, radius) && !blockedByPet(x, z, self, radius);
+    if (species.habitat === "water") return inWater(x, z, radius, species, sizeOf(self, species, radius)) && !blockedBySolid(x, z, radius) && !blockedByPet(x, z, self, radius);
+    // A ground animal is never set down in the water; a bat may be let go over it.
+    if (species.habitat === "ground" && inPond(x, z, radius)) return false;
     return inField(x, z, radius) && !blockedBySolid(x, z, radius) && !blockedByPet(x, z, self, radius);
   }
 
@@ -269,6 +309,10 @@ export function createPetSim(options: PetSimOptions): PetSim {
       const z = pet.z + Math.sin(angle) * range;
       if (pet.species.habitat === "water") {
         if (!standable(x, z, pet, pet.species, pet.radius)) continue;
+        // A new depth with every stroll: anywhere from just off the bed to just under the surface.
+        const ceiling = swimCeiling(pet.species, pet.sizeMultiplier);
+        const floor = Math.min(ceiling, bedUnder(x, z, pet.radius) + BED_CLEARANCE);
+        pet.targetY = floor + random() * (ceiling - floor);
       } else {
         if (!inField(x, z, pet.radius) || blockedBySolid(x, z, pet.radius) || blockedByPet(x, z, pet, pet.radius)) continue;
         if (!inside && blockedByKeepOut(x, z, pet.radius)) continue;
@@ -282,7 +326,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
   }
 
   /** Where a carried pet sits: a hand's reach ahead of the player, facing the way the player faces. */
-  function carryPose(player: Readonly<{ x: number; z: number; yaw?: number }>): Readonly<{ x: number; z: number; yaw: number }> {
+  function carryPose(player: Readonly<{ x: number; z: number; yaw?: number; y?: number }>): Readonly<{ x: number; z: number; yaw: number }> {
     const yaw = player.yaw ?? 0;
     const forward = petForward(yaw);
     return { x: player.x + forward.x * CARRY_REACH, z: player.z + forward.z * CARRY_REACH, yaw };
@@ -300,10 +344,12 @@ export function createPetSim(options: PetSimOptions): PetSim {
       const x = pet.x + direction.x * distance;
       const z = pet.z + direction.z * distance;
       if (pet.species.habitat === "water") {
-        if (!inWater(x, z, pet.radius)) continue;
+        if (!inWater(x, z, pet.radius, pet.species, pet.sizeMultiplier)) continue;
+        if (blockedBySolid(x, z, pet.radius)) continue;
       } else {
         if (!inField(x, z, pet.radius)) continue;
         if (blockedBySolid(x, z, pet.radius)) continue;
+        if (pet.species.habitat === "ground" && inPond(x, z, pet.radius)) continue;
       }
       if (blockedByPet(x, z, pet, pet.radius)) continue;
       if (blockedByPlayer(x, z, player, pet.radius)) continue;
@@ -314,7 +360,18 @@ export function createPetSim(options: PetSimOptions): PetSim {
     return false;
   }
 
-  function tickPet(pet: Pet, dt: number, player: Readonly<{ x: number; z: number; yaw?: number }>): void {
+  /** Glide a swimmer's depth toward the one it picked, never into the bed or out of the water. */
+  function swim(pet: Pet, dt: number): void {
+    const ceiling = swimCeiling(pet.species, pet.sizeMultiplier);
+    const floor = Math.min(ceiling, bedUnder(pet.x, pet.z, pet.radius) + BED_CLEARANCE);
+    const wanted = Math.min(ceiling, Math.max(floor, pet.targetY));
+    const step = pet.species.walkSpeed * DIVE_RATE * dt;
+    const delta = wanted - pet.swimY;
+    pet.swimY = Math.abs(delta) <= step ? wanted : pet.swimY + Math.sign(delta) * step;
+    pet.swimY = Math.min(ceiling, Math.max(floor, pet.swimY));
+  }
+
+  function tickPet(pet: Pet, dt: number, player: Readonly<{ x: number; z: number; yaw?: number; y?: number }>): void {
     pet.moving = false;
     const { species } = pet;
     if (pet.state === "carried") {
@@ -322,7 +379,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
       pet.x = pose.x;
       pet.z = pose.z;
       pet.yaw = pose.yaw;
-      pet.hover = CARRY_HEIGHT + (species.habitat === "air" ? 0.2 : 0);
+      pet.hover = (player.y ?? 0) + CARRY_HEIGHT + (species.habitat === "air" ? 0.2 : 0);
       return;
     }
     if (pet.state === "attention") {
@@ -372,9 +429,10 @@ export function createPetSim(options: PetSimOptions): PetSim {
       pet.phase += dt * BOB_RATE;
       pet.hover = species.hoverHeight + Math.sin(pet.phase) * BOB_HEIGHT;
     } else if (species.habitat === "water") {
-      // A slower, shallower bob: a body riding the surface.
+      swim(pet, dt);
+      // A slow sway in the water, kept under the surface line.
       pet.phase += dt * BOB_RATE * 0.5;
-      pet.hover = species.hoverHeight + Math.sin(pet.phase) * BOB_HEIGHT * 0.4;
+      pet.hover = Math.min(swimCeiling(species, pet.sizeMultiplier), pet.swimY + Math.sin(pet.phase) * BOB_HEIGHT * 0.4);
     }
   }
 
@@ -407,12 +465,13 @@ export function createPetSim(options: PetSimOptions): PetSim {
       }
       // A pond that moved or went while a swimmer was in it: find the swimmer new water.
       for (const pet of pets) {
-        if (pet.state === "carried" || pet.species.habitat !== "water" || inWater(pet.x, pet.z, pet.radius)) continue;
+        if (pet.state === "carried" || pet.species.habitat !== "water" || inWater(pet.x, pet.z, pet.radius, pet.species, pet.sizeMultiplier)) continue;
         const spot = spawnSpot(pet.species, pet.radius);
         pet.x = spot.x;
         pet.z = spot.z;
         pet.targetX = spot.x;
         pet.targetZ = spot.z;
+        pet.swimY = pet.targetY = swimCeiling(pet.species, pet.sizeMultiplier);
         startIdle(pet);
       }
       for (const row of layout.pets) {
@@ -440,7 +499,13 @@ export function createPetSim(options: PetSimOptions): PetSim {
           targetX: spot.x,
           targetZ: spot.z,
           phase: random() * Math.PI * 2,
+          swimY: 0,
+          targetY: 0,
         };
+        if (species.habitat === "water") {
+          pet.swimY = pet.targetY = swimCeiling(species, sizeMultiplier);
+          pet.hover = pet.swimY;
+        }
         startIdle(pet);
         pets.push(pet);
       }
@@ -466,6 +531,11 @@ export function createPetSim(options: PetSimOptions): PetSim {
       pet.targetX = spot.x;
       pet.targetZ = spot.z;
       pet.hover = pet.species.habitat === "ground" ? 0 : pet.species.hoverHeight;
+      if (pet.species.habitat === "water") {
+        // Let go at the surface; it sinks to wherever it likes from there.
+        pet.swimY = pet.targetY = swimCeiling(pet.species, pet.sizeMultiplier);
+        pet.hover = pet.swimY;
+      }
       startIdle(pet);
       return true;
     },

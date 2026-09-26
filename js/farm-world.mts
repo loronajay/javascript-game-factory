@@ -11,11 +11,20 @@
 // whose item or length changed is rebuilt, a row that only moved is re-posed,
 // and a row that is gone is disposed. Building is the expensive part, so a
 // drag costs nothing but a `position.set`.
+//
+// PONDS ARE HOLES. The field and the apron are flat planes, and a pond's
+// basin is dug below them, so both ground materials discard every fragment
+// inside a pond's ellipse (`cutPondHoles`, fed from `pondRegions` on every
+// sync). What is left is the pond's own bowl — the only ground there. An
+// aquatic dwelling is set down on the bed, and `setUnderwater` swaps the fog
+// for murky water while the camera is below a pond's surface.
 
 import { createSurfaceMaterial, applySurfaceMaterial } from "./arcade-room-surfaces.mjs";
 import { DEFAULT_GROUND_ID, findGround } from "./farm-catalog/ground.mjs";
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
 import { FARM_BOUNDS, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
+import { MAX_PONDS, pondRegions, type PondRegion } from "./farm-pond.mjs";
+import { decorBaseHeight } from "./farm-scene.mjs";
 import { createFarmDecorModel, type BarnDoors } from "./farm-props.mjs";
 import { createFarmScenery } from "./farm-scenery.mjs";
 import { celestialOrbit, generateStarField, type StarSize } from "./farm-sky.mjs";
@@ -46,7 +55,42 @@ export type FarmWorld = Readonly<{
   update: (dt: number) => void;
   /** Move the sun and moon and blend sky, fog, fill and stars for this minute of the farm day. */
   setTime: (minutes: number) => void;
+  /** With the camera under a pond's surface: murky close fog in the water's colour, until it comes back up. */
+  setUnderwater: (underwater: boolean) => void;
 }>;
+
+/** How many ponds the ground can have holes cut for at once. */
+export const MAX_POND_HOLES = MAX_PONDS;
+/** Fragments inside this fraction of a pond's ellipse are discarded: the basin mesh covers the rest to the rim. */
+const HOLE_RADIUS = 0.998;
+const UNDERWATER = Object.freeze({ color: "#1d4d5c", near: 0.1, far: 7 });
+
+type PondHoleUniforms = Readonly<{ pondHoles: { value: any[] }; pondAxes: { value: any[] }; pondCount: { value: number } }>;
+
+/** Make a ground material discard itself inside every pond: the uniforms are shared, so one update moves every hole. */
+function cutPondHoles(material: any, uniforms: PondHoleUniforms): void {
+  material.onBeforeCompile = (shader: any) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vFarmGround;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvFarmGround = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>
+uniform vec4 pondHoles[${MAX_POND_HOLES}];
+uniform vec4 pondAxes[${MAX_POND_HOLES}];
+uniform int pondCount;
+varying vec2 vFarmGround;`)
+      .replace("void main() {", `void main() {
+  for (int i = 0; i < ${MAX_POND_HOLES}; i++) {
+    if (i >= pondCount) break;
+    vec2 d = vFarmGround - pondHoles[i].xy;
+    vec2 local = vec2(d.x * pondHoles[i].z - d.y * pondHoles[i].w, d.x * pondHoles[i].w + d.y * pondHoles[i].z) / pondAxes[i].xy;
+    if (dot(local, local) < ${(HOLE_RADIUS * HOLE_RADIUS).toFixed(6)}) discard;
+  }`);
+  };
+  material.customProgramCacheKey = () => "farm-pond-holes";
+  material.needsUpdate = true;
+}
 
 function groundStyle(groundId: string) {
   return (findGround(groundId) ?? findGround(DEFAULT_GROUND_ID)!).style;
@@ -247,6 +291,13 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
   const apronSize = SKY.fog.far * 2 + width;
   const apronSpan = { u: apronSize, v: apronSize };
   const apron = new THREE.Mesh(new THREE.PlaneGeometry(apronSize, apronSize, 1, 1), createSurfaceMaterial(THREE, groundStyle(DEFAULT_GROUND_ID), apronSpan));
+  const holes: PondHoleUniforms = {
+    pondHoles: { value: Array.from({ length: MAX_POND_HOLES }, () => new THREE.Vector4()) },
+    pondAxes: { value: Array.from({ length: MAX_POND_HOLES }, () => new THREE.Vector4(1, 1, 0, 0)) },
+    pondCount: { value: 0 },
+  };
+  cutPondHoles(ground.material, holes);
+  cutPondHoles(apron.material, holes);
   apron.name = "farm-apron";
   apron.rotation.x = -Math.PI / 2;
   apron.position.y = -0.02;
@@ -276,14 +327,26 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
     return { row, group: model.group, doors: model.doors, fixtureDoors: model.fixtureDoors, animate: model.animate };
   }
 
-  function pose(entry: PlacedModel, row: FarmDecorRow): void {
-    entry.group.position.set(row.x, 0, row.z);
+  function cutHoles(ponds: readonly PondRegion[]): void {
+    const count = Math.min(MAX_POND_HOLES, ponds.length);
+    for (let index = 0; index < count; index += 1) {
+      const pond = ponds[index];
+      holes.pondHoles.value[index].set(pond.x, pond.z, Math.cos(pond.rotationY), Math.sin(pond.rotationY));
+      holes.pondAxes.value[index].set(pond.footprint.width / 2, pond.footprint.depth / 2, 0, 0);
+    }
+    holes.pondCount.value = count;
+  }
+
+  function pose(entry: PlacedModel, row: FarmDecorRow, ponds: readonly PondRegion[]): void {
+    entry.group.position.set(row.x, decorBaseHeight(row, ponds), row.z);
     entry.group.rotation.y = row.rotationY;
     entry.row = row;
   }
 
   function sync(layout: FarmLayout): void {
     const wanted = new Set<string>();
+    const ponds = pondRegions(layout);
+    cutHoles(ponds);
     for (const row of layout.decor) {
       wanted.add(row.instanceId);
       let entry = placed.get(row.instanceId);
@@ -298,7 +361,7 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
         placed.set(row.instanceId, built);
         entry = built;
       }
-      pose(entry, row);
+      pose(entry, row, ponds);
     }
     for (const [instanceId, entry] of placed) {
       if (wanted.has(instanceId)) continue;
@@ -321,6 +384,30 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
     const style = groundStyle(groundId);
     applySurfaceMaterial(THREE, ground, style, span);
     applySurfaceMaterial(THREE, apron, style, apronSpan);
+    cutPondHoles(ground.material, holes);
+    cutPondHoles(apron.material, holes);
+  }
+
+  let underwater = false;
+  let airFog = { near: SKY.fog.near, far: SKY.fog.far };
+  let dayFog: string | number = SKY.horizon;
+  let daylight = 1;
+  function underwaterColour(): any {
+    return new THREE.Color(UNDERWATER.color).multiplyScalar(0.3 + 0.7 * daylight);
+  }
+  function setUnderwater(next: boolean): void {
+    if (next === underwater) return;
+    underwater = next;
+    if (next) {
+      airFog = { near: scene.fog.near, far: scene.fog.far };
+      scene.fog.near = UNDERWATER.near;
+      scene.fog.far = UNDERWATER.far;
+      scene.fog.color.copy(underwaterColour());
+    } else {
+      scene.fog.near = airFog.near;
+      scene.fog.far = airFog.far;
+      scene.fog.color.set(dayFog);
+    }
   }
 
   function setTime(minutes: number): void {
@@ -329,7 +416,10 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
     sky.material.uniforms.horizon.value.copy(horizon);
     sky.material.uniforms.zenith.value.set(profile.zenith);
     scene.background.copy(horizon);
-    scene.fog.color.set(profile.fog);
+    dayFog = profile.fog;
+    daylight = Math.min(1, profile.hemisphere);
+    if (underwater) scene.fog.color.copy(underwaterColour());
+    else scene.fog.color.set(profile.fog);
     hemisphere.intensity = profile.hemisphere;
     sun.color.set(profile.sunColor);
     sun.intensity = profile.sun;
@@ -365,5 +455,6 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
     },
     update,
     setTime,
+    setUnderwater,
   });
 }

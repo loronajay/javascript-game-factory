@@ -10,7 +10,9 @@
 // Every builder centres its model on its footprint (x/z) with its base on the
 // ground (y = 0), so `farm-world.mts` places it by `position.set(x, 0, z)` and
 // `rotation.y` and nothing else. A stretchable item (a fence) is built for the
-// row's length and rebuilt when it changes; a pond is sized to its footprint.
+// row's length and rebuilt when it changes; a pond is sized to its footprint
+// and dug to its depth — its model reaches BELOW y = 0, into the hole the
+// world cuts in the field for it.
 //
 // `FARM_PROP_BUILDERS` is the table the catalog's `model` names index; a
 // test asserts every row names a builder.
@@ -21,6 +23,7 @@ import { farmDecorFootprint, type FarmDecorDefinition } from "./farm-catalog/dec
 import type { FarmDecorRow } from "./farm-layout.mjs";
 import { FARM_BUILDING_BUILDERS, type BuildingDoors } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
+import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
 import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createSoilPatch, createStump, createSunflowers, createTree, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
 
 export type { BarnDoors, BuildingDoors } from "./farm-props-buildings.mjs";
@@ -302,64 +305,253 @@ export function createHedgeRow(THREE: ThreeNamespace, length: number): any {
 }
 
 /**
- * A pond sized to its footprint: a raised earth bank sloping down to a sheet
- * of water, a lip of stones, cattails and a rock or two — the swimmers'
- * whole world. The bank is a lathe, so it is a real hollow, not a disc.
+ * A pond DUG INTO the field, sized to its footprint and as deep as its row
+ * says. The basin is one mesh sampled from `farm-pond.mts`'s profile — the
+ * same heights the player's feet and the swimmers read — running from the
+ * grass at the rim down the bank, across the shore shelf and down the slope
+ * to the bed; `farm-world.mts` cuts the field away over the same ellipse, so
+ * this bowl is the only ground there. Its colour follows the depth: grass at
+ * the lip, earth on the bank, sand on the shelf, silt in the deep. The water
+ * is a flat, rippling, see-through surface at `WATER_LEVEL` that meets the
+ * bank at the waterline, seen from above and from below. Stones sit on the
+ * lip, reeds stand on the shelf with their roots in the water, and weed grows
+ * on the bed — each at the height the profile gives its spot.
  */
-export function createPond(THREE: ThreeNamespace, width: number, depth: number): any {
+export function createPond(THREE: ThreeNamespace, width: number, depth: number, pondDepth: number): FarmDecorModel {
   const group = new THREE.Group();
-  const bank = farmMaterial(THREE, "soil", { colors: ["#6b4b2c", "#3f2a16", "#8f6f48"], metresPerTile: 1.2 });
-  const mud = farmMaterial(THREE, "soil", { colors: ["#4a3a2a", "#2a1e14", "#6a5a44"], metresPerTile: 1.2 });
-  const grass = farmMaterial(THREE, "foliage", { colors: ["#5f9a3c", "#3a6a28", "#8fc45a"], metresPerTile: 0.6 });
-  // The bank profile, on a unit radius, scaled to the footprint: a grassy lip outside, bare earth over it, mud below the water.
-  const outer = [new THREE.Vector2(0.56, 0), new THREE.Vector2(0.52, 0.16), new THREE.Vector2(0.5, 0.2), new THREE.Vector2(0.47, 0.19)];
-  const inner = [new THREE.Vector2(0.47, 0.19), new THREE.Vector2(0.42, 0.1), new THREE.Vector2(0.34, 0.05), new THREE.Vector2(0.18, 0.03), new THREE.Vector2(0, 0.03)];
-  const bankMesh = new THREE.Mesh(scaleUvs(new THREE.LatheGeometry(outer, 40), 1.2, Math.PI * (width + depth) / 2, 0.6), bank);
-  bankMesh.scale.set(width, 1, depth);
-  bankMesh.receiveShadow = true;
-  group.add(bankMesh);
-  const basin = new THREE.Mesh(scaleUvs(new THREE.LatheGeometry(inner, 40), 1.2, Math.PI * (width + depth) / 2, 1.5), mud);
-  basin.scale.set(width, 1, depth);
+  const a = width / 2;
+  const b = depth / 2;
+  const floorAt = (r: number): number => pondProfile(r, pondDepth);
+
+  // The basin: rings of the ellipse from the centre to the rim, finer near the rim where the bank is steep.
+  const rings = 44;
+  const segments = 72;
+  const radii: number[] = [];
+  for (let ring = 0; ring <= rings; ring += 1) {
+    const t = ring / rings;
+    radii.push(1 - (1 - t) * (1 - t) * 0.35 - (1 - t) * 0.65);
+  }
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const colors: number[] = [];
+  const grassTone = new THREE.Color("#6f9a45");
+  const bankTone = new THREE.Color("#8a6a45");
+  const sandTone = new THREE.Color("#b7a57c");
+  const siltTone = new THREE.Color("#3b3d2c");
+  const tone = new THREE.Color();
+  const tilesPerMetre = 1 / 1.2;
+  for (const r of radii) {
+    const y = floorAt(r);
+    if (y >= WATER_LEVEL + 0.04) {
+      // Dry bank: earth, turning to grass over the last hand of the lip.
+      tone.copy(bankTone).lerp(grassTone, Math.min(1, Math.max(0, (r - 0.955) / 0.045)));
+    } else {
+      // The wet margin and under water: sand on the shelf, darkening to silt with depth.
+      const deep = Math.min(1, Math.max(0, WATER_LEVEL - y) / Math.max(0.5, pondDepth + WATER_LEVEL));
+      tone.copy(sandTone).lerp(siltTone, Math.pow(deep, 0.7));
+    }
+    for (let segment = 0; segment <= segments; segment += 1) {
+      const angle = (segment / segments) * Math.PI * 2;
+      const x = Math.cos(angle) * r * a;
+      const z = Math.sin(angle) * r * b;
+      positions.push(x, y, z);
+      uvs.push(x * tilesPerMetre, z * tilesPerMetre);
+      colors.push(tone.r, tone.g, tone.b);
+    }
+  }
+  const indices: number[] = [];
+  const stride = segments + 1;
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const inner = ring * stride + segment;
+      const outer = inner + stride;
+      // Wound so the faces look up out of the bowl.
+      indices.push(inner, inner + 1, outer, outer, inner + 1, outer + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  // Its own copy of the soil tile: the vertex colours tint it, and the shared cached material must not change.
+  const soil = farmMaterial(THREE, "soil", { colors: ["#d8cdb8", "#a89a80", "#efe6d2"], metresPerTile: 1.2 });
+  const basinMaterial = typeof soil.clone === "function" ? soil.clone() : soil;
+  basinMaterial.vertexColors = true;
+  const basin = new THREE.Mesh(geometry, basinMaterial);
+  basin.name = "pond-basin";
   basin.receiveShadow = true;
   group.add(basin);
-  // Grass tufts along the outer lip.
-  const tufts = Math.max(12, Math.round((width + depth) * 3));
-  for (let index = 0; index < tufts; index += 1) {
-    const angle = (index / tufts) * Math.PI * 2;
-    const tuft = tsphere(THREE, group, 0.14 + ((index * 5) % 3) * 0.03, [Math.cos(angle) * (width / 2 + 0.02), 0.16, Math.sin(angle) * (depth / 2 + 0.02)], grass, 8, 6);
-    tuft.scale.y = 0.6;
-  }
-  const sheet = new THREE.Mesh(new THREE.CircleGeometry(0.5, 40), waterMaterial(THREE, 0.8));
-  sheet.scale.set(width - 0.45, depth - 0.45, 1);
-  sheet.rotation.x = -Math.PI / 2;
-  sheet.position.y = 0.14;
-  sheet.receiveShadow = true;
-  group.add(sheet);
-  // Stones round the lip and cattails at one end.
+
+  // The water: a flat surface that runs a little into the bank, so the bank is what draws the shoreline.
+  const surface = new THREE.Mesh(new THREE.CircleGeometry(1, 64), waterSurfaceMaterial(THREE));
+  surface.name = "pond-water";
+  surface.scale.set(a * WATERLINE_RADIUS + 0.04, b * WATERLINE_RADIUS + 0.04, 1);
+  surface.rotation.x = -Math.PI / 2;
+  surface.position.y = WATER_LEVEL;
+  surface.renderOrder = 2;
+  group.add(surface);
+
+  // Stones on the lip, bedded into it at the profile's height.
   const stone = stoneMaterial(THREE, 0.5);
   const count = Math.max(10, Math.round((width + depth) * 2));
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2 + 0.1;
     const jitter = ((index * 37) % 7) / 7;
-    const x = Math.cos(angle) * (width / 2 - 0.2);
-    const z = Math.sin(angle) * (depth / 2 - 0.2);
-    const pebble = tsphere(THREE, group, 0.08 + jitter * 0.1, [x, 0.17, z], stone, 8, 6);
+    const r = 0.965 + (index % 3) * 0.012;
+    const pebble = tsphere(THREE, group, 0.08 + jitter * 0.1, [Math.cos(angle) * r * a, floorAt(r) + 0.03, Math.sin(angle) * r * b], stone, 8, 6);
     pebble.scale.set(1.3, 0.55, 1);
     pebble.rotation.y = angle;
   }
+  // Grass tufts just past the rim, where the field meets the bank.
+  const grass = farmMaterial(THREE, "foliage", { colors: ["#5f9a3c", "#3a6a28", "#8fc45a"], metresPerTile: 0.6 });
+  const tufts = Math.max(12, Math.round((width + depth) * 3));
+  for (let index = 0; index < tufts; index += 1) {
+    const angle = (index / tufts) * Math.PI * 2;
+    const tuft = tsphere(THREE, group, 0.12 + ((index * 5) % 3) * 0.03, [Math.cos(angle) * (a + 0.06), 0.04, Math.sin(angle) * (b + 0.06)], grass, 8, 6);
+    tuft.scale.y = 0.55;
+  }
+  // Reeds on the shelf at one end: rooted under water, standing out of it.
   const reed = standard(THREE, "#5a7a34", 0.9, 0);
   const head = standard(THREE, "#5a3d24", 0.9, 0);
-  for (let index = 0; index < 7; index += 1) {
-    const angle = 3.6 + index * 0.14;
-    const x = Math.cos(angle) * (width / 2 - 0.35);
-    const z = Math.sin(angle) * (depth / 2 - 0.35);
-    const height = 0.7 + (index % 3) * 0.2;
-    cylinder(THREE, group, 0.012, 0.018, height, [x, 0.1 + height / 2, z], reed, 5, false);
-    cylinder(THREE, group, 0.035, 0.035, 0.18, [x, 0.1 + height + 0.06, z], head, 6, false);
-    const blade = box(THREE, group, [0.03, height * 0.9, 0.006], [x + 0.06, 0.1 + height * 0.45, z], reed, false);
+  for (let index = 0; index < 9; index += 1) {
+    const angle = 3.5 + index * 0.13;
+    const r = 0.9 + (index % 3) * 0.015;
+    const x = Math.cos(angle) * r * a;
+    const z = Math.sin(angle) * r * b;
+    const root = floorAt(r);
+    const height = 0.9 + (index % 3) * 0.22;
+    cylinder(THREE, group, 0.012, 0.018, height, [x, root + height / 2, z], reed, 5, false);
+    cylinder(THREE, group, 0.035, 0.035, 0.18, [x, root + height + 0.06, z], head, 6, false);
+    const blade = box(THREE, group, [0.03, height * 0.9, 0.006], [x + 0.06, root + height * 0.45, z], reed, false);
     blade.rotation.z = -0.15;
   }
-  return group;
+  // Weed on the bed and the lower slope: tufts of thin tapering blades, swaying in the water.
+  const weed = new THREE.MeshStandardMaterial({ color: "#4f8a3a", roughness: 0.8, side: THREE.DoubleSide });
+  const bladeGeometry = new THREE.ConeGeometry(0.035, 1, 3, 1, true);
+  const strands: any[] = [];
+  const weeds = Math.max(8, Math.round(width * depth * 0.6));
+  for (let index = 0; index < weeds; index += 1) {
+    const angle = index * 2.399963;
+    const r = 0.2 + ((index * 53) % 11) / 11 * 0.58;
+    const x = Math.cos(angle) * r * a;
+    const z = Math.sin(angle) * r * b;
+    const root = floorAt(r);
+    const room = WATER_LEVEL - root - 0.15;
+    if (room < 0.25) continue;
+    const height = Math.min(room, 0.35 + ((index * 17) % 7) / 7 * 0.7);
+    const strand = new THREE.Group();
+    strand.position.set(x, root, z);
+    for (let blade = 0; blade < 6; blade += 1) {
+      const leaf = new THREE.Mesh(bladeGeometry, weed);
+      const tall = height * (0.6 + ((blade * 7 + index) % 5) * 0.1);
+      const lean = blade * 1.05;
+      leaf.scale.set(1, tall, 1);
+      leaf.position.set(Math.cos(lean) * 0.05, tall / 2, Math.sin(lean) * 0.05);
+      leaf.rotation.set(Math.sin(lean) * 0.22, 0, -Math.cos(lean) * 0.22);
+      strand.add(leaf);
+    }
+    strand.userData.phase = index * 0.7;
+    group.add(strand);
+    strands.push(strand);
+  }
+  let clock = 0;
+  const ripples = surface.material.bumpMap;
+  return {
+    group,
+    doors: null,
+    fixtureDoors: {},
+    animate: (dt) => {
+      clock += dt;
+      if (ripples?.offset) ripples.offset.set(clock * 0.012, clock * 0.007);
+      for (const strand of strands) {
+        strand.rotation.x = Math.sin(clock * 0.9 + strand.userData.phase) * 0.12;
+        strand.rotation.z = Math.cos(clock * 0.7 + strand.userData.phase) * 0.1;
+      }
+    },
+  };
+}
+
+/** A lily pond: the dug pond with pads and pink lilies floating on the water. */
+export function createLilyPond(THREE: ThreeNamespace, width: number, depth: number, pondDepth: number): FarmDecorModel {
+  const pond = createPond(THREE, width, depth, pondDepth);
+  const group = pond.group;
+  const pad = farmMaterial(THREE, "foliage", { colors: ["#3f8a46", "#2b6331", "#6fb24c"], metresPerTile: 0.4 });
+  const petal = standard(THREE, "#ff8fb0", 0.6, 0);
+  const heart = standard(THREE, "#ffd33d", 0.6, 0);
+  const surface = WATER_LEVEL + 0.012;
+  const spots: Array<[number, number, number]> = [[-0.28, -0.18, 0.22], [0.16, -0.3, 0.18], [0.3, 0.12, 0.24], [-0.1, 0.28, 0.2], [-0.32, 0.22, 0.16], [0.02, -0.02, 0.15], [0.42, -0.1, 0.17], [-0.18, -0.4, 0.19]];
+  spots.forEach(([u, v, r], index) => {
+    const x = u * (width - 1);
+    const z = v * (depth - 1);
+    // A pad is cut from a disc with the notch every lily pad has.
+    const leaf = new THREE.Mesh(new THREE.CircleGeometry(r, 18, 0.35, Math.PI * 2 - 0.35), pad);
+    leaf.rotation.x = -Math.PI / 2;
+    leaf.rotation.z = index;
+    leaf.position.set(x, surface, z);
+    leaf.receiveShadow = true;
+    group.add(leaf);
+    if (index % 2 === 0) {
+      for (let k = 0; k < 6; k += 1) {
+        const angle = (k / 6) * Math.PI * 2;
+        const p = sphere(THREE, group, 0.06, [x + Math.cos(angle) * 0.07, surface + 0.05, z + Math.sin(angle) * 0.07], petal);
+        p.scale.set(1.4, 0.5, 0.8);
+        p.rotation.y = -angle;
+      }
+      sphere(THREE, group, 0.04, [x, surface + 0.08, z], heart);
+    }
+  });
+  return pond;
+}
+
+/** Ripples for the pond surface: a soft random height field, tiled, drawn once. */
+let rippleCanvas: any = null;
+function rippleTexture(THREE: ThreeNamespace): any {
+  if (typeof document === "undefined") return null;
+  if (!rippleCanvas) {
+    const size = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.fillStyle = "#808080";
+    context.fillRect(0, 0, size, size);
+    let seed = 7;
+    const random = (): number => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    for (let index = 0; index < 90; index += 1) {
+      const x = random() * size;
+      const y = random() * size;
+      const radius = 6 + random() * 18;
+      const light = random() > 0.5;
+      for (const [dx, dy] of [[0, 0], [size, 0], [-size, 0], [0, size], [0, -size]]) {
+        const gradient = context.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, radius);
+        gradient.addColorStop(0, light ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)");
+        gradient.addColorStop(1, "rgba(128,128,128,0)");
+        context.fillStyle = gradient;
+        context.fillRect(x + dx - radius, y + dy - radius, radius * 2, radius * 2);
+      }
+    }
+    rippleCanvas = canvas;
+  }
+  const texture = new THREE.CanvasTexture(rippleCanvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 3);
+  return texture;
+}
+
+/** The water: tinted, glossy and see-through, with moving ripples, drawn from both sides so it is a ceiling from below. */
+function waterSurfaceMaterial(THREE: ThreeNamespace): any {
+  const material = new THREE.MeshStandardMaterial({ color: "#2f6f94", roughness: 0.06, metalness: 0.15, transparent: true, opacity: 0.66, side: THREE.DoubleSide, depthWrite: false });
+  const ripples = rippleTexture(THREE);
+  if (ripples) {
+    material.bumpMap = ripples;
+    material.bumpScale = 0.04;
+  }
+  return material;
 }
 
 /** A scarecrow: a post, a crossbar, a stuffed shirt with straw at the cuffs, a sack head with a stitched face, and a straw hat. */
@@ -502,33 +694,6 @@ export function createLampPost(THREE: ThreeNamespace): any {
   const light = new THREE.PointLight(0xffc477, 4, 8, 1.8);
   light.position.set(0, 2.85, 0);
   group.add(light);
-  return group;
-}
-
-/** A lily pond: the pond with pads and pink lilies floating on it, and reeds along one bank. */
-export function createLilyPond(THREE: ThreeNamespace, width: number, depth: number): any {
-  const group = createPond(THREE, width, depth);
-  const pad = farmMaterial(THREE, "foliage", { colors: ["#3f8a46", "#2b6331", "#6fb24c"], metresPerTile: 0.4 });
-  const petal = standard(THREE, "#ff8fb0", 0.6, 0);
-  const heart = standard(THREE, "#ffd33d", 0.6, 0);
-  const spots: Array<[number, number, number]> = [[-0.28, -0.18, 0.22], [0.16, -0.3, 0.18], [0.3, 0.12, 0.24], [-0.1, 0.28, 0.2], [-0.32, 0.22, 0.16], [0.02, -0.02, 0.15]];
-  spots.forEach(([u, v, r], index) => {
-    const x = u * (width - 1);
-    const z = v * (depth - 1);
-    const leaf = tcylinder(THREE, group, r, r, 0.02, [x, 0.15, z], pad, 14, false);
-    leaf.rotation.y = index;
-    // The notch every lily pad has.
-    box(THREE, group, [r * 0.25, 0.03, r * 0.6], [x + r * 0.85, 0.15, z], waterMaterial(THREE, 0.8), false).rotation.y = index;
-    if (index % 2 === 0) {
-      for (let k = 0; k < 6; k += 1) {
-        const angle = (k / 6) * Math.PI * 2;
-        const p = sphere(THREE, group, 0.06, [x + Math.cos(angle) * 0.07, 0.2, z + Math.sin(angle) * 0.07], petal);
-        p.scale.set(1.4, 0.5, 0.8);
-        p.rotation.y = -angle;
-      }
-      sphere(THREE, group, 0.04, [x, 0.23, z], heart);
-    }
-  });
   return group;
 }
 
@@ -955,8 +1120,8 @@ export const FARM_PROP_BUILDERS: Readonly<Record<string, (THREE: ThreeNamespace,
   lavender: (THREE, _definition, _row, seed) => still(createLavender(THREE, seed)),
   stump: (THREE) => still(createStump(THREE)),
   // Water is sized to its footprint.
-  pond: (THREE, definition) => still(createPond(THREE, definition.footprint.width, definition.footprint.depth)),
-  "pond-lily": (THREE, definition) => still(createLilyPond(THREE, definition.footprint.width, definition.footprint.depth)),
+  pond: (THREE, definition) => createPond(THREE, definition.footprint.width, definition.footprint.depth, definition.pond?.depth ?? 1.5),
+  "pond-lily": (THREE, definition) => createLilyPond(THREE, definition.footprint.width, definition.footprint.depth, definition.pond?.depth ?? 1.5),
   // Props.
   "hay-bale": (THREE) => still(createHayBale(THREE)),
   trough: (THREE) => still(createTrough(THREE)),

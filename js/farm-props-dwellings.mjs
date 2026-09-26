@@ -2,7 +2,8 @@
 // The doghouse predates this module and stays in farm-props; everything else
 // lives here so the general prop registry remains composition rather than art.
 // All entrances face +z, matching the farm building convention and the
-// dimensions recorded on the catalog row.
+// dimensions recorded on the catalog row. The three swimmers' homes are built
+// to stand on a pond bed, under water: the world sets them down at the bed.
 import { box, cylinder, sphere, standard } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, tbox, tcylinder } from "./farm-materials.mjs";
 const timber = (THREE, color = "#8a5a34") => farmMaterial(THREE, "wood", { colors: [color, "#3e2615", "#b88450"], metresPerTile: 0.7 });
@@ -150,8 +151,9 @@ export function createJellyfishLagoon(THREE, definition) {
             continue;
         sphere(THREE, group, 0.24, [Math.sin(angle) * radius * 0.82, 0.18, Math.cos(angle) * radius * 0.82], rim);
     }
-    const water = cylinder(THREE, group, radius * 0.76, radius * 0.78, 0.06, [0, 0.03, 0], standard(THREE, "#67b6c7", 0.25, 0.05), 24, false);
-    water.scale.z = 0.9;
+    // It stands on a pond bed: a ring of pale sand inside the rocks, not a second pool of water.
+    const sand = cylinder(THREE, group, radius * 0.76, radius * 0.8, 0.08, [0, 0.04, 0], farmMaterial(THREE, "soil", { colors: ["#d9cfa8", "#b8ab80", "#efe6c4"], metresPerTile: 0.6 }), 24, false);
+    sand.scale.z = 0.9;
     const glow = new THREE.MeshStandardMaterial({ color: "#d99ac6", emissive: "#9f5fa0", emissiveIntensity: 1.4, roughness: 0.5 });
     for (const [x, z] of [[-0.45, -0.2], [0.35, 0.15], [0.05, -0.55]])
         sphere(THREE, group, 0.07, [x, 0.13, z], glow);

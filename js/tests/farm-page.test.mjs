@@ -91,8 +91,9 @@ const bodySource = readFileSync(resolve(repoRoot, "js", "farm-body.mts"), "utf8"
 
 test("the farm walks with the room's walker on a fixed timestep and never re-implements movement", () => {
   // The page steps the BODY (height, ladders, seats); the body steps the room's walker for the flat part.
-  assert.match(source, /stepFarmBody\(player, body, keys, dt, \{ bounds: walkerBounds, obstacles, platforms, ladders \}\)/);
-  assert.match(bodySource, /stepWalker\(pose, keys, dt, world\.bounds, bodyObstacles\(world\.obstacles, body\.y\)\)/);
+  assert.match(source, /stepFarmBody\(player, body, keys, dt, \{ bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt \}\)/);
+  assert.match(source, /groundHeightAt\(ponds, point\)/, "the feet stand on the dug pond ground");
+  assert.match(bodySource, /stepWalker\(pose, keys, wading \? dt \* WADE_SPEED : dt, world\.bounds, bodyObstacles\(world\.obstacles, body\.y\)\)/);
   assert.doesNotMatch(source, /stepWalker/, "the page never walks around the body");
   assert.match(source, /lookWalker\(player, event\.movementX, event\.movementY\)/);
   assert.match(source, /const TICK_SECONDS = 1 \/ 60/);
@@ -118,7 +119,7 @@ test("every platform surface offers the farm chip beside the arcade chip", () =>
 });
 
 test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies, adopted through an owner-only panel", () => {
-  assert.match(source, /petSim\.tick\(TICK_SECONDS, player\)/);
+  assert.match(source, /petSim\.tick\(TICK_SECONDS, \{ x: player\.x, z: player\.z, yaw: player\.yaw, y: body\.y \}\)/);
   assert.match(source, /petBodies\.sync\(petSim\.pets\(\), frameSeconds\)/, "bodies ease per frame, the sim steps per tick");
   assert.match(source, /obstacles: \(\) => obstacles/, "pets and the walker share one obstacle list");
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
@@ -141,7 +142,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /findPutDownSpot\(pose, held\.radius, \(spot\) => petSim\.canStand\(held\.speciesId, spot, held\.sizeMultiplier\)\)/, "the drop spot and collision check use the pet's grown radius");
   assert.match(source, /if \(editing\) dropCarried\(\)/, "build mode empties the arms");
   assert.match(source, /if \(held && putDownFits && doorInReach && openDoors\.has\(doorInReach\.doorId\)\) doorInReach = null/, "an open door yields to the put-down; a shut one is opened first");
-  assert.match(source, /petSim\.tick\(TICK_SECONDS, player\)/, "the sim gets the whole pose, so a carried pet rides the yaw");
+  assert.match(source, /petSim\.tick\(TICK_SECONDS, \{ x: player\.x, z: player\.z, yaw: player\.yaw, y: body\.y \}\)/, "the sim gets the whole pose, so a carried pet rides the yaw and the height");
   assert.match(source, /liveNeedsCheckpoint = \(\) => \{[\s\S]*?advancePetNeeds\(layout, clockMinutes\)[\s\S]*?petSim\.sync\(layout\)/, "each lifecycle checkpoint immediately gives grown size to the sim and renderer");
   // Every layout change goes through one path that applies, syncs and saves.
   assert.match(source, /async function persistLayout/);

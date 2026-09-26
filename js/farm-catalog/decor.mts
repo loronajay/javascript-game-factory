@@ -32,10 +32,19 @@
 // builders draw from that list and the walker collides with it, so a bench is
 // never something the body slips through and a ladder always goes somewhere.
 //
-// A POND IS A HABITAT. `habitat: "water"` marks its footprint as the region
-// the three swimmers live in, and the layout's `farmHabitats` reads it. The
-// visual is an ellipse inscribed in the footprint, and the sim keeps swimmers
-// inside that ellipse rather than the box.
+// A POND IS A HOLE YOU WALK INTO. `habitat: "water"` marks its footprint as
+// the region the three swimmers live in, and the layout's `farmHabitats`
+// reads it; `pond.depth` is how far its bed goes down. The pond is the
+// ellipse inscribed in the footprint, dug into the field by the one profile
+// in `farm-pond.mts`: the ground is cut away over it, the player walks down
+// its bank into the water, and the swimmers use the whole volume. It is not
+// solid — nothing walks through a wall there — but it is keep-out, so ground
+// animals never pick the water as a place to stroll to.
+//
+// AN AQUATIC DWELLING LIVES IN A POND. `aquatic: true` says the item may only
+// stand wholly inside a pond's shore line, on the bed; it is the one thing
+// that may overlap a pond's box, and it travels with the pond when the pond
+// is moved. The Water tab lists them beside the ponds (`farmDecorTab`).
 
 export const FARM_DECOR_CATEGORIES = Object.freeze(["fence", "building", "plant", "water", "prop"] as const);
 export type FarmDecorCategory = typeof FARM_DECOR_CATEGORIES[number];
@@ -92,6 +101,10 @@ export type FarmDecorDefinition = Readonly<{
   keepOut: boolean;
   /** A region animals of this habitat live in; only ponds today. */
   habitat: "water" | null;
+  /** A pond: how deep its bed goes below the field, in metres. Null for everything that is not dug. */
+  pond: Readonly<{ depth: number }> | null;
+  /** Stands on a pond's bed, wholly under water; may not be placed on dry ground. */
+  aquatic: boolean;
   /** A building the player walks into: its walls and door, or null for everything that is not a building. */
   shell: BuildingShell | null;
   /** A gate: a fence panel that swings. Solid while shut, worked with E within `reach`. */
@@ -126,6 +139,8 @@ type Spec = Readonly<{
   solid?: boolean;
   keepOut?: boolean;
   habitat?: "water";
+  pond?: Readonly<{ depth: number }>;
+  aquatic?: boolean;
   shell?: BuildingShell;
   gate?: Readonly<{ reach: number }>;
   interior?: boolean;
@@ -147,6 +162,8 @@ function item(variant: string, spec: Spec): FarmDecorDefinition {
     solid: spec.solid ?? true,
     keepOut: spec.keepOut ?? false,
     habitat: spec.habitat ?? null,
+    pond: spec.pond ? Object.freeze({ ...spec.pond }) : null,
+    aquatic: spec.aquatic ?? false,
     shell: spec.shell ? Object.freeze({ ...spec.shell, door: spec.shell.door ? Object.freeze({ ...spec.shell.door }) : null }) : null,
     gate: spec.gate ? Object.freeze({ ...spec.gate }) : null,
     doors: Boolean(spec.shell?.door) || Boolean(spec.gate),
@@ -210,10 +227,10 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("sunflowers", { title: "Sunflowers", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#ffd33d", "#4f9a3a"], model: "sunflowers" }),
   item("lavender", { title: "Lavender", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#9a7fd6", "#6f8f5a"], model: "lavender" }),
   item("stump", { title: "Tree Stump", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#9a7248", "#5d3a1f"], model: "stump" }),
-  // Water: the swimmers' home. Solid to the walker and ground animals so nobody wades in.
-  item("pond-round", { title: "Round Pond", category: "water", footprint: { width: 5, depth: 5 }, keepOut: true, habitat: "water", swatch: ["#3f7fb8", "#7a5a34"], model: "pond" }),
-  item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 8, depth: 4.5 }, keepOut: true, habitat: "water", swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
-  item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 6, depth: 6 }, keepOut: true, habitat: "water", swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
+  // Water: dug into the field. The player wades in; ground animals keep out; swimmers use the whole volume.
+  item("pond-round", { title: "Round Pond", category: "water", footprint: { width: 5, depth: 5 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2 }, swatch: ["#3f7fb8", "#7a5a34"], model: "pond" }),
+  item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 8, depth: 4.5 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 1.8 }, swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
+  item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 6, depth: 6 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2.4 }, swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
   // Props.
   item("hay-bale", { title: "Hay Bale", category: "prop", footprint: { width: 1.4, depth: 1 }, swatch: ["#d8b24a", "#b08b2f"], model: "hay-bale", unlock: STARTER }),
   item("trough", { title: "Water Trough", category: "prop", footprint: { width: 1.8, depth: 0.7 }, swatch: ["#7e8790", "#3f7fb8"], model: "trough", unlock: STARTER }),
@@ -232,9 +249,9 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("mud-wallow-shelter", { title: "Mud-Wallow Shelter", category: "prop", footprint: { width: 3.4, depth: 2.8 }, keepOut: true, dwelling: { speciesId: "pet.hippo", entrance: { width: 1.55, height: 1.35 } }, swatch: ["#8b6548", "#c8ab78"], model: "dwelling-mud-wallow" }),
   item("rhino-shade", { title: "Rhino Shade", category: "prop", footprint: { width: 3.6, depth: 2.8 }, keepOut: true, dwelling: { speciesId: "pet.rhino", entrance: { width: 1.65, height: 1.55 } }, swatch: ["#d1ba83", "#75634b"], model: "dwelling-rhino-shade" }),
   item("roosting-box", { title: "Roosting Box", category: "prop", footprint: { width: 1.5, depth: 1.2 }, keepOut: true, dwelling: { speciesId: "pet.bat", entrance: { width: 0.7, height: 0.8 } }, swatch: ["#5d3a1f", "#30263f"], model: "dwelling-roosting-box" }),
-  item("reef-grotto", { title: "Reef Grotto", category: "prop", footprint: { width: 3.4, depth: 2.5 }, keepOut: true, dwelling: { speciesId: "pet.shark", entrance: { width: 1.45, height: 1.2 } }, swatch: ["#5d7180", "#d77858"], model: "dwelling-reef-grotto" }),
-  item("darkwater-cave", { title: "Darkwater Cave", category: "prop", footprint: { width: 2.1, depth: 1.7 }, keepOut: true, dwelling: { speciesId: "pet.anglerfish", entrance: { width: 0.75, height: 0.7 } }, swatch: ["#343247", "#5f7f92"], model: "dwelling-darkwater-cave" }),
-  item("jellyfish-lagoon", { title: "Jellyfish Lagoon", category: "prop", footprint: { width: 2.4, depth: 2.4 }, keepOut: true, dwelling: { speciesId: "pet.jellyfish", entrance: { width: 0.9, height: 0.9 } }, swatch: ["#67b6c7", "#d99ac6"], model: "dwelling-jellyfish-lagoon" }),
+  item("reef-grotto", { title: "Reef Grotto", category: "prop", footprint: { width: 3.4, depth: 2.5 }, keepOut: true, aquatic: true, dwelling: { speciesId: "pet.shark", entrance: { width: 1.45, height: 1.2 } }, swatch: ["#5d7180", "#d77858"], model: "dwelling-reef-grotto" }),
+  item("darkwater-cave", { title: "Darkwater Cave", category: "prop", footprint: { width: 2.1, depth: 1.7 }, keepOut: true, aquatic: true, dwelling: { speciesId: "pet.anglerfish", entrance: { width: 0.75, height: 0.7 } }, swatch: ["#343247", "#5f7f92"], model: "dwelling-darkwater-cave" }),
+  item("jellyfish-lagoon", { title: "Jellyfish Lagoon", category: "prop", footprint: { width: 2.4, depth: 2.4 }, keepOut: true, aquatic: true, dwelling: { speciesId: "pet.jellyfish", entrance: { width: 0.9, height: 0.9 } }, swatch: ["#67b6c7", "#d99ac6"], model: "dwelling-jellyfish-lagoon" }),
   // Dog toys are ordinary placed rows: owned from the start while progression is unlocked,
   // and cross-referenced by the corgi care row instead of being special-cased in the editor.
   item("tennis-ball", { title: "Tennis Ball", category: "prop", footprint: { width: 0.24, depth: 0.24 }, solid: false, snapDegrees: 45, swatch: ["#cbea45", "#f5f0d0"], model: "tennis-ball", unlock: STARTER }),
@@ -258,8 +275,13 @@ export function findFarmDecor(id: unknown): FarmDecorDefinition | undefined {
   return typeof id === "string" ? FARM_DECOR_CATALOG.find((entry) => entry.id === id) : undefined;
 }
 
+/** The build-mode tab an item is listed under: its category, except that aquatic dwellings sit with the ponds they live in. */
+export function farmDecorTab(definition: FarmDecorDefinition): FarmDecorCategory {
+  return definition.aquatic ? "water" : definition.category;
+}
+
 export function farmDecorByCategory(category: FarmDecorCategory): readonly FarmDecorDefinition[] {
-  return FARM_DECOR_CATALOG.filter((entry) => entry.category === category && entry.catalogVisible);
+  return FARM_DECOR_CATALOG.filter((entry) => farmDecorTab(entry) === category && entry.catalogVisible);
 }
 
 export function allFarmDecorIds(): string[] {

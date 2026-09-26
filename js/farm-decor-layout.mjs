@@ -20,10 +20,16 @@
 //   A pulled end also snaps to another fence's end within the threshold, and
 //   the guide that explains it is reported.
 // - The last pond cannot go while swimmers live in it.
+// - An aquatic dwelling stands in a pond or nowhere: every corner of it inside
+//   one pond's shore line (`aquaticFits`). It is the only thing a pond's box
+//   may overlap. A pond that moves or turns carries the dwellings standing in
+//   it (the move is refused if one of them would not fit where it lands), and
+//   a pond that is removed takes them with it.
 import { clampFarmDecorLength, farmDecorFootprint, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { FARM_BOUNDS, MAX_DECOR, farmHabitats, waterPets, withFarmDecor } from "./farm-layout.mjs";
 import { FARM_SPAWN, buildingLocalToWorld, farmObstacles } from "./farm-scene.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
+import { MAX_PONDS, aquaticFits, homePond, pondRegions } from "./farm-pond.mjs";
 /** Nothing may stand within this of the gate spawn. */
 export const SPAWN_CLEARANCE = 0.9;
 const FIT_TOLERANCE = 2e-4;
@@ -125,6 +131,13 @@ function interiorFits(interior, definition, building, buildingDefinition) {
         return false;
     return !farmObstacles({ decor: [building] }).some((obstacle) => boxesOverlap(interior, interior.footprint, obstacle, obstacle.footprint));
 }
+/** The aquatic rows standing in a pond row: those whose centre is in its dug ellipse. */
+export function pondContents(layout, pond) {
+    const [region] = pondRegions({ decor: [pond] });
+    if (!region)
+        return [];
+    return layout.decor.filter((row) => row.instanceId !== pond.instanceId && definitionOf(row)?.aquatic && homePond([region], row));
+}
 /** Why a box may not stand where it is asked to, or "ok". */
 export function judgePlacement(layout, instanceId, definition, box, bounds = FARM_BOUNDS) {
     if (!insideFieldBox(box, box.footprint, bounds))
@@ -132,11 +145,19 @@ export function judgePlacement(layout, instanceId, definition, box, bounds = FAR
     if ((definition.solid || definition.keepOut) && obstacleBlocks(FARM_SPAWN, box, SPAWN_CLEARANCE))
         return "spawn";
     let hasInteriorHome = !definition.interior;
+    let hasPond = !definition.aquatic;
     for (const other of layout.decor) {
         if (other.instanceId === instanceId)
             continue;
         const otherDefinition = definitionOf(other);
         if (!otherDefinition || !farmDecorCollides(definition, otherDefinition))
+            continue;
+        // An aquatic dwelling in the water of a pond does not collide with it; a pond may stand over one that fits in it.
+        if (definition.aquatic && otherDefinition.pond && aquaticFits(box, farmDecorBox(other, otherDefinition))) {
+            hasPond = true;
+            continue;
+        }
+        if (otherDefinition.aquatic && definition.pond && aquaticFits(farmDecorBox(other, otherDefinition), box))
             continue;
         if (definition.interior && otherDefinition.shell && interiorFits(box, definition, other, otherDefinition)) {
             hasInteriorHome = true;
@@ -151,6 +172,8 @@ export function judgePlacement(layout, instanceId, definition, box, bounds = FAR
         if (boxesOverlap(box, box.footprint, other, farmDecorFootprint(otherDefinition, other)))
             return "blocked";
     }
+    if (!hasPond)
+        return "needs_pond";
     return hasInteriorHome ? "ok" : "blocked";
 }
 export function nextFarmDecorInstanceId(layout, definition) {
@@ -166,14 +189,31 @@ export function nextFarmDecorInstanceId(layout, definition) {
 function replaceRow(layout, next) {
     return withFarmDecor(layout, layout.decor.map((item) => (item.instanceId === next.instanceId ? next : item)));
 }
+/** A row carried rigidly from one pose of its pond to another. */
+function carried(row, from, to) {
+    const local = localPoint(row, from);
+    const world = buildingLocalToWorld(to, local);
+    const turn = Math.PI * 2;
+    return { ...row, x: rounded(world.x), z: rounded(world.z), rotationY: rounded(((row.rotationY + to.rotationY - from.rotationY) % turn + turn) % turn) };
+}
 function tryPlace(layout, item, definition, wanted, bounds) {
     const footprint = farmDecorFootprint(definition, item);
     const clamped = clampBoxToField(wanted, footprint, bounds);
     const next = { ...item, x: clamped.x, z: clamped.z, rotationY: rounded(clamped.rotationY) };
-    const verdict = judgePlacement(layout, item.instanceId, definition, farmDecorBox(next, definition), bounds);
+    // A pond carries what stands in it: the dwellings move with it, then every one must fit where it lands.
+    const contents = definition.pond ? pondContents(layout, item) : [];
+    const moved = new Map(contents.map((row) => [row.instanceId, carried(row, item, next)]));
+    const candidate = moved.size ? withFarmDecor(layout, layout.decor.map((row) => moved.get(row.instanceId) ?? row)) : layout;
+    const verdict = judgePlacement(candidate, item.instanceId, definition, farmDecorBox(next, definition), bounds);
     if (verdict !== "ok")
         return { valid: false, layout, instanceId: item.instanceId, reason: verdict };
-    return { valid: true, layout: replaceRow(layout, next), instanceId: item.instanceId, reason: "" };
+    const placed = replaceRow(candidate, next);
+    for (const row of moved.values()) {
+        const rowDefinition = definitionOf(row);
+        if (judgePlacement(placed, row.instanceId, rowDefinition, farmDecorBox(row, rowDefinition), bounds) !== "ok")
+            return { valid: false, layout, instanceId: item.instanceId, reason: "blocked" };
+    }
+    return { valid: true, layout: placed, instanceId: item.instanceId, reason: "" };
 }
 /** Move (and turn) a placed item; the spot is clamped to the field and refused when taken. */
 export function placeFarmDecor(layout, instanceId, wanted, bounds = FARM_BOUNDS) {
@@ -357,6 +397,8 @@ export function farmDecorHandles(layout, instanceId) {
 export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
     if (layout.decor.length >= MAX_DECOR)
         return { valid: false, layout, instanceId: "", reason: "full" };
+    if (definition.pond && pondRegions(layout).length >= MAX_PONDS)
+        return { valid: false, layout, instanceId: "", reason: "ponds" };
     const instanceId = nextFarmDecorInstanceId(layout, definition);
     const item = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0 };
     const candidate = withFarmDecor(layout, [...layout.decor, item]);
@@ -389,6 +431,34 @@ export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
         }
         return { valid: false, layout, instanceId: "", reason: "blocked" };
     }
+    if (definition.aquatic) {
+        // Into the nearest pond with room: spots across its water, centre first, in the pond's own grain and across it.
+        const ponds = layout.decor
+            .filter((row) => definitionOf(row)?.pond)
+            .sort((a, b) => Math.hypot(a.x - near.x, a.z - near.z) - Math.hypot(b.x - near.x, b.z - near.z));
+        if (!ponds.length)
+            return { valid: false, layout, instanceId: "", reason: "needs_pond" };
+        for (const pond of ponds) {
+            const pondDefinition = definitionOf(pond);
+            const halfW = pondDefinition.footprint.width / 2;
+            const halfD = pondDefinition.footprint.depth / 2;
+            const localSpots = [];
+            for (let z = -halfD; z <= halfD; z += 0.25) {
+                for (let x = -halfW; x <= halfW; x += 0.25)
+                    localSpots.push({ x, z });
+            }
+            localSpots.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+            for (const rotationY of [pond.rotationY, pond.rotationY + Math.PI / 2]) {
+                for (const local of localSpots) {
+                    const world = buildingLocalToWorld(pond, local);
+                    const result = attempt(world.x, world.z, rotationY);
+                    if (result.valid)
+                        return result;
+                }
+            }
+        }
+        return { valid: false, layout, instanceId: "", reason: "blocked" };
+    }
     for (let ring = 1; ring <= SEARCH_RINGS; ring += 1) {
         const radius = ring * SEARCH_STEP * Math.max(1, Math.max(definition.footprint.width, definition.footprint.depth) / 2);
         const spots = ring * 8;
@@ -408,6 +478,8 @@ export function duplicateFarmDecor(layout, instanceId, bounds = FARM_BOUNDS) {
         return { valid: false, layout, instanceId, reason: "missing" };
     if (layout.decor.length >= MAX_DECOR)
         return { valid: false, layout, instanceId, reason: "full" };
+    if (definition.pond && pondRegions(layout).length >= MAX_PONDS)
+        return { valid: false, layout, instanceId, reason: "ponds" };
     const footprint = farmDecorFootprint(definition, item);
     const across = alongAxis(item.rotationY + Math.PI / 2);
     const copyId = nextFarmDecorInstanceId(layout, definition);
@@ -432,7 +504,9 @@ export function removeFarmDecor(layout, instanceId) {
     const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     if (!item)
         return { valid: false, layout, instanceId, reason: "missing" };
-    const remaining = layout.decor.filter((candidate) => candidate.instanceId !== instanceId);
+    // A pond goes with the dwellings standing in it: they have no dry-ground life of their own.
+    const going = new Set([instanceId, ...(definitionOf(item)?.pond ? pondContents(layout, item).map((row) => row.instanceId) : [])]);
+    const remaining = layout.decor.filter((candidate) => !going.has(candidate.instanceId));
     if (waterPets(layout).length > 0 && !farmHabitats({ decor: remaining }).water) {
         return { valid: false, layout, instanceId, reason: "habitat" };
     }

@@ -11,6 +11,13 @@
 // keeps only the ones the body's own span crosses, which is the whole trick:
 // the walker never learns about height, it is just handed the solids that
 // matter at the height the body is at.
+//
+// THE GROUND IS NOT ALWAYS AT 0. A pond is dug into the field, so the world
+// hands the body a `ground(point)` height (`farm-pond.mts`'s profile) and the
+// body stands on it: down a bank, along the bed, up the far side. A body that
+// was standing follows the ground DOWN as well as up — a slope is walked, not
+// fallen down — while one that steps off a loft still falls. Below the
+// water's surface the legs push through water, so the walk is slower.
 import { stepWalker } from "./arcade-room-walker.mjs";
 /** A body: what a low step clears, how tall it is, how it falls and climbs, where its eyes are. */
 export const STEP_HEIGHT = 0.35;
@@ -21,6 +28,11 @@ export const CLIMB_SPEED = 1.5;
 export const SEATED_EYE = 0.85;
 /** How close a body must be to a level to be AT it (the foot of a ladder, its top). */
 export const LEVEL_TOLERANCE = 0.4;
+/** A standing body follows the ground down by up to this much in a tick; any bigger drop is a fall. */
+export const STEP_DOWN = 0.3;
+/** How fast the legs go once the feet are this far under water, as a fraction of the dry walk. */
+export const WADE_DEPTH = 0.3;
+export const WADE_SPEED = 0.55;
 export const GROUNDED_BODY = Object.freeze({ mode: "walking", y: 0, vy: 0, fixtureId: "", standAt: null });
 export function createFarmBody() {
     return GROUNDED_BODY;
@@ -43,9 +55,9 @@ export function overPlatform(point, platform) {
     const localZ = dx * sine + dz * cosine;
     return Math.abs(localX) <= platform.width / 2 && Math.abs(localZ) <= platform.depth / 2;
 }
-/** What is under a body at `point` with its feet at `feetY`: the highest platform top no higher than its feet, or the ground. */
-export function supportHeight(point, platforms, feetY) {
-    let support = 0;
+/** What is under a body at `point` with its feet at `feetY`: the highest platform top no higher than its feet, or the ground (`ground`, 0 when flat). */
+export function supportHeight(point, platforms, feetY, ground = 0) {
+    let support = ground;
     for (const platform of platforms) {
         if (platform.top > feetY + 1e-6 || platform.top <= support)
             continue;
@@ -84,8 +96,13 @@ export function stepFarmBody(pose, body, keys, dt, world) {
     }
     // Walking: the flat walker against the solids at this height, then gravity if nothing is underneath.
     // The keys still steer while falling, so a body never hangs in the air against a wall.
-    const step = stepWalker(pose, keys, dt, world.bounds, bodyObstacles(world.obstacles, body.y));
-    const support = supportHeight(step.pose, world.platforms, body.y);
+    const wading = (world.waterDepth?.(pose) ?? 0) > WADE_DEPTH && body.y < 0;
+    const step = stepWalker(pose, keys, wading ? dt * WADE_SPEED : dt, world.bounds, bodyObstacles(world.obstacles, body.y));
+    const support = supportHeight(step.pose, world.platforms, body.y, world.ground?.(step.pose) ?? 0);
+    // Standing on a slope that falls away: the feet stay on it.
+    if (body.vy === 0 && body.y > support && body.y - support <= STEP_DOWN) {
+        return { pose: step.pose, body: { ...body, y: support }, moved: true };
+    }
     if (body.y > support + 1e-6) {
         const vy = body.vy - GRAVITY * dt;
         const y = Math.max(support, body.y + vy * dt);

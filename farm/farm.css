@@ -20,6 +20,17 @@ button, a { font: inherit; }
 
 #farmCanvas { display: block; width: 100%; height: 100%; outline: 0; }
 
+/* Under a pond's surface: a murky tint and a darker edge over the canvas; the fog does the rest. */
+.farm-underwater {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(ellipse at 50% 35%, rgba(40, 110, 120, 0.18), rgba(8, 36, 44, 0.62));
+}
+.farm-underwater.is-visible { opacity: 1; }
+
 .farm-header {
   position: fixed;
   z-index: 4;

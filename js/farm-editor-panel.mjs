@@ -14,14 +14,14 @@
 // one per decor category. The active button is the drawer's handle — press it
 // to tuck the catalog away, press it again to bring it back.
 import { GROUND_CATALOG } from "./farm-catalog/ground.mjs";
-import { FARM_DECOR_CATEGORIES, FARM_DECOR_CATEGORY_TITLES, farmDecorByCategory, farmDecorFootprint, findFarmDecor } from "./farm-catalog/decor.mjs";
+import { FARM_DECOR_CATEGORIES, FARM_DECOR_CATEGORY_TITLES, farmDecorByCategory, farmDecorFootprint, farmDecorTab, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { CROP_CATALOG } from "./farm-crops.mjs";
 export const FARM_EDITOR_TABS = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES, "seeds"]);
 const CATEGORY_HINTS = Object.freeze({
     fence: "Click a fence to place a run, then pull its end arrows to stretch it. Runs cross and meet freely, so pens are easy.",
     building: "Every building can be walked into: press E at its door and step inside. Animals keep out of every building's box.",
     plant: "Trees are solid at the trunk; beds and flowers are walked over.",
-    water: "A pond is where the shark, the anglerfish and the jellyfish live. Place one and they join the adoption list.",
+    water: "Ponds are dug into the field: walk down the bank and wade in. The shark, the anglerfish and the jellyfish live in them, and their homes sit on the pond bed.",
     prop: "Bits and pieces for the yard.",
 });
 function element(tag, className = "", text = "") {
@@ -157,7 +157,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             card.title = owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`;
             card.disabled = !owned && !state.canPurchase;
             card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
-            const meta = definition.length.enabled ? "stretchable" : definition.habitat === "water" ? "habitat" : definition.shell ? "enterable" : definition.solid ? "solid" : "walk-over";
+            const meta = definition.length.enabled ? "stretchable" : definition.pond ? "walk-in" : definition.aquatic ? "in a pond" : definition.shell ? "enterable" : definition.solid ? "solid" : "walk-over";
             card.append(element("small", "decor-card__meta", owned ? meta : price ? `Buy · ${price.toLocaleString()} tickets` : "Locked"));
             if (definition.doors) {
                 card.classList.add("is-interactive");
@@ -169,7 +169,10 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
     function renderPlaced(state) {
         if (state.tab === "ground" || state.tab === "seeds")
             return;
-        const rows = state.layout.decor.filter((row) => findFarmDecor(row.itemId)?.category === state.tab);
+        const rows = state.layout.decor.filter((row) => {
+            const definition = findFarmDecor(row.itemId);
+            return definition ? farmDecorTab(definition) === state.tab : false;
+        });
         const nodes = [];
         if (rows.length)
             nodes.push(element("span", "surface-section__group", `ON THE FIELD · ${rows.length}`));
@@ -254,13 +257,15 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             ? `Walk up to the ${definition.title.toLowerCase()} and press E to open the door${definition.shell?.door?.leaves === 2 ? "s" : ""}, then step inside. Animals stay out.`
             : definition.shell
                 ? "Open on every side: walk straight in. Animals stay out."
-                : definition.habitat === "water"
-                    ? "Swimmers live inside this pond. It cannot be removed while any of them do."
-                    : definition.length.enabled
-                        ? "Fences pass through other fences, so corners and crossings are fine."
-                        : row.memorialId
-                            ? "Drag or rotate this memorial like any prop. Removing it is permanent, though its history remains in farm records."
-                            : "Drag it in the field, arrows to nudge, Q/R to turn.");
+                : definition.pond
+                    ? "Walk in: the bank slopes down to a bed deep enough to swim in. Homes placed in it move with it, and go with it if it is removed. It cannot go while it is the last pond and swimmers live in it."
+                    : definition.aquatic
+                        ? "Stands on the pond bed. Drag it anywhere in the water; it has to stay wholly inside the pond."
+                        : definition.length.enabled
+                            ? "Fences pass through other fences, so corners and crossings are fine."
+                            : row.memorialId
+                                ? "Drag or rotate this memorial like any prop. Removing it is permanent, though its history remains in farm records."
+                                : "Drag it in the field, arrows to nudge, Q/R to turn.");
         nodes.push(tools, removeRow, removeHint, hint);
         elements.inspector.replaceChildren(...nodes);
         return { instanceId: row.instanceId, where, lengthInput, remove, removeHint };

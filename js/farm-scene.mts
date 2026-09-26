@@ -26,6 +26,7 @@ import { buildingLocalToWorld, roundFace, shellWalls, type ShellWall } from "./f
 import { farmFixtures, fixtureDoorPose, fixtureLocalToItem, ladderExit, ladderFoot, type FarmFixture } from "./farm-fixtures.mjs";
 import type { FarmLadder, FarmObstacle, FarmPlatform, FarmSeat } from "./farm-body.mjs";
 import type { FloorObstacle, RoomBounds } from "./arcade-room-layout.mjs";
+import { aquaticBase, homePond, pondRegions, type PondRegion } from "./farm-pond.mjs";
 
 export { buildingLocalToWorld, roundFace, shellWalls, type ShellWall };
 export const barnLocalToWorld = buildingLocalToWorld;
@@ -135,14 +136,25 @@ export function decorRowBox(item: FarmDecorRow): FarmObstacle | null {
  * space wherever its leaf stands, shut or swung open.
  */
 export function farmObstacles(layout: Readonly<{ decor: readonly FarmDecorRow[] }>, state: FarmObstacleState = NO_OPEN_DOORS): FarmObstacle[] {
+  const ponds = pondRegions(layout);
   return layout.decor.flatMap((item) => {
     const definition = findFarmDecor(item.itemId);
     if (!definition || !definition.solid) return [];
     const fixtures = fixtureObstacles(definition, item, item.instanceId, state.openDoors);
     if (definition.shell) return [...buildingObstacles(definition, item, state.openDoors.has(item.instanceId), item.instanceId), ...fixtures];
     if (definition.gate && state.openDoors.has(item.instanceId)) return fixtures;
+    // An aquatic dwelling stands on the pond bed, so its box starts down there: a wader on the bed walks into it, not through it.
+    if (definition.aquatic) return [{ ...decorRowBox(item)!, bottom: decorBaseHeight(item, ponds) }, ...fixtures];
     return [decorRowBox(item)!, ...fixtures];
   });
+}
+
+/** How high a placed row's base stands: 0 on the field, the bed for an aquatic dwelling in a pond. */
+export function decorBaseHeight(item: FarmDecorRow, ponds: readonly PondRegion[] = []): number {
+  const definition = findFarmDecor(item.itemId);
+  if (!definition?.aquatic) return 0;
+  const pond = homePond(ponds, item);
+  return pond ? aquaticBase(decorRowBox(item)!, pond) : 0;
 }
 
 /** Every floor a body can stand on above the ground: the lofts and catwalks of the buildings on the field. */
@@ -202,7 +214,7 @@ export function seatPoint(seat: FarmSeat, point: Readonly<{ x: number; z: number
   return { x: seat.x + along * cosine, z: seat.z - along * sine };
 }
 
-/** The boxes animals keep their destinations out of: buildings (as their whole outer box) and ponds. */
+/** The boxes ground animals keep their destinations out of: buildings (as their whole outer box), ponds, and the dwellings in them. */
 export function keepOutBoxes(layout: Readonly<{ decor: readonly FarmDecorRow[] }>): FloorObstacle[] {
   return layout.decor.flatMap((item) => {
     const definition = findFarmDecor(item.itemId);
@@ -211,13 +223,9 @@ export function keepOutBoxes(layout: Readonly<{ decor: readonly FarmDecorRow[] }
   });
 }
 
-/** The water: every pond's box. The sim keeps swimmers inside the ellipse inscribed in it. */
-export function waterRegions(layout: Readonly<{ decor: readonly FarmDecorRow[] }>): FloorObstacle[] {
-  return layout.decor.flatMap((item) => {
-    const definition = findFarmDecor(item.itemId);
-    if (!definition || definition.habitat !== "water") return [];
-    return [decorRowBox(item)!];
-  });
+/** The water: every pond's box and depth. The pond is the ellipse inscribed in the box, dug by `farm-pond.mts`'s profile. */
+export function waterRegions(layout: Readonly<{ decor: readonly FarmDecorRow[] }>): PondRegion[] {
+  return pondRegions(layout);
 }
 
 /**

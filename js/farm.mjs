@@ -15,6 +15,7 @@ import { createLayoutStore } from "./arcade-room-store.mjs";
 import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions } from "./farm-scene.mjs";
+import { groundHeightAt, underwater, waterDepthAt } from "./farm-pond.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody } from "./farm-body.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot } from "./farm-interaction.mjs";
 import { FARM_BOUNDS, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
@@ -216,6 +217,11 @@ let obstacles = farmObstacles(layout, { openDoors });
 let platforms = farmPlatforms(layout);
 let ladders = farmLadders(layout);
 let seats = farmSeats(layout);
+// The ponds dug into the field: what the feet stand on in them and when the eyes are under water.
+let ponds = waterRegions(layout);
+const groundAt = (point) => groundHeightAt(ponds, point);
+const waterAt = (point) => waterDepthAt(ponds, point);
+const underwaterOverlay = document.querySelector(".farm-underwater");
 // What E would do right now: the door, ladder or seat the player is at, or null.
 let doorInReach = null;
 let ladderInReach = null;
@@ -629,6 +635,7 @@ function applyLayout(next) {
     platforms = farmPlatforms(layout);
     ladders = farmLadders(layout);
     seats = farmSeats(layout);
+    ponds = waterRegions(layout);
     if (body.mode === "seated" && !seats.some((seat) => seat.id === body.fixtureId))
         applyBodyStep(standUp(player, body));
     if (body.mode === "climbing" && !ladders.some((ladder) => ladder.id === body.fixtureId))
@@ -799,12 +806,19 @@ document.addEventListener("mousemove", (event) => {
 function updatePlayer(dt) {
     if (!farmEntered || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
         return;
-    const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders });
+    const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
     if (!step.moved)
         return;
     player.x = step.pose.x;
     player.z = step.pose.z;
     body = step.body;
+}
+/** Below a pond's surface the world goes murky; back above it, the air's fog returns. */
+function updateUnderwater(surfaced = false) {
+    const under = !surfaced && !farmEditor.isEditing() && underwater(ponds, { x: camera.position.x, z: camera.position.z }, camera.position.y);
+    world.setUnderwater(under);
+    document.body.classList.toggle("is-underwater", under);
+    underwaterOverlay?.classList.toggle("is-visible", under);
 }
 function resize() {
     const width = canvas.clientWidth;
@@ -998,6 +1012,9 @@ const farmEditor = createFarmEditor({
         draggingLook = false;
         if (editing)
             dropCarried();
+        // Come up for air first, so the underwater fog does not keep the overview's fog when it lets go.
+        if (editing)
+            updateUnderwater(true);
         // The overview presets stand well outside the field; the walking fog would swallow them.
         scene.fog.far = editing ? 260 : 90;
         scene.fog.near = editing ? 120 : 30;
@@ -1028,7 +1045,7 @@ function frame(now) {
     while (accumulator >= TICK_SECONDS) {
         updateFarmTime(TICK_SECONDS);
         updatePlayer(TICK_SECONDS);
-        petSim.tick(TICK_SECONDS, player);
+        petSim.tick(TICK_SECONDS, { x: player.x, z: player.z, yaw: player.yaw, y: body.y });
         updateInteraction();
         updateCarryPatience(TICK_SECONDS);
         accumulator -= TICK_SECONDS;
@@ -1037,6 +1054,7 @@ function frame(now) {
     petBodies.sync(petSim.pets(), frameSeconds);
     if (!farmEditor.isEditing())
         applyCamera();
+    updateUnderwater();
     resize();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -1058,6 +1076,8 @@ globalThis.__farm = Object.freeze({
     time: () => clockMinutes,
     napping: () => napRemainingMinutes > 0,
     obstacles: () => obstacles,
+    ponds: () => ponds,
+    underwater: () => document.body.classList.contains("is-underwater"),
 });
 applyCamera();
 syncFullscreenButton();

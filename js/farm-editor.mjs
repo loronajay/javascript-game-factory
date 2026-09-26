@@ -13,7 +13,7 @@
 // wheel to zoom toward the cursor; drag an end arrow to stretch a fence with
 // its far end anchored. A drag is one undo step, a typed length is a
 // preview-then-commit gesture, and a click on nothing deselects.
-import { findFarmDecor } from "./farm-catalog/decor.mjs";
+import { farmDecorTab, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { addFarmDecor, alignFarmDecorPlacement, duplicateFarmDecor, farmDecorHandles, placeFarmDecor, removeFarmDecor, rotateFarmDecor, setFarmDecorLength, stretchFarmDecorEnd } from "./farm-decor-layout.mjs";
 import { FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets } from "./farm-layout.mjs";
 import { farmObstacles } from "./farm-scene.mjs";
@@ -203,6 +203,10 @@ export function createFarmEditor(options) {
             return "The gate has to stay clear · that is where you arrive.";
         if (reason === "habitat")
             return "Swimmers live in that pond · release them first.";
+        if (reason === "ponds")
+            return "That is as many ponds as one farm can dig.";
+        if (reason === "needs_pond")
+            return "That lives in a pond · place a pond first, then drag it into the water.";
         if (reason === "full")
             return "The field is full.";
         if (reason === "fixed")
@@ -273,7 +277,7 @@ export function createFarmEditor(options) {
         if (!row || !definition)
             return;
         selection = instanceId;
-        tab = definition.category;
+        tab = farmDecorTab(definition);
         renderScene();
         renderPanel();
         if (quiet)
@@ -302,7 +306,7 @@ export function createFarmEditor(options) {
             return;
         }
         selection = result.instanceId;
-        tab = definition.category;
+        tab = farmDecorTab(definition);
         commit(result.layout, `${definition.title} added · drag it into place · unsaved`);
     }
     function remove(instanceId) {
@@ -318,7 +322,8 @@ export function createFarmEditor(options) {
         }
         if (selection === instanceId)
             selection = "";
-        commit(result.layout, `${findFarmDecor(row.itemId)?.title ?? "Item"} removed · unsaved`);
+        const alongWith = layout.decor.length - result.layout.decor.length - 1;
+        commit(result.layout, `${findFarmDecor(row.itemId)?.title ?? "Item"} removed${alongWith > 0 ? ` with ${alongWith === 1 ? "the home" : `${alongWith} homes`} in it` : ""} · unsaved`);
     }
     function duplicate(instanceId) {
         if (layout.decor.find((row) => row.instanceId === instanceId)?.memorialId) {
