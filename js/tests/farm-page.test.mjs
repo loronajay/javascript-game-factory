@@ -58,7 +58,7 @@ test("the farm is playable signed in or out, saves locally or to a loaded accoun
 });
 
 test("leaving the farm checkpoints its running clock with an unload-safe account save", () => {
-  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*if \(canPersistFarm\) void layoutStore\.save\(progressedLayout\(\), \{ keepalive: true \}\)/);
+  assert.match(source, /window\.addEventListener\("pagehide", \(\) => \{\s*if \(canPersistFarm\) void layoutStore\.save\(stampPresence\(progressedLayout\(\)\), \{ keepalive: true \}\)/);
 });
 
 test("the shared layout store forwards unload-safe save options to the account", async () => {
@@ -146,7 +146,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /liveNeedsCheckpoint = \(\) => \{[\s\S]*?advancePetNeeds\(layout, clockMinutes\)[\s\S]*?petSim\.sync\(layout\)/, "each lifecycle checkpoint immediately gives grown size to the sim and renderer");
   // Every layout change goes through one path that applies, syncs and saves.
   assert.match(source, /async function persistLayout/);
-  assert.match(source, /next = applyPetCareMilestones\(next\);\s*applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\.";\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
+  assert.match(source, /next = stampPresence\(applyPetCareMilestones\(next\)\);\s*applyLayout\(next\);\s*farmEditor\.replaceLayout\(next\);\s*if \(!canPersistFarm\) return "Session only · reload when the farm database is available to save safely\.";\s*return describeSave\(await layoutStore\.save\(layout\)\)/);
 });
 
 test("first-farm onboarding blocks entry until the required named dog is saved", () => {
@@ -224,4 +224,12 @@ test("farm build mode uses the shared ticket shop and permanent Farm inventory",
   assert.match(editorSource, /if \(!definition \|\| !inventory\.owns\(itemId\)\)/);
   assert.match(panelSource, /dataset\.buyItem/);
   assert.match(panelSource, /tickets available/);
+});
+
+test("a farm never progresses before its owner first steps onto it, and only crops catch up offline", () => {
+  assert.match(source, /if \(farmEntered\) updateFarmTime\(TICK_SECONDS\)/, "the clock stands still at the gate");
+  assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt > 0\) \{\s*const caughtUp = applyOfflineProduction\(layout\.agriculture, offlineSpan\(layout\.clock\.checkpointAt, resumedClock\.updatedAt\), resumedClock\.farmMinutes\)/, "offline production needs a checkpoint and touches agriculture only");
+  assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt <= 0\) void persistLayout\(withProductionCheckpoint\(layout, Date\.now\(\)\)\)/, "the first entry is recorded at once");
+  assert.match(source, /if \(!canManageFarm \|\| next\.clock\.checkpointAt <= 0\) return next;/, "saves before the first entry never start offline production");
+  assert.match(source, /if \(state\.dead\) action = clearDeadFarmCrop\(/, "E on a dead crop clears it");
 });

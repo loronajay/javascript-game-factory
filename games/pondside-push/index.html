@@ -18,11 +18,18 @@
       <canvas id="arenaCanvas" width="960" height="640" tabindex="0" aria-label="3D pet bumping arena"></canvas>
       <div id="scoreboard" class="scoreboard" hidden aria-label="Match score"></div>
       <section id="setupPanel" class="panel setup-panel">
-        <p class="kicker">Choose your challenger</p>
-        <h2>Own the island.</h2>
-        <p class="lede">Build momentum by holding your line, then bump rivals into the pond. Last pet standing wins the round. First to 3 wins takes the match.</p>
+        <div class="panel__header">
+          <span class="event-chip">EVENT 02 · PONDSIDE BRAWL</span>
+          <p class="kicker">Choose your challenger</p>
+          <h2>Own the<br><em>island.</em></h2>
+          <p class="lede">Pick a pet, hold your line, and send the competition swimming. Last pet dry wins the round; First to 3 takes the match.</p>
+        </div>
         <div id="petChoices" class="pet-choices" role="radiogroup" aria-label="Farm pets"></div>
-        <div class="briefing"><span><kbd>WASD</kbd> move</span><span><kbd>Space</kbd> bump</span><span>Unbroken runs build speed</span></div>
+        <div class="menu-rules">
+          <span><kbd>WASD</kbd><b>Move</b><small>Hold your line</small></span>
+          <span><kbd>Space</kbd><b>Bump</b><small>Time the hit</small></span>
+          <span><kbd>↟</kbd><b>Momentum</b><small>Speed adds force</small></span>
+        </div>
         <button id="startMatch" class="primary" type="button" disabled>Loading your farm…</button>
         <p id="loadNote" class="load-note" aria-live="polite"></p>
       </section>

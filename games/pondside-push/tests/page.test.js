@@ -27,3 +27,16 @@ test("the 3D browser entry uses real farm animals and a fixed timestep", () => {
   assert.match(source, /stepMatch\(match, controls, TICK_SECONDS\)/);
   assert.doesNotMatch(source, /getContext\(["']2d/);
 });
+
+test("the pre-match menu uses the shared Farm Field Day presentation", () => {
+  const html = readFileSync(resolve(root, "index.html"), "utf8");
+  const css = readFileSync(resolve(root, "style.css"), "utf8");
+
+  assert.match(html, /class="panel__header"/);
+  assert.match(html, /class="event-chip"/);
+  assert.match(html, /class="menu-rules"/);
+  assert.match(html, /Pick a pet, hold your line, and send the competition swimming/);
+  assert.match(css, /\.setup-panel::before/);
+  assert.match(css, /\.event-chip/);
+  assert.match(css, /\.menu-rules/);
+});

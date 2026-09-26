@@ -22,6 +22,7 @@ import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { createStarterAgriculture, normalizeAgriculture, type FarmAgriculture } from "./farm-crops.mjs";
+import { NAP_BANK_CAPACITY_MINUTES, napBankAt } from "./farm-nap-bank.mjs";
 import { createPetProfile, normalizePetProfile, type PetProfile } from "./farm-pet-care.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
 
@@ -78,7 +79,12 @@ export type FarmLayout = Readonly<{
   petHistory: readonly PetMemorial[];
   decor: readonly FarmDecorRow[];
   agriculture: FarmAgriculture;
-  clock: Readonly<{ farmMinutes: number; updatedAt: number }>;
+  /**
+   * Farm time plus the offline-production checkpoint: the real time the owner
+   * was last on the farm. 0 until they first step onto it — a farm never
+   * progresses before that (see farm-offline.mts).
+   */
+  clock: Readonly<{ farmMinutes: number; updatedAt: number; checkpointAt: number; napBank: number }>;
 }>;
 
 export type FarmPetResult = Readonly<{ valid: boolean; layout: FarmLayout; instanceId: string; reason: string }>;
@@ -136,7 +142,7 @@ export function createDefaultFarmLayout(random: () => number = Math.random): Far
     petHistory: Object.freeze([]),
     decor: STARTER_FARM_DECOR,
     agriculture: createStarterAgriculture(random),
-    clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0 }),
+    clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES }),
   });
 }
 
@@ -310,10 +316,13 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
   const agriculture = onboarding.status === "needs_name" && seedRows.length === 0
     ? createStarterAgriculture()
     : source.version === 3 ? normalizeAgriculture(source.agriculture, plotIds) : normalizeAgriculture(undefined, plotIds);
-  const rawClock = source.clock && typeof source.clock === "object" ? source.clock as { farmMinutes?: unknown; updatedAt?: unknown } : {};
+  const rawClock = source.clock && typeof source.clock === "object" ? source.clock as { farmMinutes?: unknown; updatedAt?: unknown; checkpointAt?: unknown; napBank?: unknown } : {};
   const clock = {
     farmMinutes: finiteNumber(rawClock.farmMinutes) ? Math.max(0, rawClock.farmMinutes) : 8 * 60,
     updatedAt: finiteNumber(rawClock.updatedAt) ? Math.max(0, rawClock.updatedAt) : 0,
+    checkpointAt: finiteNumber(rawClock.checkpointAt) ? Math.max(0, rawClock.checkpointAt) : 0,
+    // Nap minutes available as of `updatedAt` (farm-nap-bank.mts). Absent = full.
+    napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
   };
   return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, clock });
 }
@@ -395,8 +404,30 @@ export function withPetHistory(layout: FarmLayout, petHistory: readonly PetMemor
   return freezeLayout({ ...layout, petHistory: [...petHistory] });
 }
 
+/**
+ * Stamp the clock at real time `updatedAt`. The nap bank is held "as of
+ * updatedAt", so restamping refills it for the real time in between.
+ */
 export function withFarmClock(layout: FarmLayout, farmMinutes: number, updatedAt: number): FarmLayout {
-  return freezeLayout({ ...layout, clock: { farmMinutes: Math.max(0, farmMinutes), updatedAt: Math.max(0, updatedAt) } });
+  const stamp = Math.max(0, updatedAt);
+  const napBank = napBankAt(layout.clock.napBank, layout.clock.updatedAt, Math.max(stamp, layout.clock.updatedAt));
+  return freezeLayout({ ...layout, clock: { ...layout.clock, farmMinutes: Math.max(0, farmMinutes), updatedAt: stamp, napBank } });
+}
+
+/** The nap bank right now, without changing the layout. */
+export function farmNapBank(layout: FarmLayout, now: number): number {
+  return napBankAt(layout.clock.napBank, layout.clock.updatedAt, now);
+}
+
+/** Draw a nap from the bank at real time `now`. The caller has checked it fits. */
+export function withNapTaken(layout: FarmLayout, minutes: number, farmMinutes: number, now: number): FarmLayout {
+  const stamped = withFarmClock(layout, farmMinutes, now);
+  return freezeLayout({ ...stamped, clock: { ...stamped.clock, napBank: Math.max(0, stamped.clock.napBank - Math.max(0, minutes)) } });
+}
+
+/** Record that the owner is on the farm at real time `at`: offline production counts from here. */
+export function withProductionCheckpoint(layout: FarmLayout, at: number): FarmLayout {
+  return freezeLayout({ ...layout, clock: { ...layout.clock, checkpointAt: Number.isFinite(at) ? Math.max(0, at) : 0 } });
 }
 
 export function farmDecorRowsEqual(first: FarmDecorRow, second: FarmDecorRow): boolean {
@@ -412,6 +443,8 @@ export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean
     && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
     && first.clock.farmMinutes === second.clock.farmMinutes
     && first.clock.updatedAt === second.clock.updatedAt
+    && first.clock.checkpointAt === second.clock.checkpointAt
+    && first.clock.napBank === second.clock.napBank
     && first.pets.length === second.pets.length
     && first.pets.every((pet, index) => {
       const other = second.pets[index];

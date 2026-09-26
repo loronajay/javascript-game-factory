@@ -101,7 +101,7 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     ground: "",
     pets: [],
     agriculture: { inventory: { seeds: {}, produce: {}, supplies: {} }, crops: [] },
-    clock: { farmMinutes: 480, updatedAt: 0 },
+    clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 },
   });
   // A pre-build-mode document keeps its version so the client can migrate it (seed the starter field).
   assert.equal(normalizeFarmGarage({ version: 1, pets: [] }).version, 1);
@@ -120,12 +120,12 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
       inventory: { seeds: { bean: 4, radish: 999, "bad id": 2 }, produce: { bean: 1 }, supplies: { "food.dog-food": 20, "bad item!": 2 } },
       crops: [
         { plotId: "plot-1", cellId: "cell-0", cropId: "bean", growthMinutes: 100, moistureMinutes: 20, tended: true, lastFarmMinute: 600 },
-        { plotId: "plot-1", cellId: "cell-1", cropId: "radish", growthMinutes: 50, moistureMinutes: 10, tended: false, lastFarmMinute: 600 },
+        { plotId: "plot-1", cellId: "cell-1", cropId: "radish", growthMinutes: 50, moistureMinutes: 0, tended: false, lastFarmMinute: 600, dryMinutes: 4320, untendedMinutes: 12, carePenalty: 7, diedOf: "thirst" },
         { plotId: "bench-1", cropId: "radish", growthMinutes: 1, moistureMinutes: 1, tended: false, lastFarmMinute: 1 },
         { plotId: "missing-plot", cropId: "potato", growthMinutes: 1, moistureMinutes: 1, tended: false, lastFarmMinute: 1 },
       ],
     },
-    clock: { farmMinutes: 612.5, updatedAt: 1_800_000_000_000 },
+    clock: { farmMinutes: 612.5, updatedAt: 1_800_000_000_000, checkpointAt: 1_799_999_000_000 },
   });
 
   assert.deepEqual(garage.agriculture.inventory, {
@@ -141,16 +141,24 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     moistureMinutes: 20,
     tended: true,
     lastFarmMinute: 600,
+    dryMinutes: 0,
+    untendedMinutes: 0,
+    carePenalty: 0,
+    diedOf: "",
   }, {
     plotId: "plot-1",
     cellId: "cell-1",
     cropId: "radish",
     growthMinutes: 50,
-    moistureMinutes: 10,
+    moistureMinutes: 0,
     tended: false,
     lastFarmMinute: 600,
+    dryMinutes: 4320,
+    untendedMinutes: 12,
+    carePenalty: 1,
+    diedOf: "thirst",
   }]);
-  assert.deepEqual(garage.clock, { farmMinutes: 612.5, updatedAt: 1_800_000_000_000 });
+  assert.deepEqual(garage.clock, { farmMinutes: 612.5, updatedAt: 1_800_000_000_000, checkpointAt: 1_799_999_000_000, napBank: 1440 });
 });
 
 test("a valid farm round-trips", () => {
@@ -215,4 +223,31 @@ test("decor is the field: a namespace-checked list of bounded rows, emitted only
 test("the public loadout is the whole document, like the room", () => {
   const garage = normalizeFarmGarage({ version: 1, ground: "ground.clover", pets: [pet()] });
   assert.deepEqual(farmLoadoutFromGarage(garage), { layout: garage });
+});
+
+test("a save cannot plant past productive capacity, but stored crops always survive", () => {
+  const plots = Array.from({ length: 3 }, (_, index) => ({ instanceId: `plot-${index}`, itemId: "decor.plant.soil-patch", x: index * 4, z: 0, rotationY: 0 }));
+  const crop = (plotId, cellId) => ({ plotId, cellId, cropId: "carrot", growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: 0 });
+  const eighteen = plots.flatMap((plot) => ["cell-0", "cell-1", "cell-2", "cell-3", "cell-4", "cell-5"].map((cellId) => crop(plot.instanceId, cellId)));
+  const document = (crops, decor = plots) => ({ version: 3, decor, agriculture: { inventory: { seeds: { carrot: 50 } }, crops }, clock: {} });
+  const planted = (garage) => garage.agriculture.crops.map((row) => `${row.plotId}:${row.cellId}`);
+
+  // A first save (no stored row yet) of 18 crops on three plots keeps six.
+  const first = normalizeFarmGarage(document(eighteen), { currentGarage: null });
+  assert.equal(first.agriculture.crops.length, 6);
+
+  // A grandfathered farm keeps all 18 it already had, and a 19th is refused.
+  const stored = normalizeFarmGarage(document(eighteen));
+  assert.equal(stored.agriculture.crops.length, 18, "reads never trim");
+  const withPlots = [...plots, { instanceId: "plot-9", itemId: "decor.plant.soil-patch", x: 20, z: 0, rotationY: 0 }];
+  const grown = normalizeFarmGarage(document([...eighteen, crop("plot-9", "cell-0")], withPlots), { currentGarage: stored });
+  assert.equal(grown.agriculture.crops.length, 18);
+  assert.ok(!planted(grown).includes("plot-9:cell-0"));
+
+  // A greenhouse lifts the cap once: six new crops land, a seventh does not, a second greenhouse adds nothing.
+  const houses = [{ instanceId: "glass-1", itemId: "decor.building.greenhouse", x: -8, z: 5, rotationY: 0 }, { instanceId: "glass-2", itemId: "decor.building.greenhouse", x: 8, z: 5, rotationY: 0 }];
+  const base = normalizeFarmGarage(document(eighteen.slice(0, 6)));
+  const more = eighteen.slice(6, 13);
+  const withGreenhouse = normalizeFarmGarage(document([...eighteen.slice(0, 6), ...more], [...plots, ...houses]), { currentGarage: base, ownedEntitlementIds: new Set(["decor.building.greenhouse"]) });
+  assert.equal(withGreenhouse.agriculture.crops.length, 12);
 });

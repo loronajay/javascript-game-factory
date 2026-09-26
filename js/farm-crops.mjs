@@ -5,6 +5,27 @@ export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
 export const CARE_GATE = 0.5;
 const MAX_STACK = 99;
+// Neglect has consequences, in stages a player can read and recover from:
+// thirsty (moisture gone, growth stops) → wilted (still rescuable, but the crop
+// takes a permanent care penalty) → dead (yields nothing, stays until cleared).
+// Two separate clocks feed it: continuous time dry, and time spent blocked at
+// the care gate without being tended. Both only run while a crop is unripe.
+export const WILT_DRY_MINUTES = 1 * FARM_DAY_MINUTES;
+export const DEATH_DRY_MINUTES = 3 * FARM_DAY_MINUTES;
+export const WILT_UNTENDED_MINUTES = 2 * FARM_DAY_MINUTES;
+export const DEATH_UNTENDED_MINUTES = 4 * FARM_DAY_MINUTES;
+/** The one-off hit a crop takes the moment it wilts. */
+export const WILT_PENALTY = 0.2;
+/** Further penalty accrued across the whole wilt → death span, pro rata. */
+export const WILT_STRESS_PENALTY = 0.3;
+export const MAX_CARE_PENALTY = 0.6;
+/**
+ * Time away is never lethal (for now, while the system is being introduced):
+ * offline stress stops at least this far short of death, so a returning player
+ * always has a farm day — one real hour of play — to water or tend. A crop
+ * already closer than that when they left gets no worse while they are gone.
+ */
+export const OFFLINE_RESCUE_MINUTES = FARM_DAY_MINUTES;
 const crop = (id, title, seedPrice, days, yieldCount, models) => Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) });
 /** Crops drawn by farm/crop-lab/generator (same palette atlas as the Grimnir pack): three stages and a ripe plant. */
 const generated = (id, title, seedPrice, days, yieldCount) => crop(id, title, seedPrice, days, yieldCount, [`Crop_${title}_STAGE_1_01.glb`, `Crop_${title}_STAGE_2_01.glb`, `Crop_${title}_STAGE_3_01.glb`, `Crop_${title}_RIPE_01.glb`]);
@@ -26,6 +47,14 @@ export const CROP_CATALOG = Object.freeze([
     generated("tomato", "Tomato", 10, 3, 4),
     generated("watermelon", "Watermelon", 18, 4, 1),
 ]);
+/**
+ * The withered plant a dead crop shows instead of its own model, in three sizes
+ * (farm/crop-lab/generator: DEAD_PLANT). A dead crop must never look harvestable.
+ */
+export const DEAD_CROP_MODELS = Object.freeze(["Crop_Dead_STAGE_1_01.glb", "Crop_Dead_STAGE_2_01.glb", "Crop_Dead_STAGE_3_01.glb"]);
+export function deadCropModel(stage) {
+    return DEAD_CROP_MODELS[Math.min(2, stage)];
+}
 export function findCrop(id) {
     return typeof id === "string" ? CROP_CATALOG.find((entry) => entry.id === id) : undefined;
 }
@@ -132,6 +161,7 @@ export function normalizeAgriculture(value, validPlotIds) {
         if (!cellId || seen.has(`${row.plotId}:${cellId}`))
             continue;
         seen.add(`${row.plotId}:${cellId}`);
+        const diedOf = row.diedOf === "thirst" || row.diedOf === "neglect" ? row.diedOf : "";
         crops.push({
             plotId: row.plotId,
             cellId,
@@ -140,43 +170,125 @@ export function normalizeAgriculture(value, validPlotIds) {
             moistureMinutes: Math.min(MOISTURE_CAPACITY_MINUTES, Math.max(0, finite(row.moistureMinutes))),
             tended: row.tended === true,
             lastFarmMinute: Math.max(0, finite(row.lastFarmMinute)),
+            dryMinutes: Math.min(DEATH_DRY_MINUTES, Math.max(0, finite(row.dryMinutes))),
+            untendedMinutes: Math.min(DEATH_UNTENDED_MINUTES, Math.max(0, finite(row.untendedMinutes))),
+            carePenalty: Math.min(MAX_CARE_PENALTY, Math.max(0, finite(row.carePenalty))),
+            diedOf,
         });
     }
     return freezeAgriculture({ inventory: inventoryWith(5, source.inventory), crops });
 }
-function advanceCrop(row, now) {
+const DRY_CLOCK = { key: "dryMinutes", wilt: WILT_DRY_MINUTES, death: DEATH_DRY_MINUTES, cause: "thirst" };
+const UNTENDED_CLOCK = { key: "untendedMinutes", wilt: WILT_UNTENDED_MINUTES, death: DEATH_UNTENDED_MINUTES, cause: "neglect" };
+/**
+ * Run the given stress clocks for `span` minutes. Wilting costs WILT_PENALTY
+ * once, then time spent wilted accrues WILT_STRESS_PENALTY pro rata; the first
+ * clock to reach its death threshold kills the crop and nothing else accrues.
+ */
+function accrueStress(row, span, clocks, lethal) {
+    if (span <= 0 || !clocks.length || row.diedOf)
+        return row;
+    // Whichever clock reaches death first bounds the span everything accrues over.
+    // Non-lethal time (away) has a ceiling short of death instead, and never kills.
+    const ceiling = (clock) => lethal ? clock.death : Math.max(row[clock.key], clock.death - OFFLINE_RESCUE_MINUTES);
+    let lived = span;
+    let cause = "";
+    if (lethal) {
+        for (const clock of clocks) {
+            const untilDeath = clock.death - row[clock.key];
+            if (untilDeath <= lived) {
+                lived = Math.max(0, untilDeath);
+                cause = clock.cause;
+            }
+        }
+    }
+    let next = row;
+    let penalty = row.carePenalty;
+    for (const clock of clocks) {
+        const before = row[clock.key];
+        const after = Math.min(ceiling(clock), before + lived);
+        if (before < clock.wilt && after >= clock.wilt)
+            penalty += WILT_PENALTY;
+        penalty += WILT_STRESS_PENALTY * Math.max(0, after - Math.max(before, clock.wilt)) / (clock.death - clock.wilt);
+        next = { ...next, [clock.key]: after };
+    }
+    return { ...next, carePenalty: Math.min(MAX_CARE_PENALTY, penalty), diedOf: cause };
+}
+/** Simulate `elapsed` farm minutes of one crop's life. Dead crops are frozen. */
+function simulateCrop(row, elapsed, lethal = true) {
+    const span = Math.max(0, finite(elapsed));
+    if (row.diedOf || span <= 0)
+        return row;
     const definition = findCrop(row.cropId);
-    const elapsed = Math.max(0, finite(now) - row.lastFarmMinute);
-    const hydrated = Math.min(elapsed, row.moistureMinutes);
     const gate = definition.growMinutes * CARE_GATE;
-    const growthLimit = row.tended ? definition.growMinutes : gate;
-    return {
-        ...row,
-        growthMinutes: Math.min(growthLimit, row.growthMinutes + hydrated),
-        moistureMinutes: Math.max(0, row.moistureMinutes - elapsed),
-        lastFarmMinute: Math.max(row.lastFarmMinute, finite(now, row.lastFarmMinute)),
-    };
+    const limit = row.tended ? definition.growMinutes : gate;
+    // While moisture lasts the crop grows until it reaches its limit (the gate,
+    // or ripeness once tended); a moist crop can still sit untended at the gate.
+    const wet = Math.min(span, row.moistureMinutes);
+    const growing = Math.min(wet, Math.max(0, limit - row.growthMinutes));
+    let next = { ...row, growthMinutes: Math.min(limit, row.growthMinutes + growing), moistureMinutes: Math.max(0, row.moistureMinutes - span) };
+    const ripe = () => next.growthMinutes >= definition.growMinutes;
+    const blockedAtGate = () => !next.tended && next.growthMinutes >= gate && !ripe();
+    if (blockedAtGate())
+        next = accrueStress(next, wet - growing, [UNTENDED_CLOCK], lethal);
+    // Then the rest of the span is dry: growth has stopped, and an unripe crop suffers for it.
+    const dry = span - wet;
+    if (dry > 0 && !next.diedOf && !ripe())
+        next = accrueStress(next, dry, blockedAtGate() ? [DRY_CLOCK, UNTENDED_CLOCK] : [DRY_CLOCK], lethal);
+    return next;
+}
+function advanceCrop(row, now) {
+    const target = finite(now, row.lastFarmMinute);
+    return { ...simulateCrop(row, target - row.lastFarmMinute), lastFarmMinute: Math.max(row.lastFarmMinute, target) };
 }
 export function advanceAgriculture(value, now) {
     return freezeAgriculture({ inventory: value.inventory, crops: value.crops.map((row) => advanceCrop(row, now)) });
+}
+/**
+ * Bring every crop to `now`, then give it `extraMinutes` more of life without
+ * the farm clock moving. This is how offline production reaches crops while
+ * everything else on the farm — pets above all — stays paused. Those extra
+ * minutes can wilt a crop but never kill it (OFFLINE_RESCUE_MINUTES).
+ */
+export function advanceAgricultureBy(value, extraMinutes, now) {
+    return freezeAgriculture({
+        inventory: value.inventory,
+        crops: value.crops.map((row) => ({ ...simulateCrop(advanceCrop(row, now), extraMinutes, false) })),
+    });
+}
+/** What a ripe crop yields: the catalog yield less its care penalty, never below one. */
+export function cropHarvestYield(row) {
+    const definition = findCrop(row.cropId);
+    if (!definition || row.diedOf)
+        return 0;
+    return Math.max(1, Math.round(definition.yield * (1 - Math.min(MAX_CARE_PENALTY, row.carePenalty))));
 }
 export function cropStatus(row, now) {
     const current = advanceCrop(row, now);
     const definition = findCrop(current.cropId);
     const progress = Math.min(1, current.growthMinutes / definition.growMinutes);
-    const mature = progress >= 1;
+    const dead = Boolean(current.diedOf);
+    const mature = !dead && progress >= 1;
+    const growing = !dead && !mature;
+    const thirsty = growing && current.moistureMinutes <= 0;
+    const wilted = growing && (current.dryMinutes >= WILT_DRY_MINUTES || current.untendedMinutes >= WILT_UNTENDED_MINUTES);
     return Object.freeze({
         stage: Math.min(3, Math.floor(progress * 4)),
         mature,
-        thirsty: !mature && current.moistureMinutes <= 0,
-        needsCare: !mature && !current.tended && progress >= CARE_GATE,
+        thirsty,
+        needsCare: growing && !current.tended && progress >= CARE_GATE,
         progress,
+        condition: dead ? "dead" : wilted ? "wilted" : thirsty ? "thirsty" : "healthy",
+        wilted,
+        dead,
+        harvestYield: mature ? cropHarvestYield(current) : 0,
     });
 }
 function result(agriculture, ok, reason = "") {
     return Object.freeze({ ok, reason, agriculture });
 }
-export function plantFarmCrop(value, plotId, cellId, cropId, now) {
+/** `capacity` is how many crops may be in the ground at once (farm-capacity.mts); planting past it is refused. */
+export function plantFarmCrop(value, plotId, cellId, cropId, now, capacity = Infinity) {
     const agriculture = advanceAgriculture(value, now);
     const definition = findCrop(cropId);
     if (!definition)
@@ -187,33 +299,58 @@ export function plantFarmCrop(value, plotId, cellId, cropId, now) {
         return result(agriculture, false, "occupied");
     if ((agriculture.inventory.seeds[cropId] ?? 0) <= 0)
         return result(agriculture, false, "no_seeds");
+    if (agriculture.crops.length >= capacity)
+        return result(agriculture, false, "at_capacity");
     const seeds = { ...agriculture.inventory.seeds, [cropId]: agriculture.inventory.seeds[cropId] - 1 };
-    const cropRow = { plotId, cellId, cropId, growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: now };
+    const cropRow = {
+        plotId, cellId, cropId, growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: now,
+        dryMinutes: 0, untendedMinutes: 0, carePenalty: 0, diedOf: "",
+    };
     return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, seeds: Object.freeze(seeds) }), crops: [...agriculture.crops, cropRow] }), true);
 }
+function updateCrop(agriculture, plotId, cellId, change) {
+    return freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((row) => row.plotId === plotId && row.cellId === cellId ? change(row) : row) });
+}
+/** Watering a living crop fills its soil and ends its dry spell. A dead crop cannot be watered back. */
 export function waterFarmCrop(value, plotId, cellId, now) {
     const agriculture = advanceAgriculture(value, now);
-    if (!agriculture.crops.some((row) => row.plotId === plotId && row.cellId === cellId))
+    const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
+    if (!row)
         return result(agriculture, false, "empty");
-    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((row) => row.plotId === plotId && row.cellId === cellId ? { ...row, moistureMinutes: MOISTURE_CAPACITY_MINUTES } : row) }), true);
+    if (row.diedOf)
+        return result(agriculture, false, "dead");
+    return result(updateCrop(agriculture, plotId, cellId, (entry) => ({ ...entry, moistureMinutes: MOISTURE_CAPACITY_MINUTES, dryMinutes: 0 })), true);
 }
 export function tendFarmCrop(value, plotId, cellId, now) {
     const agriculture = advanceAgriculture(value, now);
     const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
     if (!row)
         return result(agriculture, false, "empty");
+    if (row.diedOf)
+        return result(agriculture, false, "dead");
     if (!cropStatus(row, now).needsCare)
         return result(agriculture, false, "not_ready");
-    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.map((entry) => entry.plotId === plotId && entry.cellId === cellId ? { ...entry, tended: true } : entry) }), true);
+    return result(updateCrop(agriculture, plotId, cellId, (entry) => ({ ...entry, tended: true, untendedMinutes: 0 })), true);
 }
 export function harvestFarmCrop(value, plotId, cellId, now) {
     const agriculture = advanceAgriculture(value, now);
     const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
     if (!row)
         return result(agriculture, false, "empty");
+    if (row.diedOf)
+        return result(agriculture, false, "dead");
     if (!cropStatus(row, now).mature)
         return result(agriculture, false, "not_ready");
-    const definition = findCrop(row.cropId);
-    const produce = { ...agriculture.inventory.produce, [row.cropId]: Math.min(MAX_STACK, agriculture.inventory.produce[row.cropId] + definition.yield) };
+    const produce = { ...agriculture.inventory.produce, [row.cropId]: Math.min(MAX_STACK, agriculture.inventory.produce[row.cropId] + cropHarvestYield(row)) };
     return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, produce: Object.freeze(produce) }), crops: agriculture.crops.filter((entry) => entry.plotId !== plotId || entry.cellId !== cellId) }), true);
+}
+/** Dig out a dead crop. It yields nothing and its seed is gone; only then is the cell free again. */
+export function clearDeadFarmCrop(value, plotId, cellId, now) {
+    const agriculture = advanceAgriculture(value, now);
+    const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
+    if (!row)
+        return result(agriculture, false, "empty");
+    if (!row.diedOf)
+        return result(agriculture, false, "alive");
+    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.filter((entry) => entry !== row) }), true);
 }

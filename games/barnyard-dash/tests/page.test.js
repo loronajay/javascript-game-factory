@@ -39,3 +39,16 @@ test("catalog metadata classifies Barnyard Dash as a 3D solo cabinet", () => {
   assert.deepEqual(metadata.play_modes, ["solo"]);
   assert.equal(metadata.players, "1-8");
 });
+
+test("the pre-race menu uses the shared Farm Field Day presentation", () => {
+  const html = readFileSync(resolve(root, "index.html"), "utf8");
+  const css = readFileSync(resolve(root, "style.css"), "utf8");
+
+  assert.match(html, /class="panel__header"/);
+  assert.match(html, /class="event-chip"/);
+  assert.match(html, /class="menu-rules"/);
+  assert.match(html, /Pick a pet, size up the field, and chase the checkered barn/);
+  assert.match(css, /\.setup-panel::before/);
+  assert.match(css, /\.event-chip/);
+  assert.match(css, /\.menu-rules/);
+});

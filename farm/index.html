@@ -48,12 +48,19 @@
       </div>
     </section>
 
+    <section id="awayReport" class="away-report" aria-live="polite" hidden>
+      <span class="eyebrow">YOUR FIELD</span>
+      <h2 data-away-heading>While you were away</h2>
+      <ul data-away-lines></ul>
+      <button type="button" data-away-close>Got it</button>
+    </section>
+
     <div id="farmPrompt" class="farm-prompt" aria-live="polite"></div>
     <div class="farm-clock" aria-label="Farm time">
       <span id="farmClockPhase">Morning</span>
       <strong id="farmClock">8:00 AM</strong>
     </div>
-    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong></div>
+    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small></div>
     <div class="control-hint" aria-hidden="true">
       <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Pet · Plant · Water · Harvest</span><span><b>G</b> Feed pet</span><span><b>C</b> Carry pet</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>I</b> Inventory</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
     </div>
@@ -109,6 +116,7 @@
         <span class="eyebrow">FARMHOUSE BED</span>
         <h2 id="napHeading">How long should we nap?</h2>
         <p id="napStatus">The farm keeps moving while you sleep.</p>
+        <p id="napBank" class="nap-dialog__bank"></p>
         <div class="nap-dialog__choices">
           <button type="button" data-nap-hours="1">1 hour</button>
           <button type="button" data-nap-hours="3">3 hours</button>

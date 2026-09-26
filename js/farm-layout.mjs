@@ -21,6 +21,7 @@ import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { createStarterAgriculture, normalizeAgriculture } from "./farm-crops.mjs";
+import { NAP_BANK_CAPACITY_MINUTES, napBankAt } from "./farm-nap-bank.mjs";
 import { createPetProfile, normalizePetProfile } from "./farm-pet-care.mjs";
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
 export const FARM_LAYOUT_VERSION = 3;
@@ -78,7 +79,7 @@ export function createDefaultFarmLayout(random = Math.random) {
         petHistory: Object.freeze([]),
         decor: STARTER_FARM_DECOR,
         agriculture: createStarterAgriculture(random),
-        clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0 }),
+        clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES }),
     });
 }
 function freezeLayout(layout) {
@@ -269,6 +270,9 @@ export function normalizeFarmLayout(value) {
     const clock = {
         farmMinutes: finiteNumber(rawClock.farmMinutes) ? Math.max(0, rawClock.farmMinutes) : 8 * 60,
         updatedAt: finiteNumber(rawClock.updatedAt) ? Math.max(0, rawClock.updatedAt) : 0,
+        checkpointAt: finiteNumber(rawClock.checkpointAt) ? Math.max(0, rawClock.checkpointAt) : 0,
+        // Nap minutes available as of `updatedAt` (farm-nap-bank.mts). Absent = full.
+        napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
     };
     return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, clock });
 }
@@ -348,8 +352,27 @@ export function withFarmPets(layout, pets) {
 export function withPetHistory(layout, petHistory) {
     return freezeLayout({ ...layout, petHistory: [...petHistory] });
 }
+/**
+ * Stamp the clock at real time `updatedAt`. The nap bank is held "as of
+ * updatedAt", so restamping refills it for the real time in between.
+ */
 export function withFarmClock(layout, farmMinutes, updatedAt) {
-    return freezeLayout({ ...layout, clock: { farmMinutes: Math.max(0, farmMinutes), updatedAt: Math.max(0, updatedAt) } });
+    const stamp = Math.max(0, updatedAt);
+    const napBank = napBankAt(layout.clock.napBank, layout.clock.updatedAt, Math.max(stamp, layout.clock.updatedAt));
+    return freezeLayout({ ...layout, clock: { ...layout.clock, farmMinutes: Math.max(0, farmMinutes), updatedAt: stamp, napBank } });
+}
+/** The nap bank right now, without changing the layout. */
+export function farmNapBank(layout, now) {
+    return napBankAt(layout.clock.napBank, layout.clock.updatedAt, now);
+}
+/** Draw a nap from the bank at real time `now`. The caller has checked it fits. */
+export function withNapTaken(layout, minutes, farmMinutes, now) {
+    const stamped = withFarmClock(layout, farmMinutes, now);
+    return freezeLayout({ ...stamped, clock: { ...stamped.clock, napBank: Math.max(0, stamped.clock.napBank - Math.max(0, minutes)) } });
+}
+/** Record that the owner is on the farm at real time `at`: offline production counts from here. */
+export function withProductionCheckpoint(layout, at) {
+    return freezeLayout({ ...layout, clock: { ...layout.clock, checkpointAt: Number.isFinite(at) ? Math.max(0, at) : 0 } });
 }
 export function farmDecorRowsEqual(first, second) {
     return first.instanceId === second.instanceId && first.itemId === second.itemId
@@ -363,6 +386,8 @@ export function farmLayoutsEqual(first, second) {
         && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
         && first.clock.farmMinutes === second.clock.farmMinutes
         && first.clock.updatedAt === second.clock.updatedAt
+        && first.clock.checkpointAt === second.clock.checkpointAt
+        && first.clock.napBank === second.clock.napBank
         && first.pets.length === second.pets.length
         && first.pets.every((pet, index) => {
             const other = second.pets[index];

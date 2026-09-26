@@ -36,7 +36,7 @@ test("a new farm waits for a named dog and receives one plot plus six persisted 
   assert.equal(Object.values(layout.agriculture.inventory.seeds).filter((count) => count === 1).length, 6);
   assert.equal(Object.values(layout.agriculture.inventory.seeds).filter((count) => count === 0).length, CROP_CATALOG.length - 6);
   assert.deepEqual(layout.agriculture.crops, []);
-  assert.deepEqual(layout.clock, { farmMinutes: 480, updatedAt: 0 });
+  assert.deepEqual(layout.clock, { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 });
   assert.ok(Object.isFrozen(layout));
   // The slice-1 field, as rows: a fenced perimeter with a gate, the barn, trees, hay and the trough.
   const kinds = STARTER_FARM_DECOR.map((row) => row.itemId);

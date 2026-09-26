@@ -138,12 +138,16 @@ export async function saveGarage(pool: any, { playerId, gameSlug, garage }: any 
     const db = client ?? pool;
     if (client) await client.query("begin");
     const current = await db.query(
-      `select garage from game_loadouts where player_id = $1 and game_slug = $2 for update`,
+      `select garage, updated_at from game_loadouts where player_id = $1 and game_slug = $2 for update`,
       [normalizedPlayerId, slug],
     );
     const context = {
       ...await getOwnershipContext(db, normalizedPlayerId, slug, catalog),
       currentGarage: current.rows[0]?.garage ?? null,
+      // When that stored garage was written, and the server's now: a catalog that
+      // bounds client-run time (the farm clock) measures real time with these.
+      currentSavedAt: current.rows[0]?.updated_at ? new Date(current.rows[0].updated_at).getTime() : null,
+      now: Date.now(),
     };
     const normalized = catalog.normalizeGarage(garage, context);
     await db.query(

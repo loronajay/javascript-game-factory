@@ -5,6 +5,18 @@ import { resolve } from "node:path";
 
 import {
   CARE_GATE,
+  DEAD_CROP_MODELS,
+  DEATH_DRY_MINUTES,
+  DEATH_UNTENDED_MINUTES,
+  FARM_DAY_MINUTES,
+  MAX_CARE_PENALTY,
+  WILT_DRY_MINUTES,
+  WILT_PENALTY,
+  WILT_UNTENDED_MINUTES,
+  advanceAgricultureBy,
+  clearDeadFarmCrop,
+  cropHarvestYield,
+  deadCropModel,
   CROP_CATALOG,
   MOISTURE_CAPACITY_MINUTES,
   GREENHOUSE_CELL_LAYOUT,
@@ -143,6 +155,10 @@ test("one seed creates one plant and all six cells in the same plot can be plant
     thirsty: true,
     needsCare: false,
     progress: 0,
+    condition: "thirsty",
+    wilted: false,
+    dead: false,
+    harvestYield: 0,
   });
   assert.equal(plantFarmCrop(planted.agriculture, "soil-1", "cell-0", "radish", 480).reason, "occupied");
   assert.equal(plantFarmCrop(starter, "soil-1", "cell-0", "missing", 480).reason, "unknown_crop");
@@ -216,4 +232,159 @@ test("stored agriculture is bounded and unknown crop or orphan plot rows are dis
   assert.equal(normalized.crops[0].growthMinutes, carrot.growMinutes);
   assert.equal(normalized.crops[0].moistureMinutes, MOISTURE_CAPACITY_MINUTES);
   assert.equal(normalized.crops[0].cellId, "cell-0", "legacy whole-plot crops migrate into the first cell");
+});
+
+// ---------------------------------------------------------------- crop condition: thirsty → wilted → dead
+
+const PLOT = new Set(["soil-1"]);
+const seeded = () => normalizeAgriculture({ inventory: { seeds: { carrot: 5, pumpkin: 5, potato: 5 } } }, PLOT);
+const plant = (cropId = "carrot", at = 0) => plantFarmCrop(seeded(), "soil-1", "cell-0", cropId, at).agriculture;
+const only = (agriculture, now) => cropStatus(agriculture.crops[0], now);
+
+test("the neglect thresholds are the plan's: a day dry wilts, three kill; two days untended wilt, four kill", () => {
+  assert.equal(WILT_DRY_MINUTES, FARM_DAY_MINUTES);
+  assert.equal(DEATH_DRY_MINUTES, 3 * FARM_DAY_MINUTES);
+  assert.equal(WILT_UNTENDED_MINUTES, 2 * FARM_DAY_MINUTES);
+  assert.equal(DEATH_UNTENDED_MINUTES, 4 * FARM_DAY_MINUTES);
+});
+
+test("a dry crop is thirsty, then wilted after a farm day, and watering rescues it with a lasting penalty", () => {
+  let agriculture = plant();
+  assert.equal(only(agriculture, WILT_DRY_MINUTES - 1).condition, "thirsty");
+  agriculture = advanceAgriculture(agriculture, WILT_DRY_MINUTES + 60);
+  const wilted = only(agriculture, WILT_DRY_MINUTES + 60);
+  assert.equal(wilted.condition, "wilted");
+  assert.equal(wilted.wilted, true);
+  assert.ok(agriculture.crops[0].carePenalty >= WILT_PENALTY);
+
+  const rescued = waterFarmCrop(agriculture, "soil-1", "cell-0", WILT_DRY_MINUTES + 60);
+  assert.equal(rescued.ok, true);
+  assert.equal(rescued.agriculture.crops[0].dryMinutes, 0);
+  assert.equal(only(rescued.agriculture, WILT_DRY_MINUTES + 60).condition, "healthy");
+  assert.equal(rescued.agriculture.crops[0].carePenalty, agriculture.crops[0].carePenalty, "the penalty never resets");
+  const later = advanceAgriculture(rescued.agriculture, WILT_DRY_MINUTES + 600);
+  assert.ok(later.crops[0].growthMinutes > 0, "a rescued crop grows again");
+});
+
+test("three farm days dry kills a crop: it cannot be watered, tended or harvested, only cleared", () => {
+  const agriculture = advanceAgriculture(plant(), DEATH_DRY_MINUTES + 500);
+  const now = DEATH_DRY_MINUTES + 500;
+  const status = only(agriculture, now);
+  assert.equal(status.dead, true);
+  assert.equal(status.condition, "dead");
+  assert.equal(status.harvestYield, 0);
+  assert.equal(agriculture.crops[0].diedOf, "thirst");
+  assert.equal(agriculture.crops[0].dryMinutes, DEATH_DRY_MINUTES, "the clock stops at death");
+  const frozen = advanceAgriculture(agriculture, now + 50_000);
+  assert.deepEqual({ ...frozen.crops[0], lastFarmMinute: 0 }, { ...agriculture.crops[0], lastFarmMinute: 0 }, "a dead crop never changes again");
+
+  assert.equal(waterFarmCrop(agriculture, "soil-1", "cell-0", now).reason, "dead");
+  assert.equal(tendFarmCrop(agriculture, "soil-1", "cell-0", now).reason, "dead");
+  assert.equal(harvestFarmCrop(agriculture, "soil-1", "cell-0", now).reason, "dead");
+  assert.equal(plantFarmCrop(agriculture, "soil-1", "cell-0", "carrot", now).reason, "occupied", "a dead crop still holds its cell");
+
+  const seedsBefore = agriculture.inventory.seeds.carrot;
+  const cleared = clearDeadFarmCrop(agriculture, "soil-1", "cell-0", now);
+  assert.equal(cleared.ok, true);
+  assert.equal(cleared.agriculture.crops.length, 0);
+  assert.equal(cleared.agriculture.inventory.seeds.carrot, seedsBefore, "the seed is gone for good");
+  assert.equal(cleared.agriculture.inventory.produce.carrot, 0);
+  assert.equal(plantFarmCrop(cleared.agriculture, "soil-1", "cell-0", "carrot", now).ok, true);
+});
+
+test("a living crop cannot be cleared", () => {
+  assert.equal(clearDeadFarmCrop(plant(), "soil-1", "cell-0", 10).reason, "alive");
+  assert.equal(clearDeadFarmCrop(plant(), "soil-1", "cell-5", 10).reason, "empty");
+});
+
+/** Keep the one crop watered every 10 farm hours so only the untended clock can matter. */
+function wateredUntil(agriculture, now, done) {
+  while (!done(agriculture, now)) {
+    agriculture = waterFarmCrop(agriculture, "soil-1", "cell-0", now).agriculture;
+    now += 600;
+    agriculture = advanceAgriculture(agriculture, now);
+  }
+  return { agriculture, now };
+}
+
+test("a moist crop left at the care gate wilts after two days and dies of neglect after four", () => {
+  let { agriculture, now } = wateredUntil(plant(), 0, (a, t) => only(a, t).wilted);
+  assert.ok(agriculture.crops[0].untendedMinutes >= WILT_UNTENDED_MINUTES);
+  assert.ok(agriculture.crops[0].untendedMinutes < WILT_UNTENDED_MINUTES + 600);
+  assert.equal(agriculture.crops[0].dryMinutes, 0);
+  assert.equal(only(agriculture, now).needsCare, true, "a wilted crop can still be tended");
+  ({ agriculture, now } = wateredUntil(agriculture, now, (a) => Boolean(a.crops[0].diedOf)));
+  assert.equal(agriculture.crops[0].diedOf, "neglect");
+  assert.equal(agriculture.crops[0].untendedMinutes, DEATH_UNTENDED_MINUTES);
+});
+
+test("tending a wilted crop resets its neglect clock", () => {
+  const { agriculture, now } = wateredUntil(plant(), 0, (a, t) => only(a, t).wilted);
+  const tended = tendFarmCrop(agriculture, "soil-1", "cell-0", now);
+  assert.equal(tended.ok, true);
+  assert.equal(tended.agriculture.crops[0].untendedMinutes, 0);
+  assert.equal(only(tended.agriculture, now).wilted, false);
+});
+
+test("a ripe crop does not suffer: dryness and the gate only threaten unripe plants", () => {
+  const ripe = normalizeAgriculture({ inventory: { seeds: {} }, crops: [{ plotId: "soil-1", cellId: "cell-0", cropId: "carrot", growthMinutes: carrot.growMinutes, moistureMinutes: 0, tended: true, lastFarmMinute: 0 }] }, PLOT);
+  const later = advanceAgriculture(ripe, DEATH_DRY_MINUTES * 5);
+  assert.equal(later.crops[0].diedOf, "");
+  assert.equal(later.crops[0].dryMinutes, 0);
+  assert.equal(only(later, DEATH_DRY_MINUTES * 5).harvestYield, carrot.yield);
+});
+
+test("care penalty lowers the harvest, capped, and never below one", () => {
+  const row = (carePenalty, cropId = "carrot") => ({ plotId: "soil-1", cellId: "cell-0", cropId, growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: 0, dryMinutes: 0, untendedMinutes: 0, carePenalty, diedOf: "" });
+  const potatoYield = CROP_CATALOG.find((crop) => crop.id === "potato").yield;
+  assert.equal(cropHarvestYield(row(0, "potato")), potatoYield);
+  assert.ok(cropHarvestYield(row(0.4, "potato")) < potatoYield);
+  assert.equal(cropHarvestYield(row(5, "potato")), cropHarvestYield(row(MAX_CARE_PENALTY, "potato")));
+  assert.equal(cropHarvestYield(row(MAX_CARE_PENALTY, "pumpkin")), 1);
+  assert.equal(cropHarvestYield({ ...row(0), diedOf: "thirst" }), 0);
+});
+
+test("a crop that nearly died of thirst pays for it at harvest", () => {
+  let now = DEATH_DRY_MINUTES - 60; // a close call
+  let agriculture = waterFarmCrop(advanceAgriculture(plant("potato"), now), "soil-1", "cell-0", now).agriculture;
+  assert.ok(agriculture.crops[0].carePenalty > WILT_PENALTY + 0.2);
+  while (!only(agriculture, now).mature) {
+    if (only(agriculture, now).needsCare) agriculture = tendFarmCrop(agriculture, "soil-1", "cell-0", now).agriculture;
+    agriculture = waterFarmCrop(agriculture, "soil-1", "cell-0", now).agriculture;
+    now += 600;
+    agriculture = advanceAgriculture(agriculture, now);
+  }
+  const potato = CROP_CATALOG.find((crop) => crop.id === "potato");
+  const harvested = harvestFarmCrop(agriculture, "soil-1", "cell-0", now);
+  assert.ok(harvested.agriculture.inventory.produce.potato < potato.yield);
+  assert.ok(harvested.agriculture.inventory.produce.potato >= 1);
+});
+
+test("extra offline minutes give crops life without moving the farm clock", () => {
+  const watered = waterFarmCrop(plant(), "soil-1", "cell-0", 0).agriculture;
+  const later = advanceAgricultureBy(watered, 300, 0);
+  assert.equal(later.crops[0].growthMinutes, 300);
+  assert.equal(later.crops[0].lastFarmMinute, 0, "crop time is anchored to the paused clock");
+  assert.equal(advanceAgriculture(later, 0).crops[0].growthMinutes, 300, "no double counting at the same clock minute");
+});
+
+test("legacy crop rows load healthy, and death survives normalization", () => {
+  const legacy = normalizeAgriculture({ crops: [{ plotId: "soil-1", cellId: "cell-0", cropId: "carrot", growthMinutes: 10, moistureMinutes: 10, tended: false, lastFarmMinute: 0 }] }, PLOT);
+  const row = legacy.crops[0];
+  assert.deepEqual({ dry: row.dryMinutes, untended: row.untendedMinutes, penalty: row.carePenalty, diedOf: row.diedOf }, { dry: 0, untended: 0, penalty: 0, diedOf: "" });
+  const dead = normalizeAgriculture({ crops: [{ ...row, diedOf: "neglect", carePenalty: 9, dryMinutes: 1e9 }] }, PLOT);
+  assert.equal(dead.crops[0].diedOf, "neglect");
+  assert.equal(dead.crops[0].carePenalty, MAX_CARE_PENALTY);
+  assert.equal(dead.crops[0].dryMinutes, DEATH_DRY_MINUTES);
+  assert.equal(normalizeAgriculture({ crops: [{ ...row, diedOf: "boredom" }] }, PLOT).crops[0].diedOf, "");
+});
+
+test("the withered dead-plant models exist in three sizes and share the pack texture", () => {
+  assert.equal(DEAD_CROP_MODELS.length, 3);
+  assert.equal(deadCropModel(0), DEAD_CROP_MODELS[0]);
+  assert.equal(deadCropModel(3), DEAD_CROP_MODELS[2], "ripe and stage-2 crops die into the largest size");
+  for (const file of DEAD_CROP_MODELS) {
+    assert.equal(existsSync(resolve(cropAssets, file)), true, file);
+    assert.equal(glbJson(file).images?.[0]?.uri, "Textures/Texture%20Map.png", file);
+  }
 });

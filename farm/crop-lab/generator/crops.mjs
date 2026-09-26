@@ -582,6 +582,71 @@ function blueberry(b, r, stage) {
   }
 }
 
+// ------------------------------------------------------------------ the dead plant
+
+// What a crop that died of neglect looks like: one generic withered plant in
+// three sizes, so a dead crop never reads as harvestable. Brown, collapsed,
+// curled; a snapped stalk or two on the bigger ones and leaf litter on the soil.
+const DEAD = {
+  stalk: paint(1, 0, 0.05, 0.75),
+  leaf: paint(8, 0, 0, 1),
+  leafDark: paint(9, 0, 0.35, 1),
+  rust: paint(2, 0, 0.2, 1),
+  straw: paint(1, 3, 0.35, 1),
+};
+
+function witheredLeaf(b, r, origin, yaw, size, material) {
+  at(b, chain(aim(origin, heading(yaw, 0.1 + r.jitter(0.2))), rotZ(r.jitter(0.6))), leaf({
+    length: size, width: size * r.range(0.18, 0.26), lift: r.range(-0.1, 0.35), droop: r.range(1.8, 2.6),
+    fold: r.range(0.6, 0.9), steps: 4, serrate: 0.3, twist: r.jitter(0.9), simple: true,
+    profile: (s) => Math.pow(Math.sin(Math.PI * Math.min(1, s * 0.95 + 0.05)), 0.9),
+  }), material);
+}
+
+/** A dry stalk arching over from the crown; a snapped one kinks and hangs its top half. Returns its points. */
+function deadStalk(b, r, yaw, height, snapped) {
+  const lean = r.range(0.2, 0.55);
+  const radius = 0.0045 + height * 0.028;
+  if (!snapped) {
+    const points = arc([0, 0.002, 0], heading(yaw, 1.25 - lean * 0.5), height, { bend: [Math.sin(yaw) * height * lean, -height * lean * 0.85, Math.cos(yaw) * height * lean], steps: 6 });
+    stemAlong(b, points, radius, radius * 0.45, DEAD.stalk, 4);
+    return points;
+  }
+  const lower = arc([0, 0.002, 0], heading(yaw, 1.4), height * 0.55, { bend: [Math.sin(yaw) * height * 0.06, 0, Math.cos(yaw) * height * 0.06], steps: 3 });
+  const kink = stemAlong(b, lower, radius, radius * 0.75, DEAD.stalk, 4);
+  const hang = arc(kink, heading(yaw + r.jitter(0.5), -1.1), height * 0.5, { bend: [Math.sin(yaw) * height * 0.08, height * 0.05, Math.cos(yaw) * height * 0.08], steps: 4 });
+  stemAlong(b, hang, radius * 0.7, radius * 0.35, DEAD.stalk, 4);
+  return [...lower, ...hang.slice(1)];
+}
+
+function deadPlant(b, r, size) {
+  const stalks = [3, 5, 7][size];
+  const height = [0.06, 0.13, 0.22][size];
+  const leafSize = [0.03, 0.05, 0.07][size];
+  const crown = r() * TAU;
+  const leafMats = [DEAD.leaf, DEAD.leafDark, DEAD.rust, DEAD.straw];
+  for (let i = 0; i < stalks; i++) {
+    const yaw = crown + (i / stalks) * TAU + r.jitter(0.35);
+    const points = deadStalk(b, r, yaw, height * r.range(0.75, 1.1), size > 0 && i % 3 === 1);
+    const leaves = size === 0 ? 2 : 3;
+    for (let k = 0; k < leaves; k++) {
+      const point = points[Math.min(points.length - 1, Math.round(points.length * (0.45 + k * 0.3)))];
+      witheredLeaf(b, r, point, yaw + (k % 2 ? 1.3 : -1.3) + r.jitter(0.4), leafSize * r.range(0.8, 1.1), leafMats[(i + k) % leafMats.length]);
+    }
+  }
+  // Leaf litter: shed leaves lying curled on the soil round the crown.
+  for (let i = 0; i < [4, 7, 10][size]; i++) {
+    const yaw = r() * TAU;
+    const reach = height * r.range(0.35, 0.9);
+    at(b, chain(translate(Math.sin(yaw) * reach, 0.003, Math.cos(yaw) * reach), rotY(r() * TAU)), leaf({
+      length: leafSize * r.range(0.7, 1), width: leafSize * 0.24, lift: 0.05, droop: 0.15, fold: 0.75, steps: 3, serrate: 0.3, twist: r.jitter(0.5), simple: true,
+    }), leafMats[i % leafMats.length]);
+  }
+}
+
+/** The dead plant's three sizes: sprout, grown, and full-sized (stages 2 and ripe share it). */
+export const DEAD_PLANT = { id: "dead", title: "Dead", sizes: 3, draw: deadPlant };
+
 // ------------------------------------------------------------------ catalog of generated crops
 
 /**

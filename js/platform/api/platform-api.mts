@@ -581,6 +581,10 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     purchaseFarmSupply({ itemId, quantity, purchaseId }: { itemId: string; quantity: number; purchaseId: string }) {
       return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId }, "purchase", {}, true);
     },
+    /** The server decides ripeness and yield; the client sends its farm and names the cell. */
+    harvestFarmCrop({ layout, plotId, cellId }: { layout: unknown; plotId: string; cellId: string }) {
+      return post("/games/farm/harvests", { layout, plotId, cellId }, "harvest", {}, true);
+    },
     recordGameProgressClaim(gameSlug: string, claim: unknown = {}) {
       const encoded = encodePathSegment(gameSlug);
       return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);

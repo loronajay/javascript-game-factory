@@ -1,6 +1,7 @@
 import { spendTicketsInTransaction } from "./tickets.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply } from "../services/farm-economy-catalog.mjs";
+import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 const MAX_PETS = 12;
 const MAX_STACK = 99;
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -142,5 +143,70 @@ export async function purchaseFarmSupply(pool, input) {
         }, { ownedEntitlementIds: farm.owned });
         await saveFarm(client, playerId, next);
         return { ok: true, duplicate: false, price: total, quantity, balance: spend.balance, layout: next };
+    });
+}
+const CELL_ID = /^cell-[0-5]$/;
+const PLOT_ID = /^[A-Za-z0-9_-]{1,40}$/;
+/**
+ * A harvest is the only way produce enters a farm. The client sends its farm as
+ * it stands (the same document a save would) and names one cell; inside one
+ * locked transaction the server holds that document to everything it already
+ * knows — exactly the save guard: clock bounded by real time and the nap bank,
+ * each crop's growth bounded by its own stamp, produce unable to rise — then
+ * decides for itself whether that crop is ripe, what it yields, removes it and
+ * credits the produce. The canonical farm comes back either way, so a client
+ * whose view ran ahead of what the server accepts is corrected in place.
+ *
+ * Retrying a harvest that already landed is harmless: the crop is no longer
+ * stored, so the resubmitted row counts as newly planted and is nowhere near ripe.
+ */
+export async function harvestFarmCrop(pool, input, now = Date.now()) {
+    const playerId = required(input?.playerId, "playerId");
+    const plotId = required(input?.plotId, "plotId");
+    const cellId = required(input?.cellId, "cellId");
+    if (!PLOT_ID.test(plotId) || !CELL_ID.test(cellId))
+        throw new TypeError("invalid cell");
+    if (!input?.layout || typeof input.layout !== "object")
+        throw new TypeError("layout is required");
+    return transaction(pool, async (client) => {
+        const stored = await client.query(`select garage, updated_at from game_loadouts where player_id = $1 and game_slug = 'farm' for update`, [playerId]);
+        const row = stored.rows?.[0];
+        if (!row)
+            return { ok: false, error: "farm_not_initialized" };
+        const entitlements = await client.query(`select entitlement_id from game_entitlements where player_id = $1 and game_slug = 'farm'`, [playerId]);
+        const owned = new Set(entitlements.rows.map((entry) => String(entry.entitlement_id)));
+        const verified = normalizeFarmGarage(input.layout, {
+            ownedEntitlementIds: owned,
+            currentGarage: row.garage,
+            currentSavedAt: row.updated_at ? new Date(row.updated_at).getTime() : null,
+            now,
+        });
+        if (verified.onboarding?.status !== "complete")
+            return { ok: false, error: "farm_not_initialized" };
+        const crops = verified.agriculture?.crops ?? [];
+        const crop = crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
+        // Whatever happens to the harvest, the verified farm is what is now true.
+        const answer = async (result) => {
+            await saveFarm(client, playerId, result.layout);
+            return result;
+        };
+        if (!crop)
+            return answer({ ok: false, error: "empty", layout: verified });
+        if (crop.diedOf)
+            return answer({ ok: false, error: "dead", layout: verified });
+        const amount = farmHarvestYield(crop);
+        if (amount <= 0)
+            return answer({ ok: false, error: "not_ready", layout: verified });
+        const produce = { ...verified.agriculture.inventory.produce };
+        produce[crop.cropId] = Math.min(MAX_STACK, (Number(produce[crop.cropId]) || 0) + amount);
+        const layout = normalizeFarmGarage({
+            ...verified,
+            agriculture: {
+                ...verified.agriculture,
+                inventory: { ...verified.agriculture.inventory, produce },
+                crops: crops.filter((entry) => entry !== crop),
+            },
+        }, { ownedEntitlementIds: owned });
+        return answer({ ok: true, cropId: crop.cropId, quantity: amount, layout });
     });
 }

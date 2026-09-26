@@ -34,6 +34,8 @@
 import { FARM_CATALOG_IDS, FARM_STARTER_IDS } from "./farm-ticket-catalog.mjs";
 import { findFarmSpecies } from "./farm-economy-catalog.mjs";
 import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
+import { farmCropRule } from "./farm-crop-catalog.mjs";
+import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, verifyFarmClock } from "./farm-time-policy.mjs";
 
 export const FARM_GAME_SLUG = "farm";
 
@@ -83,7 +85,7 @@ function normalizeRotation(value: any): number | null {
 
 export function defaultFarmGarage(): any {
   // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {} }, crops: [] }, clock: { farmMinutes: 480, updatedAt: 0 } };
+  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {} }, crops: [] }, clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 } };
 }
 
 function normalizeCropCounts(value: any): any {
@@ -127,9 +129,77 @@ function normalizeAgriculture(value: any, decorIds: ReadonlySet<string>): any {
       moistureMinutes: Math.max(0, boundedNumber(row.moistureMinutes, 100000) ?? 0),
       tended: row.tended === true,
       lastFarmMinute: Math.max(0, boundedNumber(row.lastFarmMinute, 1000000000) ?? 0),
+      // Crop condition (js/farm-crops.mts): stress clocks, permanent care penalty, and death.
+      dryMinutes: Math.max(0, boundedNumber(row.dryMinutes, 100000) ?? 0),
+      untendedMinutes: Math.max(0, boundedNumber(row.untendedMinutes, 100000) ?? 0),
+      carePenalty: Math.max(0, boundedNumber(row.carePenalty, 1) ?? 0),
+      diedOf: row.diedOf === "thirst" || row.diedOf === "neglect" ? row.diedOf : "",
     });
   }
   return { inventory: { seeds: normalizeCropCounts(inventory.seeds), produce: normalizeCropCounts(inventory.produce), supplies: normalizeSupplyCounts(inventory.supplies) }, crops };
+}
+
+// Productive capacity (mirrors js/farm-capacity.mts). Growing plots are free,
+// repeatable decor, so the number of crops in the ground is what is capped:
+// Farming level 1 (no Farming skill exists yet) plus one greenhouse bonus,
+// however many greenhouses stand. Enforced on client SAVES only — crops already
+// stored always survive (a farm over the cap is grandfathered), and a new row
+// is accepted only while the farm is under capacity. Reads never trim.
+const BASE_CROP_CAPACITY = 6;
+const GREENHOUSE_CAPACITY_BONUS = 6;
+
+function cropCapacity(decor: any[]): number {
+  return BASE_CROP_CAPACITY + (decor.some((row: any) => row.itemId === "decor.building.greenhouse") ? GREENHOUSE_CAPACITY_BONUS : 0);
+}
+
+function capNewCrops(crops: any[], storedCrops: any[], capacity: number): any[] {
+  const key = (row: any) => `${row.plotId}:${row.cellId}:${row.cropId}`;
+  const stored = new Set(storedCrops.map(key));
+  const kept = crops.filter((row) => stored.has(key(row)));
+  for (const row of crops) {
+    if (stored.has(key(row))) continue;
+    if (kept.length >= capacity) break;
+    kept.push(row);
+  }
+  // Preserve the client's order: it is the order the farm draws and walks them in.
+  const accepted = new Set(kept);
+  return crops.filter((row) => accepted.has(row));
+}
+
+/**
+ * The trust boundary for a client save. The document is the client's, but the
+ * things that are worth something are held to what the server already knows:
+ *   - seeds and supplies can only fall (they rise through purchases and
+ *     adoptions); PRODUCE is the server's alone — a save cannot change it at
+ *     all, so a stale tab or a retried request can never undo a harvest;
+ *   - the clock may only advance by real time plus the nap bank;
+ *   - each crop may only grow as far as its own stamp moved inside that clock;
+ *   - no more crops than productive capacity, stored ones grandfathered.
+ */
+function guardFarmSave(garage: any, current: any, context: any): void {
+  const inventory = garage.agriculture.inventory;
+  const storedInventory = current?.agriculture?.inventory ?? { seeds: {}, produce: {}, supplies: {} };
+  const atMost = (submitted: any, stored: any) => Object.fromEntries(Object.entries(stored ?? {})
+    .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted?.[id]) || 0)]));
+  if (current) {
+    inventory.supplies = atMost(inventory.supplies, storedInventory.supplies);
+    inventory.seeds = atMost(inventory.seeds, storedInventory.seeds);
+  }
+  // Produce is only ever changed by server operations (harvest now; selling and
+  // cooking later). A first save starts with none.
+  inventory.produce = { ...(storedInventory.produce ?? {}) };
+
+  const now = typeof context.now === "number" && Number.isFinite(context.now) ? context.now : Date.now();
+  const storedAt = current?.clock ? (current.clock.verifiedAt ?? (typeof context.currentSavedAt === "number" ? context.currentSavedAt : null)) : null;
+  const verified = verifyFarmClock(current?.clock ?? null, storedAt, garage.clock.farmMinutes, now);
+  garage.clock.farmMinutes = Number(verified.farmMinutes.toFixed(4));
+  garage.clock.napBank = Number(verified.napBank.toFixed(4));
+  garage.clock.verifiedAt = verified.verifiedAt;
+
+  const storedCrops = Array.isArray(current?.agriculture?.crops) ? current.agriculture.crops : [];
+  const storedClockMinutes = current?.clock ? Number(current.clock.farmMinutes) || 0 : verified.farmMinutes;
+  const bounded = boundCropGrowth(garage.agriculture.crops, storedCrops, storedClockMinutes, verified, (cropId) => farmCropRule(cropId)?.growMinutes ?? 0);
+  garage.agriculture.crops = capNewCrops(bounded, storedCrops, cropCapacity(garage.decor ?? []));
 }
 
 function normalizePetProfile(value: any): any | null {
@@ -319,23 +389,23 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
   if (garage.version === 3) {
     const decorIds = new Set<string>((garage.decor ?? []).filter((row: any) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row: any) => String(row.instanceId)));
     garage.agriculture = normalizeAgriculture(input.agriculture, decorIds);
-    if (current?.agriculture?.inventory?.supplies) {
-      const stored = current.agriculture.inventory.supplies;
-      const submitted = garage.agriculture.inventory.supplies;
-      garage.agriculture.inventory.supplies = Object.fromEntries(Object.entries(stored)
-        .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted[id]) || 0)]));
-    }
-    if (current?.agriculture?.inventory?.seeds) {
-      const stored = current.agriculture.inventory.seeds;
-      const submitted = garage.agriculture.inventory.seeds;
-      garage.agriculture.inventory.seeds = Object.fromEntries(Object.entries(stored)
-        .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted[id]) || 0)]));
-    }
     const clock = input.clock && typeof input.clock === "object" ? input.clock : {};
     garage.clock = {
       farmMinutes: Math.max(0, boundedNumber(clock.farmMinutes, 1000000000) ?? 480),
       updatedAt: Math.max(0, boundedNumber(clock.updatedAt, 1000000000000000) ?? 0),
+      // Real time the owner was last on the farm; 0 = never entered, so no offline production.
+      checkpointAt: Math.max(0, boundedNumber(clock.checkpointAt, 1000000000000000) ?? 0),
+      // Farm minutes of naps available (js/farm-nap-bank.mts); absent = a full bank.
+      napBank: Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, boundedNumber(clock.napBank, 100000) ?? NAP_BANK_CAPACITY_MINUTES)),
     };
+    // Server time the clock was last verified. Only the server writes it; on a read it passes through.
+    const verifiedAt = boundedNumber(clock.verifiedAt, 1000000000000000);
+    if (verifiedAt !== null && verifiedAt > 0) garage.clock.verifiedAt = verifiedAt;
+    // A client SAVE (the store passes `currentGarage`, even when null) is where the
+    // farm's economic inventory is guarded. Reads and the server's own economy
+    // writes normalize stored documents and are not re-checked.
+    const saving = Boolean(context) && Object.prototype.hasOwnProperty.call(context, "currentGarage");
+    if (saving) guardFarmSave(garage, current, context);
   }
   return garage;
 }

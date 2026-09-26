@@ -28,9 +28,12 @@
       </aside>
 
       <section id="setupPanel" class="panel setup-panel">
-        <p class="kicker">Choose your racer</p>
-        <h2>Your pet. Your line.</h2>
-        <p class="lede">Race your actual 3D farm pet for three laps through mud, hurdles, hay and sweeping turns. Choose a 1v1 duel or fill the course with up to eight pets.</p>
+        <div class="panel__header">
+          <span class="event-chip">EVENT 01 · OBSTACLE RACE</span>
+          <p class="kicker">Choose your racer</p>
+          <h2>Your pet.<br><em>Your line.</em></h2>
+          <p class="lede">Pick a pet, size up the field, and chase the checkered barn through mud, hurdles, hay and sweeping turns.</p>
+        </div>
         <div id="petChoices" class="pet-choices" role="radiogroup" aria-label="Farm pets"></div>
         <label class="race-options" for="fieldSize">
           <span>Race field</span>
@@ -41,11 +44,11 @@
             <option value="8">Full field · 8 pets</option>
           </select>
         </label>
-        <div class="briefing">
-          <span><kbd>W</kbd> accelerate</span>
-          <span><kbd>S</kbd> brake</span>
-          <span><kbd>A</kbd><kbd>D</kbd> steer</span>
-          <span><kbd>Space</kbd> jump</span>
+        <div class="menu-rules">
+          <span><kbd>W</kbd><b>Drive</b><small>Accelerate</small></span>
+          <span><kbd>A D</kbd><b>Steer</b><small>Find the line</small></span>
+          <span><kbd>S</kbd><b>Brake</b><small>Own the turns</small></span>
+          <span><kbd>Space</kbd><b>Jump</b><small>Clear hurdles</small></span>
         </div>
         <button id="startRace" class="primary" type="button" disabled>Loading your farm…</button>
         <p id="loadNote" class="load-note" aria-live="polite"></p>

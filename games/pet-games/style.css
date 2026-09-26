@@ -1,22 +1,147 @@
-:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #102a24; color: #fff8df; }
+:root {
+  color-scheme: dark;
+  --ink: #f8f5e8;
+  --muted: #d9e0d3;
+  --race: #ffb43a;
+  --push: #5ce2e8;
+  font-family: Inter, ui-rounded, "Segoe UI", sans-serif;
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% 0%, #36785e, transparent 48%), linear-gradient(145deg, #153c31, #091d1d 72%); }
-main { width: min(1120px, calc(100% - 32px)); margin: auto; min-height: 100vh; display: grid; align-content: center; gap: 28px; padding: 40px 0; }
-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 18px; }
-header > div { text-align: center; } header > span { text-align: right; color: #bad4c1; }
-a { color: inherit; } header a { text-decoration: none; font-weight: 800; }
-p { margin: 0; color: #efcb6c; font-size: .74rem; font-weight: 900; letter-spacing: .18em; }
-h1 { margin: 4px 0 0; font-family: Georgia, serif; font-size: clamp(2.4rem, 7vw, 5.3rem); line-height: .92; }
-.event-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.event-card { min-height: 430px; padding: 28px; border: 1px solid #ffffff2c; border-radius: 26px; text-decoration: none; display: grid; align-content: space-between; overflow: hidden; position: relative; box-shadow: 0 25px 60px #0005; transition: transform .18s, border-color .18s; }
-.event-card:hover, .event-card:focus-visible { transform: translateY(-5px); border-color: #ffe28a; outline: none; }
-.event-card::after { content: ""; position: absolute; width: 270px; height: 270px; right: -60px; top: -60px; border-radius: 50%; border: 34px solid #ffffff12; box-shadow: inset 0 0 0 32px #0001; }
-.event-card--race { background: linear-gradient(145deg, #825a2f, #3c6b36); }
-.event-card--push { background: radial-gradient(circle at 78% 20%, #d8ad5b 0 17%, #4e8e67 18% 35%, #277b91 36% 49%, transparent 50%), linear-gradient(145deg, #1f5860, #193747); }
-.number { font: 900 5rem/1 Georgia, serif; opacity: .22; }
-h2 { margin: 8px 0 20px; font: 800 clamp(2.1rem, 5vw, 4.4rem)/.95 Georgia, serif; }
-.event-card strong { display: inline-block; padding: 12px 16px; border-radius: 999px; background: #fff8df; color: #17382d; }
-ul { list-style: none; margin: 0; padding: 16px 0 0; display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid #ffffff35; }
-li { color: #e9f2e8; font-size: .84rem; } li + li::before { content: "·"; margin-right: 8px; color: #efcb6c; }
-footer { text-align: center; color: #9fc6b1; }
-@media (max-width: 720px) { header { grid-template-columns: 1fr auto; } header > div { text-align: right; } header > span { display: none; } .event-grid { grid-template-columns: 1fr; } .event-card { min-height: 340px; } }
+html, body { margin: 0; width: 100%; min-height: 100%; background: #142a23; }
+body { min-height: 100vh; overflow: hidden; color: var(--ink); }
+a { color: inherit; }
+
+.world-menu {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background: url("assets/farm-games-hero.png") center center / cover no-repeat;
+}
+.world-menu::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 20, 19, .5) 0, transparent 28%),
+    linear-gradient(90deg, rgba(3, 14, 12, .18), transparent 30% 70%, rgba(3, 14, 12, .18)),
+    radial-gradient(circle at 50% 43%, transparent 28%, rgba(4, 15, 13, .18) 100%);
+}
+.world-menu::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: auto 0 0;
+  height: 43%;
+  background: linear-gradient(transparent, rgba(5, 16, 14, .82) 60%, rgba(5, 16, 14, .96));
+  pointer-events: none;
+}
+
+.farm-return {
+  position: absolute;
+  z-index: 2;
+  top: max(22px, env(safe-area-inset-top));
+  left: max(24px, env(safe-area-inset-left));
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,.42);
+  border-radius: 999px;
+  background: rgba(7, 25, 21, .44);
+  box-shadow: 0 8px 28px #0004;
+  backdrop-filter: blur(12px);
+  text-decoration: none;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: background .18s, transform .18s;
+}
+.farm-return:hover, .farm-return:focus-visible { outline: none; background: rgba(7, 25, 21, .78); transform: translateX(-3px); }
+
+.world-menu__title {
+  position: absolute;
+  z-index: 1;
+  top: clamp(28px, 5vh, 66px);
+  left: 50%;
+  width: min(680px, calc(100% - 190px));
+  transform: translateX(-50%);
+  text-align: center;
+  text-shadow: 0 3px 18px #0b241d, 0 1px 2px #000;
+}
+.world-menu__title span { color: #ffe19a; font-size: .69rem; font-weight: 1000; letter-spacing: .38em; }
+.world-menu__title h1 { margin: 4px 0 2px; font: 900 clamp(2.4rem, 5vw, 5rem)/.9 Rockwell, "Roboto Slab", Georgia, serif; letter-spacing: -.05em; text-transform: uppercase; }
+.world-menu__title p { margin: 10px 0 0; color: var(--muted); font-size: .83rem; font-weight: 750; letter-spacing: .04em; }
+
+.event-choices {
+  position: absolute;
+  z-index: 2;
+  left: clamp(20px, 4vw, 70px);
+  right: clamp(20px, 4vw, 70px);
+  bottom: clamp(50px, 7vh, 84px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 5vw, 86px);
+}
+.event-choice {
+  position: relative;
+  min-height: 150px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(15px, 2vw, 28px);
+  padding: 22px 24px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-left: 5px solid var(--accent);
+  border-radius: 4px;
+  background: linear-gradient(105deg, rgba(5, 22, 18, .9), rgba(7, 26, 23, .64));
+  box-shadow: 0 18px 55px #0008, inset 0 1px #fff2;
+  backdrop-filter: blur(13px) saturate(1.3);
+  text-decoration: none;
+  transition: transform .2s, background .2s, border-color .2s;
+}
+.event-choice--race { --accent: var(--race); }
+.event-choice--push { --accent: var(--push); }
+.event-choice:hover, .event-choice:focus-visible { outline: none; transform: translateY(-7px); border-color: var(--accent); background: linear-gradient(105deg, rgba(5, 22, 18, .96), rgba(7, 26, 23, .8)); }
+.event-choice__index { color: var(--accent); font: 900 clamp(2.8rem, 5vw, 5rem)/1 Georgia, serif; opacity: .82; }
+.event-choice small { color: var(--accent); font-size: .62rem; font-weight: 1000; letter-spacing: .17em; }
+.event-choice h2 { margin: 3px 0 5px; font: 900 clamp(1.65rem, 3.2vw, 3.1rem)/.92 Rockwell, "Roboto Slab", Georgia, serif; letter-spacing: -.04em; text-transform: uppercase; }
+.event-choice p { margin: 0; color: var(--muted); font-size: .75rem; font-weight: 650; }
+.event-choice__action { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); font-size: .68rem; font-weight: 1000; letter-spacing: .08em; text-transform: uppercase; }
+.event-choice__action b { display: block; margin-top: -12px; font-size: 1.2rem; transition: transform .18s; }.event-choice:hover .event-choice__action b { transform: translateX(4px); }
+
+.world-menu footer { position: absolute; z-index: 2; bottom: 19px; left: 0; right: 0; color: #c9d7cb; text-align: center; font-size: .62rem; font-weight: 800; letter-spacing: .13em; text-shadow: 0 2px 8px #000; text-transform: uppercase; }
+
+@media (max-width: 800px) {
+  .world-menu { background-position: 50% center; }
+  .world-menu::after { height: 62%; }
+  .world-menu__title { top: 72px; width: calc(100% - 34px); }
+  .world-menu__title h1 { font-size: clamp(2.2rem, 10vw, 3.7rem); }
+  .event-choices { left: 14px; right: 14px; bottom: 42px; grid-template-columns: 1fr; gap: 10px; }
+  .event-choice { min-height: 112px; padding: 14px 16px; }
+  .event-choice__index { font-size: 2.5rem; }
+  .event-choice h2 { font-size: clamp(1.45rem, 6vw, 2.2rem); }
+  .event-choice__action { width: 54px; height: 54px; font-size: .57rem; }
+  .event-choice p { display: none; }
+  .world-menu footer { bottom: 12px; font-size: .5rem; }
+}
+
+@media (max-width: 460px) {
+  .farm-return { top: 13px; left: 13px; padding: 8px 11px; font-size: .61rem; }
+  .world-menu__title { top: 55px; }
+  .world-menu__title p { font-size: .72rem; }
+  .event-choice { grid-template-columns: 38px 1fr 46px; gap: 9px; min-height: 94px; padding: 11px 12px; }
+  .event-choice__index { font-size: 1.9rem; }
+  .event-choice small { font-size: .48rem; }
+  .event-choice h2 { font-size: 1.38rem; }
+  .event-choice__action { width: 44px; height: 44px; border: 0; font-size: 0; }
+  .event-choice__action b { margin: 0; font-size: 1.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

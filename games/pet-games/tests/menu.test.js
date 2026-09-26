@@ -16,6 +16,28 @@ test("the Pet Games hub offers both playable events and returns to the farm", ()
   assert.match(html, /\.\.\/\.\.\/farm\//);
 });
 
+test("the hub presents the events inside a cinematic farm-games world", () => {
+  const html = readFileSync(resolve(root, "index.html"), "utf8");
+  const css = readFileSync(resolve(root, "style.css"), "utf8");
+
+  for (const hook of [
+    'class="world-menu"',
+    'class="world-menu__title"',
+    'class="event-choice event-choice--race"',
+    'class="event-choice event-choice--push"',
+    'class="event-choice__action"',
+  ]) {
+    assert.match(html, new RegExp(hook));
+  }
+  assert.match(html, /FARM GAMES/);
+  assert.match(html, /Choose your event/);
+  assert.match(css, /farm-games-hero\.png/);
+  assert.match(css, /\.world-menu::after/);
+  assert.match(css, /\.event-choice--race/);
+  assert.match(css, /\.event-choice--push/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
 test("the farm routes Pet Games through the hub instead of one event", () => {
   const farm = readFileSync(resolve(root, "..", "..", "farm", "index.html"), "utf8");
   assert.match(farm, /id="openPetGames" href="\.\.\/games\/pet-games\/index\.html"/);

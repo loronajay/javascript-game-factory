@@ -19,7 +19,8 @@ import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacl
 import { groundHeightAt, underwater, waterDepthAt, type PondRegion } from "./farm-pond.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type PetInteractionId, type SeatInReach } from "./farm-interaction.mjs";
-import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
+import { canNap, formatNapMinutes, napBankReadyIn } from "./farm-nap-bank.mjs";
+import { FARM_BOUNDS, addPet, createDefaultFarmLayout, farmCacheKey, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withNapTaken, withProductionCheckpoint, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -32,7 +33,10 @@ import { createTicketWalletClient, publishTicketBalance } from "./platform/api/t
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
-import { SOIL_CELL_LAYOUT, advanceAgriculture, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type SoilCellTarget } from "./farm-crops.mjs";
+import { advanceAgriculture, clearDeadFarmCrop, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type SoilCellTarget } from "./farm-crops.mjs";
+import { cropCapacityUse } from "./farm-capacity.mjs";
+import { applyOfflineProduction, offlineSpan, type OfflineReport } from "./farm-offline.mjs";
+import { createAwayReport } from "./farm-away-report.mjs";
 import { createFarmCropsView } from "./farm-crops-view.mjs";
 import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
 import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
@@ -69,9 +73,11 @@ const editButton = requiredElement<HTMLButtonElement>("#editFarm");
 const editorPanel = requiredElement<HTMLElement>("#farmEditor");
 const editorDrawer = requiredElement<HTMLElement>("#farmEditorDrawer");
 const farmClock = requiredElement<HTMLElement>("#farmClock");
+const fieldCapacity = requiredElement<HTMLElement>("#fieldCapacity");
 const farmClockPhase = requiredElement<HTMLElement>("#farmClockPhase");
 const napDialog = requiredElement<HTMLDialogElement>("#napDialog");
 const napStatus = requiredElement<HTMLElement>("#napStatus");
+const napBankLabel = requiredElement<HTMLElement>("#napBank");
 const openInventoryButton = requiredElement<HTMLButtonElement>("#openInventory");
 const starterDogForm = requiredElement<HTMLFormElement>("#starterDogForm");
 const starterDogName = requiredElement<HTMLInputElement>("#starterDogName");
@@ -132,6 +138,24 @@ const showFarmIntro = canManageFarm && layout.onboarding.status === "needs_name"
 let onboardingInitialization: ReturnType<typeof layoutStore.save> | null = null;
 const resumedClock = resumeFarmClock(layout.clock, Date.now());
 layout = withFarmClock(advancePetNeeds(layout, resumedClock.farmMinutes), resumedClock.farmMinutes, resumedClock.updatedAt);
+// Crops (only crops) caught up for the time the owner was away, at the offline
+// rate and cap. A farm whose owner has never stepped onto it has no checkpoint
+// and so never moves. Visitors see the farm exactly as it was saved.
+let pendingAwayReport: OfflineReport | null = null;
+if (canManageFarm && layout.clock.checkpointAt > 0) {
+  const caughtUp = applyOfflineProduction(layout.agriculture, offlineSpan(layout.clock.checkpointAt, resumedClock.updatedAt), resumedClock.farmMinutes);
+  layout = withProductionCheckpoint(withFarmAgriculture(layout, caughtUp.agriculture), resumedClock.updatedAt);
+  pendingAwayReport = caughtUp.report;
+}
+// When the tab was hidden: the farm is "away" from then until it is visible again.
+let hiddenSince = 0;
+/** The real time the owner was last actually on the farm: now, unless the tab is hidden. */
+const presentAt = (): number => hiddenSince || Date.now();
+/** Every owner save moves the offline checkpoint — once the farm has been entered at least once. */
+function stampPresence(next: FarmLayout): FarmLayout {
+  if (!canManageFarm || next.clock.checkpointAt <= 0) return next;
+  return withProductionCheckpoint(next, presentAt());
+}
 if (showFarmIntro) {
   layout = markFarmIntroSeen(layout);
   // This first write pins the random seed pool before a reload can make a new one.
@@ -216,6 +240,7 @@ let renderedQuarter = -1;
 let liveNeedsCheckpoint: (() => void) | null = null;
 world.setTime(clockMinutes);
 const cropsView = createFarmCropsView(THREE, scene);
+const awayReport = createAwayReport(requiredElement<HTMLElement>("#awayReport"));
 cropsView.sync(layout, layout.agriculture, clockMinutes);
 
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
@@ -313,12 +338,28 @@ function openNapDialog(): void {
   keys.clear();
   document.exitPointerLock?.();
   napStatus.textContent = `It is ${formatFarmTime(clockMinutes)}. The farm keeps moving while you sleep.`;
+  renderNapBank();
   napDialog.showModal();
 }
 
+/** Naps draw on a bank that refills with real time (farm-nap-bank.mts); a nap it cannot pay for is greyed out. */
+function renderNapBank(): void {
+  const bank = farmNapBank(layout, Date.now());
+  for (const button of napDialog.querySelectorAll<HTMLButtonElement>("[data-nap-hours]")) {
+    const minutes = Number(button.dataset.napHours) * 60;
+    const affordable = canNap(bank, minutes);
+    button.disabled = !affordable;
+    button.title = affordable ? "" : `Rested again in ${formatNapMinutes(napBankReadyIn(bank, minutes) / 60000)} of real time`;
+  }
+  napBankLabel.textContent = `Rest left: ${formatNapMinutes(bank)} of sleep · refills 18h a day`;
+}
+
 function startNap(hours: number): void {
+  const minutes = hours * 60;
   if (!Number.isFinite(hours) || hours <= 0 || napRemainingMinutes > 0) return;
-  napRemainingMinutes = hours * 60;
+  if (!canNap(farmNapBank(layout, Date.now()), minutes)) return;
+  layout = withNapTaken(layout, minutes, clockMinutes, Date.now());
+  napRemainingMinutes = minutes;
   napDialog.close();
   document.body.classList.add("is-napping");
 }
@@ -386,20 +427,22 @@ function updateInteraction(): void {
   if (soilInReach) {
     const plotId = soilInReach.plot.instanceId;
     const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId && crop.cellId === soilInReach!.cellId);
-    const occupied = layout.agriculture.crops.filter((crop) => crop.plotId === plotId).length;
     if (!planted) {
       const selected = findCrop(inventoryPanel.selectedCropId())!;
       const seeds = layout.agriculture.inventory.seeds[selected.id] ?? 0;
-      setPrompt(seeds > 0
-        ? `Press E to plant 1 ${selected.title} here · ${seeds} seeds · plot ${occupied}/${SOIL_CELL_LAYOUT.length}`
-        : `No ${selected.title} seeds · choose another in Inventory`);
+      const fields = cropCapacityUse(layout.agriculture, layout.decor);
+      if (fields.full) setPrompt(`Your fields are full · ${fields.used}/${fields.capacity} growing · harvest or clear a crop to plant here`);
+      else if (seeds > 0) setPrompt(`Press E to plant 1 ${selected.title} here · ${seeds} seeds · ${fields.used}/${fields.capacity} growing`);
+      else setPrompt(`No ${selected.title} seeds · choose another in Inventory`);
       return;
     }
     const definition = findCrop(planted.cropId)!;
     const crop = cropStatus(planted, clockMinutes);
-    if (crop.mature) setPrompt(`Press E to harvest ${definition.title}`);
-    else if (crop.needsCare) setPrompt(`Press E to tend the ${definition.title}`);
-    else if (crop.thirsty) setPrompt(`Press E to water the ${definition.title}`);
+    const wilting = crop.wilted ? "wilting " : "";
+    if (crop.dead) setPrompt(`The ${definition.title} died ${planted.diedOf === "thirst" ? "of thirst" : "untended"} · Press E to clear it`);
+    else if (crop.mature) setPrompt(`Press E to harvest ${definition.title} · ${crop.harvestYield} to collect`);
+    else if (crop.needsCare) setPrompt(`Press E to tend the ${wilting}${definition.title}`);
+    else if (crop.thirsty) setPrompt(`Press E to water the ${wilting}${definition.title}`);
     else setPrompt(`${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist`);
     return;
   }
@@ -478,16 +521,57 @@ function workSoilPlot(): void {
   const cellId = soilInReach.cellId;
   const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId && crop.cellId === cellId);
   let action;
-  if (!planted) action = plantFarmCrop(layout.agriculture, plotId, cellId, inventoryPanel.selectedCropId(), clockMinutes);
+  if (!planted) action = plantFarmCrop(layout.agriculture, plotId, cellId, inventoryPanel.selectedCropId(), clockMinutes, cropCapacityUse(layout.agriculture, layout.decor).capacity);
   else {
     const state = cropStatus(planted, clockMinutes);
-    if (state.mature) action = harvestFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
+    if (state.dead) action = clearDeadFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
+    else if (state.mature) {
+      // An account farm's produce is minted only by the server: it decides ripeness and yield.
+      if (serverHarvests) {
+        void harvestOnServer(plotId, cellId, findCrop(planted.cropId)!.title);
+        return;
+      }
+      action = harvestFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
+    }
     else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
     else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
     else return;
   }
   if (!action.ok) return;
   void persistLayout(withFarmClock(withFarmAgriculture(layout, action.agriculture), clockMinutes, Date.now()));
+}
+
+// Signed-out farms live on this device and harvest locally; an account farm harvests through the API.
+const serverHarvests = layoutStore.accountBacked && canPersistFarm;
+let harvestInFlight = false;
+
+async function harvestOnServer(plotId: string, cellId: SoilCellTarget["cellId"], title: string): Promise<void> {
+  if (harvestInFlight) return;
+  harvestInFlight = true;
+  const sent = stampPresence(progressedLayout());
+  try {
+    const result = await ticketClient.harvestFarmCrop(sent, plotId, cellId);
+    if (result?.layout) adoptServerFarm(normalizeFarmLayout(result.layout), sent.clock.farmMinutes);
+    if (result?.ok) status.textContent = `Harvested ${result.quantity} ${title}. Saved to your account.`;
+    else if (result?.error === "not_ready") status.textContent = `The ${title} is not ripe yet by the farm's records — it needs a little longer.`;
+    else status.textContent = "That harvest did not go through. Try again in a moment.";
+  } catch {
+    status.textContent = "That harvest did not go through. Try again in a moment.";
+  } finally {
+    harvestInFlight = false;
+  }
+}
+
+/**
+ * Take the farm as the server now holds it. If the server held the clock back
+ * (it can only move as far as real time and the nap bank allow), the page's
+ * clock follows it, keeping whatever time has passed since the request left.
+ */
+function adoptServerFarm(next: FarmLayout, sentMinutes: number): void {
+  const sinceSent = Math.max(0, clockMinutes - sentMinutes);
+  if (next.clock.farmMinutes < sentMinutes - 1e-3) clockMinutes = next.clock.farmMinutes + sinceSent;
+  applyLayout(next);
+  farmEditor.replaceLayout(next);
 }
 
 /** Run one available pet action through the shared registry. */
@@ -633,6 +717,14 @@ function applyLayout(next: FarmLayout): void {
   petSim.sync(layout);
   petsPanel.render(layout);
   inventoryPanel.render(layout.agriculture);
+  renderFieldCapacity();
+}
+
+/** How many crops are in the ground against how many may be: plots are placement, this is production. */
+function renderFieldCapacity(): void {
+  const fields = cropCapacityUse(layout.agriculture, layout.decor);
+  fieldCapacity.textContent = `${fields.used}/${fields.capacity} growing${fields.full ? " · fields full" : ""}`;
+  fieldCapacity.classList.toggle("is-full", fields.full);
 }
 
 function isFarmFullscreen(): boolean {
@@ -755,15 +847,37 @@ starterDogForm.addEventListener("submit", async (event) => {
 enterButton.addEventListener("click", () => {
   if (canManageFarm && layout.onboarding.status !== "complete") return;
   farmEntered = true;
+  // The first time an owner steps onto the farm starts its offline production;
+  // record it at once so a closed tab cannot lose the fact.
+  if (canManageFarm && layout.clock.checkpointAt <= 0) void persistLayout(withProductionCheckpoint(layout, Date.now()));
+  if (pendingAwayReport) awayReport.show(pendingAwayReport);
+  pendingAwayReport = null;
   farmMusic.start();
   startGate.classList.add("is-hidden");
   canvas.focus();
   status.textContent = "WASD to move · Drag to look · Click for mouse capture";
 });
 window.addEventListener("pagehide", () => {
-  if (canPersistFarm) void layoutStore.save(progressedLayout(), { keepalive: true });
+  if (canPersistFarm) void layoutStore.save(stampPresence(progressedLayout()), { keepalive: true });
   farmMusic.destroy();
 }, { once: true });
+// A hidden tab is time away like any other: crops catch up at the offline rate
+// when it comes back. (The clock itself does not run while hidden.)
+document.addEventListener("visibilitychange", () => {
+  if (!canManageFarm || !farmEntered) return;
+  if (document.hidden) {
+    hiddenSince = Date.now();
+    return;
+  }
+  const since = hiddenSince;
+  hiddenSince = 0;
+  const span = offlineSpan(since, Date.now());
+  if (span.awayMs < 60_000 || layout.clock.checkpointAt <= 0) return;
+  const progressed = progressedLayout();
+  const caughtUp = applyOfflineProduction(progressed.agriculture, span, clockMinutes);
+  if (caughtUp.report) awayReport.show(caughtUp.report);
+  void persistLayout(withFarmAgriculture(progressed, caughtUp.agriculture));
+});
 document.addEventListener("pointerlockchange", () => {
   const locked = document.pointerLockElement === canvas;
   startGate.classList.toggle("is-hidden", farmEntered);
@@ -819,7 +933,7 @@ function describeSave(result: Readonly<{ ok: boolean; target: string }>): string
 /** Pets-panel changes land here: apply, tell the editor, then save, and say where the save went. */
 async function persistLayout(next: FarmLayout): Promise<string> {
   if (!canManageFarm) return "This farm is read-only while visiting.";
-  next = applyPetCareMilestones(next);
+  next = stampPresence(applyPetCareMilestones(next));
   applyLayout(next);
   farmEditor.replaceLayout(next);
   if (!canPersistFarm) return "Session only · reload when the farm database is available to save safely.";
@@ -912,6 +1026,7 @@ const inventoryPanel = createFarmInventoryPanel({
   } : null,
 });
 inventoryPanel.render(layout.agriculture);
+renderFieldCapacity();
 if (visiting) openInventoryButton.hidden = true;
 
 // Build mode: the shared editor frame over the farm's own placement rules. The
@@ -939,7 +1054,7 @@ const farmEditor = createFarmEditor({
   } : null,
   persist: async (next) => {
     if (!canPersistFarm) return { ok: false, message: "Session only · reload when the farm database is available to save safely." };
-    const cared = applyPetCareMilestones(next);
+    const cared = stampPresence(applyPetCareMilestones(next));
     if (cared !== next) {
       applyLayout(cared);
       farmEditor.replaceLayout(cared);
@@ -1008,7 +1123,8 @@ function frame(now: number): void {
   accumulator += frameSeconds;
   previous = now;
   while (accumulator >= TICK_SECONDS) {
-    updateFarmTime(TICK_SECONDS);
+    // The farm stands still at the gate: time only passes once the player is on it.
+    if (farmEntered) updateFarmTime(TICK_SECONDS);
     updatePlayer(TICK_SECONDS);
     petSim.tick(TICK_SECONDS, { x: player.x, z: player.z, yaw: player.yaw, y: body.y });
     updateInteraction();

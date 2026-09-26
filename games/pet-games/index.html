@@ -3,28 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17382d">
+  <meta name="theme-color" content="#142a23">
   <title>Pet Games | Javascript Game Factory</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <header>
-      <a href="../../farm/">← Farm</a>
-      <div><p>PET GAMES</p><h1>Pick an event</h1></div>
-      <span>Bring your own farm pet</span>
+  <main class="world-menu">
+    <a class="farm-return" href="../../farm/"><span aria-hidden="true">←</span> Farm</a>
+
+    <header class="world-menu__title">
+      <span>FARM GAMES</span>
+      <h1>Choose your event</h1>
+      <p>Bring your pet. The rest is up to you.</p>
     </header>
-    <section class="event-grid" aria-label="Pet game events">
-      <a class="event-card event-card--race" href="../barnyard-dash/index.html">
-        <span class="number">01</span><div><p>3D OBSTACLE RACE</p><h2>Barnyard Dash</h2><strong>Race now →</strong></div>
-        <ul><li>2–8 pets</li><li>Three laps</li><li>Jump · steer · sprint</li></ul>
+
+    <section class="event-choices" aria-label="Pet game events">
+      <a class="event-choice event-choice--race" href="../barnyard-dash/index.html">
+        <span class="event-choice__index">01</span>
+        <div>
+          <small>OBSTACLE RACE · 2–8 PETS</small>
+          <h2>Barnyard Dash</h2>
+          <p>Drive the line. Clear the hurdles. Beat the pack.</p>
+        </div>
+        <span class="event-choice__action">Race <b aria-hidden="true">→</b></span>
       </a>
-      <a class="event-card event-card--push" href="../pondside-push/index.html">
-        <span class="number">02</span><div><p>3D KING OF THE HILL</p><h2>Pondside Push</h2><strong>Bump now →</strong></div>
-        <ul><li>4 pets</li><li>First to 3 wins</li><li>Build speed · land bumps</li></ul>
+
+      <a class="event-choice event-choice--push" href="../pondside-push/index.html">
+        <span class="event-choice__index">02</span>
+        <div>
+          <small>ISLAND BRAWL · 4 PETS</small>
+          <h2>Pondside Push</h2>
+          <p>Build momentum. Land the bump. Stay dry.</p>
+        </div>
+        <span class="event-choice__action">Brawl <b aria-hidden="true">→</b></span>
       </a>
     </section>
-    <footer>Your pet’s stats matter a little. Your decisions matter more.</footer>
+
+    <footer>Player skill leads. Pet stats add flavor.</footer>
   </main>
 </body>
 </html>

@@ -81,3 +81,109 @@ footer { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 28px;
   .lede { margin: 9px 0; font-size: .84rem; }
   .briefing { display: none; }
 }
+
+/* Farm Field Day menu language */
+.setup-panel {
+  width: min(720px, calc(100% - 34px));
+  max-height: calc(100% - 28px);
+  overflow: auto;
+  padding: clamp(25px, 4vw, 42px);
+  border: 3px solid #193b32;
+  border-radius: 12px;
+  background: #fff8dc;
+  color: #193b32;
+  box-shadow: 9px 10px 0 #193b32aa, 0 28px 80px #0009;
+  backdrop-filter: none;
+}
+.game-stage:has(.setup-panel:not([hidden])) { height: min(640px, calc(100vh - 155px)) !important; }
+.setup-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 11px;
+  background: conic-gradient(#193b32 25%, #fff8dc 0 50%, #193b32 0 75%, #fff8dc 0) 0 0 / 18px 18px;
+  border-bottom: 2px solid #193b32;
+}
+.panel__header { position: relative; max-width: 590px; margin: 0 auto; }
+.event-chip { display: inline-block; margin: 0 0 14px; padding: 6px 11px; background: #d9533e; color: white; box-shadow: 3px 3px 0 #8b3328; font-size: .62rem; font-weight: 1000; letter-spacing: .16em; transform: rotate(-1deg); }
+.setup-panel .kicker { margin-bottom: 5px; color: #587064; }
+.setup-panel h2 { color: #193b32; font-family: Rockwell, "Roboto Slab", Georgia, serif; font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: .78; letter-spacing: -.05em; text-transform: uppercase; }
+.setup-panel h2 em { color: #bd4434; font-size: .86em; font-style: normal; }
+.setup-panel .lede { max-width: 55ch; margin: 16px auto 18px; color: #526b61; font-weight: 650; }
+.setup-panel .pet-choices { margin: 14px 0 12px; padding: 4px; }
+.setup-panel .pet-card { border: 2px solid #193b3233; border-radius: 7px; background: #f1e5bc; color: #193b32; box-shadow: 2px 2px 0 #193b3225; }
+.setup-panel .pet-card[aria-checked="true"] { border-color: #193b32; background: #ffdc68; box-shadow: 4px 4px 0 #193b32; transform: translate(-2px, -2px); }
+.setup-panel .pet-card small { color: #587064; }
+.setup-panel .race-options { border: 2px solid #193b32; border-radius: 6px; background: #f1e5bc; color: #526b61; }
+.setup-panel .race-options span { color: #193b32; text-transform: uppercase; letter-spacing: .06em; }
+.setup-panel .race-options select { border: 2px solid #193b32; border-radius: 4px; background: #fff8dc; color: #193b32; }
+.menu-rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 18px; }
+.menu-rules > span { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 1px 8px; padding: 8px; border-top: 1px dashed #193b3266; border-bottom: 1px dashed #193b3266; text-align: left; }
+.menu-rules kbd { grid-row: 1 / 3; min-width: 33px; margin: 0; border: 0; border-radius: 4px; background: #193b32; color: white; box-shadow: 0 3px 0 #071c17; font-size: .66rem; }
+.menu-rules b { font-size: .7rem; text-transform: uppercase; }.menu-rules small { color: #667c73; font-size: .6rem; }
+.setup-panel .primary { min-width: min(320px, 100%); border: 2px solid #193b32; border-radius: 5px; background: #ffd45f; color: #193b32; box-shadow: 5px 5px 0 #193b32; text-transform: uppercase; }
+.setup-panel .primary:not(:disabled):hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 #193b32; }
+.setup-panel .load-note { color: #587064; }
+
+@media (max-width: 620px) {
+  .setup-panel { max-height: calc(100% - 18px); padding: 27px 15px 18px; }
+  .setup-panel h2 { font-size: 2.6rem; }
+  .setup-panel .lede { margin: 10px auto; font-size: .78rem; }
+  .setup-panel .pet-choices { margin: 7px 0; }
+  .setup-panel .pet-card { min-height: 70px; padding: 10px; }
+  .event-chip { margin-bottom: 8px; }
+  .menu-rules { grid-template-columns: repeat(4, 1fr); margin: 8px 0 12px; }
+  .menu-rules > span { display: block; text-align: center; }
+  .menu-rules kbd { margin: 0 auto 5px; }
+  .menu-rules b { display: block; }
+  .menu-rules small { display: none; }
+}
+
+@media (max-width: 470px) {
+  .menu-rules { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* In-world event setup — keep the course visible instead of presenting a paper form. */
+.setup-panel {
+  left: clamp(18px, 4vw, 54px);
+  width: min(590px, calc(100% - 36px));
+  transform: translateY(-50%);
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid #ffffff38;
+  border-left: 5px solid #ffc34d;
+  border-radius: 5px;
+  background: linear-gradient(105deg, rgba(5, 22, 17, .96), rgba(8, 28, 21, .78));
+  color: var(--ink);
+  box-shadow: 0 28px 90px #000c, inset 0 1px #fff2;
+  text-align: left;
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+.setup-panel::before { height: 4px; background: linear-gradient(90deg, #ffc34d, transparent 72%); border: 0; }
+.panel__header { max-width: none; margin: 0; }
+.event-chip { margin-bottom: 10px; padding: 0; background: none; color: #ffc34d; box-shadow: none; letter-spacing: .2em; transform: none; }
+.setup-panel .kicker { color: #b7cabd; }
+.setup-panel h2 { color: #fff9e6; font-size: clamp(2.8rem, 6vw, 5rem); text-shadow: 0 5px 24px #000; }
+.setup-panel h2 em { color: #ffc34d; }
+.setup-panel .lede { max-width: 52ch; margin: 14px 0 17px; color: #c7d6cc; font-weight: 600; }
+.setup-panel .pet-choices { max-height: 120px; margin: 10px 0; display: flex; }
+.setup-panel .pet-card { flex: 1 0 145px; min-height: 70px; padding: 10px 12px; border: 1px solid #ffffff25; border-radius: 4px; background: #ffffff0c; color: #f8f3df; box-shadow: none; }
+.setup-panel .pet-card[aria-checked="true"] { border-color: #ffc34d; background: #ffc34d1f; box-shadow: inset 4px 0 #ffc34d; transform: none; }
+.setup-panel .pet-card small { color: #a9bdae; }
+.setup-panel .race-options { margin: 10px 0; border: 1px solid #ffffff2b; border-radius: 4px; background: #ffffff0b; color: #b7cabd; }
+.setup-panel .race-options span { color: #f8f3df; }
+.setup-panel .race-options select { border: 1px solid #ffffff38; border-radius: 4px; background: #071b14; color: #f8f3df; }
+.menu-rules { margin: 10px 0 17px; gap: 4px; }
+.menu-rules > span { border-color: #ffffff27; }
+.menu-rules kbd { background: #ffffff16; color: #fff; box-shadow: none; }
+.menu-rules b { color: #fff; }.menu-rules small { color: #9db2a3; }
+.setup-panel .primary { border: 1px solid #ffe19b; border-radius: 4px; background: #ffc34d; color: #15271f; box-shadow: 0 8px 24px #0006; }
+.setup-panel .primary:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 12px 28px #0007; }
+.setup-panel .load-note { color: #a9bdae; }
+
+@media (max-width: 620px) {
+  .setup-panel { left: 50%; width: calc(100% - 24px); transform: translate(-50%, -50%); padding: 22px 16px 16px; }
+  .setup-panel h2 { font-size: 2.8rem; }
+  .setup-panel .lede { margin: 8px 0; }
+  .setup-panel .pet-choices { margin: 6px 0; }
+  .menu-rules { margin: 6px 0 11px; }
+}
