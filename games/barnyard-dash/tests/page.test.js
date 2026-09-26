@@ -5,13 +5,13 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 
-test("the 3D cabinet exposes pet and field-size selection, race HUD, controls, and a farm return path", () => {
+test("the 3D cabinet exposes pet and field-size selection, race HUD, controls, and a Pet Games return path", () => {
   const html = readFileSync(resolve(root, "index.html"), "utf8");
   for (const id of ["raceCanvas", "petChoices", "fieldSize", "startRace", "raceHud", "raceLap", "raceResult", "touchControls"]) {
     assert.match(html, new RegExp(`id=["']${id}["']`));
   }
-  assert.match(html, /\.\.\/\.\.\/farm\//);
-  assert.match(html, /platform-config\.mjs"><\/script>\s*<script type="module" src="scripts\/main\.js\?v=20260926-course-walls"/);
+  assert.match(html, /\.\.\/pet-games\//);
+  assert.match(html, /platform-config\.mjs"><\/script>\s*<script type="module" src="scripts\/main\.js\?v=20260926-farm-grass"/);
   assert.match(html, /id="raceProgress">Checkpoint 0 \/ 7/);
   assert.doesNotMatch(html, /id="raceProgress">Gate/);
 });
@@ -22,6 +22,8 @@ test("the browser entry loads farm-owned pets and advances gameplay on a fixed t
   assert.match(source, /THREE\.WebGLRenderer/);
   assert.match(source, /GLTFLoader/);
   assert.match(source, /farm\/assets\/animals/);
+  assert.match(source, /createSurfaceMaterial/);
+  assert.match(source, /findGround\(DEFAULT_GROUND_ID\)/);
   assert.match(source, /cpuFieldFor\(selectedPet, fieldSize - 1\)/);
   assert.match(source, /const TICK_SECONDS = 1 \/ 60/);
   assert.match(source, /while \(accumulator >= TICK_SECONDS\)/);

@@ -5,6 +5,8 @@ import { animalTrack, splitAnimalClips } from "../../../js/farm-animal-clips.mjs
 import { materialForAnimalPalette } from "../../../js/farm-pet-palettes.mjs";
 import { createFenceRun, createHayBale, createTree } from "../../../js/farm-props.mjs";
 import { farmMaterial } from "../../../js/farm-materials.mjs";
+import { createSurfaceMaterial } from "../../../js/arcade-room-surfaces.mjs";
+import { DEFAULT_GROUND_ID, findGround } from "../../../js/farm-catalog/ground.mjs";
 import { loadFarmPets } from "./farm-source.js?v=20260925-track-fix-2";
 import { cpuFieldFor, speciesStyle } from "./pets.js?v=20260925-track-fix-2";
 import { createRace, raceOrder, stepRace } from "./race.js?v=20260926-course-walls";
@@ -83,7 +85,11 @@ const held = new Set();
 const worldPoint = (point) => new THREE.Vector3((point.x - GAME_WIDTH / 2) * WORLD_SCALE, 0, (point.y - GAME_HEIGHT / 2) * WORLD_SCALE);
 
 function addGround() {
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 120), farmMaterial(THREE, "foliage", { colors: ["#78aa55", "#527e3c", "#a0c86d"], metresPerTile: 4 }));
+  const farmGrass = findGround(DEFAULT_GROUND_ID).style;
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(150, 120),
+    createSurfaceMaterial(THREE, farmGrass, { u: 150, v: 120 }),
+  );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   courseRoot.add(ground);

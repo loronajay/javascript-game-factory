@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173d42">
+  <title>Pondside Push | Javascript Game Factory</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="cabinet">
+    <header class="topbar">
+      <a class="back-link" href="../pet-games/">← Pet Games</a>
+      <div><p class="eyebrow">PET GAMES · EVENT 02</p><h1>Pondside Push</h1></div>
+      <button id="fullscreen" type="button">Fullscreen</button>
+    </header>
+    <section id="gameStage" class="game-stage" aria-label="Circular Pondside Push arena">
+      <canvas id="arenaCanvas" width="960" height="640" tabindex="0" aria-label="3D pet bumping arena"></canvas>
+      <div id="scoreboard" class="scoreboard" hidden aria-label="Match score"></div>
+      <section id="setupPanel" class="panel setup-panel">
+        <p class="kicker">Choose your challenger</p>
+        <h2>Own the island.</h2>
+        <p class="lede">Build momentum by holding your line, then bump rivals into the pond. Last pet standing wins the round. First to 3 wins takes the match.</p>
+        <div id="petChoices" class="pet-choices" role="radiogroup" aria-label="Farm pets"></div>
+        <div class="briefing"><span><kbd>WASD</kbd> move</span><span><kbd>Space</kbd> bump</span><span>Unbroken runs build speed</span></div>
+        <button id="startMatch" class="primary" type="button" disabled>Loading your farm…</button>
+        <p id="loadNote" class="load-note" aria-live="polite"></p>
+      </section>
+      <section id="roundResult" class="panel result-panel" hidden>
+        <p id="resultKicker" class="kicker">Round over</p><h2 id="resultTitle">Splash!</h2><p id="resultCopy" class="lede"></p>
+        <button id="nextRound" class="primary" type="button">Next round</button>
+        <button id="changePet" class="secondary" type="button" hidden>Change pet</button>
+      </section>
+      <div id="roundBanner" class="round-banner" aria-live="assertive"></div>
+      <div id="touchControls" class="touch-controls" aria-label="Touch controls">
+        <div class="dpad"><button data-control="up">↑</button><button data-control="left">←</button><button data-control="down">↓</button><button data-control="right">→</button></div>
+        <button class="bump" data-control="bump">BUMP</button>
+      </div>
+    </section>
+    <footer><span>Keep moving forward to build momentum.</span><span>Your faster approach makes the bump hit harder.</span></footer>
+  </main>
+  <script type="module" src="../../js/platform-config.mjs"></script>
+  <script type="module" src="scripts/main.js?v=20260926-impact-grass"></script>
+</body>
+</html>

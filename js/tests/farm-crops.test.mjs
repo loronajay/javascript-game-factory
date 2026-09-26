@@ -30,9 +30,10 @@ function glbJson(file) {
   return JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").replace(/\0+$/, ""));
 }
 
-test("the farming catalog exposes every Grimnir growth-cycle crop and the inventory includes pet-food supplies", () => {
+test("the farming catalog exposes every growth-cycle crop and the inventory includes pet-food supplies", () => {
   assert.deepEqual(CROP_CATALOG.map((crop) => crop.id), [
-    "bean", "beetroot", "cabbage", "carrot", "cauliflower", "garlic", "potato", "radish",
+    "bean", "beetroot", "blueberry", "cabbage", "carrot", "cauliflower", "corn", "eggplant",
+    "garlic", "potato", "pumpkin", "radish", "strawberry", "sunflower", "tomato", "watermelon",
   ]);
   assert.ok(carrot);
   const agriculture = createStarterAgriculture(() => 0);
@@ -40,7 +41,7 @@ test("the farming catalog exposes every Grimnir growth-cycle crop and the invent
   assert.deepEqual(Object.keys(agriculture.inventory.supplies), PET_CARE.map((care) => care.food.itemId));
   for (const care of PET_CARE.filter((row) => row.speciesId !== "pet.corgi")) assert.equal(agriculture.inventory.supplies[care.food.itemId], 0);
   assert.equal(Object.values(agriculture.inventory.seeds).filter((count) => count === 1).length, 6);
-  assert.equal(Object.values(agriculture.inventory.seeds).filter((count) => count === 0).length, 2);
+  assert.equal(Object.values(agriculture.inventory.seeds).filter((count) => count === 0).length, CROP_CATALOG.length - 6);
   for (const crop of CROP_CATALOG) {
     assert.ok([0, 1].includes(agriculture.inventory.seeds[crop.id]), crop.id);
     assert.equal(agriculture.inventory.produce[crop.id], 0, crop.id);
@@ -54,11 +55,29 @@ test("starter seeds choose six unique crops under injected randomness", () => {
   const low = createStarterAgriculture(() => 0).inventory.seeds;
   const high = createStarterAgriculture(() => 0.999).inventory.seeds;
   assert.deepEqual(Object.entries(low).filter(([, count]) => count === 1).map(([id]) => id), [
-    "bean", "beetroot", "cabbage", "carrot", "cauliflower", "garlic",
+    "bean", "beetroot", "blueberry", "cabbage", "carrot", "cauliflower",
   ]);
   assert.deepEqual(Object.entries(high).filter(([, count]) => count === 1).map(([id]) => id), [
-    "cabbage", "carrot", "cauliflower", "garlic", "potato", "radish",
+    "pumpkin", "radish", "strawberry", "sunflower", "tomato", "watermelon",
   ]);
+});
+
+test("a crop added after a farm was saved starts at zero seeds instead of a free stack", () => {
+  // The API keeps only seed ids already stored, so any default here would be
+  // re-granted on every load. Only a legacy farm with no seed stack gets 5.
+  const saved = normalizeAgriculture({ inventory: { seeds: { carrot: 3 } } }, new Set());
+  assert.equal(saved.inventory.seeds.carrot, 3);
+  assert.equal(saved.inventory.seeds.watermelon, 0);
+  assert.equal(saved.inventory.seeds.radish, 0);
+  const legacy = normalizeAgriculture({}, new Set());
+  assert.ok(CROP_CATALOG.every((crop) => legacy.inventory.seeds[crop.id] === 5));
+});
+
+test("every crop model exists on disk and every stage is a distinct file", () => {
+  for (const crop of CROP_CATALOG) {
+    assert.equal(new Set(crop.models).size, 4, crop.id);
+    for (const file of crop.models) assert.equal(existsSync(resolve(cropAssets, file)), true, `${crop.id}: ${file}`);
+  }
 });
 
 test("Grimnir GLBs use the shared color texture instead of their embedded white placeholder", () => {

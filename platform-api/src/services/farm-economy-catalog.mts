@@ -54,6 +54,9 @@ const supplyPrices: Readonly<Record<string, number>> = Object.freeze({
 const seedPrices: Readonly<Record<string, number>> = Object.freeze({
   bean: 10, beetroot: 7, cabbage: 12, carrot: 8,
   cauliflower: 14, garlic: 7, potato: 11, radish: 6,
+  // Generated crops (farm/crop-lab); must match js/farm-crops.mts.
+  blueberry: 13, corn: 11, eggplant: 12, pumpkin: 16,
+  strawberry: 9, sunflower: 12, tomato: 10, watermelon: 18,
 });
 
 export function findFarmSpecies(value: unknown): Species | null {

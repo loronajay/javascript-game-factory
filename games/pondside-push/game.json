@@ -1,0 +1,13 @@
+{
+  "title": "Pondside Push",
+  "description": "Build momentum and bump rival farm pets off a circular island in this first-to-three king-of-the-hill match.",
+  "category": "Action",
+  "featured": false,
+  "hidden": true,
+  "players": "1-4",
+  "play_modes": ["solo"],
+  "dimensions": ["3d"],
+  "controls": ["keyboard", "touch"],
+  "orientation": "landscape",
+  "status": "playable"
+}

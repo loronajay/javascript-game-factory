@@ -34,7 +34,7 @@ test("a new farm waits for a named dog and receives one plot plus six persisted 
   assert.deepEqual(layout.onboarding, { status: "needs_name", introSeen: false });
   assert.equal(layout.decor.filter((row) => row.itemId === "decor.plant.soil-patch").length, 1);
   assert.equal(Object.values(layout.agriculture.inventory.seeds).filter((count) => count === 1).length, 6);
-  assert.equal(Object.values(layout.agriculture.inventory.seeds).filter((count) => count === 0).length, 2);
+  assert.equal(Object.values(layout.agriculture.inventory.seeds).filter((count) => count === 0).length, CROP_CATALOG.length - 6);
   assert.deepEqual(layout.agriculture.crops, []);
   assert.deepEqual(layout.clock, { farmMinutes: 480, updatedAt: 0 });
   assert.ok(Object.isFrozen(layout));
@@ -60,7 +60,7 @@ test("normalize keeps a valid document, treats old documents as established, and
   assert.deepEqual({ instanceId: normalized.pets[0].instanceId, speciesId: normalized.pets[0].speciesId, name: normalized.pets[0].name }, valid.pets[0]);
   assert.ok(normalized.pets[0].profile, "legacy dogs gain a safe bounded profile");
   assert.deepEqual(normalized.decor, valid.decor);
-  assert.deepEqual(Object.values(normalized.agriculture.inventory.seeds), Array(8).fill(5));
+  assert.deepEqual(Object.values(normalized.agriculture.inventory.seeds), Array(CROP_CATALOG.length).fill(5));
   assert.deepEqual(normalized.onboarding, { status: "complete", introSeen: true });
   assert.equal(normalizeFarmLayout(null).onboarding.status, "needs_name");
   assert.equal(normalizeFarmLayout({ version: 9 }).onboarding.status, "needs_name");
@@ -105,7 +105,7 @@ test("a server-created pending farm receives its six-seed pool once", () => {
     agriculture: { inventory: { seeds: {}, produce: {}, supplies: {} }, crops: [] },
   });
   assert.equal(Object.values(fromServer.agriculture.inventory.seeds).filter((count) => count === 1).length, 6);
-  assert.equal(Object.values(fromServer.agriculture.inventory.seeds).filter((count) => count === 0).length, 2);
+  assert.equal(Object.values(fromServer.agriculture.inventory.seeds).filter((count) => count === 0).length, CROP_CATALOG.length - 6);
   const reloaded = normalizeFarmLayout(fromServer);
   assert.deepEqual(reloaded.agriculture.inventory.seeds, fromServer.agriculture.inventory.seeds);
 });

@@ -39,9 +39,9 @@ test("the farm page ships the shell the composition root requires", () => {
   assert.match(html, /id="farmOwnerLink"[^>]*hidden/);
 });
 
-test("the farm links owners directly to the first pet game", () => {
+test("the farm links owners to the Pet Games event menu", () => {
   assert.match(html, /id="openPetGames"/);
-  assert.match(html, /href="\.\.\/games\/barnyard-dash\/index\.html"/);
+  assert.match(html, /href="\.\.\/games\/pet-games\/index\.html"/);
 });
 
 test("the farm is playable signed in or out, saves locally or to a loaded account, and keeps visits read-only", () => {

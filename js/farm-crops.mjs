@@ -6,15 +6,25 @@ export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
 export const CARE_GATE = 0.5;
 const MAX_STACK = 99;
 const crop = (id, title, seedPrice, days, yieldCount, models) => Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) });
+/** Crops drawn by farm/crop-lab/generator (same palette atlas as the Grimnir pack): three stages and a ripe plant. */
+const generated = (id, title, seedPrice, days, yieldCount) => crop(id, title, seedPrice, days, yieldCount, [`Crop_${title}_STAGE_1_01.glb`, `Crop_${title}_STAGE_2_01.glb`, `Crop_${title}_STAGE_3_01.glb`, `Crop_${title}_RIPE_01.glb`]);
 export const CROP_CATALOG = Object.freeze([
     crop("bean", "Bean", 10, 3, 4, ["Crop_Bean_STAGE_1_01.glb", "Crop_Bean_STAGE_2_01.glb", "Crop_Bean_STAGE_3_01.glb", "Crop_Bean_STAGE_4_01.glb"]),
     crop("beetroot", "Beetroot", 7, 2, 3, ["Crop_Beetroot_STAGE_1_01.glb", "Crop_Beetroot_STAGE_2_01.glb", "Crop_Beetroot_STAGE_3_01.glb", "Crop_Beetroot_01.glb"]),
+    generated("blueberry", "Blueberry", 13, 4, 6),
     crop("cabbage", "Cabbage", 12, 3, 2, ["Crop_Cabbage_STAGE_1_01.glb", "Crop_Cabbage_STAGE_1_02.glb", "Crop_Cabbage_STAGE_1_03.glb", "Crop_Cabbage_01.glb"]),
     crop("carrot", "Carrot", 8, 2, 3, ["Crop_Carrot_STAGE_1_01.glb", "Crop_Carrot_STAGE_2_01.glb", "Crop_Carrot_STAGE_3_01.glb", "Crop_Carrot_01.glb"]),
     crop("cauliflower", "Cauliflower", 14, 4, 2, ["Crop_Cauliflower_STAGE_1_01.glb", "Crop_Cauliflower_STAGE_2_01.glb", "Crop_Cauliflower_STAGE_3_01.glb", "Crop_Cauliflower_01.glb"]),
+    generated("corn", "Corn", 11, 3.5, 2),
+    generated("eggplant", "Eggplant", 12, 3.5, 3),
     crop("garlic", "Garlic", 7, 2.5, 4, ["Crop_Garlic_STAGE_1_01.glb", "Crop_Garlic_STAGE_2_01.glb", "Crop_Garlic_STAGE_3_01.glb", "Crop_Garlic_01.glb"]),
     crop("potato", "Potato", 11, 3.5, 5, ["Crop_Potato_STAGE_1_01.glb", "Crop_Potato_STAGE_2_01.glb", "Crop_Potato_STAGE_3_01.glb", "Crop_Potato_01.glb"]),
+    generated("pumpkin", "Pumpkin", 16, 4, 1),
     crop("radish", "Radish", 6, 2, 3, ["Crop_Radish_STAGE_1_01.glb", "Crop_Radish_STAGE_2_01.glb", "Crop_Radish_STAGE_3_01.glb", "Crop_Radish_01.glb"]),
+    generated("strawberry", "Strawberry", 9, 2.5, 5),
+    generated("sunflower", "Sunflower", 12, 4, 1),
+    generated("tomato", "Tomato", 10, 3, 4),
+    generated("watermelon", "Watermelon", 18, 4, 1),
 ]);
 export function findCrop(id) {
     return typeof id === "string" ? CROP_CATALOG.find((entry) => entry.id === id) : undefined;
@@ -73,11 +83,16 @@ const count = (value) => typeof value === "number" && Number.isFinite(value) ? M
 const finite = (value, fallback = 0) => typeof value === "number" && Number.isFinite(value) ? value : fallback;
 function inventoryWith(defaultSeeds, source) {
     const input = source && typeof source === "object" ? source : {};
-    const seeds = input.seeds && typeof input.seeds === "object" ? input.seeds : {};
+    const storedSeeds = Boolean(input.seeds && typeof input.seeds === "object");
+    const seeds = storedSeeds ? input.seeds : {};
     const produce = input.produce && typeof input.produce === "object" ? input.produce : {};
     const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies : {};
     return Object.freeze({
-        seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? defaultSeeds : count(defaultSeeds[entry.id])]))),
+        // A stored seed stack is authoritative: a crop added to the catalog after it
+        // was saved starts at 0 (the server keeps only stored ids, so a default here
+        // would re-grant on every load). The number default is only for a legacy
+        // document with no seed stack at all.
+        seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? (storedSeeds ? 0 : defaultSeeds) : count(defaultSeeds[entry.id])]))),
         produce: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, count(produce[entry.id])]))),
         supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
             care.food.itemId,

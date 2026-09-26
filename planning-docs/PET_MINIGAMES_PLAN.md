@@ -38,7 +38,18 @@ Next sensible Barnyard Dash passes:
 4. Design the trusted result/accomplishment authority before writing wins or records back to farm history.
 5. Add online PvP only with a headless latency harness and server-authoritative or deterministic contract.
 
-## Event 02 — Fence Hopper
+## Event 02 — Pondside Push
+
+Status: **first playable offline slice implemented** in `games/pondside-push/`.
+
+A four-pet king-of-the-hill brawl on a circular grass-and-stone island surrounded by water. The player's farm pet faces three deterministic CPU rivals. Holding a clean forward line builds momentum; the bump button produces a short burst and its collision force grows with approach speed. The last pet on the island wins the round, and the first pet to three round wins takes the match.
+
+- Speed has a narrow effect on maximum pace; sustained direction and steering discipline create the larger advantage.
+- Strength adds a modest bump-force multiplier, while current size uses the species' canonical visible-body radius.
+- The cabinet reads canonical farm identity through the shared Pet Games adapter and has no farm write path.
+- The first slice is offline only, with no rewards, records, or online authority.
+
+## Event 03 — Fence Hopper
 
 Status: **design held for a later task; not implemented**.
 
@@ -52,7 +63,7 @@ An animal-hurdles timing game. Forward motion may be automatic or offer limited 
 
 Open design question for its own task: decide whether it is a distinct cabinet or a mode sharing Barnyard Dash presentation/runtime. Do not decide this by growing `main.js`; first evaluate the simulation and UI boundaries.
 
-## Event 03 — Hay Bale Smash
+## Event 04 — Hay Bale Smash
 
 Status: **design held for a later task; not implemented**.
 
@@ -71,7 +82,7 @@ Possible formats are distance records, target zones, and different destructible 
 - Online matchmaking and private rooms.
 - Ticket rewards, entry fees, anti-cheat, and result authority.
 - Durable pet accomplishments and memorial-history integration.
-- A shared Pet Games lobby/event structure inside the 3D farm.
+- An in-world Pet Games lobby structure inside the 3D farm. The HTML Pet Games hub now owns event selection.
 - Cross-event seasons, rankings, or stat-specific leagues.
 - Bespoke animation work.
 
