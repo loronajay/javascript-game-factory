@@ -124,6 +124,9 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("apple", { title: "Apple Tree", category: "plant", footprint: { width: 0.6, depth: 0.6 }, swatch: ["#4f9a3a", "#d43a3a"], model: "tree-apple" }),
     item("willow", { title: "Willow", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#7fb35a", "#5d3a1f"], model: "tree-willow" }),
     item("bush", { title: "Hedge Bush", category: "plant", footprint: { width: 1.2, depth: 1 }, swatch: ["#4f9a3a", "#2f6b2a"], model: "bush" }),
+    // A Tree Plot is where a productive tree grows (farm-trees.mts): free and repeatable like a growing plot,
+    // since how many trees may produce is capped by skill. Its footprint is the trunk it will hold.
+    item("tree-plot", { title: "Tree Plot", category: "plant", footprint: { width: 0.6, depth: 0.6 }, swatch: ["#6b4a2e", "#8e8b82"], model: "tree-plot", unlock: STARTER }),
     item("soil-patch", { title: "Growing Plot", category: "plant", footprint: { width: 3, depth: 2 }, solid: false, swatch: ["#5b3820", "#8a633c"], model: "soil-patch", unlock: STARTER }),
     item("flower-bed", { title: "Flower Bed", category: "plant", footprint: { width: 2, depth: 1 }, solid: false, swatch: ["#ff6f91", "#5f9a3c"], model: "flower-bed" }),
     item("sunflowers", { title: "Sunflowers", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#ffd33d", "#4f9a3a"], model: "sunflowers" }),

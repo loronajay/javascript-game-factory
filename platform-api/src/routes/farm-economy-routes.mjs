@@ -4,8 +4,11 @@ export async function handleFarmEconomyRoute(context) {
     const adopting = pathname === "/games/farm/adoptions" && method === "POST";
     const buyingSupply = pathname === "/games/farm/supplies/purchases" && method === "POST";
     const harvesting = pathname === "/games/farm/harvests" && method === "POST";
+    const harvestingTree = pathname === "/games/farm/trees/harvests" && method === "POST";
     const selling = pathname === "/games/farm/market/sales" && method === "POST";
-    if (!adopting && !buyingSupply && !harvesting && !selling)
+    const readingOrders = pathname === "/games/farm/market/orders" && method === "GET";
+    const fillingOrder = pathname === "/games/farm/market/orders/fulfillments" && method === "POST";
+    if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder)
         return false;
     if (!authClaims?.playerId) {
         writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
@@ -13,8 +16,14 @@ export async function handleFarmEconomyRoute(context) {
     }
     if (harvesting)
         return handleHarvest(context);
+    if (harvestingTree)
+        return handleTreeHarvest(context);
     if (selling)
         return handleSale(context);
+    if (readingOrders)
+        return handleOrderBoard(context);
+    if (fillingOrder)
+        return handleOrderFill(context);
     const action = adopting ? services?.adoptFarmPet : services?.purchaseFarmSupply;
     if (typeof action !== "function") {
         writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
@@ -31,7 +40,7 @@ export async function handleFarmEconomyRoute(context) {
     try {
         const purchase = await action(input);
         if (!purchase?.ok) {
-            const conflict = new Set(["insufficient_tickets", "inventory_full", "farm_full", "needs_water"]);
+            const conflict = new Set(["insufficient_tickets", "inventory_full", "farm_full", "needs_water", "level_too_low"]);
             writeJson(res, conflict.has(purchase?.error) ? 409 : 400, { status: "error", ...purchase, timestamp }, requestOrigin);
             return true;
         }
@@ -78,6 +87,37 @@ async function handleHarvest(context) {
     return true;
 }
 /**
+ * POST /games/farm/trees/harvests — self only. Pick a fruit tree or fell a
+ * timber tree: the client sends its farm and a Tree Plot; whether the tree is
+ * ready, and what it pays, are the server's (db/farm-economy.mts `harvestFarmTree`).
+ * Refusals still return the verified farm so the client can adopt it.
+ */
+async function handleTreeHarvest(context) {
+    const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+    if (typeof services?.harvestFarmTree !== "function") {
+        writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+        return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return true;
+    }
+    try {
+        const harvest = await services.harvestFarmTree({ playerId: authClaims.playerId, plotId: body.value?.plotId, layout: body.value?.layout });
+        if (!harvest?.ok) {
+            const conflict = new Set(["not_ready", "empty"]);
+            writeJson(res, conflict.has(harvest?.error) ? 409 : 400, { status: "error", ...harvest, timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { harvest }, requestOrigin);
+    }
+    catch {
+        writeJson(res, 400, { status: "error", error: "invalid_farm_tree_harvest", timestamp }, requestOrigin);
+    }
+    return true;
+}
+/**
  * POST /games/farm/market/sales — self only. The body names crops and counts
  * and an idempotency key; the price and the payout are the server's
  * (db/farm-economy.mts `sellFarmProduce`). Any price the client sends is ignored.
@@ -108,6 +148,56 @@ async function handleSale(context) {
     }
     catch {
         writeJson(res, 400, { status: "error", error: "invalid_farm_sale", timestamp }, requestOrigin);
+    }
+    return true;
+}
+/**
+ * GET /games/farm/market/orders — self only. Today's board, which orders this
+ * player has filled, their Farming level and their basket. The board itself is
+ * the same for everyone; only the ticks are personal, which is why it is not public.
+ */
+async function handleOrderBoard(context) {
+    const { res, authClaims, requestOrigin, timestamp, services } = context;
+    if (typeof services?.getFarmOrderBoard !== "function") {
+        writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+        return true;
+    }
+    try {
+        const board = await services.getFarmOrderBoard({ playerId: authClaims.playerId });
+        writeJson(res, 200, { board }, requestOrigin);
+    }
+    catch {
+        writeJson(res, 500, { status: "error", error: "farm_orders_unavailable", timestamp }, requestOrigin);
+    }
+    return true;
+}
+/**
+ * POST /games/farm/market/orders/fulfillments — self only. The body names an
+ * order id and nothing else counts: what it asks for, what it pays and whether
+ * it is still on the board are the server's (db/farm-economy.mts `fillFarmOrder`).
+ */
+async function handleOrderFill(context) {
+    const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+    if (typeof services?.fillFarmOrder !== "function") {
+        writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+        return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return true;
+    }
+    try {
+        const fill = await services.fillFarmOrder({ playerId: authClaims.playerId, orderId: body.value?.orderId });
+        if (!fill?.ok) {
+            const conflict = new Set(["not_enough_produce", "level_too_low", "order_expired"]);
+            writeJson(res, conflict.has(fill?.error) ? 409 : 400, { status: "error", ...fill, timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { fill }, requestOrigin);
+    }
+    catch {
+        writeJson(res, 400, { status: "error", error: "invalid_farm_order", timestamp }, requestOrigin);
     }
     return true;
 }

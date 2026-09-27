@@ -1,6 +1,7 @@
 // Persistent crop rules. This is deliberately independent of THREE and the DOM:
 // the page, server normalizer and headless tests all use the same farming contract.
 import { PET_CARE } from "./farm-pet-care.mjs";
+import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
 export const CARE_GATE = 0.5;
@@ -55,6 +56,8 @@ export const DEAD_CROP_MODELS = Object.freeze(["Crop_Dead_STAGE_1_01.glb", "Crop
 export function deadCropModel(stage) {
     return DEAD_CROP_MODELS[Math.min(2, stage)];
 }
+/** Everything the harvest basket holds: the crops, then the fruit. */
+export const PRODUCE_IDS = Object.freeze([...CROP_CATALOG.map((entry) => entry.id), ...FRUIT_IDS]);
 export function findCrop(id) {
     return typeof id === "string" ? CROP_CATALOG.find((entry) => entry.id === id) : undefined;
 }
@@ -110,23 +113,29 @@ export function findSoilCellInReach(decor, player, reach = 2.65) {
 }
 const count = (value) => typeof value === "number" && Number.isFinite(value) ? Math.min(MAX_STACK, Math.max(0, Math.floor(value))) : 0;
 const finite = (value, fallback = 0) => typeof value === "number" && Number.isFinite(value) ? value : fallback;
-function inventoryWith(defaultSeeds, source) {
+/** A new farm's first saplings: one fruit tree and one timber tree to try. Older farms buy theirs. */
+const STARTER_SAPLINGS = Object.freeze({ apple: 1, oak: 1 });
+function inventoryWith(defaultSeeds, source, defaultSaplings = {}) {
     const input = source && typeof source === "object" ? source : {};
     const storedSeeds = Boolean(input.seeds && typeof input.seeds === "object");
     const seeds = storedSeeds ? input.seeds : {};
     const produce = input.produce && typeof input.produce === "object" ? input.produce : {};
     const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies : {};
+    const saplings = input.saplings && typeof input.saplings === "object" ? input.saplings : defaultSaplings;
+    const logs = input.logs && typeof input.logs === "object" ? input.logs : {};
     return Object.freeze({
         // A stored seed stack is authoritative: a crop added to the catalog after it
         // was saved starts at 0 (the server keeps only stored ids, so a default here
         // would re-grant on every load). The number default is only for a legacy
         // document with no seed stack at all.
         seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? (storedSeeds ? 0 : defaultSeeds) : count(defaultSeeds[entry.id])]))),
-        produce: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, count(produce[entry.id])]))),
+        produce: Object.freeze(Object.fromEntries(PRODUCE_IDS.map((id) => [id, count(produce[id])]))),
         supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
             care.food.itemId,
             care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
         ]))),
+        saplings: Object.freeze(Object.fromEntries(TREE_CATALOG.map((species) => [species.id, count(saplings[species.id])]))),
+        logs: Object.freeze(Object.fromEntries(TIMBER_TREES.map((species) => [species.id, count(logs[species.id])]))),
     });
 }
 function freezeAgriculture(value) {
@@ -142,7 +151,7 @@ export function createStarterAgriculture(random = Math.random) {
         selected.add(available.splice(Math.floor(roll * available.length), 1)[0]);
     }
     const seeds = Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, selected.has(entry.id) ? 1 : 0]));
-    return freezeAgriculture({ inventory: inventoryWith(seeds), crops: [] });
+    return freezeAgriculture({ inventory: inventoryWith(seeds, undefined, STARTER_SAPLINGS), crops: [] });
 }
 export function normalizeAgriculture(value, validPlotIds) {
     const source = value && typeof value === "object" ? value : {};

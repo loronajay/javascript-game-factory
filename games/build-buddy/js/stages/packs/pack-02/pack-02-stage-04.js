@@ -19,9 +19,9 @@ export const pack02Stage04 = createTeamworkStage({
     deck('start', 80, 2400, 1120),
     deck('well_top', 1000, 1148, 400, 64, [
       tool('springBlue', 880, 2360),
-      tool('springBlue', 880, 1990),
-      tool('springBlue', 880, 1620),
-      tool('springBlue', 880, 1250),
+      tool('springBlue', 880, 2000),
+      tool('springBlue', 880, 1640),
+      tool('springBlue', 880, 1280),
     ]),
     deck('gallery', 2300, 1148, 400, 64, [tool('platform', 1800, 1120)]),
     deck('launch', 3600, 840, 400, 64, [tool('springBlue', 2640, 1120), tool('platform', 3160, 840)]),

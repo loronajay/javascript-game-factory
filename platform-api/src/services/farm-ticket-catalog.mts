@@ -6,7 +6,7 @@ export const FARM_GAME_SLUG = "farm";
 export const FARM_STARTER_IDS: ReadonlySet<string> = new Set([
   "ground.meadow",
   "decor.fence.post-rail", "decor.fence.gate", "decor.building.barn",
-  "decor.plant.oak", "decor.plant.soil-patch", "decor.prop.hay-bale",
+  "decor.plant.oak", "decor.plant.soil-patch", "decor.plant.tree-plot", "decor.prop.hay-bale",
   "decor.prop.trough", "decor.prop.doghouse", "decor.prop.tennis-ball",
   "decor.prop.rope-toy", "decor.prop.bone",
 ]);

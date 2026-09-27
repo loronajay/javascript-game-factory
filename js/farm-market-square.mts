@@ -121,11 +121,12 @@ const stall = (spec: Omit<MarketStall, "footprint"> & Partial<Pick<MarketStall, 
   Object.freeze({ footprint: Object.freeze({ width: 3.4, depth: 2 }), ...spec });
 
 export const PRODUCE_STALL_ID = "produce";
+export const ORDER_BOARD_ID = "orders";
 
 /**
- * The square's stalls. v1 opens the Produce Merchant; the others stand where
- * they will trade, shuttered, and say so — the plan's Seed Merchant, Kitchen,
- * Sawmill and Order Board, in the order the plan brings them online.
+ * The square's stalls. The Produce Merchant (v1) and the Order Board (Phase 4)
+ * are open; the others stand where they will trade, shuttered, and say so —
+ * the plan's Seed Merchant, Kitchen and Sawmill, in the order it brings them online.
  */
 export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
@@ -147,13 +148,13 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
     id: "sawmill", kind: "stall", title: "Sawmill", open: false,
     x: -11, z: 1.2, rotationY: QUARTER, colors: ["#7a5534", "#e9d9bb"], keeper: null,
-    closedNote: "The Sawmill is quiet. It opens when timber trees and Woodcutting arrive.",
+    closedNote: "The Sawmill is quiet. Keep the logs you fell — when it opens they will be sawn into planks.",
   }),
   stall({
-    id: "orders", kind: "board", title: "Order Board", open: false,
+    id: ORDER_BOARD_ID, kind: "board", title: "Order Board", open: true,
     x: 11.2, z: 1.2, rotationY: -QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
     colors: ["#6b4b2c", "#f4ecd6"], keeper: null,
-    closedNote: "No orders are pinned up yet. Contracts open with Farming levels.",
+    closedNote: "",
   }),
 ]);
 
@@ -218,6 +219,7 @@ export function findStallInReach(
 
 export function stallPrompt(entry: MarketStall, signedIn: boolean): string {
   if (!entry.open) return `${entry.title} · closed for now · Press E to read the notice`;
+  if (entry.kind === "board") return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;
   if (!signedIn) return `${entry.title} · sign in to sell your produce`;
   return `Press E to sell produce to ${entry.keeper?.name ?? entry.title}`;
 }

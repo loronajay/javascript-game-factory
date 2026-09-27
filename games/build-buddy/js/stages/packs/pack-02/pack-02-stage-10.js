@@ -20,7 +20,7 @@ export const pack02Stage10 = createTeamworkStage({
     deck('pier_a', 1540, 2560, 400, 64, [tool('platform', 1000, 2680)]),
     deck('pier_b', 2880, 2560, 400, 64, [tool('platform', 2320, 2560)]),
     deck('yard_end', 4180, 2560, 520, 64, [tool('platform', 3640, 2560)]),
-    climb('west_wall', 4560, 1560, 540, [tool('springBlue', 4500, 2520)]),
+    climb('west_wall', 4560, 1560, 540, [tool('springBlue', 4520, 2520)]),
     deck('corridor_a', 4200, 1536, 320),
     deck('corridor_b', 3400, 1536, 400, 64, { tools: [tool('platform', 3920, 1536)], low: true }),
     climb('east_wall', 3348, 936, 600),

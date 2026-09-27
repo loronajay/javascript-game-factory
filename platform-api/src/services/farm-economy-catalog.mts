@@ -1,4 +1,5 @@
 import { paletteTier, rollFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
+import { farmTreeRule } from "./farm-tree-catalog.mjs";
 
 export const FARM_ADOPTION_PRICE = 1200;
 
@@ -63,10 +64,15 @@ export function findFarmSpecies(value: unknown): Species | null {
   return typeof value === "string" ? FARM_SPECIES.find((row) => row.id === value.trim()) ?? null : null;
 }
 
-export function findFarmSupply(value: unknown): Readonly<{ id: string; price: number; kind: "supply" | "seed"; cropId?: string }> | null {
+export type FarmSupply = Readonly<{ id: string; price: number; kind: "supply" | "seed" | "sapling"; cropId?: string; speciesId?: string }>;
+
+export function findFarmSupply(value: unknown): FarmSupply | null {
   const id = typeof value === "string" ? value.trim() : "";
   const price = supplyPrices[id];
   if (price) return Object.freeze({ id, price, kind: "supply" as const });
+  // Productive-tree saplings (services/farm-tree-catalog): `sapling.<species>`, level-gated at purchase.
+  const tree = id.startsWith("sapling.") ? farmTreeRule(id.slice(8)) : null;
+  if (tree) return Object.freeze({ id, price: tree.saplingPrice, kind: "sapling" as const, speciesId: id.slice(8) });
   const cropId = id.startsWith("seed.") ? id.slice(5) : "";
   const seedPrice = seedPrices[cropId];
   return seedPrice ? Object.freeze({ id, price: seedPrice, kind: "seed" as const, cropId }) : null;

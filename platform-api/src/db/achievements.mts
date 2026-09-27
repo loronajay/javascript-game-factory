@@ -211,3 +211,33 @@ export async function getPlayerAchievements(pool: any, params: any = {}): Promis
     return null;
   }
 }
+
+/**
+ * Awards a SERVER-AWARDED game's achievements (services/farm-achievement-catalog)
+ * inside the caller's transaction, from facts the caller's own operation just
+ * established. No run is filed and nothing from a browser is judged: the
+ * detector reads the stored record the transaction is about to commit.
+ *
+ * Returns the definitions newly earned, presented for a toast. Ids already
+ * held are skipped by the same `on conflict do nothing` the run path uses, so
+ * two concurrent operations can never both report the same unlock.
+ */
+export async function awardServerAchievementsInTransaction(client: any, params: { playerId: string; gameSlug: string; facts: unknown; sourceId: string }): Promise<any[]> {
+  const game = getAchievementGame(params.gameSlug);
+  if (!game || !params.playerId) return [];
+  const owned = await readOwned(client, params.playerId, game.gameSlug);
+  const unlocked: any[] = [];
+  for (const id of evaluateAchievementRun(game, params.facts, owned.keys())) {
+    const inserted = await client.query(
+      `insert into player_achievements (player_id, game_slug, achievement_id, run_id, unlocked_at)
+       values ($1, $2, $3, $4, now())
+       on conflict (player_id, game_slug, achievement_id) do nothing
+       returning unlocked_at`,
+      [params.playerId, game.gameSlug, id, cleanText(params.sourceId, 80)],
+    );
+    if (!inserted.rows?.length) continue;
+    const definition = game.definitions.find((entry) => entry.id === id);
+    if (definition) unlocked.push(presentAchievement(definition, toIso(inserted.rows[0].unlocked_at) || new Date().toISOString()));
+  }
+  return unlocked;
+}

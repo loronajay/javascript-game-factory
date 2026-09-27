@@ -24,7 +24,7 @@ import type { FarmDecorRow } from "./farm-layout.mjs";
 import { FARM_BUILDING_BUILDERS, type BuildingDoors } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
-import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createSoilPatch, createStump, createSunflowers, createTree, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
+import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createSoilPatch, createStump, createSunflowers, createTree, createTreePlot, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
 
 export type { BarnDoors, BuildingDoors } from "./farm-props-buildings.mjs";
 export { createBarn } from "./farm-props-buildings.mjs";
@@ -1112,6 +1112,7 @@ export const FARM_PROP_BUILDERS: Readonly<Record<string, (THREE: ThreeNamespace,
   "tree-willow": (THREE, _definition, _row, seed) => still(createWillow(THREE, seed)),
   bush: (THREE, _definition, _row, seed) => still(createBush(THREE, seed)),
   "soil-patch": (THREE) => still(createSoilPatch(THREE)),
+  "tree-plot": (THREE) => still(createTreePlot(THREE)),
   "flower-bed": (THREE, _definition, _row, seed) => still(createFlowerBed(THREE, seed)),
   sunflowers: (THREE, _definition, _row, seed) => still(createSunflowers(THREE, seed)),
   "pumpkin-patch": (THREE, _definition, _row, seed) => still(createPumpkinPatch(THREE, seed)),

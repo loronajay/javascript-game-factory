@@ -17,9 +17,9 @@ export const pack02Stage08 = createTeamworkStage({
   timerMs: 210000,
   route: [
     deck('start', 80, 2828, 480),
-    deck('green_ledge', 800, 2428, 400, 64, [tool('springGreen', 460, 2760)]),
-    deck('blue_ledge', 1440, 1908, 400, 64, [tool('springBlue', 1100, 2360)]),
-    deck('green_again', 2080, 1508, 400, 64, [tool('springGreen', 1740, 1840)]),
+    deck('green_ledge', 800, 2428, 400, 64, [tool('springGreen', 480, 2760)]),
+    deck('blue_ledge', 1440, 1908, 400, 64, [tool('springBlue', 1120, 2360)]),
+    deck('green_again', 2080, 1508, 400, 64, [tool('springGreen', 1760, 1840)]),
     climb('exchange_mast', 2480, 948, 560),
     deck('roof', 2532, 924, 368),
     deck('exit', 3000, 224, 560, 64, [tool('springBlue', 2800, 880), tool('springGreen', 2800, 520)]),

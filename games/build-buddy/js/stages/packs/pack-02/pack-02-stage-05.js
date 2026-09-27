@@ -30,7 +30,7 @@ export const pack02Stage05 = createTeamworkStage({
     deck('pump_house', 5280, 1720, 480, 64, [tool('platform', 4760, 1720)]),
     climb('pump_wall', 5760, 1000, 720),
     deck('roof', 5812, 976, 468),
-    deck('exit', 6980, 436, 560, 64, [tool('springBlue', 6220, 920), tool('platform', 6560, 640)]),
+    deck('exit', 6980, 436, 560, 64, [tool('springBlue', 6240, 920), tool('platform', 6560, 640)]),
   ],
   extras: [
     deck('basin_floor', 2380, 1900, 2900),

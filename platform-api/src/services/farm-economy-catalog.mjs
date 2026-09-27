@@ -1,4 +1,5 @@
 import { paletteTier, rollFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
+import { farmTreeRule } from "./farm-tree-catalog.mjs";
 export const FARM_ADOPTION_PRICE = 1200;
 const paletteIds = Object.freeze({
     "pet.corgi": ["sable", "midnight", "cosmic"], "pet.duck": ["mallard", "lavender", "prism"],
@@ -53,6 +54,10 @@ export function findFarmSupply(value) {
     const price = supplyPrices[id];
     if (price)
         return Object.freeze({ id, price, kind: "supply" });
+    // Productive-tree saplings (services/farm-tree-catalog): `sapling.<species>`, level-gated at purchase.
+    const tree = id.startsWith("sapling.") ? farmTreeRule(id.slice(8)) : null;
+    if (tree)
+        return Object.freeze({ id, price: tree.saplingPrice, kind: "sapling", speciesId: id.slice(8) });
     const cropId = id.startsWith("seed.") ? id.slice(5) : "";
     const seedPrice = seedPrices[cropId];
     return seedPrice ? Object.freeze({ id, price: seedPrice, kind: "seed", cropId }) : null;

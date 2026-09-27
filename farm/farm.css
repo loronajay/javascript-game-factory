@@ -141,6 +141,38 @@ button, a { font: inherit; }
 .seed-hud strong { display: block; margin-top: 2px; color: #fff6cf; font-size: 13px; }
 .seed-hud small { display: block; margin-top: 3px; color: #c9d7bd; font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .06em; }
 .seed-hud small.is-full { color: var(--farm-accent); }
+.farming-skill { margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.1); }
+.farming-skill[hidden] { display: none; }
+.seed-hud .farming-skill small { margin-top: 0; color: #fff6cf; }
+.farming-skill__bar { display: block; height: 5px; margin-top: 4px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.12); }
+.farming-skill__bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--farm-leaf); transition: width .4s ease; }
+.farming-skill.is-levelled .farming-skill__bar i { background: var(--farm-accent); }
+.farming-skill--wood .farming-skill__bar i { background: #c98a4b; }
+
+/* The felling meter: a marker sweeps the bar; E when it is in the green. */
+.chop-meter { position: fixed; left: 50%; bottom: 200px; z-index: 6; width: min(420px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: rgba(20, 26, 16, .86); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
+.chop-meter[hidden] { display: none; }
+.chop-meter strong { font-size: 15px; letter-spacing: .02em; }
+.chop-meter small { font-size: 12px; color: rgba(255,246,207,.8); }
+.chop-meter__bar { position: relative; height: 22px; border-radius: 11px; background: linear-gradient(90deg, #5a2a1d, #7a3a22 50%, #5a2a1d); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.chop-meter__good { position: absolute; top: 0; bottom: 0; background: #6fae4a; }
+.chop-meter__perfect { position: absolute; top: 0; bottom: 0; background: #d8f07a; }
+.chop-meter__marker { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.8); }
+.chop-meter__tree { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.chop-meter__tree i { display: block; height: 100%; width: 100%; background: #c98a4b; transition: width .15s ease; }
+.chop-meter__word:not(:empty)::before { content: " · "; color: rgba(255,246,207,.6); font-weight: 400; }
+.chop-meter__word[data-quality="perfect"] { color: #d8f07a; font-weight: 700; }
+.chop-meter__word[data-quality="good"] { color: #9fdc74; }
+.chop-meter__word[data-quality="poor"] { color: #e0a080; }
+
+/* Saplings in the inventory: pick one for E, or buy one. */
+.sapling-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.sapling-card { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); border-left: 4px solid var(--fruit, #8a5a34); }
+.sapling-card[aria-pressed="true"] { background: rgba(143, 196, 94, .18); box-shadow: inset 0 0 0 2px var(--farm-leaf); }
+.sapling-card__pick { display: grid; gap: 2px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sapling-card__pick:disabled { cursor: default; opacity: .7; }
+.sapling-card__pick small { font-size: 12px; opacity: .8; }
+.seed-card__image.is-fruit::after { content: ""; width: 58%; height: 58%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), transparent 35%), var(--fruit); box-shadow: 0 3px 4px rgba(0,0,0,.35); }
 
 .nap-dialog { width: min(440px, calc(100vw - 36px)); padding: 0; border: 1px solid var(--farm-line); border-radius: 18px; background: var(--farm-ink); color: #f8fbf4; box-shadow: 0 30px 90px rgba(0,0,0,.65); }
 .nap-dialog::backdrop { background: rgba(3, 7, 15, .68); backdrop-filter: blur(4px); }

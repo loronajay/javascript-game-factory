@@ -52,8 +52,10 @@
 // condition is evaluated on its own. A game that wants a genuine
 // prerequisite expresses it in `detect` against `ownedIds`.
 import { LOVERS_LOST_ACHIEVEMENTS } from "./lovers-lost-achievement-catalog.mjs";
+import { FARM_ACHIEVEMENTS } from "./farm-achievement-catalog.mjs";
 const GAMES = Object.freeze([
     LOVERS_LOST_ACHIEVEMENTS,
+    FARM_ACHIEVEMENTS,
 ]);
 const BY_SLUG = new Map(GAMES.map((game) => [game.gameSlug, game]));
 function cleanText(value, maxLength = 60) {

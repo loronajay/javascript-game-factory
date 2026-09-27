@@ -1,4 +1,4 @@
-import { createTeamworkStage, deck, climb, spikes, spikeBall, tool } from '../../course-helpers.js';
+import { createTeamworkStage, deck, climb, spikes, lock, spikeBall, tool } from '../../course-helpers.js';
 
 // A double-back along the breakwater. The ground run heads right over two
 // gaps that need three platforms against a cap of two, then up the lighthouse
@@ -34,5 +34,6 @@ export const pack02Stage07 = createTeamworkStage({
     spikes('pillar_a_spikes', 3200, 976, 100),
     spikes('pillar_b_spikes', 2000, 976, 100),
     spikes('roof_spikes', 4180, 976, 80),
+    lock('start_goal_shortcut', 0, 1320, 1200, 480),
   ],
 });

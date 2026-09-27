@@ -21,7 +21,13 @@ function shaft(i, S, Y, phase) {
 }
 
 function catches(S, Y) {
-  return { tools: [tool('platform', S + 120, Y + 240), tool('platform', S + 120, Y + 500)], low: true };
+  return {
+    tools: [
+      tool('platform', S + 120, Math.round((Y + 240) / 40) * 40),
+      tool('platform', S + 120, Math.floor((Y + 500) / 40) * 40),
+    ],
+    low: true,
+  };
 }
 
 export const pack02Stage06 = createTeamworkStage({
@@ -39,16 +45,16 @@ export const pack02Stage06 = createTeamworkStage({
     climb('service_mast', 3710, 1540, 560),
     deck('roof', 3762, 1516, 428),
     deck('exit', 4190, 816, 560, 64, [
-      tool('springGreen', 4090, 1460),
-      tool('springGreen', 4090, 1200),
-      tool('springGreen', 4090, 940),
+      tool('springGreen', 4080, 1480),
+      tool('springGreen', 4080, 1240),
+      tool('springGreen', 4080, 1000),
     ]),
   ],
   extras: [
     ...shaft(1, 640, 600, 0),
     ...shaft(2, 1640, 1100, 0.5),
     ...shaft(3, 2640, 1600, 0),
-    lock('roof_lock', 3762, 820, 328, 656),
-    lock('exit_face_lock', 4150, 820, 40, 656),
+    lock('roof_lock', 3762, 820, 318, 656),
+    lock('exit_face_lock', 4160, 820, 30, 656),
   ],
 });

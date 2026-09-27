@@ -129,8 +129,39 @@ function buildBoard(THREE: ThreeNamespace, group: any, stall: MarketStall): void
   tbox(THREE, group, [width - 0.1, 1.3, 0.08], [0, 1.45, 0], planks);
   tbox(THREE, group, [width + 0.3, 0.06, 0.5], [0, 2.52, 0.05], shingles);
   canvasPlane(THREE, group, width - 0.4, 0.34, [640, 110], (context, w, h) => drawSign(context, w, h, stall.title, stall.colors[0], ""), [0, 2.24, 0.05], false);
-  // An empty board: pins and the one notice that says why.
-  canvasPlane(THREE, group, 1.2, 0.8, [420, 280], (context, w, h) => drawSign(context, w, h, "No orders", "#6b4b2c", "contracts open soon"), [0, 1.4, 0.05], false);
+  if (!stall.open) {
+    // An empty board: pins and the one notice that says why.
+    canvasPlane(THREE, group, 1.2, 0.8, [420, 280], (context, w, h) => drawSign(context, w, h, "No orders", "#6b4b2c", "contracts open soon"), [0, 1.4, 0.05], false);
+    return;
+  }
+  // Open: three notices pinned up, one per tier, a little askew. What they ask for
+  // is read at the board (E); the model only says there is work here.
+  const pin = new THREE.MeshStandardMaterial({ color: "#b8452f", roughness: 0.4, metalness: 0.2 });
+  const notices: readonly [number, number, number, string][] = [[-0.72, 1.48, 0.05, "Wanted"], [0, 1.52, -0.04, "Wanted"], [0.72, 1.46, 0.03, "Wanted"]];
+  for (const [x, y, tilt, title] of notices) {
+    const note = canvasPlane(THREE, group, 0.56, 0.72, [224, 288], (context, w, h) => drawNotice(context, w, h, title), [x, y, 0.05], false);
+    if (note?.rotation) note.rotation.z = tilt;
+    tsphere(THREE, group, 0.025, [x, y + 0.32, 0.07], pin, 8, 6);
+  }
+}
+
+/** A handwritten-looking paper notice: a title and a few scrawled lines. */
+function drawNotice(context: CanvasRenderingContext2D, width: number, height: number, title: string): void {
+  context.fillStyle = "#f6efd9";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#3d2a18";
+  context.textAlign = "center";
+  context.font = `800 ${Math.round(height * 0.12)}px Georgia, serif`;
+  context.fillText(title.toUpperCase(), width / 2, height * 0.2, width - 20);
+  context.strokeStyle = "rgba(61,42,24,.55)";
+  context.lineWidth = 3;
+  for (let line = 0; line < 5; line += 1) {
+    const y = height * (0.36 + line * 0.11);
+    context.beginPath();
+    context.moveTo(width * 0.16, y);
+    context.lineTo(width * (0.84 - (line % 2) * 0.18), y);
+    context.stroke();
+  }
 }
 
 /** One stall's group, posed in the square. */

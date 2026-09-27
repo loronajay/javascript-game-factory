@@ -1,0 +1,168 @@
+// The Market Square's Order Board: rotating NPC contracts. Server-owned — the
+// client reads the board from `GET /games/farm/market/orders` and names an
+// order to fill; what it asks for and what it pays are decided here.
+//
+// ONE BOARD FOR EVERYONE. The board is a pure function of the UTC day, so
+// every farmer in the shared square is reading the same three notices (and can
+// talk about them), while each fills their own copy once. Nothing is stored
+// to rotate it: day N's board is regenerated from N whenever it is asked for,
+// and the ticket ledger's `farm:order:<id>` key is what makes a fill once-only.
+//
+// WHY ORDERS PAY BETTER. A raw sale returns the seed plus a flat margin per
+// cell-day (farm-market-catalog). An order pays that same raw value times a
+// premium that rises with its size, plus Farming XP — so growing what the town
+// asks for, several crops at once, beats growing one crop and dumping it. That
+// is the plan's main defence against a single optimal crop.
+//
+// Tiers gate on Farming level: the large order is a capability a level buys.
+
+import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
+import { farmProducePrice } from "./farm-market-catalog.mjs";
+import { farmHarvestXp } from "./farm-skill-catalog.mjs";
+
+export const FARM_ORDER_DAY_MS = 24 * 60 * 60 * 1000;
+/** An order's XP is this share of what growing its produce earned. */
+export const ORDER_XP_SHARE = 0.5;
+const MAX_LINE = 99;
+
+export type FarmOrderTier = Readonly<{
+  tier: "small" | "medium" | "large";
+  minLevel: number;
+  crops: number;
+  /** How many harvests' worth of each crop the order asks for, low to high. */
+  harvests: readonly [number, number];
+  premium: number;
+}>;
+
+export const FARM_ORDER_TIERS: readonly FarmOrderTier[] = Object.freeze([
+  Object.freeze({ tier: "small", minLevel: 1, crops: 1, harvests: Object.freeze([1, 2]) as readonly [number, number], premium: 1.5 }),
+  Object.freeze({ tier: "medium", minLevel: 5, crops: 2, harvests: Object.freeze([1, 2]) as readonly [number, number], premium: 1.6 }),
+  Object.freeze({ tier: "large", minLevel: 10, crops: 3, harvests: Object.freeze([2, 3]) as readonly [number, number], premium: 1.75 }),
+]);
+
+/** Who pins orders up. `note` is what their notice says. */
+export const FARM_ORDER_CUSTOMERS: readonly Readonly<{ name: string; note: string }>[] = Object.freeze([
+  { name: "Martha's Bakery", note: "Baking for the weekend rush. Fresh only, please!" },
+  { name: "The Crooked Kettle Inn", note: "The stew pot is empty and the regulars are restless." },
+  { name: "Pickle & Preserve Co.", note: "Jarring season. We'll take it by the crate." },
+  { name: "Schoolhouse Kitchen", note: "Lunch for forty hungry kids. No pressure." },
+  { name: "Harvest Festival Committee", note: "The judges' table needs filling before the parade." },
+  { name: "Old Man Hollis", note: "Can't work my own field anymore. I pay fair." },
+  { name: "Riverside Soup Kitchen", note: "Anything helps, but this list helps most." },
+  { name: "Juniper's Juice Cart", note: "Blending all week. Bring it ripe." },
+  { name: "The Mayor's Garden Party", note: "Everything must look perfect. EVERYTHING." },
+  { name: "Copperpot Catering", note: "Wedding on Saturday. The bride is very particular." },
+].map((entry) => Object.freeze(entry)));
+
+export type FarmOrder = Readonly<{
+  id: string;
+  day: number;
+  slot: number;
+  tier: FarmOrderTier["tier"];
+  minLevel: number;
+  customer: string;
+  note: string;
+  lines: Readonly<Record<string, number>>;
+  tickets: number;
+  xp: number;
+  /** Real time (ms) the board turns over and this order comes down. */
+  endsAt: number;
+}>;
+
+export function farmOrderDay(now: number): number {
+  return Math.floor(now / FARM_ORDER_DAY_MS);
+}
+
+function seedFor(text: string): number {
+  // FNV-1a: a stable 32-bit seed from the day's name.
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pick<T>(list: readonly T[], random: () => number, taken: Set<T>): T {
+  const open = list.filter((entry) => !taken.has(entry));
+  const choice = open[Math.floor(random() * open.length)]!;
+  taken.add(choice);
+  return choice;
+}
+
+/** What the lines would fetch sold raw at the Produce Merchant. */
+export function farmOrderRawValue(lines: Readonly<Record<string, number>>): number {
+  return Object.entries(lines).reduce((sum, [cropId, quantity]) => sum + farmProducePrice(cropId) * quantity, 0);
+}
+
+/** The XP an order pays: a share of what harvesting its produce earned. */
+export function farmOrderXp(lines: Readonly<Record<string, number>>): number {
+  let xp = 0;
+  for (const [cropId, quantity] of Object.entries(lines)) {
+    xp += (quantity / FARM_CROP_RULES[cropId]!.yield) * farmHarvestXp(cropId);
+  }
+  return Math.max(1, Math.round(xp * ORDER_XP_SHARE));
+}
+
+/** Day `day`'s board: one order per tier, customers and crops all different. */
+export function farmOrderBoard(day: number): readonly FarmOrder[] {
+  const random = mulberry32(seedFor(`farm-orders:v1:${day}`));
+  const cropIds = Object.keys(FARM_CROP_RULES);
+  const customers = new Set<(typeof FARM_ORDER_CUSTOMERS)[number]>();
+  return Object.freeze(FARM_ORDER_TIERS.map((tier, slot) => {
+    const customer = pick(FARM_ORDER_CUSTOMERS, random, customers);
+    const cropsTaken = new Set<string>();
+    const lines: Record<string, number> = {};
+    for (let index = 0; index < tier.crops; index += 1) {
+      const cropId = pick(cropIds, random, cropsTaken);
+      // Half-harvest steps between the tier's low and high.
+      const steps = Math.round((tier.harvests[1] - tier.harvests[0]) * 2);
+      const harvests = tier.harvests[0] + Math.floor(random() * (steps + 1)) / 2;
+      lines[cropId] = Math.min(MAX_LINE, Math.max(1, Math.round(FARM_CROP_RULES[cropId]!.yield * harvests)));
+    }
+    const tickets = Math.ceil((farmOrderRawValue(lines) * tier.premium) / 5) * 5;
+    return Object.freeze({
+      id: `d${day}-${slot}`,
+      day,
+      slot,
+      tier: tier.tier,
+      minLevel: tier.minLevel,
+      customer: customer.name,
+      note: customer.note,
+      lines: Object.freeze(lines),
+      tickets,
+      xp: farmOrderXp(lines),
+      endsAt: (day + 1) * FARM_ORDER_DAY_MS,
+    });
+  }));
+}
+
+const ORDER_ID = /^d(\d{1,7})-(\d)$/;
+
+/** The order an id names, if it is on day `day`'s board. An id from any other day is not. */
+export function findFarmOrder(orderId: unknown, day: number): FarmOrder | null {
+  const match = typeof orderId === "string" ? ORDER_ID.exec(orderId) : null;
+  if (!match || Number(match[1]) !== day) return null;
+  return farmOrderBoard(day)[Number(match[2])] ?? null;
+}
+
+/** An id that is well formed but for another day: the board has turned over. */
+export function isStaleFarmOrderId(orderId: unknown, day: number): boolean {
+  const match = typeof orderId === "string" ? ORDER_ID.exec(orderId) : null;
+  return Boolean(match) && Number(match![1]) !== day;
+}
+
+export function farmOrderTransactionKey(orderId: string): string {
+  return `farm:order:${orderId}`;
+}

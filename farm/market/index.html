@@ -28,7 +28,7 @@
       <div class="start-card">
         <span class="start-card__tag">EVERYONE'S SQUARE</span>
         <h2>Market day.</h2>
-        <p>The road from the farm ends in a walled square. Marigold at the Produce Merchant buys your harvest for tickets; the other stalls open as the farm grows. Whoever else is here, you'll see them.</p>
+        <p>The road from the farm ends in a walled square. Marigold at the Produce Merchant buys your harvest for tickets, and the Order Board pays better — plus Farming XP — for what the town needs today. The other stalls open as the farm grows. Whoever else is here, you'll see them.</p>
         <button id="enterMarket" type="button">Walk in</button>
         <small id="marketStatus">WASD to move · E to use · Enter to chat · out the south gate to go home</small>
       </div>
@@ -54,7 +54,7 @@
         <button id="closeSale" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
       <div class="inventory-panel__body">
-        <p class="sale-note">Prices are the merchant's: what the seed cost you, plus a fair day's margin for every day it grew. Orders and cooking will pay better when they open.</p>
+        <p class="sale-note">Prices are the merchant's: what the seed cost you, plus a fair day's margin for every day it grew. The Order Board across the square pays better for what it asks for.</p>
         <ol id="saleList" class="sale-list"></ol>
       </div>
       <footer class="sale-footer">
@@ -64,6 +64,20 @@
           <button id="sellProduce" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Pick something to sell</button>
         </div>
         <p id="saleStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <aside id="ordersPanel" class="inventory-panel orders-panel" aria-label="Order Board" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">ORDER BOARD · <span id="ordersLevel"></span></span><strong>Today's orders</strong></div>
+        <button id="closeOrders" class="farm-button" type="button" title="Step back from the board (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Everyone in the square reads the same notices. Each pays once per farmer, better than the merchant does, and every delivery earns Farming XP. <span id="ordersTurnover" class="orders-turnover"></span></p>
+        <ol id="ordersList" class="orders-list"></ol>
+      </div>
+      <footer class="sale-footer orders-footer">
+        <p id="ordersStatus" class="pets-status" aria-live="polite"></p>
       </footer>
     </aside>
   </main>

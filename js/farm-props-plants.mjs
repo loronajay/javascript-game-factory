@@ -151,6 +151,10 @@ export function createBirch(THREE, seed = 1) {
 }
 /** An apple tree: a short gnarled trunk, a round canopy, and red apples in it. */
 export function createAppleTree(THREE, seed = 1) {
+    return createFruitTree(THREE, seed);
+}
+/** An orchard tree: the apple tree's shape in any species' leaves, with its fruit hung only when there is fruit. */
+export function createFruitTree(THREE, seed = 1, look = {}) {
     const group = new THREE.Group();
     const trunk = bark(THREE, "#6a4a2a");
     tcylinder(THREE, group, 0.16, 0.26, 1.7, [0, 0.85, 0], trunk, 10);
@@ -159,8 +163,10 @@ export function createAppleTree(THREE, seed = 1) {
         const angle = spin + index * 2.1;
         branchBetween(THREE, group, [0, 1.25 + (index % 3) * 0.18, 0], [Math.cos(angle) * 1.05, 2.25 + (index % 2) * 0.35, Math.sin(angle) * 1.05], 0.085, trunk, 7);
     }
-    canopy(THREE, group, 1.25, 2.9, seed, ["#4f9a3a", "#74b85a", "#3a7a2e"]);
-    const apple = standard(THREE, "#d43a3a", 0.5, 0);
+    canopy(THREE, group, 1.25, 2.9, seed, look.leaves ?? ["#4f9a3a", "#74b85a", "#3a7a2e"]);
+    if (look.fruit === false)
+        return group;
+    const apple = standard(THREE, look.fruitColor ?? "#d43a3a", 0.5, 0);
     const random = seeded(seed * 11 + 1);
     for (let index = 0; index < TREE_ARCHETYPES.apple.fruitCount; index += 1) {
         const angle = random() * Math.PI * 2;
@@ -229,6 +235,20 @@ export function createBush(THREE, seed = 1) {
     tsphere(THREE, group, 0.4, [Math.cos(spin) * 0.4, 0.38, Math.sin(spin) * 0.3], dark);
     tsphere(THREE, group, 0.38, [Math.cos(spin + 2.4) * 0.42, 0.36, Math.sin(spin + 2.4) * 0.3], leaves);
     tsphere(THREE, group, 0.32, [Math.cos(spin + 4.4) * 0.35, 0.55, Math.sin(spin + 4.4) * 0.25], dark);
+    return group;
+}
+/** A Tree Plot: a ring of mulch inside a low stone edge, with a stake waiting for a sapling. */
+export function createTreePlot(THREE) {
+    const group = new THREE.Group();
+    const mulch = farmMaterial(THREE, "soil", { colors: ["#5a3b22", "#2f1d10", "#7d5634"], metresPerTile: 0.45 });
+    const stone = farmMaterial(THREE, "fieldstone", { metresPerTile: 0.6 });
+    tcylinder(THREE, group, 0.68, 0.72, 0.06, [0, 0.03, 0], mulch, 20, false);
+    for (let index = 0; index < 12; index += 1) {
+        const angle = index / 12 * Math.PI * 2;
+        const rock = tsphere(THREE, group, 0.11, [Math.cos(angle) * 0.74, 0.05, Math.sin(angle) * 0.74], stone, 8, 6);
+        rock.scale.set(1.3, 0.6, 1);
+        rock.rotation.y = -angle;
+    }
     return group;
 }
 /** A tree stump: a cut trunk with rings on top, an axe in it, and a root flare. */

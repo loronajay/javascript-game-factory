@@ -585,9 +585,21 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     harvestFarmCrop({ layout, plotId, cellId }: { layout: unknown; plotId: string; cellId: string }) {
       return post("/games/farm/harvests", { layout, plotId, cellId }, "harvest", {}, true);
     },
+    /** Pick a fruit tree or fell a timber tree: the client sends its farm and names the Tree Plot; the server decides. */
+    harvestFarmTree({ layout, plotId }: { layout: unknown; plotId: string }) {
+      return post("/games/farm/trees/harvests", { layout, plotId }, "harvest", {}, true);
+    },
     /** The Produce Merchant: crops and counts only — the server prices the sale and pays it. */
     sellFarmProduce({ items, saleId }: { items: Record<string, number>; saleId: string }) {
       return post("/games/farm/market/sales", { items, saleId }, "sale", {}, true);
+    },
+    /** Today's Order Board with this player's ticks, Farming level and basket (self only). */
+    fetchFarmOrders() {
+      return get("/games/farm/market/orders", "board");
+    },
+    /** Fill one order by id: what it asks for and what it pays are the server's. */
+    fillFarmOrder({ orderId }: { orderId: string }) {
+      return post("/games/farm/market/orders/fulfillments", { orderId }, "fill", {}, true);
     },
     recordGameProgressClaim(gameSlug: string, claim: unknown = {}) {
       const encoded = encodePathSegment(gameSlug);

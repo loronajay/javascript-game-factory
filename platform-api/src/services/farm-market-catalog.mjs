@@ -10,6 +10,7 @@
 // plan's rule that passive raw farming is the low-value use of a crop.
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
+import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 const DAY = 24 * 60;
 /** Ticket margin one productive cell earns per farm day of growth when its crop is sold raw. */
 export const MARKET_MARGIN_PER_CELL_DAY = 12;
@@ -19,12 +20,23 @@ export const MAX_SALE_QUANTITY = 99;
 export function derivedProducePrice(rule, seedPrice) {
     return Math.ceil((MARKET_MARGIN_PER_CELL_DAY * (rule.growMinutes / DAY) + seedPrice) / rule.yield);
 }
-export const FARM_PRODUCE_PRICES = Object.freeze(Object.fromEntries(Object.entries(FARM_CROP_RULES).map(([cropId, rule]) => {
-    const seed = findFarmSupply(`seed.${cropId}`);
-    if (!seed)
-        throw new Error(`farm-market-catalog: ${cropId} has no seed price`);
-    return [cropId, derivedProducePrice(rule, seed.price)];
-})));
+/**
+ * Fruit is priced the same way, per productive slot: a tree's fruiting days
+ * at the same margin, over what a pick yields. The sapling is not in it — a
+ * tree fruits for as long as it stands, so its cost is paid back many times.
+ */
+export function derivedFruitPrice(rule) {
+    return Math.ceil((MARKET_MARGIN_PER_CELL_DAY * (rule.fruitEveryMinutes / DAY)) / rule.yield);
+}
+export const FARM_PRODUCE_PRICES = Object.freeze(Object.fromEntries([
+    ...Object.entries(FARM_CROP_RULES).map(([cropId, rule]) => {
+        const seed = findFarmSupply(`seed.${cropId}`);
+        if (!seed)
+            throw new Error(`farm-market-catalog: ${cropId} has no seed price`);
+        return [cropId, derivedProducePrice(rule, seed.price)];
+    }),
+    ...Object.entries(FARM_TREE_RULES).filter(([, rule]) => rule.kind === "fruit").map(([fruitId, rule]) => [fruitId, derivedFruitPrice(rule)]),
+]));
 export function farmProducePrice(cropId) {
     return typeof cropId === "string" && Object.prototype.hasOwnProperty.call(FARM_PRODUCE_PRICES, cropId)
         ? FARM_PRODUCE_PRICES[cropId]

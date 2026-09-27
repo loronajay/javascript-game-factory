@@ -19,7 +19,7 @@ import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-reco
 import { getPlayerAchievements, submitAchievementRun } from "./db/achievements.mjs";
 import { submitGameResult } from "./db/game-results.mjs";
 import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tickets.mjs";
-import { adoptFarmPet, harvestFarmCrop, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
+import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
 import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
 import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
@@ -281,7 +281,10 @@ async function bootstrap() {
         adoptFarmPet: (params) => adoptFarmPet(pool, params),
         purchaseFarmSupply: (params) => purchaseFarmSupply(pool, params),
         harvestFarmCrop: (params) => harvestFarmCrop(pool, params),
+        harvestFarmTree: (params) => harvestFarmTree(pool, params),
         sellFarmProduce: (params) => sellFarmProduce(pool, params),
+        getFarmOrderBoard: (params) => getFarmOrderBoard(pool, params),
+        fillFarmOrder: (params) => fillFarmOrder(pool, params),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         spendValor: (params) => spendValorForEntitlement(pool, params),
         resetCampaign: (params) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

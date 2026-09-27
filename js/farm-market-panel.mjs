@@ -32,6 +32,9 @@ export function createMarketSalePanel(elements, options) {
         const ready = options.thumbnail?.(line.cropId, show);
         if (ready)
             show(ready);
+        if (line.color)
+            portrait.style.setProperty("--fruit", line.color);
+        portrait.classList.toggle("is-fruit", Boolean(line.color));
         const label = document.createElement("div");
         label.className = "sale-row__label";
         const title = document.createElement("strong");

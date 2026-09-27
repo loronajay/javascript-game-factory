@@ -5,6 +5,7 @@ import { courseNotes } from '../js/stages/course-helpers.js';
 import { Runner } from '../js/runner.js';
 import { ToolRegistry } from '../js/tools.js';
 import { updateMovingHazards } from '../js/hazards.js';
+import { GRID } from '../js/constants.js';
 
 // Pack 02 is the harbor pack and the one that introduces spike balls. These
 // checks are about the pack as a whole; the per-leg physics lives in
@@ -37,6 +38,43 @@ test('every Pack 02 course uses the new hazard and keeps its own identity', () =
     b.from.x === b.to.x ? 'vertical' : b.from.y === b.to.y ? 'horizontal' : 'diagonal'
   )));
   assert.deepEqual([...directions].sort(), ['diagonal', 'horizontal', 'vertical']);
+});
+
+test('every intended Pack 02 spring is selectable on the Builder grid', () => {
+  for (const id of getStageSequence('pack_02')) {
+    const notes = courseNotes.get(id);
+    for (const via of Object.values(notes.builds)) {
+      for (const placement of via?.tools ?? []) {
+        if (!placement.toolType.startsWith('spring')) continue;
+        assert.equal(placement.x % GRID.size, 0, `${id}: ${placement.toolType} x=${placement.x} is off-grid`);
+        assert.equal(placement.y % GRID.size, 0, `${id}: ${placement.toolType} y=${placement.y} is off-grid`);
+      }
+    }
+  }
+});
+
+test('pack_02_stage_06: all three exit springs fit in the authored build strip', () => {
+  const stage = getStageById('pack_02_stage_06');
+  const registry = new ToolRegistry(stage);
+  const runner = { safetyNoBuildRect: () => ({ x: -1000, y: -1000, w: 1, h: 1 }) };
+  const exit = courseNotes.get(stage.id).builds.stage_06_6_exit;
+
+  for (const placement of exit.tools) {
+    const result = registry.add(placement.toolType, placement.x, placement.y, runner);
+    assert.ok(result.valid, `${placement.toolType} at ${placement.x},${placement.y}: ${result.reason}`);
+  }
+});
+
+test('pack_02_stage_07: the goal cannot be built into directly from the start', () => {
+  const stage = getStageById('pack_02_stage_07');
+  const goalDeck = stage.solids.find((solid) => solid.id === 'stage_07_8_exit');
+  const shortcutLock = stage.blockedPlacementZones.find((zone) => zone.id.endsWith('_start_goal_shortcut'));
+
+  assert.ok(goalDeck, 'goal deck exists');
+  assert.ok(shortcutLock, 'the direct start-to-goal build lane is locked');
+  assert.ok(shortcutLock.x <= stage.start.x && shortcutLock.x + shortcutLock.w >= stage.start.x + 200);
+  assert.ok(shortcutLock.x + shortcutLock.w >= 1200, 'the lock cannot be bypassed beside the start deck');
+  assert.ok(shortcutLock.y < goalDeck.y + goalDeck.h && shortcutLock.y + shortcutLock.h >= stage.start.y);
 });
 
 const idle = {

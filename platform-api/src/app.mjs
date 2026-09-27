@@ -324,7 +324,10 @@ export function createApp(options = {}) {
     const adoptFarmPet = typeof options?.adoptFarmPet === "function" ? options.adoptFarmPet : null;
     const purchaseFarmSupply = typeof options?.purchaseFarmSupply === "function" ? options.purchaseFarmSupply : null;
     const harvestFarmCrop = typeof options?.harvestFarmCrop === "function" ? options.harvestFarmCrop : null;
+    const harvestFarmTree = typeof options?.harvestFarmTree === "function" ? options.harvestFarmTree : null;
     const sellFarmProduce = typeof options?.sellFarmProduce === "function" ? options.sellFarmProduce : null;
+    const getFarmOrderBoard = typeof options?.getFarmOrderBoard === "function" ? options.getFarmOrderBoard : null;
+    const fillFarmOrder = typeof options?.fillFarmOrder === "function" ? options.fillFarmOrder : null;
     // Earned advancement, read-only. Null for the leaderboards' reason: an
     // unconfigured backend must answer 503 rather than report a level-1 document a
     // client would cache as the truth. There is no write service — XP is awarded
@@ -658,7 +661,7 @@ export function createApp(options = {}) {
         getPlayerAchievements,
     };
     const ticketServices = { getTicketWallet, getTicketShop, purchaseTicketShopItem };
-    const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, sellFarmProduce };
+    const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder };
     const gameResultServices = { submitGameResult };
     const progressionServices = {
         getGameXpProgress,

@@ -8,6 +8,32 @@ function imageMaterial(THREE, src) {
     texture.magFilter = THREE.NearestFilter;
     return new THREE.MeshBasicMaterial({ map: texture });
 }
+function titleMaterial(THREE, title, fallback) {
+    if (typeof document === "undefined" || typeof THREE.CanvasTexture !== "function")
+        return fallback;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 256;
+    const context = canvas.getContext("2d");
+    if (!context)
+        return fallback;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = "900 132px Impact, Arial Black, sans-serif";
+    context.lineJoin = "round";
+    context.lineWidth = 24;
+    context.strokeStyle = "#07172d";
+    context.strokeText(title.toUpperCase(), canvas.width / 2, canvas.height / 2 + 4);
+    context.fillStyle = "#fff8d6";
+    context.shadowColor = "#22d8ff";
+    context.shadowBlur = 18;
+    context.fillText(title.toUpperCase(), canvas.width / 2, canvas.height / 2 + 4);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.LinearFilter;
+    return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+}
 function addBox(THREE, parent, name, size, position, surface) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), surface);
     mesh.name = name;
@@ -62,6 +88,14 @@ export function createBuildBuddyCabinet(THREE, definition) {
     marquee.name = "marquee";
     marquee.position.set(0, 1.9, marqueeGeometry.artZ);
     root.add(marquee);
+    // The crew illustration is atmosphere; this separate face keeps the game's
+    // canonical title readable from the aisle like every other cabinet marquee.
+    const marqueeTitle = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), titleMaterial(THREE, definition.title, new THREE.MeshBasicMaterial({ color: "#fff8d6" })));
+    marqueeTitle.name = "marquee-title";
+    marqueeTitle.userData = { label: definition.title };
+    marqueeTitle.position.set(0, 1.9, marqueeGeometry.artZ + 0.003);
+    marqueeTitle.renderOrder = 1;
+    root.add(marqueeTitle);
     addBox(THREE, root, "screen-bezel", [0.8, 0.51, 0.06], [0, 1.5, 0.25], dark);
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.3825), imageMaterial(THREE, BUILD_BUDDY_CABINET_ART.keyArt));
     screen.name = "screen";

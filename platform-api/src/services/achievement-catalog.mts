@@ -53,6 +53,7 @@
 // prerequisite expresses it in `detect` against `ownedIds`.
 
 import { LOVERS_LOST_ACHIEVEMENTS } from "./lovers-lost-achievement-catalog.mjs";
+import { FARM_ACHIEVEMENTS } from "./farm-achievement-catalog.mjs";
 
 export type AchievementCategory =
   | "progression"
@@ -105,6 +106,7 @@ export interface AchievementGame<Run = unknown> {
 
 const GAMES: readonly AchievementGame<any>[] = Object.freeze([
   LOVERS_LOST_ACHIEVEMENTS,
+  FARM_ACHIEVEMENTS,
 ]);
 
 const BY_SLUG = new Map<string, AchievementGame<any>>(GAMES.map((game) => [game.gameSlug, game]));

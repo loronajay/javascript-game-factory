@@ -127,7 +127,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
   assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay \}\)/);
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
@@ -209,7 +209,7 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
   assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);
@@ -230,8 +230,9 @@ test("farm build mode uses the shared ticket shop and permanent Farm inventory",
 
 test("a farm never progresses before its owner first steps onto it, and only crops catch up offline", () => {
   assert.match(source, /if \(farmEntered\) updateFarmTime\(TICK_SECONDS\)/, "the clock stands still at the gate");
-  assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt > 0\) \{\s*const caughtUp = applyOfflineProduction\(layout\.agriculture, offlineSpan\(layout\.clock\.checkpointAt, resumedClock\.updatedAt\), resumedClock\.farmMinutes\)/, "offline production needs a checkpoint and touches agriculture only");
+  assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt > 0\) \{\s*const caughtUp = applyOfflineProduction\(layout\.agriculture, offlineSpan\(layout\.clock\.checkpointAt, resumedClock\.updatedAt\), resumedClock\.farmMinutes, layout\.trees\)/, "offline production needs a checkpoint and touches production (crops and trees) only");
   assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt <= 0\) void persistLayout\(withProductionCheckpoint\(layout, Date\.now\(\)\)\)/, "the first entry is recorded at once");
   assert.match(source, /if \(!canManageFarm \|\| next\.clock\.checkpointAt <= 0\) return next;/, "saves before the first entry never start offline production");
-  assert.match(source, /if \(state\.dead\) action = clearDeadFarmCrop\(/, "E on a dead crop clears it");
+  const crops = readFileSync(resolve(repoRoot, "js", "farm-crops-controller.mts"), "utf8");
+  assert.match(crops, /if \(state\.dead\) action = clearDeadFarmCrop\(/, "E on a dead crop clears it");
 });

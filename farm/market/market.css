@@ -1,6 +1,6 @@
 /* The Market Square: the farm's shell (../farm.css) and the shared presence
-   chrome (../../css/space-presence.css), plus the ticket chip and the Produce
-   Merchant's counter. */
+   chrome (../../css/space-presence.css), plus the ticket chip, the Produce
+   Merchant's counter and the Order Board. */
 
 #marketCanvas { display: block; width: 100%; height: 100%; outline: 0; }
 
@@ -37,7 +37,32 @@
 .sale-footer__actions button:disabled { opacity: .45; cursor: not-allowed; }
 .sale-footer .pets-status { margin: 0; }
 
+/* The Order Board: one card per notice. */
+.orders-panel { width: min(560px, calc(100vw - 36px)); }
+.orders-turnover { display: block; margin-top: 6px; color: var(--farm-accent); font: 800 11px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.orders-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.order-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(246,239,217,.06); }
+.order-card[data-state="filled"] { opacity: .62; }
+.order-card[data-state="locked"] { border-style: dashed; }
+.order-card__head { display: grid; gap: 2px; }
+.order-card__tier { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.order-card__head strong { font-size: 15px; }
+.order-card__note { margin: 0; color: #c9d7bd; font: italic 12.5px/1.4 Georgia, serif; }
+.order-card__lines { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.order-card__lines li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; }
+.order-card__lines .seed-card__image { width: 30px; height: 30px; }
+.order-card__lines small { color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
+.order-card__lines li.is-short small { color: #ffb08a; }
+.order-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.order-card__reward { display: grid; }
+.order-card__reward strong { color: #fff6cf; font: 900 16px ui-monospace, monospace; }
+.order-card__reward small { color: var(--farm-leaf); font: 700 11px ui-monospace, monospace; }
+.order-card__fill:disabled { opacity: .55; cursor: not-allowed; }
+.orders-footer { padding-top: 10px; padding-bottom: 12px; }
+.orders-footer .pets-status:empty::before { content: "Deliver from your basket: the produce comes off, the tickets and XP go on."; color: #9fb294; }
+
 @media (max-width: 720px) {
   .sale-row { grid-template-columns: 36px minmax(0, 1fr) 48px; }
   .sale-row__stepper { grid-column: 2 / 4; }
+  .order-card__foot { flex-direction: column; align-items: stretch; }
 }

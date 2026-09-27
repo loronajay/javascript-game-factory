@@ -21,7 +21,7 @@ import { groundHeightAt, underwater, waterDepthAt, type PondRegion } from "./far
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type PetInteractionId, type SeatInReach } from "./farm-interaction.mjs";
 import { canNap, formatNapMinutes, napBankReadyIn } from "./farm-nap-bank.mjs";
-import { FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withNapTaken, withProductionCheckpoint, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
+import { FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withFarmTrees, withNapTaken, withProductionCheckpoint, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -34,8 +34,16 @@ import { createTicketWalletClient, publishTicketBalance } from "./platform/api/t
 import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
-import { advanceAgriculture, clearDeadFarmCrop, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type SoilCellTarget } from "./farm-crops.mjs";
+import { advanceAgriculture } from "./farm-crops.mjs";
 import { cropCapacityUse } from "./farm-capacity.mjs";
+import { farmingLevelForXp } from "./farm-skills.mjs";
+import { createFarmSkillsHud } from "./farm-skills-hud.mjs";
+import { advanceFarmTrees } from "./farm-trees.mjs";
+import { createFarmTreesView } from "./farm-trees-view.mjs";
+import { createFarmTreesController } from "./farm-trees-controller.mjs";
+import { createFarmCropsController } from "./farm-crops-controller.mjs";
+import { createChopMeter } from "./farm-chop-view.mjs";
+import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { applyOfflineProduction, offlineSpan, type OfflineReport } from "./farm-offline.mjs";
 import { createAwayReport } from "./farm-away-report.mjs";
 import { createFarmCropsView } from "./farm-crops-view.mjs";
@@ -75,6 +83,10 @@ const editorPanel = requiredElement<HTMLElement>("#farmEditor");
 const editorDrawer = requiredElement<HTMLElement>("#farmEditorDrawer");
 const farmClock = requiredElement<HTMLElement>("#farmClock");
 const fieldCapacity = requiredElement<HTMLElement>("#fieldCapacity");
+const skillsHud = createFarmSkillsHud({
+  farming: { root: requiredElement<HTMLElement>("#farmingSkill"), label: requiredElement<HTMLElement>("#farmingSkillLabel"), bar: requiredElement<HTMLElement>("#farmingSkillBar") },
+  woodcutting: { root: requiredElement<HTMLElement>("#woodcuttingSkill"), label: requiredElement<HTMLElement>("#woodcuttingSkillLabel"), bar: requiredElement<HTMLElement>("#woodcuttingSkillBar") },
+});
 const farmClockPhase = requiredElement<HTMLElement>("#farmClockPhase");
 const napDialog = requiredElement<HTMLDialogElement>("#napDialog");
 const napStatus = requiredElement<HTMLElement>("#napStatus");
@@ -136,8 +148,8 @@ layout = withFarmClock(advancePetNeeds(layout, resumedClock.farmMinutes), resume
 // and so never moves. Visitors see the farm exactly as it was saved.
 let pendingAwayReport: OfflineReport | null = null;
 if (canManageFarm && layout.clock.checkpointAt > 0) {
-  const caughtUp = applyOfflineProduction(layout.agriculture, offlineSpan(layout.clock.checkpointAt, resumedClock.updatedAt), resumedClock.farmMinutes);
-  layout = withProductionCheckpoint(withFarmAgriculture(layout, caughtUp.agriculture), resumedClock.updatedAt);
+  const caughtUp = applyOfflineProduction(layout.agriculture, offlineSpan(layout.clock.checkpointAt, resumedClock.updatedAt), resumedClock.farmMinutes, layout.trees);
+  layout = withProductionCheckpoint(withFarmTrees(withFarmAgriculture(layout, caughtUp.agriculture), caughtUp.trees), resumedClock.updatedAt);
   pendingAwayReport = caughtUp.report;
 }
 // When the tab was hidden: the farm is "away" from then until it is visible again.
@@ -233,8 +245,10 @@ let renderedQuarter = -1;
 let liveNeedsCheckpoint: (() => void) | null = null;
 world.setTime(clockMinutes);
 const cropsView = createFarmCropsView(THREE, scene);
+const treesView = createFarmTreesView(THREE, scene);
 const awayReport = createAwayReport(requiredElement<HTMLElement>("#awayReport"));
 cropsView.sync(layout, layout.agriculture, clockMinutes);
+treesView.sync(layout, clockMinutes);
 
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
@@ -257,7 +271,6 @@ let doorInReach: DoorRow | null = null;
 let ladderInReach: LadderInReach | null = null;
 let seatInReach: SeatInReach | null = null;
 let bedInReach: BedRow | null = null;
-let soilInReach: SoilCellTarget<FarmDecorRow> | null = null;
 let nearbyPetCanPickUp = false;
 let nearbyPetCanFeed = false;
 let nearbyPetCanPlay = false;
@@ -304,6 +317,7 @@ function renderFarmClock(): void {
   farmClock.textContent = formatFarmTime(clockMinutes);
   farmClockPhase.textContent = farmLightProfile(clockMinutes).phase;
   cropsView.sync(layout, layout.agriculture, clockMinutes);
+  treesView.sync(layout, clockMinutes);
   liveNeedsCheckpoint?.();
 }
 
@@ -372,9 +386,12 @@ function updateInteraction(): void {
   const handsFree = walking && !carrying;
   ladderInReach = handsFree && !doorInReach ? findLadderInReach(ladders, pose) : null;
   bedInReach = handsFree && !doorInReach && !ladderInReach ? findBedInReach(layout.decor, pose) : null;
-  soilInReach = handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach ? findSoilCellInReach(layout.decor, pose) : null;
-  seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach ? findSeatInReach(seats, pose) : null;
-  nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !soilInReach && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
+  // The field's producers, crops then trees, each behind its own controller.
+  crops.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach);
+  trees.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach());
+  const producing = crops.inReach() || trees.inReach();
+  seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing ? findSeatInReach(seats, pose) : null;
+  nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
   const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
   const nearbyPetRow = nearbyPet ? layout.pets.find((pet) => pet.instanceId === nearbyPet!.instanceId) : null;
   const nearbyPetProfile = nearbyPetRow?.profile
@@ -395,6 +412,10 @@ function updateInteraction(): void {
   if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId)) doorInReach = null;
   if (petsPanel.isOpen() || farmEditor.isEditing() || !farmEntered) {
     setPrompt("");
+    return;
+  }
+  if (trees.chopping()) {
+    setPrompt(trees.prompt());
     return;
   }
   if (body.mode === "climbing") {
@@ -418,26 +439,12 @@ function updateInteraction(): void {
     setPrompt(BED_PROMPT);
     return;
   }
-  if (soilInReach) {
-    const plotId = soilInReach.plot.instanceId;
-    const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId && crop.cellId === soilInReach!.cellId);
-    if (!planted) {
-      const selected = findCrop(inventoryPanel.selectedCropId())!;
-      const seeds = layout.agriculture.inventory.seeds[selected.id] ?? 0;
-      const fields = cropCapacityUse(layout.agriculture, layout.decor);
-      if (fields.full) setPrompt(`Your fields are full · ${fields.used}/${fields.capacity} growing · harvest or clear a crop to plant here`);
-      else if (seeds > 0) setPrompt(`Press E to plant 1 ${selected.title} here · ${seeds} seeds · ${fields.used}/${fields.capacity} growing`);
-      else setPrompt(`No ${selected.title} seeds · choose another in Inventory`);
-      return;
-    }
-    const definition = findCrop(planted.cropId)!;
-    const crop = cropStatus(planted, clockMinutes);
-    const wilting = crop.wilted ? "wilting " : "";
-    if (crop.dead) setPrompt(`The ${definition.title} died ${planted.diedOf === "thirst" ? "of thirst" : "untended"} · Press E to clear it`);
-    else if (crop.mature) setPrompt(`Press E to harvest ${definition.title} · ${crop.harvestYield} to collect`);
-    else if (crop.needsCare) setPrompt(`Press E to tend the ${wilting}${definition.title}`);
-    else if (crop.thirsty) setPrompt(`Press E to water the ${wilting}${definition.title}`);
-    else setPrompt(`${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist`);
+  if (crops.inReach()) {
+    setPrompt(crops.prompt());
+    return;
+  }
+  if (trees.inReach()) {
+    setPrompt(trees.prompt());
     return;
   }
   if (seatInReach) {
@@ -468,6 +475,10 @@ function applyBodyStep(step: Readonly<{ pose: Readonly<{ x: number; z: number; y
 
 /** E, while walking: whatever `updateInteraction` found nearest to hand. */
 function interact(): boolean {
+  if (trees.chopping()) {
+    trees.swing();
+    return true;
+  }
   if (body.mode === "climbing") {
     applyBodyStep(releaseLadder(player, body));
     return true;
@@ -489,10 +500,8 @@ function interact(): boolean {
     openNapDialog();
     return true;
   }
-  if (soilInReach) {
-    workSoilPlot();
-    return true;
-  }
+  if (crops.inReach()) return crops.interact();
+  if (trees.inReach()) return trees.interact();
   if (seatInReach) {
     applyBodyStep(sitOn(player, body, seatInReach.seat, seatInReach.point));
     keys.clear();
@@ -508,52 +517,26 @@ function interact(): boolean {
   return false;
 }
 
-/** E at a growing plot performs the one action its current state calls for. */
-function workSoilPlot(): void {
-  if (!soilInReach || !canManageFarm) return;
-  const plotId = soilInReach.plot.instanceId;
-  const cellId = soilInReach.cellId;
-  const planted = layout.agriculture.crops.find((crop) => crop.plotId === plotId && crop.cellId === cellId);
-  let action;
-  if (!planted) action = plantFarmCrop(layout.agriculture, plotId, cellId, inventoryPanel.selectedCropId(), clockMinutes, cropCapacityUse(layout.agriculture, layout.decor).capacity);
-  else {
-    const state = cropStatus(planted, clockMinutes);
-    if (state.dead) action = clearDeadFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
-    else if (state.mature) {
-      // An account farm's produce is minted only by the server: it decides ripeness and yield.
-      if (serverHarvests) {
-        void harvestOnServer(plotId, cellId, findCrop(planted.cropId)!.title);
-        return;
-      }
-      action = harvestFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
-    }
-    else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
-    else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, cellId, clockMinutes);
-    else return;
-  }
-  if (!action.ok) return;
-  void persistLayout(withFarmClock(withFarmAgriculture(layout, action.agriculture), clockMinutes, Date.now()));
-}
-
 // Signed-out farms live on this device and harvest locally; an account farm harvests through the API.
 const serverHarvests = layoutStore.accountBacked && canPersistFarm;
-let harvestInFlight = false;
+const achievementToaster = createAchievementToaster();
 
-async function harvestOnServer(plotId: string, cellId: SoilCellTarget["cellId"], title: string): Promise<void> {
-  if (harvestInFlight) return;
-  harvestInFlight = true;
+/** The Farming level on the server's record (farm-skills.mts). A local farm stays at 1. */
+function farmingLevel(): number {
+  return farmingLevelForXp(layout.skills.farming.xp);
+}
+
+/**
+ * A harvest-shaped server call (a crop, a pick, a felling): send the farm as it
+ * stands, adopt the farm that comes back, hand the answer to the controller
+ * that asked. The server decides what was harvested and what it paid.
+ */
+async function submitServerHarvest(send: (sent: FarmLayout) => Promise<any>): Promise<any> {
   const sent = stampPresence(progressedLayout());
-  try {
-    const result = await ticketClient.harvestFarmCrop(sent, plotId, cellId);
-    if (result?.layout) adoptServerFarm(normalizeFarmLayout(result.layout), sent.clock.farmMinutes);
-    if (result?.ok) status.textContent = `Harvested ${result.quantity} ${title}. Saved to your account.`;
-    else if (result?.error === "not_ready") status.textContent = `The ${title} is not ripe yet by the farm's records — it needs a little longer.`;
-    else status.textContent = "That harvest did not go through. Try again in a moment.";
-  } catch {
-    status.textContent = "That harvest did not go through. Try again in a moment.";
-  } finally {
-    harvestInFlight = false;
-  }
+  const result = await send(sent);
+  const next = result?.layout ? normalizeFarmLayout(result.layout) : null;
+  if (next) adoptServerFarm(next, sent.clock.farmMinutes);
+  return result;
 }
 
 /**
@@ -700,6 +683,7 @@ function applyLayout(next: FarmLayout): void {
   world.applyGround(layout.ground);
   world.sync(layout);
   cropsView.sync(layout, layout.agriculture, clockMinutes);
+  treesView.sync(layout, clockMinutes);
   for (const doorId of [...openDoors]) if (!world.doorsFor(doorId)) openDoors.delete(doorId);
   obstacles = farmObstacles(layout, { openDoors });
   platforms = farmPlatforms(layout);
@@ -710,15 +694,22 @@ function applyLayout(next: FarmLayout): void {
   if (body.mode === "climbing" && !ladders.some((ladder) => ladder.id === body.fixtureId)) applyBodyStep(releaseLadder(player, body));
   petSim.sync(layout);
   petsPanel.render(layout);
-  inventoryPanel.render(layout.agriculture);
+  inventoryPanel.render(layout.agriculture, skillLevels());
   renderFieldCapacity();
+}
+
+/** The levels that decide which saplings are on sale. A local farm stays at 1. */
+function skillLevels(): Readonly<{ farming: number; woodcutting: number }> {
+  return { farming: farmingLevel(), woodcutting: farmingLevelForXp(layout.skills.woodcutting.xp) };
 }
 
 /** How many crops are in the ground against how many may be: plots are placement, this is production. */
 function renderFieldCapacity(): void {
-  const fields = cropCapacityUse(layout.agriculture, layout.decor);
+  const fields = cropCapacityUse(layout.agriculture, layout.decor, farmingLevel());
   fieldCapacity.textContent = `${fields.used}/${fields.capacity} growing${fields.full ? " · fields full" : ""}`;
   fieldCapacity.classList.toggle("is-full", fields.full);
+  // The skill lines under the seed HUD: account farms only.
+  skillsHud.render(layout.skills, serverHarvests);
 }
 
 function isFarmFullscreen(): boolean {
@@ -749,6 +740,13 @@ window.addEventListener("keydown", (event) => {
   if (farmEditor.isEditing()) {
     keys.clear();
     return;
+  }
+  // Felling holds the player at the tree: a move key or Escape puts the axe down (the damage done is kept for
+  // this visit), and so does opening a panel on top of it.
+  if (trees.chopping() && (event.code === "Escape" || isMoveKey(event.code) || event.code === "KeyI" || event.code === "KeyP")) {
+    trees.cancelChop();
+    keys.clear();
+    if (event.code === "Escape" || isMoveKey(event.code)) return;
   }
   if (event.code === "KeyI" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
     event.preventDefault();
@@ -868,9 +866,9 @@ document.addEventListener("visibilitychange", () => {
   const span = offlineSpan(since, Date.now());
   if (span.awayMs < 60_000 || layout.clock.checkpointAt <= 0) return;
   const progressed = progressedLayout();
-  const caughtUp = applyOfflineProduction(progressed.agriculture, span, clockMinutes);
+  const caughtUp = applyOfflineProduction(progressed.agriculture, span, clockMinutes, progressed.trees);
   if (caughtUp.report) awayReport.show(caughtUp.report);
-  void persistLayout(withFarmAgriculture(progressed, caughtUp.agriculture));
+  void persistLayout(withFarmTrees(withFarmAgriculture(progressed, caughtUp.agriculture), caughtUp.trees));
 });
 document.addEventListener("pointerlockchange", () => {
   const locked = document.pointerLockElement === canvas;
@@ -890,7 +888,7 @@ document.addEventListener("mousemove", (event) => {
 });
 
 function updatePlayer(dt: number): void {
-  if (!farmEntered || leavingForMarket || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0) return;
+  if (!farmEntered || leavingForMarket || trees.chopping() || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0) return;
   const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
   if (!step.moved) return;
   player.x = step.pose.x;
@@ -936,7 +934,8 @@ async function persistLayout(next: FarmLayout): Promise<string> {
 
 function progressedLayout(): FarmLayout {
   const needs = advancePetNeeds(layout, clockMinutes);
-  return withFarmClock(withFarmAgriculture(needs, advanceAgriculture(needs.agriculture, clockMinutes)), clockMinutes, Date.now());
+  const grown = withFarmTrees(withFarmAgriculture(needs, advanceAgriculture(needs.agriculture, clockMinutes)), advanceFarmTrees(needs.trees, clockMinutes));
+  return withFarmClock(grown, clockMinutes, Date.now());
 }
 
 async function persistFarmProgress(): Promise<void> {
@@ -1006,6 +1005,8 @@ const inventoryPanel = createFarmInventoryPanel({
   seedGrid: requiredElement<HTMLElement>("#seedGrid"),
   produceGrid: requiredElement<HTMLElement>("#produceGrid"),
   suppliesGrid: requiredElement<HTMLElement>("#suppliesGrid"),
+  saplingGrid: requiredElement<HTMLElement>("#saplingGrid"),
+  logsGrid: requiredElement<HTMLElement>("#logsGrid"),
   selected: requiredElement<HTMLElement>("#selectedSeed"),
 }, {
   thumbnail: cropThumbnails.get,
@@ -1019,9 +1020,33 @@ const inventoryPanel = createFarmInventoryPanel({
     return `Purchased · ${Number(result.balance).toLocaleString()} tickets remain.`;
   } : null,
 });
-inventoryPanel.render(layout.agriculture);
+inventoryPanel.render(layout.agriculture, skillLevels());
 renderFieldCapacity();
 if (visiting) openInventoryButton.hidden = true;
+
+// The field's producers. Growing plots (farm-crops-controller.mts) and the orchard and forestry
+// (farm-trees-controller.mts); an account farm's harvests, picks and fellings are the server's.
+const crops = createFarmCropsController({
+  layout: () => layout,
+  clockMinutes: () => clockMinutes,
+  selectedCropId: () => inventoryPanel.selectedCropId(),
+  farmingLevel,
+  persist: persistLayout,
+  submitHarvest: serverHarvests ? (plotId, cellId) => submitServerHarvest((sent) => ticketClient.harvestFarmCrop(sent, plotId, cellId)) : null,
+  setStatus: (text) => { status.textContent = text; },
+  onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements as any[]),
+});
+const trees = createFarmTreesController({
+  view: treesView,
+  meter: createChopMeter(requiredElement<HTMLElement>("#chopMeter")),
+  layout: () => layout,
+  clockMinutes: () => clockMinutes,
+  selectedSaplingId: () => inventoryPanel.selectedSaplingId(),
+  persist: persistLayout,
+  submitHarvest: serverHarvests ? (plotId) => submitServerHarvest((sent) => ticketClient.harvestFarmTree(sent, plotId)) : null,
+  setStatus: (text) => { status.textContent = text; },
+  onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements as any[]),
+});
 
 // Build mode: the shared editor frame over the farm's own placement rules. The
 // editor owns the layout while it is open; every change comes back through `applyLayout`.
@@ -1086,6 +1111,7 @@ const farmEditor = createFarmEditor({
     keys.clear();
     draggingLook = false;
     if (editing) dropCarried();
+    if (editing) trees.cancelChop();
     // Come up for air first, so the underwater fog does not keep the overview's fog when it lets go.
     if (editing) updateUnderwater(true);
     // The overview presets stand well outside the field; the walking fog would swallow them.
@@ -1147,10 +1173,12 @@ function frame(now: number): void {
     checkGateway();
     petSim.tick(TICK_SECONDS, { x: player.x, z: player.z, yaw: player.yaw, y: body.y });
     updateInteraction();
+    trees.tick();
     updateCarryPatience(TICK_SECONDS);
     accumulator -= TICK_SECONDS;
   }
   world.update(frameSeconds);
+  treesView.update(frameSeconds);
   petBodies.sync(petSim.pets(), frameSeconds);
   if (!farmEditor.isEditing()) applyCamera();
   updateUnderwater();
@@ -1172,6 +1200,7 @@ function frame(now: number): void {
   carrying: () => carrying,
   putDownFits: () => putDownAt !== null,
   layout: () => layout,
+  chopping: () => trees.chopping(),
   editing: () => farmEditor.isEditing(),
   time: () => clockMinutes,
   napping: () => napRemainingMinutes > 0,

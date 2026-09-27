@@ -23,6 +23,9 @@ import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { createStarterAgriculture, normalizeAgriculture, type FarmAgriculture } from "./farm-crops.mjs";
 import { NAP_BANK_CAPACITY_MINUTES, napBankAt } from "./farm-nap-bank.mjs";
+import { EMPTY_FARM_SKILLS, normalizeFarmSkills, type FarmSkills } from "./farm-skills.mjs";
+import { normalizeFarmTrees, type FarmTree } from "./farm-trees.mjs";
+import { TREE_PLOT_ITEM_ID } from "./farm-catalog/trees.mjs";
 import { createPetProfile, normalizePetProfile, type PetProfile } from "./farm-pet-care.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
 import type { LayoutDocumentSpec } from "./arcade-room-store.mjs";
@@ -81,11 +84,24 @@ export type FarmLayout = Readonly<{
   decor: readonly FarmDecorRow[];
   agriculture: FarmAgriculture;
   /**
+   * The productive trees (farm-trees.mts): one per Tree Plot, keyed by the
+   * plot's instance id, so moving a plot moves its tree and removing one
+   * removes it. Their fruit, logs and saplings live in `agriculture.inventory`.
+   */
+  trees: readonly FarmTree[];
+  /**
    * Farm time plus the offline-production checkpoint: the real time the owner
    * was last on the farm. 0 until they first step onto it — a farm never
    * progresses before that (see farm-offline.mts).
    */
   clock: Readonly<{ farmMinutes: number; updatedAt: number; checkpointAt: number; napBank: number }>;
+  /**
+   * The Farming and Woodcutting records (farm-skills.mts). Server-owned: only a
+   * server harvest, pick, felling or filled order changes them and a save
+   * cannot, so the page only ever adopts them from a server answer. Local
+   * farms keep them empty.
+   */
+  skills: FarmSkills;
 }>;
 
 export type FarmPetResult = Readonly<{ valid: boolean; layout: FarmLayout; instanceId: string; reason: string }>;
@@ -132,7 +148,14 @@ export const STARTER_FARM_DECOR: readonly FarmDecorRow[] = Object.freeze([
   row("hay-bale-2", "decor.prop.hay-bale", 0.9, -8.9, -0.2),
   row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
   row("soil-1", "decor.plant.soil-patch", 4.5, 6.5),
+  // Two Tree Plots for the new farm's first sapling of each kind.
+  row("tree-plot-1", "decor.plant.tree-plot", -9.5, 10.5),
+  row("tree-plot-2", "decor.plant.tree-plot", -6.2, 11.2),
 ]);
+
+/** The decor rows crops may grow in, and the ones a tree may. */
+const cropPlotIds = (decor: readonly FarmDecorRow[]): Set<string> => new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => row.instanceId));
+const treePlotIds = (decor: readonly FarmDecorRow[]): Set<string> => new Set(decor.filter((row) => row.itemId === TREE_PLOT_ITEM_ID).map((row) => row.instanceId));
 
 export function createDefaultFarmLayout(random: () => number = Math.random): FarmLayout {
   return Object.freeze({
@@ -143,7 +166,9 @@ export function createDefaultFarmLayout(random: () => number = Math.random): Far
     petHistory: Object.freeze([]),
     decor: STARTER_FARM_DECOR,
     agriculture: createStarterAgriculture(random),
+    trees: Object.freeze([]),
     clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES }),
+    skills: EMPTY_FARM_SKILLS,
   });
 }
 
@@ -155,6 +180,7 @@ function freezeLayout(layout: FarmLayout): FarmLayout {
     decor: Object.freeze(layout.decor.map((item) => Object.freeze({ ...item }))),
     onboarding: Object.freeze({ ...layout.onboarding }),
     agriculture: layout.agriculture,
+    trees: Object.freeze(layout.trees.map((tree) => Object.freeze({ ...tree }))),
     clock: Object.freeze({ ...layout.clock }),
   });
 }
@@ -255,7 +281,7 @@ export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }
 
 export function normalizeFarmLayout(value: unknown): FarmLayout {
   if (!value || typeof value !== "object") return createDefaultFarmLayout();
-  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; clock?: unknown };
+  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown };
   if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
   const seen = new Set<string>();
   // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
@@ -294,7 +320,7 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     petHistory.push(entry);
     if (petHistory.length >= 100) break;
   }
-  const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => row.instanceId));
+  const plotIds = cropPlotIds(decor);
   // Old documents are established farms. Only a document created with the explicit
   // marker may enter onboarding; absence must never re-grant or force-name a dog.
   const rawOnboarding = source.onboarding && typeof source.onboarding === "object"
@@ -325,7 +351,8 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     // Nap minutes available as of `updatedAt` (farm-nap-bank.mts). Absent = full.
     napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
   };
-  return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, clock });
+  const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
+  return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills) });
 }
 
 export function parseFarmLayout(serialized: string | null): FarmLayout {
@@ -388,12 +415,20 @@ export function setFarmGround(layout: FarmLayout, id: string): Readonly<{ valid:
 
 /** Replace the decor list wholesale; the placement rules call this after they have decided. */
 export function withFarmDecor(layout: FarmLayout, decor: readonly FarmDecorRow[]): FarmLayout {
-  const plotIds = new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => row.instanceId));
-  return freezeLayout({ ...layout, decor: [...decor], agriculture: normalizeAgriculture(layout.agriculture, plotIds) });
+  return freezeLayout({
+    ...layout,
+    decor: [...decor],
+    agriculture: normalizeAgriculture(layout.agriculture, cropPlotIds(decor)),
+    trees: normalizeFarmTrees(layout.trees, treePlotIds(decor)),
+  });
 }
 
 export function withFarmAgriculture(layout: FarmLayout, agriculture: FarmAgriculture): FarmLayout {
   return freezeLayout({ ...layout, agriculture });
+}
+
+export function withFarmTrees(layout: FarmLayout, trees: readonly FarmTree[]): FarmLayout {
+  return freezeLayout({ ...layout, trees: [...trees] });
 }
 
 /** Replace pet rows after a pure care/lifecycle pass while preserving the layout's immutable document contract. */
@@ -442,10 +477,12 @@ export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean
     && first.onboarding.introSeen === second.onboarding.introSeen
     && first.ground === second.ground
     && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
+    && JSON.stringify(first.trees) === JSON.stringify(second.trees)
     && first.clock.farmMinutes === second.clock.farmMinutes
     && first.clock.updatedAt === second.clock.updatedAt
     && first.clock.checkpointAt === second.clock.checkpointAt
     && first.clock.napBank === second.clock.napBank
+    && JSON.stringify(first.skills) === JSON.stringify(second.skills)
     && first.pets.length === second.pets.length
     && first.pets.every((pet, index) => {
       const other = second.pets[index];

@@ -1,0 +1,104 @@
+// The farm's skills, for display: Farming and Woodcutting. PURE — no DOM, no
+// THREE, no storage.
+//
+// The server owns the records (platform-api/src/services/farm-skill-catalog.mts):
+// only a server harvest, a picked fruit tree, a felled tree or a filled Market
+// order raises them, and a save can never change them. The page reads `layout.skills.farming` as the server last
+// returned it and derives the level and progress bar from it with this same
+// curve; platform-api/tests/farm-skills.test.mjs holds the two copies equal.
+//
+// A signed-out farm has no server, so it earns no Farming XP and stays at
+// level 1 — the skill is account progression, like the tickets it leads to.
+import { CROP_CATALOG, FARM_DAY_MINUTES, findCrop } from "./farm-crops.mjs";
+import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
+export const FARMING_MAX_LEVEL = 99;
+export const FARMING_MAX_XP = 200_000_000;
+/** XP a harvest earns per farm day its crop spent growing, before the care penalty. */
+export const HARVEST_XP_PER_GROW_DAY = 60;
+/** XP needed to REACH each level (index = level): the RuneScape curve. */
+export const FARMING_XP_TABLE = Object.freeze((() => {
+    const table = [0, 0];
+    let points = 0;
+    for (let level = 1; level < FARMING_MAX_LEVEL; level += 1) {
+        points += Math.floor(level + 300 * 2 ** (level / 7));
+        table.push(Math.floor(points / 4));
+    }
+    return table;
+})());
+/** Both skills share the curve; Farming's names stay for the code that has always read them. */
+export function skillLevelForXp(xp) {
+    return farmingLevelForXp(xp);
+}
+export function farmingLevelForXp(xp) {
+    const total = Math.max(0, Number(xp) || 0);
+    let level = 1;
+    while (level < FARMING_MAX_LEVEL && total >= FARMING_XP_TABLE[level + 1])
+        level += 1;
+    return level;
+}
+/** What a harvest of `cropId` earns: its growing days, less the care penalty that cut its yield. */
+export function harvestXp(cropId, carePenalty = 0) {
+    const crop = findCrop(cropId);
+    if (!crop)
+        return 0;
+    const penalty = Math.min(1, Math.max(0, Number(carePenalty) || 0));
+    return Math.max(1, Math.round(HARVEST_XP_PER_GROW_DAY * (crop.growMinutes / FARM_DAY_MINUTES) * (1 - penalty)));
+}
+export const EMPTY_FARM_SKILLS = Object.freeze({
+    farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
+    woodcutting: Object.freeze({ xp: 0, fellings: 0, trees: Object.freeze({}) }),
+});
+function count(value, limit = 100_000_000) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(limit, Math.max(0, Math.floor(number))) : 0;
+}
+/** Positive counts for the known ids only. */
+function counts(source, ids) {
+    const output = {};
+    for (const id of ids) {
+        const value = count(source?.[id]);
+        if (value > 0)
+            output[id] = value;
+    }
+    return Object.freeze(output);
+}
+export function normalizeFarmSkills(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const farming = source.farming && typeof source.farming === "object" ? source.farming : null;
+    const woodcutting = source.woodcutting && typeof source.woodcutting === "object" ? source.woodcutting : null;
+    if (!farming && !woodcutting)
+        return EMPTY_FARM_SKILLS;
+    return Object.freeze({
+        farming: farming ? Object.freeze({
+            xp: count(farming.xp, FARMING_MAX_XP),
+            harvests: count(farming.harvests),
+            orders: count(farming.orders),
+            crops: counts(farming.crops, CROP_CATALOG.map((crop) => crop.id)),
+            fruit: counts(farming.fruit, FRUIT_TREES.map((species) => species.id)),
+        }) : EMPTY_FARM_SKILLS.farming,
+        woodcutting: woodcutting ? Object.freeze({
+            xp: count(woodcutting.xp, FARMING_MAX_XP),
+            fellings: count(woodcutting.fellings),
+            trees: counts(woodcutting.trees, TIMBER_TREES.map((species) => species.id)),
+        }) : EMPTY_FARM_SKILLS.woodcutting,
+    });
+}
+export function farmingProgress(xp) {
+    const total = Math.max(0, Number(xp) || 0);
+    const level = farmingLevelForXp(total);
+    const maxed = level >= FARMING_MAX_LEVEL;
+    const levelXp = FARMING_XP_TABLE[level];
+    const nextLevelXp = maxed ? levelXp : FARMING_XP_TABLE[level + 1];
+    const fraction = maxed ? 1 : Math.min(1, (total - levelXp) / Math.max(1, nextLevelXp - levelXp));
+    return Object.freeze({ level, xp: total, levelXp, nextLevelXp, fraction, maxed });
+}
+/** The HUD's words: "Farming 7 · 1,120 / 1,358 XP". */
+export function farmingLabel(xp) {
+    return skillLabel("Farming", xp);
+}
+export function skillLabel(name, xp) {
+    const progress = farmingProgress(xp);
+    if (progress.maxed)
+        return `${name} ${progress.level} · ${progress.xp.toLocaleString()} XP`;
+    return `${name} ${progress.level} · ${progress.xp.toLocaleString()} / ${progress.nextLevelXp.toLocaleString()} XP`;
+}

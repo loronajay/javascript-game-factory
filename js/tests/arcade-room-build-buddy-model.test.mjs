@@ -74,7 +74,7 @@ test("Build Buddy has runner and builder controls on a detailed standard cabinet
 
   assert.equal(root.userData.gameSlug, "build-buddy");
   for (const required of [
-    "shell", "upper-shell", "marquee", "screen", "screen-bezel", "control-deck",
+    "shell", "upper-shell", "marquee", "marquee-title", "screen", "screen-bezel", "control-deck",
     "runner-joystick", "builder-trackball", "builder-tool-button-1", "builder-tool-button-2",
     "side-art-left", "side-art-right", "coin-door", "hard-hat-topper",
   ]) assert.ok(names.includes(required), `missing ${required}`);
@@ -84,4 +84,7 @@ test("Build Buddy has runner and builder controls on a detailed standard cabinet
   const builder = nodes.find((node) => node.name === "builder-trackball");
   assert.ok(runner.position.x < 0, "runner controls belong on the left");
   assert.ok(builder.position.x > 0, "builder controls belong on the right");
+
+  const title = nodes.find((node) => node.name === "marquee-title");
+  assert.equal(title.userData.label, BUILD_BUDDY_CABINET.title, "the cabinet marquee names the game");
 });

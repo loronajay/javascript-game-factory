@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { getStageById, getStageSequence, listPacks } from '../js/stages/stage-registry.js';
 import { courseNotes } from '../js/stages/course-helpers.js';
 import { KIT_TOOL_TYPES } from '../js/stages/stage-authoring.js';
-import { PHYS, RUNNER, TOOL_DEFS } from '../js/constants.js';
+import { GRID, PHYS, RUNNER, TOOL_DEFS } from '../js/constants.js';
 import { Runner } from '../js/runner.js';
 import { ToolRegistry } from '../js/tools.js';
 import { updateMovingHazards, spikeBallHits } from '../js/hazards.js';
@@ -306,15 +306,17 @@ for (const id of ALL_STAGE_IDS) {
 
       const supports = [from];
       for (const t of via.tools) {
-        let placed = registry.add(t.toolType, t.x, t.y, waitingRunner);
+        const gridX = stage.packId === 'pack_02' ? Math.round(t.x / GRID.size) * GRID.size : t.x;
+        const gridY = stage.packId === 'pack_02' ? Math.round(t.y / GRID.size) * GRID.size : t.y;
+        let placed = registry.add(t.toolType, gridX, gridY, waitingRunner);
         // Junk the stage pre-placed is the Builder's to clear when it eats a cap.
         while (!placed.valid && /cap reached/.test(placed.reason)) {
           const junk = registry.tools.find(j => j.active && stage.preplacedTools.some(pre => pre.x === j.x && pre.y === j.y && pre.toolType === j.toolType));
           if (!junk) break;
           assert.ok(registry.deleteAt(junk.x + 1, junk.y + 1).deleted, `${leg}: could not clear junk ${junk.toolType}`);
-          placed = registry.add(t.toolType, t.x, t.y, waitingRunner);
+          placed = registry.add(t.toolType, gridX, gridY, waitingRunner);
         }
-        assert.ok(placed.valid, `${leg}: ${t.toolType} at ${t.x},${t.y}: ${placed.reason}`);
+        assert.ok(placed.valid, `${leg}: ${t.toolType} at selectable ${gridX},${gridY}: ${placed.reason}`);
         const prev = supports.at(-1);
         const edge = prev.x + prev.w / 2;
         assert.ok(placed.tool.y >= prev.y - VIEW_ABOVE && placed.tool.y <= prev.y + VIEW_BELOW,

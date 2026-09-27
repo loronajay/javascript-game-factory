@@ -2,6 +2,7 @@
 // the page, server normalizer and headless tests all use the same farming contract.
 
 import { PET_CARE } from "./farm-pet-care.mjs";
+import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
 
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
@@ -77,10 +78,18 @@ export function deadCropModel(stage: 0 | 1 | 2 | 3): string {
 
 export type FarmInventory = Readonly<{
   seeds: Readonly<Record<string, number>>;
+  /** The harvest basket: every crop and every fruit (farm-catalog/trees.mts), server-owned on account farms. */
   produce: Readonly<Record<string, number>>;
   /** Stackable non-crop items. Food starts here; toys remain placed/owned items later. */
   supplies: Readonly<Record<string, number>>;
+  /** Productive-tree saplings by species, planted with E in a Tree Plot (farm-trees.mts). */
+  saplings: Readonly<Record<string, number>>;
+  /** Felled timber by species. Server-owned like produce; the Sawmill (a later phase) turns it into planks. */
+  logs: Readonly<Record<string, number>>;
 }>;
+
+/** Everything the harvest basket holds: the crops, then the fruit. */
+export const PRODUCE_IDS: readonly string[] = Object.freeze([...CROP_CATALOG.map((entry) => entry.id), ...FRUIT_IDS]);
 
 export type FarmCrop = Readonly<{
   plotId: string;
@@ -179,23 +188,30 @@ export function findSoilCellInReach<T extends SoilPlotRow>(decor: readonly T[], 
 const count = (value: unknown): number => typeof value === "number" && Number.isFinite(value) ? Math.min(MAX_STACK, Math.max(0, Math.floor(value))) : 0;
 const finite = (value: unknown, fallback = 0): number => typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
-function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, source?: unknown): FarmInventory {
-  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown } : {};
+/** A new farm's first saplings: one fruit tree and one timber tree to try. Older farms buy theirs. */
+const STARTER_SAPLINGS: Readonly<Record<string, number>> = Object.freeze({ apple: 1, oak: 1 });
+
+function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, source?: unknown, defaultSaplings: Readonly<Record<string, number>> = {}): FarmInventory {
+  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown; saplings?: unknown; logs?: unknown } : {};
   const storedSeeds = Boolean(input.seeds && typeof input.seeds === "object");
   const seeds = storedSeeds ? input.seeds as Record<string, unknown> : {};
   const produce = input.produce && typeof input.produce === "object" ? input.produce as Record<string, unknown> : {};
   const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies as Record<string, unknown> : {};
+  const saplings = input.saplings && typeof input.saplings === "object" ? input.saplings as Record<string, unknown> : defaultSaplings;
+  const logs = input.logs && typeof input.logs === "object" ? input.logs as Record<string, unknown> : {};
   return Object.freeze({
     // A stored seed stack is authoritative: a crop added to the catalog after it
     // was saved starts at 0 (the server keeps only stored ids, so a default here
     // would re-grant on every load). The number default is only for a legacy
     // document with no seed stack at all.
     seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? (storedSeeds ? 0 : defaultSeeds) : count(defaultSeeds[entry.id])]))),
-    produce: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, count(produce[entry.id])]))),
+    produce: Object.freeze(Object.fromEntries(PRODUCE_IDS.map((id) => [id, count(produce[id])]))),
     supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
       care.food.itemId,
       care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
     ]))),
+    saplings: Object.freeze(Object.fromEntries(TREE_CATALOG.map((species) => [species.id, count(saplings[species.id])]))),
+    logs: Object.freeze(Object.fromEntries(TIMBER_TREES.map((species) => [species.id, count(logs[species.id])]))),
   });
 }
 
@@ -213,7 +229,7 @@ export function createStarterAgriculture(random: () => number = Math.random): Fa
     selected.add(available.splice(Math.floor(roll * available.length), 1)[0]);
   }
   const seeds = Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, selected.has(entry.id) ? 1 : 0]));
-  return freezeAgriculture({ inventory: inventoryWith(seeds), crops: [] });
+  return freezeAgriculture({ inventory: inventoryWith(seeds, undefined, STARTER_SAPLINGS), crops: [] });
 }
 
 export function normalizeAgriculture(value: unknown, validPlotIds: ReadonlySet<string>): FarmAgriculture {
