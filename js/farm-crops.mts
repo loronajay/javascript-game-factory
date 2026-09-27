@@ -3,6 +3,7 @@
 
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
+import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
 
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
@@ -86,6 +87,12 @@ export type FarmInventory = Readonly<{
   saplings: Readonly<Record<string, number>>;
   /** Felled timber by species. Server-owned like produce; the Sawmill (a later phase) turns it into planks. */
   logs: Readonly<Record<string, number>>;
+  /**
+   * The pantry: cooked dishes keyed "recipe@stars" (farm-catalog/recipes.mts).
+   * Server-owned like produce — only a cook at the Kitchen Range makes one and
+   * only a sale or a dish order takes one away.
+   */
+  dishes: Readonly<Record<string, number>>;
 }>;
 
 /** Everything the harvest basket holds: the crops, then the fruit. */
@@ -192,13 +199,14 @@ const finite = (value: unknown, fallback = 0): number => typeof value === "numbe
 const STARTER_SAPLINGS: Readonly<Record<string, number>> = Object.freeze({ apple: 1, oak: 1 });
 
 function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, source?: unknown, defaultSaplings: Readonly<Record<string, number>> = {}): FarmInventory {
-  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown; saplings?: unknown; logs?: unknown } : {};
+  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown; saplings?: unknown; logs?: unknown; dishes?: unknown } : {};
   const storedSeeds = Boolean(input.seeds && typeof input.seeds === "object");
   const seeds = storedSeeds ? input.seeds as Record<string, unknown> : {};
   const produce = input.produce && typeof input.produce === "object" ? input.produce as Record<string, unknown> : {};
   const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies as Record<string, unknown> : {};
   const saplings = input.saplings && typeof input.saplings === "object" ? input.saplings as Record<string, unknown> : defaultSaplings;
   const logs = input.logs && typeof input.logs === "object" ? input.logs as Record<string, unknown> : {};
+  const dishes = input.dishes && typeof input.dishes === "object" ? input.dishes as Record<string, unknown> : {};
   return Object.freeze({
     // A stored seed stack is authoritative: a crop added to the catalog after it
     // was saved starts at 0 (the server keeps only stored ids, so a default here
@@ -212,6 +220,7 @@ function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, 
     ]))),
     saplings: Object.freeze(Object.fromEntries(TREE_CATALOG.map((species) => [species.id, count(saplings[species.id])]))),
     logs: Object.freeze(Object.fromEntries(TIMBER_TREES.map((species) => [species.id, count(logs[species.id])]))),
+    dishes: Object.freeze(Object.fromEntries(DISH_KEYS.map((key) => [key, count(dishes[key])]))),
   });
 }
 

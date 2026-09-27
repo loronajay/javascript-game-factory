@@ -1022,10 +1022,10 @@ export function createCottage(THREE: ThreeNamespace, definition: FarmDecorDefini
     strut.rotation.x = -0.75;
   }
   wallLantern(THREE, group, [shell.door!.width / 2 + 0.35, shell.door!.height - 0.3, halfD + 0.02], 0);
-  // Inside: a rug, a table with two stools, a stone hearth with a fire, a dresser of crockery and a lamp.
-  const rug = farmMaterial(THREE, "brick", { colors: ["#a83a3a", "#7a2828", "#c95a4a", "#d8b24a"], metresPerTile: 0.5 });
-  tbox(THREE, group, [2.4, 0.02, 1.8], [0, 0.07, 0.2], rug, false);
+  // Inside: a dining corner (a rug, a table with two stools) and a stone hearth with a fire; the rest is the player's to furnish.
   const table = fixtureNamed(definition, "table");
+  const rug = farmMaterial(THREE, "brick", { colors: ["#a83a3a", "#7a2828", "#c95a4a", "#d8b24a"], metresPerTile: 0.5 });
+  tbox(THREE, group, [2.4, 0.02, 2.2], [table.x, 0.07, table.z], rug, false);
   drawFixtureBox(THREE, group, table, beam, { bottom: table.top - 0.06 });
   for (const [x, z] of [[-0.5, -0.3], [0.5, 0.3], [-0.5, 0.3], [0.5, -0.3]] as const) tbox(THREE, group, [0.06, table.top - 0.06, 0.06], [table.x + x, (table.top - 0.06) / 2, table.z + z], beam, false);
   // A jug and a loaf on the table.

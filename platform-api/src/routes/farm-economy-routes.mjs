@@ -8,7 +8,8 @@ export async function handleFarmEconomyRoute(context) {
     const selling = pathname === "/games/farm/market/sales" && method === "POST";
     const readingOrders = pathname === "/games/farm/market/orders" && method === "GET";
     const fillingOrder = pathname === "/games/farm/market/orders/fulfillments" && method === "POST";
-    if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder)
+    const cooking = pathname === "/games/farm/kitchen/cooks" && method === "POST";
+    if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder && !cooking)
         return false;
     if (!authClaims?.playerId) {
         writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
@@ -24,6 +25,8 @@ export async function handleFarmEconomyRoute(context) {
         return handleOrderBoard(context);
     if (fillingOrder)
         return handleOrderFill(context);
+    if (cooking)
+        return handleCook(context);
     const action = adopting ? services?.adoptFarmPet : services?.purchaseFarmSupply;
     if (typeof action !== "function") {
         writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
@@ -114,6 +117,44 @@ async function handleTreeHarvest(context) {
     }
     catch {
         writeJson(res, 400, { status: "error", error: "invalid_farm_tree_harvest", timestamp }, requestOrigin);
+    }
+    return true;
+}
+/**
+ * POST /games/farm/kitchen/cooks — self only. The client sends its farm, a
+ * recipe, the scores of its cooking steps and a cook id; whether the recipe is
+ * taught, whether the basket holds it, the dish's stars and the XP are the
+ * server's (db/farm-kitchen.mts `cookFarmDish`). Refusals still return the
+ * verified farm so the client can adopt it.
+ */
+async function handleCook(context) {
+    const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+    if (typeof services?.cookFarmDish !== "function") {
+        writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+        return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return true;
+    }
+    try {
+        const cook = await services.cookFarmDish({
+            playerId: authClaims.playerId,
+            recipeId: body.value?.recipeId,
+            scores: body.value?.scores,
+            cookId: body.value?.cookId,
+            layout: body.value?.layout,
+        });
+        if (!cook?.ok) {
+            const conflict = new Set(["not_enough_produce", "level_too_low", "pantry_full"]);
+            writeJson(res, conflict.has(cook?.error) ? 409 : 400, { status: "error", ...cook, timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { cook }, requestOrigin);
+    }
+    catch {
+        writeJson(res, 400, { status: "error", error: "invalid_farm_cook", timestamp }, requestOrigin);
     }
     return true;
 }

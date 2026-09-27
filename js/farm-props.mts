@@ -23,6 +23,7 @@ import { farmDecorFootprint, type FarmDecorDefinition } from "./farm-catalog/dec
 import type { FarmDecorRow } from "./farm-layout.mjs";
 import { FARM_BUILDING_BUILDERS, type BuildingDoors } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
+import { createKitchenRange } from "./farm-props-kitchen.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
 import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createSoilPatch, createStump, createSunflowers, createTree, createTreePlot, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
 
@@ -1143,6 +1144,7 @@ export const FARM_PROP_BUILDERS: Readonly<Record<string, (THREE: ThreeNamespace,
   crates: (THREE) => still(createCrates(THREE)),
   "log-pile": (THREE) => still(createLogPile(THREE)),
   campfire: (THREE) => { const fire = createCampfire(THREE); return { group: fire.group, doors: null, fixtureDoors: {}, animate: fire.animate }; },
+  "kitchen-range": (THREE) => { const range = createKitchenRange(THREE); return { group: range.group, doors: null, fixtureDoors: {}, animate: range.animate }; },
   birdbath: (THREE) => still(createBirdbath(THREE)),
   signpost: (THREE) => still(createSignpost(THREE)),
   mailbox: (THREE) => still(createMailbox(THREE)),

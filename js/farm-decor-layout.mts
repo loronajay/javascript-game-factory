@@ -162,11 +162,11 @@ export function judgePlacement(layout: FarmLayout, instanceId: string, definitio
       continue;
     }
     if (otherDefinition.aquatic && definition.pond && aquaticFits(farmDecorBox(other, otherDefinition), box)) continue;
-    if (definition.interior && otherDefinition.shell && interiorFits(box, definition, other, otherDefinition)) {
+    if ((definition.interior || definition.indoors) && otherDefinition.shell && interiorFits(box, definition, other, otherDefinition)) {
       hasInteriorHome = true;
       continue;
     }
-    if (otherDefinition.interior && definition.shell) {
+    if ((otherDefinition.interior || otherDefinition.indoors) && definition.shell) {
       const candidateBuilding: FarmDecorRow = { instanceId, itemId: definition.id, x: box.x, z: box.z, rotationY: box.rotationY, length: 0 };
       const otherBox = farmDecorBox(other, otherDefinition);
       if (interiorFits(otherBox, otherDefinition, candidateBuilding, definition)) continue;

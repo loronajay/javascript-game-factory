@@ -14,7 +14,8 @@
 // Ids are permanent (see achievement-catalog). Records start at zero when this
 // shipped, so harvests from before Phase 4 do not count toward them.
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
-import { farmingLevelForXp, normalizeWoodcuttingRecord } from "./farm-skill-catalog.mjs";
+import { farmingLevelForXp, normalizeCookingRecord, normalizeWoodcuttingRecord } from "./farm-skill-catalog.mjs";
+import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
 function def(id, name, description, category, extra = {}) {
     return Object.freeze({ id, name, description, category, parentId: null, tier: 1, points: 10, secret: false, icon: null, ...extra });
 }
@@ -35,6 +36,13 @@ export const FARM_ACHIEVEMENT_DEFINITIONS = Object.freeze([
     def("farm_timber", "Timber!", "Fell your first tree.", "progression"),
     def("farm_lumberjack", "Lumberjack", "Fell 50 trees.", "progression", { parentId: "farm_timber", tier: 2, points: 30 }),
     def("farm_woodsman", "Woodsman", "Reach Woodcutting level 10.", "progression", { points: 20 }),
+    // Phase 6: the kitchen.
+    def("farm_home_cooking", "Home Cooking", "Cook your first dish at a Kitchen Range.", "progression"),
+    def("farm_three_stars", "Three Stars", "Cook a three-star dish.", "challenge", { parentId: "farm_home_cooking", tier: 2, points: 20 }),
+    def("farm_line_cook", "Line Cook", "Cook 50 dishes.", "progression", { parentId: "farm_home_cooking", tier: 2, points: 30 }),
+    def("farm_order_up", "Order Up!", "Fill a dish order from the Order Board.", "progression", { parentId: "farm_home_cooking", tier: 2, points: 20 }),
+    def("farm_head_chef", "Head Chef", "Reach Cooking level 10.", "progression", { points: 20 }),
+    def("farm_cookbook", "Well-Thumbed Cookbook", "Cook every recipe at least once.", "mastery", { parentId: "farm_head_chef", tier: 2, points: 50 }),
 ]);
 export function detectFarmAchievements(facts) {
     const { farming } = facts;
@@ -71,6 +79,19 @@ export function detectFarmAchievements(facts) {
         earned.push("farm_lumberjack");
     if (farmingLevelForXp(woodcutting.xp) >= 10)
         earned.push("farm_woodsman");
+    const cooking = normalizeCookingRecord(facts.cooking);
+    if (cooking.dishes >= 1)
+        earned.push("farm_home_cooking");
+    if (cooking.perfect >= 1)
+        earned.push("farm_three_stars");
+    if (cooking.dishes >= 50)
+        earned.push("farm_line_cook");
+    if (cooking.orders >= 1)
+        earned.push("farm_order_up");
+    if (farmingLevelForXp(cooking.xp) >= 10)
+        earned.push("farm_head_chef");
+    if (Object.keys(FARM_RECIPE_RULES).every((recipeId) => (cooking.recipes[recipeId] ?? 0) > 0))
+        earned.push("farm_cookbook");
     return earned;
 }
 export const FARM_ACHIEVEMENTS = Object.freeze({

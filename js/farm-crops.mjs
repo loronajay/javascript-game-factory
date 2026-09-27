@@ -2,6 +2,7 @@
 // the page, server normalizer and headless tests all use the same farming contract.
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
+import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
 export const CARE_GATE = 0.5;
@@ -123,6 +124,7 @@ function inventoryWith(defaultSeeds, source, defaultSaplings = {}) {
     const supplies = input.supplies && typeof input.supplies === "object" ? input.supplies : {};
     const saplings = input.saplings && typeof input.saplings === "object" ? input.saplings : defaultSaplings;
     const logs = input.logs && typeof input.logs === "object" ? input.logs : {};
+    const dishes = input.dishes && typeof input.dishes === "object" ? input.dishes : {};
     return Object.freeze({
         // A stored seed stack is authoritative: a crop added to the catalog after it
         // was saved starts at 0 (the server keeps only stored ids, so a default here
@@ -136,6 +138,7 @@ function inventoryWith(defaultSeeds, source, defaultSaplings = {}) {
         ]))),
         saplings: Object.freeze(Object.fromEntries(TREE_CATALOG.map((species) => [species.id, count(saplings[species.id])]))),
         logs: Object.freeze(Object.fromEntries(TIMBER_TREES.map((species) => [species.id, count(logs[species.id])]))),
+        dishes: Object.freeze(Object.fromEntries(DISH_KEYS.map((key) => [key, count(dishes[key])]))),
     });
 }
 function freezeAgriculture(value) {

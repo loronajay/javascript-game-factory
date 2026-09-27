@@ -589,7 +589,11 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     harvestFarmTree({ layout, plotId }: { layout: unknown; plotId: string }) {
       return post("/games/farm/trees/harvests", { layout, plotId }, "harvest", {}, true);
     },
-    /** The Produce Merchant: crops and counts only — the server prices the sale and pays it. */
+    /** Cook a dish at the Kitchen Range: the client sends its farm, the recipe and its step scores; the server takes the ingredients and decides the stars. */
+    cookFarmDish({ layout, recipeId, scores, cookId }: { layout: unknown; recipeId: string; scores: readonly number[]; cookId: string }) {
+      return post("/games/farm/kitchen/cooks", { layout, recipeId, scores, cookId }, "cook", {}, true);
+    },
+    /** The Market buys produce (the Produce Merchant) and dishes (the Kitchen): item ids and counts only — the server prices the sale and pays it. */
     sellFarmProduce({ items, saleId }: { items: Record<string, number>; saleId: string }) {
       return post("/games/farm/market/sales", { items, saleId }, "sale", {}, true);
     },

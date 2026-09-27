@@ -7,6 +7,8 @@ export const FARM_STARTER_IDS = new Set([
     "decor.plant.oak", "decor.plant.soil-patch", "decor.plant.tree-plot", "decor.prop.hay-bale",
     "decor.prop.trough", "decor.prop.doghouse", "decor.prop.tennis-ball",
     "decor.prop.rope-toy", "decor.prop.bone",
+    // Every farm has a home and can cook (services/farm-recipe-catalog).
+    "decor.building.cottage", "decor.prop.kitchen-range",
 ]);
 const prices = Object.freeze({
     "ground.clover": 150, "ground.dry": 150, "ground.mud": 200, "ground.gravel": 250,
@@ -14,7 +16,7 @@ const prices = Object.freeze({
     "decor.fence.hedge": 200, "decor.fence.stone-wall": 250,
     "decor.building.shed": 650, "decor.building.coop": 800, "decor.building.gazebo": 900,
     "decor.building.greenhouse": 1400, "decor.building.stable": 1700, "decor.building.silo": 1800,
-    "decor.building.cottage": 2200, "decor.building.windmill": 2400,
+    "decor.building.windmill": 2400,
     "decor.plant.stump": 25, "decor.plant.bush": 50, "decor.plant.flower-bed": 75,
     "decor.plant.sunflowers": 75, "decor.plant.lavender": 75, "decor.plant.pine": 100,
     "decor.plant.birch": 125, "decor.plant.apple": 175, "decor.plant.willow": 200,

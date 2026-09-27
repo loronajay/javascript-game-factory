@@ -3,8 +3,16 @@
 // (farm-materials.mts), so a stall sits in the same world as the barn and
 // blocks exactly where it is drawn. Everything else in the square is an
 // ordinary farm decor row and is drawn by farm-props.mts.
+//
+// An open stall's stock is the real goods (farm-item-models.mts): the Produce
+// Merchant's crates are heaped with the crops and fruit she buys, the
+// Kitchen's counter is set with the dishes Basil buys.
 import { canvasPlane } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
+import { KITCHEN_STALL_ID } from "./farm-market-square.mjs";
+import { createProduceModel } from "./farm-produce-models.mjs";
+import { createDishModel } from "./farm-dish-models.mjs";
+import { findRecipe } from "./farm-catalog/recipes.mjs";
 const COUNTER_HEIGHT = 1.02;
 const POST_HEIGHT = 2.5;
 function stripedCanvas(THREE, colors) {
@@ -45,15 +53,58 @@ function drawSign(context, width, height, title, ink, sub) {
         context.fillText(sub, width / 2, height * 0.76, width - 40);
     }
 }
-/** A heaped crate of one crop, for the open stall's counter. */
-function produceCrate(THREE, group, x, z, color, y) {
+/** A crate heaped with one crop: the crop's own model, laid in rows and a second layer on top. */
+function produceCrate(THREE, group, x, z, cropId, y) {
     const wood = farmMaterial(THREE, "wood", { colors: ["#9a7248", "#6e4d2c"] });
-    tbox(THREE, group, [0.5, 0.16, 0.36], [x, y + 0.08, z], wood);
-    const fruit = new THREE.MeshStandardMaterial({ color, roughness: 0.55 });
-    const heap = [[-0.14, -0.08], [0, -0.08], [0.14, -0.08], [-0.14, 0.08], [0, 0.08], [0.14, 0.08], [-0.07, 0], [0.07, 0]];
-    heap.forEach(([dx, dz], index) => {
-        tsphere(THREE, group, 0.075, [x + dx, y + 0.18 + (index >= 6 ? 0.07 : 0), z + dz], fruit, 10, 8);
-    });
+    tbox(THREE, group, [0.5, 0.05, 0.36], [x, y + 0.025, z], wood);
+    for (const side of [-1, 1]) {
+        tbox(THREE, group, [0.5, 0.14, 0.02], [x, y + 0.07, z + side * 0.17], wood);
+        tbox(THREE, group, [0.02, 0.14, 0.36], [x + side * 0.24, y + 0.07, z], wood);
+    }
+    const probe = createProduceModel(THREE, cropId);
+    if (!probe)
+        return;
+    const size = new THREE.Box3().setFromObject(probe).getSize(new THREE.Vector3());
+    const stepX = Math.max(0.05, size.x * 1.05);
+    const stepZ = Math.max(0.05, size.z * 1.05);
+    const columns = Math.max(1, Math.floor(0.44 / stepX));
+    const rows = Math.max(1, Math.floor(0.3 / stepZ));
+    let turn = 0;
+    for (let layer = 0; layer < 2; layer += 1) {
+        const layerColumns = Math.max(1, columns - layer);
+        const layerRows = Math.max(1, rows - layer);
+        for (let column = 0; column < layerColumns; column += 1) {
+            for (let row = 0; row < layerRows; row += 1) {
+                const item = createProduceModel(THREE, cropId);
+                item.position.set(x + (column - (layerColumns - 1) / 2) * stepX, y + 0.05 + layer * size.y * 0.7, z + (row - (layerRows - 1) / 2) * stepZ);
+                item.rotation.y = (turn += 2.3);
+                group.add(item);
+            }
+        }
+    }
+}
+/** The Kitchen's counter: plated dishes set out on it and on the shelf behind, as a menu you can see. */
+function setDishes(THREE, group, front, back) {
+    const counter = [["farm-stew", -1.15], ["cherry-pie", -0.55], ["pumpkin-soup", 0.05], ["roasted-roots", 0.62], ["corn-chowder", 1.15]];
+    for (const [recipeId, x] of counter) {
+        const recipe = findRecipe(recipeId);
+        if (!recipe)
+            continue;
+        const dish = createDishModel(THREE, recipe, 3);
+        dish.position.set(x, COUNTER_HEIGHT + 0.06, front - 0.32);
+        dish.scale.setScalar(1.4);
+        group.add(dish);
+    }
+    const shelf = [["tomato-sauce", -1.1], ["berry-preserves", -0.9], ["orange-marmalade", -0.7], ["melon-sorbet", 0.2], ["baked-apples", 0.75], ["peach-cobbler", 1.15]];
+    for (const [recipeId, x] of shelf) {
+        const recipe = findRecipe(recipeId);
+        if (!recipe)
+            continue;
+        const dish = createDishModel(THREE, recipe, 2);
+        dish.position.set(x, 1.275, back + 0.28);
+        dish.scale.setScalar(1.3);
+        group.add(dish);
+    }
 }
 function buildStall(THREE, group, stall) {
     const { width, depth } = stall.footprint;
@@ -91,12 +142,19 @@ function buildStall(THREE, group, stall) {
     const board = Math.min(width - 0.2, 2.6);
     tbox(THREE, group, [board + 0.12, 0.56, 0.05], [0, POST_HEIGHT - 0.02, front + 0.24], wood);
     canvasPlane(THREE, group, board, 0.48, [640, 118], (context, w, h) => drawSign(context, w, h, stall.title, stall.colors[0], ""), [0, POST_HEIGHT - 0.02, front + 0.27], false);
+    if (stall.open && stall.id === KITCHEN_STALL_ID) {
+        setDishes(THREE, group, front, back);
+        // A copper pot and a ladle hang at the corner where the scale would be.
+        const copper = new THREE.MeshStandardMaterial({ color: "#b8733a", roughness: 0.35, metalness: 0.8 });
+        tcylinder(THREE, group, 0.012, 0.012, 0.4, [width / 2 - 0.35, POST_HEIGHT - 0.65, front - 0.2], copper, 6, false);
+        tcylinder(THREE, group, 0.13, 0.11, 0.16, [width / 2 - 0.35, POST_HEIGHT - 0.93, front - 0.2], copper, 16);
+        return;
+    }
     if (stall.open) {
-        // Stock on the counter and on the back shelf.
-        const crops = ["#d8412f", "#f08a24", "#6aa84f", "#7b3fa0", "#e6c64a", "#b5332e"];
+        // Stock on the counter and on the back shelf: crates of what the merchant buys.
         const y = COUNTER_HEIGHT + 0.06;
-        [-1.05, -0.35, 0.35, 1.05].forEach((x, index) => produceCrate(THREE, group, x, front - 0.32, crops[index], y));
-        [-0.8, 0.8].forEach((x, index) => produceCrate(THREE, group, x, back + 0.28, crops[index + 4], 1.28));
+        ["tomato", "carrot", "cabbage", "eggplant"].forEach((cropId, index) => produceCrate(THREE, group, [-1.05, -0.35, 0.35, 1.05][index], front - 0.32, cropId, y));
+        ["apple", "corn"].forEach((cropId, index) => produceCrate(THREE, group, [-0.8, 0.8][index], back + 0.28, cropId, 1.28));
         // A hanging scale at the corner of the counter.
         const iron = new THREE.MeshStandardMaterial({ color: "#4a4a4a", roughness: 0.4, metalness: 0.7 });
         tcylinder(THREE, group, 0.012, 0.012, 0.5, [width / 2 - 0.35, POST_HEIGHT - 0.7, front - 0.2], iron, 6, false);
@@ -124,15 +182,15 @@ function buildBoard(THREE, group, stall) {
         canvasPlane(THREE, group, 1.2, 0.8, [420, 280], (context, w, h) => drawSign(context, w, h, "No orders", "#6b4b2c", "contracts open soon"), [0, 1.4, 0.05], false);
         return;
     }
-    // Open: three notices pinned up, one per tier, a little askew. What they ask for
-    // is read at the board (E); the model only says there is work here.
+    // Open: five notices pinned up, a little askew — the three produce tiers, then the
+    // kitchen's two. What they ask for is read at the board (E); the model only says there is work here.
     const pin = new THREE.MeshStandardMaterial({ color: "#b8452f", roughness: 0.4, metalness: 0.2 });
-    const notices = [[-0.72, 1.48, 0.05, "Wanted"], [0, 1.52, -0.04, "Wanted"], [0.72, 1.46, 0.03, "Wanted"]];
+    const notices = [[-0.98, 1.48, 0.05, "Wanted"], [-0.49, 1.52, -0.04, "Wanted"], [0, 1.46, 0.03, "Wanted"], [0.49, 1.5, -0.05, "Kitchen"], [0.98, 1.47, 0.04, "Kitchen"]];
     for (const [x, y, tilt, title] of notices) {
-        const note = canvasPlane(THREE, group, 0.56, 0.72, [224, 288], (context, w, h) => drawNotice(context, w, h, title), [x, y, 0.05], false);
+        const note = canvasPlane(THREE, group, 0.44, 0.6, [192, 256], (context, w, h) => drawNotice(context, w, h, title), [x, y, 0.05], false);
         if (note?.rotation)
             note.rotation.z = tilt;
-        tsphere(THREE, group, 0.025, [x, y + 0.32, 0.07], pin, 8, 6);
+        tsphere(THREE, group, 0.025, [x, y + 0.26, 0.07], pin, 8, 6);
     }
 }
 /** A handwritten-looking paper notice: a title and a few scrawled lines. */

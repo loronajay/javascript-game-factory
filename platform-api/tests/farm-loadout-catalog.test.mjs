@@ -100,10 +100,14 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     onboarding: { status: "needs_name", introSeen: false },
     ground: "",
     pets: [],
-    agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {} }, crops: [] },
+    agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {} }, crops: [] },
     trees: [],
     clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 },
-    skills: { farming: { xp: 0, harvests: 0, orders: 0, crops: {}, fruit: {} }, woodcutting: { xp: 0, fellings: 0, trees: {} } },
+    skills: {
+      farming: { xp: 0, harvests: 0, orders: 0, crops: {}, fruit: {} },
+      woodcutting: { xp: 0, fellings: 0, trees: {} },
+      cooking: { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] },
+    },
   });
   // A pre-build-mode document keeps its version so the client can migrate it (seed the starter field).
   assert.equal(normalizeFarmGarage({ version: 1, pets: [] }).version, 1);
@@ -136,6 +140,7 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     supplies: { "food.dog-food": 20 },
     saplings: {},
     logs: {},
+    dishes: {},
   });
   assert.deepEqual(garage.agriculture.crops, [{
     plotId: "plot-1",

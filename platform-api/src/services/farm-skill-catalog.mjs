@@ -9,6 +9,7 @@
 // they are always derived from XP, so a curve retune moves every farm at once.
 import { FARM_CROP_RULES, farmCropRule } from "./farm-crop-catalog.mjs";
 import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
+import { COOK_ID, FARM_RECIPE_RULES, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
 export const FARMING_MAX_LEVEL = 99;
 /** A bound on stored XP, comfortably past level 99 (13,034,431). */
 export const FARMING_MAX_XP = 200_000_000;
@@ -72,6 +73,9 @@ export function emptyFarmingRecord() {
 export function emptyWoodcuttingRecord() {
     return { xp: 0, fellings: 0, trees: {} };
 }
+export function emptyCookingRecord() {
+    return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] };
+}
 /** Positive counts for the known ids only. */
 function counts(value, ids) {
     const source = value && typeof value === "object" ? value : {};
@@ -96,10 +100,22 @@ export function normalizeWoodcuttingRecord(value) {
     const source = value && typeof value === "object" ? value : {};
     return { xp: count(source.xp, FARMING_MAX_XP), fellings: count(source.fellings), trees: counts(source.trees, TIMBER_TREE_IDS) };
 }
-/** Both server-owned skill records, shape-bounded. */
+export function normalizeCookingRecord(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const recent = Array.isArray(source.recent) ? source.recent.filter((id) => typeof id === "string" && COOK_ID.test(id)).slice(-RECENT_COOK_IDS) : [];
+    return {
+        xp: count(source.xp, FARMING_MAX_XP), dishes: count(source.dishes), perfect: count(source.perfect), orders: count(source.orders),
+        recipes: counts(source.recipes, Object.keys(FARM_RECIPE_RULES)),
+        recent,
+    };
+}
+/** Every server-owned skill record, shape-bounded. */
 export function normalizeFarmSkillRecords(value) {
     const source = value && typeof value === "object" ? value : {};
-    return { farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting) };
+    return { farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting), cooking: normalizeCookingRecord(source.cooking) };
+}
+export function emptyFarmSkillRecords() {
+    return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord() };
 }
 /** A harvest of `cropId` landed: its XP, one more harvest, one more of that crop. */
 export function recordFarmHarvest(record, cropId, xp) {
@@ -117,6 +133,21 @@ export function recordFarmFruit(record, speciesId, xp) {
 /** A tree was felled: its Woodcutting XP and one more felling of that species. */
 export function recordFarmFelling(record, speciesId, xp) {
     return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), fellings: record.fellings + 1, trees: { ...record.trees, [speciesId]: (record.trees[speciesId] ?? 0) + 1 } };
+}
+/** A dish was cooked: its XP, one more dish of that recipe, one more three-star if it was, and the cook's id remembered. */
+export function recordFarmCook(record, recipeId, xp, stars, cookId) {
+    return {
+        ...record,
+        xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)),
+        dishes: record.dishes + 1,
+        perfect: record.perfect + (stars >= 3 ? 1 : 0),
+        recipes: { ...record.recipes, [recipeId]: (record.recipes[recipeId] ?? 0) + 1 },
+        recent: [...record.recent, cookId].slice(-RECENT_COOK_IDS),
+    };
+}
+/** A dish order was filled: its Cooking XP and one more dish order. */
+export function recordFarmDishOrder(record, xp) {
+    return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), orders: record.orders + 1 };
 }
 /** An order was filled: its XP and one more order. */
 export function recordFarmOrder(record, xp) {

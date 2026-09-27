@@ -122,11 +122,13 @@ const stall = (spec: Omit<MarketStall, "footprint"> & Partial<Pick<MarketStall, 
 
 export const PRODUCE_STALL_ID = "produce";
 export const ORDER_BOARD_ID = "orders";
+export const KITCHEN_STALL_ID = "kitchen";
 
 /**
- * The square's stalls. The Produce Merchant (v1) and the Order Board (Phase 4)
- * are open; the others stand where they will trade, shuttered, and say so —
- * the plan's Seed Merchant, Kitchen and Sawmill, in the order it brings them online.
+ * The square's stalls. The Produce Merchant (v1), the Order Board (Phase 4)
+ * and the Kitchen (Phase 6, buying cooked dishes) are open; the others stand
+ * where they will trade, shuttered, and say so — the plan's Seed Merchant and
+ * Sawmill, in the order it brings them online.
  */
 export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
@@ -141,9 +143,10 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
     closedNote: "The Seed Merchant's shutters are down. Seeds are still sold from your farm's Inventory.",
   }),
   stall({
-    id: "kitchen", kind: "stall", title: "Kitchen", open: false,
-    x: 7.4, z: -9.4, rotationY: 0, colors: ["#b8452f", "#f4ecd6"], keeper: null,
-    closedNote: "The Kitchen is not cooking yet. Recipes come with the Cooking skill.",
+    id: KITCHEN_STALL_ID, kind: "stall", title: "Kitchen", open: true,
+    x: 7.4, z: -9.4, rotationY: 0, colors: ["#b8452f", "#f4ecd6"],
+    keeper: Object.freeze({ name: "Basil", avatarId: "avatar.villager-m", greeting: "Something smells good. Cooked it yourself?" }),
+    closedNote: "",
   }),
   stall({
     id: "sawmill", kind: "stall", title: "Sawmill", open: false,
@@ -220,6 +223,7 @@ export function findStallInReach(
 export function stallPrompt(entry: MarketStall, signedIn: boolean): string {
   if (!entry.open) return `${entry.title} · closed for now · Press E to read the notice`;
   if (entry.kind === "board") return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;
-  if (!signedIn) return `${entry.title} · sign in to sell your produce`;
-  return `Press E to sell produce to ${entry.keeper?.name ?? entry.title}`;
+  const goods = entry.id === KITCHEN_STALL_ID ? "cooking" : "produce";
+  if (!signedIn) return `${entry.title} · sign in to sell your ${goods}`;
+  return `Press E to sell ${goods} to ${entry.keeper?.name ?? entry.title}`;
 }

@@ -1,10 +1,11 @@
-// The Produce Merchant's counter, on screen: the crops the player holds, a
-// count to sell for each, the total, and one Sell button. The maths is the pure
-// `farm-market-prices.mts`; the sale itself is whatever `sell` the page injects
-// (the server call). The panel never decides what was sold — it shows the
-// produce the page hands back after the server answers.
+// A Market counter, on screen: the goods the player holds that this stall buys
+// (the Produce Merchant's crops and fruit, the Kitchen's dishes), each shown as
+// its model, a count to sell for each, the total, and one Sell button. The
+// maths is the pure `farm-market-prices.mts`; the sale itself is whatever
+// `sell` the page injects (the server call). The panel never decides what was
+// sold — it shows the stock the page hands back after the server answers.
 
-import { MAX_SALE_QUANTITY, saleItems, saleLines, saleTotal, type SaleLine } from "./farm-market-prices.mjs";
+import { MAX_SALE_QUANTITY, SELLABLE_PRODUCE, saleItems, saleLines, saleTotal, type SaleLine, type Sellable } from "./farm-market-prices.mjs";
 
 type Elements = Readonly<{
   root: HTMLElement;
@@ -20,7 +21,12 @@ export type SaleOutcome = Readonly<{ ok: boolean; message: string; produce?: Rea
 
 type Options = Readonly<{
   sell: (items: Record<string, number>) => Promise<SaleOutcome>;
-  thumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
+  /** A line's portrait, by its item key (farm-item-thumbnails.mts). */
+  thumbnail?: (itemKey: string, onReady: (url: string) => void) => string | null;
+  /** What this counter buys; the Produce Merchant's list by default. */
+  sellable?: readonly Sellable[];
+  /** What the counter says when the player holds nothing it buys. */
+  emptyNote?: string;
   onClose?: () => void;
 }>;
 
@@ -31,6 +37,7 @@ export type MarketSalePanel = Readonly<{
 }>;
 
 export function createMarketSalePanel(elements: Elements, options: Options): MarketSalePanel {
+  const sellable = options.sellable ?? SELLABLE_PRODUCE;
   let produce: Readonly<Record<string, number>> = {};
   let picked: Record<string, number> = {};
   let busy = false;
@@ -58,10 +65,8 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
     const image = document.createElement("img");
     image.alt = "";
     const show = (url: string): void => { image.src = url; portrait.replaceChildren(image); };
-    const ready = options.thumbnail?.(line.cropId, show);
+    const ready = options.thumbnail?.(line.itemKey, show);
     if (ready) show(ready);
-    if (line.color) portrait.style.setProperty("--fruit", line.color);
-    portrait.classList.toggle("is-fruit", Boolean(line.color));
     const label = document.createElement("div");
     label.className = "sale-row__label";
     const title = document.createElement("strong");
@@ -106,11 +111,11 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
   }
 
   function render(): void {
-    const lines = saleLines(produce, picked);
+    const lines = saleLines(produce, picked, sellable);
     if (!lines.length) {
       const empty = document.createElement("li");
       empty.className = "sale-empty";
-      empty.textContent = "Your harvest basket is empty. Grow something on the farm and bring it back.";
+      empty.textContent = options.emptyNote ?? "Your harvest basket is empty. Grow something on the farm and bring it back.";
       elements.list.replaceChildren(empty);
     } else {
       elements.list.replaceChildren(...lines.map(row));
@@ -123,7 +128,7 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
   }
 
   async function sell(): Promise<void> {
-    const items = saleItems(saleLines(produce, picked));
+    const items = saleItems(saleLines(produce, picked, sellable));
     if (busy || !Object.keys(items).length) return;
     busy = true;
     render();
@@ -148,7 +153,7 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
   elements.closeButton.addEventListener("click", close);
   elements.sellButton.addEventListener("click", () => void sell());
   elements.pickAllButton.addEventListener("click", () => {
-    picked = Object.fromEntries(saleLines(produce, {}).map((line) => [line.cropId, line.held]));
+    picked = Object.fromEntries(saleLines(produce, {}, sellable).map((line) => [line.cropId, line.held]));
     render();
   });
   elements.root.hidden = true;

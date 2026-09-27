@@ -20,6 +20,7 @@ import { getPlayerAchievements, submitAchievementRun } from "./db/achievements.m
 import { submitGameResult } from "./db/game-results.mjs";
 import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tickets.mjs";
 import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
+import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
 import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
 import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
@@ -282,6 +283,7 @@ async function bootstrap() {
         purchaseFarmSupply: (params) => purchaseFarmSupply(pool, params),
         harvestFarmCrop: (params) => harvestFarmCrop(pool, params),
         harvestFarmTree: (params) => harvestFarmTree(pool, params),
+        cookFarmDish: (params) => cookFarmDish(pool, params),
         sellFarmProduce: (params) => sellFarmProduce(pool, params),
         getFarmOrderBoard: (params) => getFarmOrderBoard(pool, params),
         fillFarmOrder: (params) => fillFarmOrder(pool, params),

@@ -1,9 +1,9 @@
-// The farm's skills, for display: Farming and Woodcutting. PURE — no DOM, no
+// The farm's skills, for display: Farming, Woodcutting and Cooking. PURE — no DOM, no
 // THREE, no storage.
 //
 // The server owns the records (platform-api/src/services/farm-skill-catalog.mts):
-// only a server harvest, a picked fruit tree, a felled tree or a filled Market
-// order raises them, and a save can never change them. The page reads `layout.skills.farming` as the server last
+// only a server harvest, a picked fruit tree, a felled tree, a cooked dish or a
+// filled Market order raises them, and a save can never change them. The page reads `layout.skills.farming` as the server last
 // returned it and derives the level and progress bar from it with this same
 // curve; platform-api/tests/farm-skills.test.mjs holds the two copies equal.
 //
@@ -11,6 +11,7 @@
 // level 1 — the skill is account progression, like the tickets it leads to.
 import { CROP_CATALOG, FARM_DAY_MINUTES, findCrop } from "./farm-crops.mjs";
 import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
+import { RECIPE_CATALOG } from "./farm-catalog/recipes.mjs";
 export const FARMING_MAX_LEVEL = 99;
 export const FARMING_MAX_XP = 200_000_000;
 /** XP a harvest earns per farm day its crop spent growing, before the care penalty. */
@@ -47,6 +48,7 @@ export function harvestXp(cropId, carePenalty = 0) {
 export const EMPTY_FARM_SKILLS = Object.freeze({
     farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
     woodcutting: Object.freeze({ xp: 0, fellings: 0, trees: Object.freeze({}) }),
+    cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}) }),
 });
 function count(value, limit = 100_000_000) {
     const number = Number(value);
@@ -66,7 +68,8 @@ export function normalizeFarmSkills(value) {
     const source = value && typeof value === "object" ? value : {};
     const farming = source.farming && typeof source.farming === "object" ? source.farming : null;
     const woodcutting = source.woodcutting && typeof source.woodcutting === "object" ? source.woodcutting : null;
-    if (!farming && !woodcutting)
+    const cooking = source.cooking && typeof source.cooking === "object" ? source.cooking : null;
+    if (!farming && !woodcutting && !cooking)
         return EMPTY_FARM_SKILLS;
     return Object.freeze({
         farming: farming ? Object.freeze({
@@ -81,6 +84,13 @@ export function normalizeFarmSkills(value) {
             fellings: count(woodcutting.fellings),
             trees: counts(woodcutting.trees, TIMBER_TREES.map((species) => species.id)),
         }) : EMPTY_FARM_SKILLS.woodcutting,
+        cooking: cooking ? Object.freeze({
+            xp: count(cooking.xp, FARMING_MAX_XP),
+            dishes: count(cooking.dishes),
+            perfect: count(cooking.perfect),
+            orders: count(cooking.orders),
+            recipes: counts(cooking.recipes, RECIPE_CATALOG.map((entry) => entry.id)),
+        }) : EMPTY_FARM_SKILLS.cooking,
     });
 }
 export function farmingProgress(xp) {

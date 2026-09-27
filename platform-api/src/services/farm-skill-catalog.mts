@@ -10,6 +10,7 @@
 
 import { FARM_CROP_RULES, farmCropRule } from "./farm-crop-catalog.mjs";
 import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
+import { COOK_ID, FARM_RECIPE_RULES, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
 /** A bound on stored XP, comfortably past level 99 (13,034,431). */
@@ -72,6 +73,12 @@ export function farmCropCapacity(decor: readonly any[], farmingLevel: number): n
 export type FarmingRecord = { xp: number; harvests: number; orders: number; crops: Record<string, number>; fruit: Record<string, number> };
 /** The Woodcutting skill: same curve, earned only by felling productive trees on the server. */
 export type WoodcuttingRecord = { xp: number; fellings: number; trees: Record<string, number> };
+/**
+ * The Cooking skill: same curve, earned only by dishes the server made and
+ * dish orders it filled. `recent` is bookkeeping, not progress: the latest
+ * cook ids, so a retried cook request makes its dish once.
+ */
+export type CookingRecord = { xp: number; dishes: number; perfect: number; orders: number; recipes: Record<string, number>; recent: string[] };
 
 const COUNT_LIMIT = 100_000_000;
 
@@ -86,6 +93,10 @@ export function emptyFarmingRecord(): FarmingRecord {
 
 export function emptyWoodcuttingRecord(): WoodcuttingRecord {
   return { xp: 0, fellings: 0, trees: {} };
+}
+
+export function emptyCookingRecord(): CookingRecord {
+  return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] };
 }
 
 /** Positive counts for the known ids only. */
@@ -114,10 +125,26 @@ export function normalizeWoodcuttingRecord(value: unknown): WoodcuttingRecord {
   return { xp: count(source.xp, FARMING_MAX_XP), fellings: count(source.fellings), trees: counts(source.trees, TIMBER_TREE_IDS) };
 }
 
-/** Both server-owned skill records, shape-bounded. */
-export function normalizeFarmSkillRecords(value: unknown): { farming: FarmingRecord; woodcutting: WoodcuttingRecord } {
+export function normalizeCookingRecord(value: unknown): CookingRecord {
   const source: any = value && typeof value === "object" ? value : {};
-  return { farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting) };
+  const recent = Array.isArray(source.recent) ? source.recent.filter((id: unknown) => typeof id === "string" && COOK_ID.test(id)).slice(-RECENT_COOK_IDS) : [];
+  return {
+    xp: count(source.xp, FARMING_MAX_XP), dishes: count(source.dishes), perfect: count(source.perfect), orders: count(source.orders),
+    recipes: counts(source.recipes, Object.keys(FARM_RECIPE_RULES)),
+    recent,
+  };
+}
+
+export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord };
+
+/** Every server-owned skill record, shape-bounded. */
+export function normalizeFarmSkillRecords(value: unknown): FarmSkillRecords {
+  const source: any = value && typeof value === "object" ? value : {};
+  return { farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting), cooking: normalizeCookingRecord(source.cooking) };
+}
+
+export function emptyFarmSkillRecords(): FarmSkillRecords {
+  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord() };
 }
 
 /** A harvest of `cropId` landed: its XP, one more harvest, one more of that crop. */
@@ -138,6 +165,23 @@ export function recordFarmFruit(record: FarmingRecord, speciesId: string, xp: nu
 /** A tree was felled: its Woodcutting XP and one more felling of that species. */
 export function recordFarmFelling(record: WoodcuttingRecord, speciesId: string, xp: number): WoodcuttingRecord {
   return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), fellings: record.fellings + 1, trees: { ...record.trees, [speciesId]: (record.trees[speciesId] ?? 0) + 1 } };
+}
+
+/** A dish was cooked: its XP, one more dish of that recipe, one more three-star if it was, and the cook's id remembered. */
+export function recordFarmCook(record: CookingRecord, recipeId: string, xp: number, stars: number, cookId: string): CookingRecord {
+  return {
+    ...record,
+    xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)),
+    dishes: record.dishes + 1,
+    perfect: record.perfect + (stars >= 3 ? 1 : 0),
+    recipes: { ...record.recipes, [recipeId]: (record.recipes[recipeId] ?? 0) + 1 },
+    recent: [...record.recent, cookId].slice(-RECENT_COOK_IDS),
+  };
+}
+
+/** A dish order was filled: its Cooking XP and one more dish order. */
+export function recordFarmDishOrder(record: CookingRecord, xp: number): CookingRecord {
+  return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), orders: record.orders + 1 };
 }
 
 /** An order was filled: its XP and one more order. */

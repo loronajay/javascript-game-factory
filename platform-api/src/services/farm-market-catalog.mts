@@ -12,6 +12,7 @@
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
+import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey, type DishStars } from "./farm-recipe-catalog.mjs";
 
 const DAY = 24 * 60;
 
@@ -50,16 +51,49 @@ export function farmProducePrice(cropId: unknown): number {
     : 0;
 }
 
+// ---------------------------------------------------------------- cooked dishes
+
 /**
- * A sale request made safe: known crops only, whole positive counts, at most
- * MAX_SALE_QUANTITY each, at least one line. `null` for anything else.
+ * What the Market's Kitchen pays for a dish: what its ingredients would fetch
+ * raw at the Produce Merchant, times a premium for how well it was cooked. The
+ * premium is the reason to cook at all — the plan's rule that processed goods
+ * are worth more than the crop — and it grows with the stars, so the cooking
+ * game is worth playing well.
+ */
+export const DISH_PREMIUM: Readonly<Record<DishStars, number>> = Object.freeze({ 1: 1.25, 2: 1.45, 3: 1.7 });
+
+/** The raw produce value of one cook of a recipe. */
+export function farmRecipeRawValue(recipeId: string): number {
+  const rule = farmRecipeRule(recipeId);
+  if (!rule) return 0;
+  return Object.entries(rule.ingredients).reduce((sum, [id, count]) => sum + farmProducePrice(id) * count, 0);
+}
+
+export function farmDishPrice(recipeId: string, stars: DishStars): number {
+  const raw = farmRecipeRawValue(recipeId);
+  return raw > 0 ? Math.ceil(raw * DISH_PREMIUM[stars]) : 0;
+}
+
+export const FARM_DISH_PRICES: Readonly<Record<string, number>> = Object.freeze(Object.fromEntries(
+  Object.keys(FARM_RECIPE_RULES).flatMap((recipeId) => ([1, 2, 3] as const).map((stars) => [`${recipeId}@${stars}`, farmDishPrice(recipeId, stars)])),
+));
+
+/** Whatever a sale line names — a crop, a fruit or a dish — at the server's price, or 0 for anything the market does not buy. */
+export function farmSalePrice(itemId: unknown): number {
+  const dish = parseFarmDishKey(itemId);
+  return dish ? farmDishPrice(dish.recipeId, dish.stars) : farmProducePrice(itemId);
+}
+
+/**
+ * A sale request made safe: known crops, fruit and dishes only, whole positive
+ * counts, at most MAX_SALE_QUANTITY each, at least one line. `null` for anything else.
  */
 export function normalizeSaleLines(value: unknown): Readonly<Record<string, number>> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const lines: Record<string, number> = {};
   for (const [cropId, raw] of Object.entries(value as Record<string, unknown>)) {
     const quantity = Number(raw);
-    if (!farmProducePrice(cropId)) return null;
+    if (!farmSalePrice(cropId)) return null;
     if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > MAX_SALE_QUANTITY) return null;
     if (quantity > 0) lines[cropId] = quantity;
   }

@@ -9,9 +9,9 @@
 // the arcade-room bridge, with its chat, so the square is a place people meet.
 //
 // Money is never decided here. The Produce Merchant's panel names crops and
-// counts; the server prices the sale, takes the produce and pays the tickets in
-// one transaction (`POST /games/farm/market/sales`), and the page shows what it
-// answers. The Order Board is the same: the server writes the day's orders
+// counts, the Kitchen's names dishes; the server prices the sale, takes the
+// goods and pays the tickets in one transaction (`POST /games/farm/market/sales`),
+// and the page shows what it answers. The Order Board is the same: the server writes the day's orders
 // (`GET /games/farm/market/orders`), the panel names one to fill, and the
 // server checks the basket and the Farming level, pays and grants the XP.
 // Nothing on this page is saved: the square is a constant.
@@ -29,14 +29,15 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, findMarketStall, findStallInReach, keeperPose, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, findMarketStall, findStallInReach, keeperPose, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createOrderBoardPanel } from "./farm-orders-panel.mjs";
 import { normalizeOrderBoard } from "./farm-orders.mjs";
+import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
-import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
+import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
@@ -71,6 +72,16 @@ const farmStore = createLayoutStore(FARM_LAYOUT_SPEC);
 const farmLoad = await farmStore.load();
 const canSell = farmStore.accountBacked && farmLoad.source === "account";
 let produce = farmLoad.layout.agriculture.inventory.produce;
+let dishes = farmLoad.layout.agriculture.inventory.dishes;
+/** Take the basket and pantry from a farm the server answered with. */
+function takeStock(layoutValue) {
+    if (!layoutValue)
+        return null;
+    const next = normalizeFarmLayout(layoutValue);
+    produce = next.agriculture.inventory.produce;
+    dishes = next.agriculture.inventory.dishes;
+    return next;
+}
 const ticketClient = createTicketWalletClient();
 let balance = null;
 function renderTickets() {
@@ -223,29 +234,31 @@ function publishPresence() {
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking",
-        activity: salePanel.isOpen() ? "selling produce" : ordersPanel.isOpen() ? "reading the Order Board" : "",
+        activity: salePanel.isOpen() ? "selling produce" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : "",
     });
 }
-// ---------------------------------------------------------------- the Produce Merchant
-const cropThumbnails = createCropThumbnails(THREE);
+// ---------------------------------------------------------------- the Produce Merchant and the Kitchen
+// Every line on every counter and notice is the item itself: its model, rendered offscreen.
+const itemThumbnails = createFarmItemThumbnails(THREE);
 const saleMessages = Object.freeze({
     not_enough_produce: "Your basket was not what the merchant was shown, so she counted again. Nothing was sold.",
+    not_enough_dishes: "Your pantry was not what Basil was shown, so he counted again. Nothing was sold.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
     invalid_sale: "That sale did not add up. Nothing was sold.",
 });
-async function sellProduce(items) {
+/** One counter's sale: the server prices it, takes the goods and pays; the counter shows what it answered. */
+async function sellAt(stallId, items) {
     const saleId = `sale-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
     const result = await ticketClient.sellFarmProduce(items, saleId);
-    if (result?.layout)
-        produce = normalizeFarmLayout(result.layout).agriculture.inventory.produce;
+    takeStock(result?.layout);
+    const stock = stallId === KITCHEN_STALL_ID ? dishes : produce;
     if (!result?.ok) {
-        return { ok: false, message: saleMessages[result?.error] ?? "The sale did not go through. Nothing was sold — try again in a moment.", produce };
+        return { ok: false, message: saleMessages[result?.error] ?? "The sale did not go through. Nothing was sold — try again in a moment.", produce: stock };
     }
     takeBalance(result.balance);
-    const produceStall = findMarketStall(PRODUCE_STALL_ID);
-    keeperSays(produceStall, "Pleasure doing business!");
+    keeperSays(findMarketStall(stallId), stallId === KITCHEN_STALL_ID ? "I'll have these on the menu by supper." : "Pleasure doing business!");
     const earned = Number(result.earned) || 0;
-    return { ok: true, message: `Sold for ${earned.toLocaleString()} tickets. Your balance is ${formatTicketBalance(balance)}.`, produce };
+    return { ok: true, message: `Sold for ${earned.toLocaleString()} tickets. Your balance is ${formatTicketBalance(balance)}.`, produce: stock };
 }
 const salePanel = createMarketSalePanel({
     root: requiredElement("#salePanel"),
@@ -256,15 +269,31 @@ const salePanel = createMarketSalePanel({
     pickAllButton: requiredElement("#pickAllProduce"),
     status: requiredElement("#saleStatus"),
 }, {
-    sell: sellProduce,
-    thumbnail: cropThumbnails.get,
+    sell: (items) => sellAt(PRODUCE_STALL_ID, items),
+    thumbnail: itemThumbnails.get,
+    onClose: () => canvas.focus(),
+});
+const kitchenPanel = createMarketSalePanel({
+    root: requiredElement("#kitchenPanel"),
+    closeButton: requiredElement("#closeKitchen"),
+    list: requiredElement("#kitchenList"),
+    total: requiredElement("#kitchenTotal"),
+    sellButton: requiredElement("#sellDishes"),
+    pickAllButton: requiredElement("#pickAllDishes"),
+    status: requiredElement("#kitchenStatus"),
+}, {
+    sell: (items) => sellAt(KITCHEN_STALL_ID, items),
+    thumbnail: itemThumbnails.get,
+    sellable: SELLABLE_DISHES,
+    emptyNote: "Your pantry is empty. Cook something at your farm's Kitchen Range and bring it here.",
     onClose: () => canvas.focus(),
 });
 // ---------------------------------------------------------------- the Order Board
 const achievementToaster = createAchievementToaster();
 const orderMessages = Object.freeze({
     not_enough_produce: "Your basket came up short when it was counted. Nothing was delivered.",
-    level_too_low: "That order needs a higher Farming level. Nothing was delivered.",
+    not_enough_dishes: "Your pantry came up short when it was counted. Nothing was delivered.",
+    level_too_low: "That order needs a higher level. Nothing was delivered.",
     order_expired: "That notice came down while you were reading it — the board has turned over. Nothing was delivered.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
 });
@@ -277,31 +306,35 @@ function takeBalance(value) {
 }
 async function loadOrderBoard() {
     const board = normalizeOrderBoard(await ticketClient.getFarmOrders());
-    // The board carries the basket as the server holds it now: fresher than the page's.
-    if (board)
+    // The board carries the basket and pantry as the server holds them now: fresher than the page's.
+    if (board) {
         produce = board.produce;
+        dishes = board.dishes;
+    }
     return board;
 }
 async function fillOrder(orderId) {
     const result = await ticketClient.fillFarmOrder(orderId);
-    const layout = result?.layout ? normalizeFarmLayout(result.layout) : null;
-    if (layout)
-        produce = layout.agriculture.inventory.produce;
-    const level = layout ? farmingLevelForXp(layout.skills.farming.xp) : undefined;
+    const layout = takeStock(result?.layout);
+    const levels = layout ? { farming: farmingLevelForXp(layout.skills.farming.xp), cooking: farmingLevelForXp(layout.skills.cooking.xp) } : undefined;
+    const stock = { produce, dishes, levels };
     if (!result?.ok) {
-        return { ok: false, message: orderMessages[result?.error] ?? "The delivery did not go through. Nothing was taken — try again in a moment.", produce, level };
+        return { ok: false, message: orderMessages[result?.error] ?? "The delivery did not go through. Nothing was taken — try again in a moment.", ...stock };
     }
     takeBalance(result.balance);
     if (Array.isArray(result.achievements) && result.achievements.length)
         achievementToaster.show("farm", "The Farm", result.achievements);
     if (result.duplicate)
-        return { ok: true, message: "That order was already delivered.", produce, level, filled: true };
+        return { ok: true, message: "That order was already delivered.", ...stock, filled: true };
     const customer = typeof result.order?.customer === "string" ? result.order.customer : "The customer";
-    const levelUp = Number(result.farming?.level) > Number(result.farming?.levelBefore) ? ` Farming level ${result.farming.level}!` : "";
+    const cooking = result.skill === "cooking";
+    const summary = cooking ? result.cooking : result.farming;
+    const skill = cooking ? "Cooking" : "Farming";
+    const levelUp = Number(summary?.level) > Number(summary?.levelBefore) ? ` ${skill} level ${summary.level}!` : "";
     return {
         ok: true,
-        message: `${customer} paid ${Number(result.earned).toLocaleString()} tickets · +${Number(result.xp).toLocaleString()} Farming XP.${levelUp}`,
-        produce, level, filled: true,
+        message: `${customer} paid ${Number(result.earned).toLocaleString()} tickets · +${Number(result.xp).toLocaleString()} ${skill} XP.${levelUp}`,
+        ...stock, filled: true,
     };
 }
 const ordersPanel = createOrderBoardPanel({
@@ -314,12 +347,12 @@ const ordersPanel = createOrderBoardPanel({
 }, {
     load: loadOrderBoard,
     fill: fillOrder,
-    thumbnail: cropThumbnails.get,
+    thumbnail: itemThumbnails.get,
     onClose: () => canvas.focus(),
 });
 /** A counter or the board has the player's attention: no walking, no looking round. */
 function panelOpen() {
-    return salePanel.isOpen() || ordersPanel.isOpen();
+    return salePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen();
 }
 function workStall(stall) {
     if (!stall.open) {
@@ -331,7 +364,9 @@ function workStall(stall) {
             ? "The market cannot see your farm's records right now. Try again in a moment."
             : stall.kind === "board"
                 ? "Sign in to fill orders — only an account farm's harvest can be delivered for tickets."
-                : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
+                : stall.id === KITCHEN_STALL_ID
+                    ? "Sign in to sell your cooking — only an account farm's dishes can be traded for tickets."
+                    : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
         return;
     }
     keys.clear();
@@ -339,7 +374,10 @@ function workStall(stall) {
         ordersPanel.open();
         return;
     }
-    salePanel.open(produce);
+    if (stall.id === KITCHEN_STALL_ID)
+        kitchenPanel.open(dishes);
+    else
+        salePanel.open(produce);
     if (stall.keeper)
         keeperSays(stall, stall.keeper.greeting);
 }
@@ -438,6 +476,7 @@ window.addEventListener("keydown", (event) => {
     if (panelOpen()) {
         if (event.code === "Escape") {
             salePanel.close();
+            kitchenPanel.close();
             ordersPanel.close();
         }
         keys.clear();
@@ -537,7 +576,9 @@ globalThis.__market = Object.freeze({
     openDoors: () => [...openDoors],
     saleOpen: () => salePanel.isOpen(),
     ordersOpen: () => ordersPanel.isOpen(),
+    kitchenOpen: () => kitchenPanel.isOpen(),
     produce: () => produce,
+    dishes: () => dishes,
     canSell: () => canSell,
     presence: () => presence.status(),
 });

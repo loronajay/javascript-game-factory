@@ -43,6 +43,11 @@ import { createFarmTreesView } from "./farm-trees-view.mjs";
 import { createFarmTreesController } from "./farm-trees-controller.mjs";
 import { createFarmCropsController } from "./farm-crops-controller.mjs";
 import { createChopMeter } from "./farm-chop-view.mjs";
+import { createKitchenView } from "./farm-kitchen-view.mjs";
+import { createKitchenPanel } from "./farm-kitchen-panel.mjs";
+import { createCookingHud } from "./farm-cooking-view.mjs";
+import { createFarmKitchenController } from "./farm-kitchen-controller.mjs";
+import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { applyOfflineProduction, offlineSpan, type OfflineReport } from "./farm-offline.mjs";
 import { createAwayReport } from "./farm-away-report.mjs";
@@ -86,6 +91,7 @@ const fieldCapacity = requiredElement<HTMLElement>("#fieldCapacity");
 const skillsHud = createFarmSkillsHud({
   farming: { root: requiredElement<HTMLElement>("#farmingSkill"), label: requiredElement<HTMLElement>("#farmingSkillLabel"), bar: requiredElement<HTMLElement>("#farmingSkillBar") },
   woodcutting: { root: requiredElement<HTMLElement>("#woodcuttingSkill"), label: requiredElement<HTMLElement>("#woodcuttingSkillLabel"), bar: requiredElement<HTMLElement>("#woodcuttingSkillBar") },
+  cooking: { root: requiredElement<HTMLElement>("#cookingSkill"), label: requiredElement<HTMLElement>("#cookingSkillLabel"), bar: requiredElement<HTMLElement>("#cookingSkillBar") },
 });
 const farmClockPhase = requiredElement<HTMLElement>("#farmClockPhase");
 const napDialog = requiredElement<HTMLDialogElement>("#napDialog");
@@ -207,7 +213,7 @@ function renderOnboardingGate(): void {
   startTag.textContent = showFarmIntro ? "WELCOME TO YOUR FARM" : "YOUR FIRST FARM FRIEND";
   startHeading.textContent = showFarmIntro ? "A field, a future, and a dog." : "Name your dog to continue.";
   startCopy.textContent = showFarmIntro
-    ? "Your new farm includes one growing plot, six kinds of seed, 20 servings of Dog Food, and a dog of your own. Give your dog a name before you step onto the field."
+    ? "Your new farm includes a farmhouse with a kitchen, one growing plot, six kinds of seed, 20 servings of Dog Food, and a dog of your own. Give your dog a name before you step onto the field."
     : "Your starter supplies are safe. Give your dog a name before normal farm play begins.";
   if (!canPersistFarm) {
     nameStarterDog.disabled = true;
@@ -249,6 +255,10 @@ const treesView = createFarmTreesView(THREE, scene);
 const awayReport = createAwayReport(requiredElement<HTMLElement>("#awayReport"));
 cropsView.sync(layout, layout.agriculture, clockMinutes);
 treesView.sync(layout, clockMinutes);
+// Cooking, in the world: ingredients on the board, the pot, the oven, the plated dish (farm-kitchen-view.mts).
+const kitchenView = createKitchenView(THREE, scene, world);
+/** Set once the kitchen controller exists: a layout change moves or clears what is on a range. */
+let kitchenSync: () => void = () => undefined;
 
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
@@ -386,10 +396,11 @@ function updateInteraction(): void {
   const handsFree = walking && !carrying;
   ladderInReach = handsFree && !doorInReach ? findLadderInReach(ladders, pose) : null;
   bedInReach = handsFree && !doorInReach && !ladderInReach ? findBedInReach(layout.decor, pose) : null;
-  // The field's producers, crops then trees, each behind its own controller.
+  // The field's producers, crops then trees, each behind its own controller; then the kitchen.
   crops.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach);
   trees.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach());
-  const producing = crops.inReach() || trees.inReach();
+  kitchen.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach() && !trees.inReach());
+  const producing = crops.inReach() || trees.inReach() || kitchen.inReach();
   seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing ? findSeatInReach(seats, pose) : null;
   nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
   const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
@@ -410,12 +421,16 @@ function updateInteraction(): void {
   const putDownFits = putDownAt !== null;
   // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
   if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId)) doorInReach = null;
-  if (petsPanel.isOpen() || farmEditor.isEditing() || !farmEntered) {
+  if (petsPanel.isOpen() || kitchenPanel.isOpen() || farmEditor.isEditing() || !farmEntered) {
     setPrompt("");
     return;
   }
   if (trees.chopping()) {
     setPrompt(trees.prompt());
+    return;
+  }
+  if (kitchen.cooking()) {
+    setPrompt(kitchen.prompt());
     return;
   }
   if (body.mode === "climbing") {
@@ -445,6 +460,10 @@ function updateInteraction(): void {
   }
   if (trees.inReach()) {
     setPrompt(trees.prompt());
+    return;
+  }
+  if (kitchen.inReach()) {
+    setPrompt(kitchen.prompt());
     return;
   }
   if (seatInReach) {
@@ -502,6 +521,7 @@ function interact(): boolean {
   }
   if (crops.inReach()) return crops.interact();
   if (trees.inReach()) return trees.interact();
+  if (kitchen.inReach()) return kitchen.interact();
   if (seatInReach) {
     applyBodyStep(sitOn(player, body, seatInReach.seat, seatInReach.point));
     keys.clear();
@@ -695,6 +715,7 @@ function applyLayout(next: FarmLayout): void {
   petSim.sync(layout);
   petsPanel.render(layout);
   inventoryPanel.render(layout.agriculture, skillLevels());
+  kitchenSync();
   renderFieldCapacity();
 }
 
@@ -738,6 +759,18 @@ window.addEventListener("keydown", (event) => {
   }
   // Build mode owns the keyboard: the editor listens for itself, and walking keys never reach the walker.
   if (farmEditor.isEditing()) {
+    keys.clear();
+    return;
+  }
+  // A dish on the stove owns the keyboard: E cuts, pulls and fans the fire, the arrows and WASD stir,
+  // Escape takes it off the heat (nothing is used until it is served).
+  if (kitchen.cooking()) {
+    if (!event.repeat && kitchen.keyDown(event.code)) event.preventDefault();
+    keys.clear();
+    return;
+  }
+  if (kitchenPanel.isOpen()) {
+    if (event.code === "Escape") kitchenPanel.close();
     keys.clear();
     return;
   }
@@ -801,11 +834,17 @@ window.addEventListener("keydown", (event) => {
     if (interact()) event.preventDefault();
   }
 });
-window.addEventListener("keyup", (event) => keys.delete(event.code));
-window.addEventListener("blur", () => keys.clear());
+window.addEventListener("keyup", (event) => {
+  keys.delete(event.code);
+  kitchen.keyUp(event.code);
+});
+window.addEventListener("blur", () => {
+  keys.clear();
+  kitchen.keyUp("KeyE");
+});
 
 canvas.addEventListener("click", () => {
-  if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !farmEditor.isEditing()) canvas.requestPointerLock?.().catch(() => undefined);
+  if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !kitchenPanel.isOpen() && !farmEditor.isEditing()) canvas.requestPointerLock?.().catch(() => undefined);
 });
 starterDogForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -880,7 +919,7 @@ document.addEventListener("pointerlockchange", () => {
 canvas.addEventListener("pointerdown", () => { draggingLook = !farmEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-  if (petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing()) return;
+  if (petsPanel.isOpen() || inventoryPanel.isOpen() || kitchenPanel.isOpen() || kitchen.cooking() || farmEditor.isEditing()) return;
   if (document.pointerLockElement !== canvas && !draggingLook) return;
   const looked = lookWalker(player, event.movementX, event.movementY);
   player.yaw = looked.yaw;
@@ -888,7 +927,7 @@ document.addEventListener("mousemove", (event) => {
 });
 
 function updatePlayer(dt: number): void {
-  if (!farmEntered || leavingForMarket || trees.chopping() || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0) return;
+  if (!farmEntered || leavingForMarket || trees.chopping() || kitchen.cooking() || petsPanel.isOpen() || inventoryPanel.isOpen() || kitchenPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0) return;
   const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
   if (!step.moved) return;
   player.x = step.pose.x;
@@ -998,6 +1037,8 @@ petsPanel.render(layout);
 if (visiting) openPetsButton.hidden = true;
 
 const cropThumbnails = createCropThumbnails(THREE);
+// Every other item — produce, dishes, logs, saplings, feed — is portrayed by its own model.
+const itemThumbnails = createFarmItemThumbnails(THREE);
 const inventoryPanel = createFarmInventoryPanel({
   root: requiredElement<HTMLElement>("#inventoryPanel"),
   openButton: openInventoryButton,
@@ -1007,9 +1048,11 @@ const inventoryPanel = createFarmInventoryPanel({
   suppliesGrid: requiredElement<HTMLElement>("#suppliesGrid"),
   saplingGrid: requiredElement<HTMLElement>("#saplingGrid"),
   logsGrid: requiredElement<HTMLElement>("#logsGrid"),
+  pantryGrid: requiredElement<HTMLElement>("#pantryGrid"),
   selected: requiredElement<HTMLElement>("#selectedSeed"),
 }, {
   thumbnail: cropThumbnails.get,
+  itemThumbnail: itemThumbnails.get,
   purchaseSupply: layoutStore.accountBacked ? async (itemId, quantity) => {
     const result = await ticketClient.purchaseFarmSupply(itemId, quantity, farmPurchaseId("supply"));
     if (!result?.ok) return result?.error === "insufficient_tickets" ? "Not enough tickets." : result?.error === "inventory_full" ? "That supply stack is full." : "Purchase failed. Try again.";
@@ -1047,6 +1090,33 @@ const trees = createFarmTreesController({
   setStatus: (text) => { status.textContent = text; },
   onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements as any[]),
 });
+
+// The kitchen (farm-kitchen-controller.mts): E at a Kitchen Range opens the cookbook, Cook plays the
+// cooking games at the stove, and an account farm's dish is made by the server.
+const kitchenPanel = createKitchenPanel({
+  root: requiredElement<HTMLElement>("#kitchenPanel"),
+  closeButton: requiredElement<HTMLButtonElement>("#closeKitchen"),
+  level: requiredElement<HTMLElement>("#kitchenLevel"),
+  list: requiredElement<HTMLElement>("#recipeList"),
+  detail: requiredElement<HTMLElement>("#recipeDetail"),
+  status: requiredElement<HTMLElement>("#kitchenStatus"),
+}, {
+  thumbnail: itemThumbnails.get,
+  cook: (recipeId) => kitchen.begin(recipeId),
+  earnsXp: () => serverHarvests,
+  onClose: () => canvas.focus(),
+});
+const kitchen = createFarmKitchenController({
+  panel: kitchenPanel,
+  hud: createCookingHud(requiredElement<HTMLElement>("#cookingHud"), { thumbnail: itemThumbnails.get }),
+  view: kitchenView,
+  layout: () => layout,
+  persist: persistLayout,
+  submitCook: serverHarvests ? (recipeId, scores, cookId) => submitServerHarvest((sent) => ticketClient.cookFarmDish(sent, recipeId, scores, cookId)) : null,
+  setStatus: (text) => { status.textContent = text; },
+  onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements as any[]),
+});
+kitchenSync = () => kitchen.sync();
 
 // Build mode: the shared editor frame over the farm's own placement rules. The
 // editor owns the layout while it is open; every change comes back through `applyLayout`.
@@ -1106,7 +1176,7 @@ const farmEditor = createFarmEditor({
     inspector: requiredElement<HTMLElement>("#farmInspector"),
   },
   // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-  canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !napDialog.open && napRemainingMinutes <= 0,
+  canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !kitchenPanel.isOpen() && !kitchen.cooking() && !napDialog.open && napRemainingMinutes <= 0,
   onEditingChange: (editing) => {
     keys.clear();
     draggingLook = false;
@@ -1174,11 +1244,13 @@ function frame(now: number): void {
     petSim.tick(TICK_SECONDS, { x: player.x, z: player.z, yaw: player.yaw, y: body.y });
     updateInteraction();
     trees.tick();
+    kitchen.tick();
     updateCarryPatience(TICK_SECONDS);
     accumulator -= TICK_SECONDS;
   }
   world.update(frameSeconds);
   treesView.update(frameSeconds);
+  kitchenView.update(frameSeconds);
   petBodies.sync(petSim.pets(), frameSeconds);
   if (!farmEditor.isEditing()) applyCamera();
   updateUnderwater();
@@ -1201,6 +1273,9 @@ function frame(now: number): void {
   putDownFits: () => putDownAt !== null,
   layout: () => layout,
   chopping: () => trees.chopping(),
+  kitchenInReach: () => kitchen.inReach(),
+  cooking: () => kitchen.cooking(),
+  cookbookOpen: () => kitchenPanel.isOpen(),
   editing: () => farmEditor.isEditing(),
   time: () => clockMinutes,
   napping: () => napRemainingMinutes > 0,

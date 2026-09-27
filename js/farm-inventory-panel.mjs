@@ -1,6 +1,12 @@
+// The farm's inventory, on screen (I). Every stack is shown as the thing it
+// is — the seed's grown plant, and for everything else its item model
+// (farm-item-models.mts): the harvest basket as a shelf of produce, the
+// pantry as the dishes themselves with their stars, logs, saplings in burlap
+// and sacks of feed.
 import { CROP_CATALOG } from "./farm-crops.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies } from "./farm-catalog/trees.mjs";
+import { pantryLines, starsLabel } from "./farm-kitchen.mjs";
 export function createFarmInventoryPanel(elements, options = {}) {
     let agriculture;
     let selectedCropId = CROP_CATALOG[0].id;
@@ -39,6 +45,33 @@ export function createFarmInventoryPanel(elements, options = {}) {
         });
         return buy;
     }
+    function portrait(key) {
+        const frame = document.createElement("span");
+        frame.className = "seed-card__image";
+        frame.setAttribute("aria-hidden", "true");
+        const image = document.createElement("img");
+        image.alt = "";
+        const show = (url) => { image.src = url; frame.replaceChildren(image); };
+        const ready = options.itemThumbnail?.(key, show);
+        if (ready)
+            show(ready);
+        return frame;
+    }
+    /** One stack as a tile: the item, its name, how many. An empty stack stays on the shelf, dimmed. */
+    function itemTile(key, title, count, extra = null) {
+        const tile = document.createElement("div");
+        tile.className = "item-tile";
+        tile.dataset.itemKey = key;
+        tile.classList.toggle("is-empty", count <= 0);
+        const name = document.createElement("span");
+        name.className = "item-tile__name";
+        name.textContent = title;
+        const total = document.createElement("strong");
+        total.className = "item-tile__count";
+        total.textContent = `×${count}`;
+        tile.replaceChildren(portrait(key), name, total, ...(extra ? [extra] : []));
+        return tile;
+    }
     function saplingCard(species) {
         const held = agriculture.inventory.saplings[species.id] ?? 0;
         const skill = species.kind === "fruit" ? "Farming" : "Woodcutting";
@@ -56,23 +89,13 @@ export function createFarmInventoryPanel(elements, options = {}) {
         title.textContent = species.title;
         const detail = document.createElement("small");
         detail.textContent = `${held} sapling${held === 1 ? "" : "s"} · ${species.kind === "fruit" ? `${species.yield} ${species.fruitPlural.toLowerCase()} a crop` : `${species.yield} logs a felling`}`;
-        pick.replaceChildren(title, detail);
+        pick.replaceChildren(portrait(`sapling:${species.id}`), title, detail);
         pick.addEventListener("click", () => {
             selectedSaplingId = species.id;
             render(agriculture, levels);
         });
         card.replaceChildren(pick, buyButton(`sapling.${species.id}`, species.saplingPrice, held, level < species.minLevel ? `Needs ${skill} ${species.minLevel}` : ""));
         return card;
-    }
-    function countRow(title, count) {
-        const item = document.createElement("div");
-        item.className = "produce-row";
-        const name = document.createElement("span");
-        name.textContent = title;
-        const total = document.createElement("strong");
-        total.textContent = String(count);
-        item.replaceChildren(name, total);
-        return item;
     }
     function render(next, nextLevels = levels) {
         agriculture = next;
@@ -110,18 +133,22 @@ export function createFarmInventoryPanel(elements, options = {}) {
             });
             return button;
         }));
-        elements.produceGrid.replaceChildren(...CROP_CATALOG.map((crop) => countRow(crop.title, agriculture.inventory.produce[crop.id] ?? 0)), ...FRUIT_TREES.map((species) => countRow(species.fruitPlural, agriculture.inventory.produce[species.fruitId] ?? 0)));
+        elements.produceGrid.replaceChildren(...CROP_CATALOG.map((crop) => itemTile(`produce:${crop.id}`, crop.title, agriculture.inventory.produce[crop.id] ?? 0)), ...FRUIT_TREES.map((species) => itemTile(`produce:${species.fruitId}`, species.fruitPlural, agriculture.inventory.produce[species.fruitId] ?? 0)));
+        const pantry = pantryLines(agriculture.inventory.dishes);
+        if (pantry.length) {
+            elements.pantryGrid.replaceChildren(...pantry.map((line) => itemTile(`dish:${line.key}`, `${line.recipe.title} ${starsLabel(line.stars)}`, line.count)));
+        }
+        else {
+            const empty = document.createElement("p");
+            empty.className = "item-empty";
+            empty.textContent = "Nothing cooked yet. Place a Kitchen Range from Build mode (B · Props) and press E at it to cook your harvest.";
+            elements.pantryGrid.replaceChildren(empty);
+        }
         elements.saplingGrid.replaceChildren(...TREE_CATALOG.map(saplingCard));
-        elements.logsGrid.replaceChildren(...TIMBER_TREES.map((species) => countRow(`${species.title} logs`, agriculture.inventory.logs[species.id] ?? 0)));
+        elements.logsGrid.replaceChildren(...TIMBER_TREES.map((species) => itemTile(`log:${species.id}`, `${species.title} logs`, agriculture.inventory.logs[species.id] ?? 0)));
         elements.suppliesGrid.replaceChildren(...PET_CARE.map((care) => {
-            const food = document.createElement("div");
-            food.className = "produce-row";
-            const title = document.createElement("span");
-            title.textContent = care.food.title;
-            const count = document.createElement("strong");
-            count.textContent = String(agriculture.inventory.supplies[care.food.itemId] ?? 0);
-            food.replaceChildren(title, count, buyButton(care.food.itemId, care.food.price, agriculture.inventory.supplies[care.food.itemId] ?? 0));
-            return food;
+            const held = agriculture.inventory.supplies[care.food.itemId] ?? 0;
+            return itemTile(`supply:${care.food.itemId}`, care.food.title, held, buyButton(care.food.itemId, care.food.price, held));
         }));
         const selected = CROP_CATALOG.find((entry) => entry.id === selectedCropId);
         if (!elements.selected.textContent?.includes("Purchased"))

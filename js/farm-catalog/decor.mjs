@@ -73,6 +73,7 @@ function item(variant, spec) {
         gate: spec.gate ? Object.freeze({ ...spec.gate }) : null,
         doors: Boolean(spec.shell?.door) || Boolean(spec.gate),
         interior: spec.interior ?? false,
+        indoors: spec.indoors ?? false,
         dwelling: spec.dwelling ? Object.freeze({ speciesId: spec.dwelling.speciesId, entrance: Object.freeze({ ...spec.dwelling.entrance }) }) : null,
         snapDegrees: spec.snapDegrees ?? 15,
         swatch: Object.freeze([spec.swatch[0], spec.swatch[1]]),
@@ -110,7 +111,10 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     // Buildings: every one is a shell the player walks into. The footprint is the outer wall line.
     item("barn", { title: "Barn", category: "building", footprint: { width: 7, depth: 5.5 }, keepOut: true, shell: walls(3.4, DOUBLE_DOOR), swatch: ["#a8312b", "#4a3a33"], model: "barn", unlock: STARTER }),
     item("stable", { title: "Stable", category: "building", footprint: { width: 8, depth: 4.2 }, keepOut: true, shell: walls(2.9, STABLE_DOOR), swatch: ["#8a5a34", "#4a3a33"], model: "stable" }),
-    item("cottage", { title: "Farmhouse", category: "building", footprint: { width: 6, depth: 5 }, keepOut: true, shell: walls(3, SINGLE_DOOR, 0.24), swatch: ["#f1e6d2", "#7a4a3a"], model: "cottage" }),
+    // The Farmhouse is the player's home, not a prop: every farm starts with one (a Kitchen Range already
+    // inside), and it is big enough — 9 × 7 m, about 55 m² of floor — to furnish: the dining corner and the
+    // hearth are built in, and the rest of the room is for a bed, a range and whatever else fits.
+    item("cottage", { title: "Farmhouse", category: "building", footprint: { width: 9, depth: 7 }, keepOut: true, shell: walls(3, SINGLE_DOOR, 0.24), swatch: ["#f1e6d2", "#7a4a3a"], model: "cottage", unlock: STARTER }),
     item("greenhouse", { title: "Greenhouse", category: "building", footprint: { width: 5, depth: 3.6 }, keepOut: true, shell: walls(2.4, GLASS_DOOR, 0.12), swatch: ["#bfe6ee", "#f1e6d2"], model: "greenhouse" }),
     item("shed", { title: "Tool Shed", category: "building", footprint: { width: 3, depth: 2.4 }, keepOut: true, shell: walls(2.3, SINGLE_DOOR, 0.12), swatch: ["#6f7d86", "#3b444a"], model: "shed" }),
     item("coop", { title: "Chicken Coop", category: "building", footprint: { width: 2.8, depth: 2.4 }, keepOut: true, shell: walls(2.2, SMALL_DOOR, 0.12), swatch: ["#c98a4b", "#5d3a1f"], model: "coop" }),
@@ -141,7 +145,10 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("trough", { title: "Water Trough", category: "prop", footprint: { width: 1.8, depth: 0.7 }, swatch: ["#7e8790", "#3f7fb8"], model: "trough", unlock: STARTER }),
     item("scarecrow", { title: "Scarecrow", category: "prop", footprint: { width: 0.5, depth: 0.5 }, swatch: ["#d8b24a", "#8a5a34"], model: "scarecrow" }),
     item("well", { title: "Stone Well", category: "prop", footprint: { width: 1.6, depth: 1.6 }, swatch: ["#8e8b82", "#4a3a33"], model: "well" }),
-    item("bench", { title: "Garden Bench", category: "prop", footprint: { width: 1.6, depth: 0.6 }, swatch: ["#8a5a34", "#5d3a1f"], model: "bench" }),
+    item("bench", { title: "Garden Bench", category: "prop", footprint: { width: 1.6, depth: 0.6 }, indoors: true, swatch: ["#8a5a34", "#5d3a1f"], model: "bench" }),
+    // The Kitchen Range is where the Cooking skill is played (farm-kitchen.mts): free, so every farm can cook,
+    // and happy out in the yard as a summer kitchen or inside the Farmhouse beside the hearth.
+    item("kitchen-range", { title: "Kitchen Range", category: "prop", footprint: { width: 2.2, depth: 0.8 }, indoors: true, swatch: ["#2f3236", "#b8452f"], model: "kitchen-range", unlock: STARTER }),
     item("bed", { title: "Farmhouse Bed", category: "prop", footprint: { width: 1.35, depth: 2.1 }, interior: true, swatch: ["#f2e5ca", "#7d9bb8"], model: "bed" }),
     item("lamp-post", { title: "Lamp Post", category: "prop", footprint: { width: 0.3, depth: 0.3 }, swatch: ["#2b2b2b", "#ffd9a0"], model: "lamp-post" }),
     // Pet dwellings are regular placeable props. `keepOut` keeps random wandering from
@@ -165,9 +172,9 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", unlock: PET_OUTCOME, catalogVisible: false }),
     item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
     item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),
-    item("barrel", { title: "Barrel", category: "prop", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#7a4a2a", "#3b3b3b"], model: "barrel" }),
-    item("crates", { title: "Crate Stack", category: "prop", footprint: { width: 1.2, depth: 1 }, swatch: ["#c9a06a", "#8a5a34"], model: "crates" }),
-    item("log-pile", { title: "Log Pile", category: "prop", footprint: { width: 1.6, depth: 0.9 }, swatch: ["#9a7248", "#5d3a1f"], model: "log-pile" }),
+    item("barrel", { title: "Barrel", category: "prop", footprint: { width: 0.7, depth: 0.7 }, indoors: true, swatch: ["#7a4a2a", "#3b3b3b"], model: "barrel" }),
+    item("crates", { title: "Crate Stack", category: "prop", footprint: { width: 1.2, depth: 1 }, indoors: true, swatch: ["#c9a06a", "#8a5a34"], model: "crates" }),
+    item("log-pile", { title: "Log Pile", category: "prop", footprint: { width: 1.6, depth: 0.9 }, indoors: true, swatch: ["#9a7248", "#5d3a1f"], model: "log-pile" }),
     item("campfire", { title: "Campfire", category: "prop", footprint: { width: 1.2, depth: 1.2 }, swatch: ["#ff8a2b", "#4a3a33"], model: "campfire" }),
     item("birdbath", { title: "Birdbath", category: "prop", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#b9bec4", "#3f7fb8"], model: "birdbath" }),
     item("signpost", { title: "Signpost", category: "prop", footprint: { width: 0.3, depth: 0.3 }, swatch: ["#8a5a34", "#f1e6d2"], model: "signpost" }),

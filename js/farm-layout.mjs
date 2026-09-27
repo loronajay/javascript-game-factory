@@ -72,6 +72,9 @@ export const STARTER_FARM_DECOR = Object.freeze([
     row("hay-bale-2", "decor.prop.hay-bale", 0.9, -8.9, -0.2),
     row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
     row("soil-1", "decor.plant.soil-patch", 4.5, 6.5),
+    // The farmhouse, door to the east across the field, with a Kitchen Range already against its back wall.
+    row("cottage-1", "decor.building.cottage", -7.5, 1.5, Math.PI / 2),
+    row("kitchen-range-1", "decor.prop.kitchen-range", -10.28, 2.7, Math.PI / 2),
     // Two Tree Plots for the new farm's first sapling of each kind.
     row("tree-plot-1", "decor.plant.tree-plot", -9.5, 10.5),
     row("tree-plot-2", "decor.plant.tree-plot", -6.2, 11.2),

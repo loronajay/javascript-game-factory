@@ -5,7 +5,7 @@
 // decides an order was filled — it shows what the page hands back after the
 // server answers.
 
-import { boardTurnoverLabel, orderTierLabel, orderView, type FarmOrderBoard, type OrderView } from "./farm-orders.mjs";
+import { SKILL_TITLES, boardTurnoverLabel, orderTierLabel, orderView, type FarmOrderBoard, type FarmOrderSkill, type OrderView } from "./farm-orders.mjs";
 
 type Elements = Readonly<{
   root: HTMLElement;
@@ -19,16 +19,18 @@ type Elements = Readonly<{
 export type OrderFillOutcome = Readonly<{
   ok: boolean;
   message: string;
-  /** The basket and level after the server answered, and whether this order is now filled. */
+  /** The basket, pantry and levels after the server answered, and whether this order is now filled. */
   produce?: Readonly<Record<string, number>>;
-  level?: number;
+  dishes?: Readonly<Record<string, number>>;
+  levels?: Readonly<Record<FarmOrderSkill, number>>;
   filled?: boolean;
 }>;
 
 type Options = Readonly<{
   load: () => Promise<FarmOrderBoard | null>;
   fill: (orderId: string) => Promise<OrderFillOutcome>;
-  thumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
+  /** A line's portrait, by its item key (farm-item-thumbnails.mts). */
+  thumbnail?: (itemKey: string, onReady: (url: string) => void) => string | null;
   now?: () => number;
   onClose?: () => void;
 }>;
@@ -56,10 +58,10 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
   function buttonText(view: OrderView): string {
     if (busyId === view.order.id) return "Delivering…";
     if (view.state === "filled") return "Filled ✓";
-    if (view.state === "locked") return `Needs Farming ${view.order.minLevel}`;
+    if (view.state === "locked") return `Needs ${SKILL_TITLES[view.order.skill]} ${view.order.minLevel}`;
     if (view.state === "short") {
       const missing = view.lines.filter((line) => line.short > 0);
-      return missing.length === 1 ? `Need ${missing[0]!.short} more ${missing[0]!.title}` : "Missing produce";
+      return missing.length === 1 ? `Need ${missing[0]!.short} more ${missing[0]!.title}` : view.order.kind === "dish" ? "Missing dishes" : "Missing produce";
     }
     return `Deliver for ${view.order.tickets.toLocaleString()} tickets`;
   }
@@ -69,11 +71,12 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
     item.className = "order-card";
     item.dataset.orderId = view.order.id;
     item.dataset.state = view.state;
+    item.dataset.kind = view.order.kind;
     const head = document.createElement("header");
     head.className = "order-card__head";
     const tier = document.createElement("span");
     tier.className = "order-card__tier";
-    tier.textContent = orderTierLabel(view.order.tier) + (view.order.minLevel > 1 ? ` · Farming ${view.order.minLevel}+` : "");
+    tier.textContent = orderTierLabel(view.order.tier) + (view.order.minLevel > 1 ? ` · ${SKILL_TITLES[view.order.skill]} ${view.order.minLevel}+` : "");
     const customer = document.createElement("strong");
     customer.textContent = view.order.customer;
     head.replaceChildren(tier, customer);
@@ -91,7 +94,7 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
       const image = document.createElement("img");
       image.alt = "";
       const show = (url: string): void => { image.src = url; portrait.replaceChildren(image); };
-      const ready = options.thumbnail?.(line.cropId, show);
+      const ready = options.thumbnail?.(line.itemKey, show);
       if (ready) show(ready);
       const label = document.createElement("span");
       label.textContent = `${line.need} ${line.title}`;
@@ -107,7 +110,7 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
     const tickets = document.createElement("strong");
     tickets.textContent = `${view.order.tickets.toLocaleString()} tickets`;
     const xp = document.createElement("small");
-    xp.textContent = `+${view.order.xp.toLocaleString()} Farming XP`;
+    xp.textContent = `+${view.order.xp.toLocaleString()} ${SKILL_TITLES[view.order.skill]} XP`;
     reward.replaceChildren(tickets, xp);
     const button = document.createElement("button");
     button.type = "button";
@@ -126,9 +129,11 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
       elements.turnover.textContent = "";
       return;
     }
-    elements.level.textContent = `Farming ${board.level}`;
+    elements.level.textContent = board.levels.cooking > 1 || board.orders.some((order) => order.kind === "dish")
+      ? `Farming ${board.levels.farming} · Cooking ${board.levels.cooking}`
+      : `Farming ${board.level}`;
     elements.turnover.textContent = boardTurnoverLabel(board.endsAt, now());
-    const views = board.orders.map((order) => orderView(order, board!.produce, board!.level));
+    const views = board.orders.map((order) => orderView(order, board!));
     if (!views.length) {
       const empty = document.createElement("li");
       empty.className = "sale-empty";
@@ -146,10 +151,13 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
     const outcome = await options.fill(orderId).catch((): OrderFillOutcome => ({ ok: false, message: "The board could not be reached. Nothing was delivered." }));
     busyId = "";
     if (board) {
+      const levels = outcome.levels ?? board.levels;
       board = Object.freeze({
         ...board,
         produce: outcome.produce ?? board.produce,
-        level: outcome.level ?? board.level,
+        dishes: outcome.dishes ?? board.dishes,
+        levels,
+        level: levels.farming,
         orders: board.orders.map((order) => (order.id === orderId && outcome.filled ? Object.freeze({ ...order, filled: true }) : order)),
       });
     }

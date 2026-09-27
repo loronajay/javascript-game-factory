@@ -6,6 +6,8 @@
 
 import { CROP_CATALOG, FARM_DAY_MINUTES, type CropDefinition } from "./farm-crops.mjs";
 import { FRUIT_TREES, type TreeSpecies } from "./farm-catalog/trees.mjs";
+import { DISH_STARS, RECIPE_CATALOG, dishKey, parseDishKey, type DishStars } from "./farm-catalog/recipes.mjs";
+import { starsLabel } from "./farm-kitchen.mjs";
 
 /** Ticket margin one productive cell earns per farm day of growth when its crop is sold raw. */
 export const MARKET_MARGIN_PER_CELL_DAY = 12;
@@ -26,28 +28,74 @@ export const PRODUCE_PRICES: Readonly<Record<string, number>> = Object.freeze(Ob
   ...FRUIT_TREES.map((species) => [species.fruitId, derivedFruitPrice(species)]),
 ]));
 
-/** Everything the merchant buys, in the order the counter lists it: the crops, then the fruit. */
-const SELLABLE: readonly Readonly<{ id: string; title: string; color: string }>[] = Object.freeze([
-  ...CROP_CATALOG.map((crop) => Object.freeze({ id: crop.id, title: crop.title, color: "" })),
-  ...FRUIT_TREES.map((species) => Object.freeze({ id: species.fruitId, title: species.fruitTitle, color: species.fruitColor })),
+/** Something a stall buys: the id a sale names, what it is called, and the item model that portrays it. */
+export type Sellable = Readonly<{ id: string; title: string; itemKey: string }>;
+
+/** Everything the Produce Merchant buys, in the order the counter lists it: the crops, then the fruit. */
+export const SELLABLE_PRODUCE: readonly Sellable[] = Object.freeze([
+  ...CROP_CATALOG.map((crop) => Object.freeze({ id: crop.id, title: crop.title, itemKey: `produce:${crop.id}` })),
+  ...FRUIT_TREES.map((species) => Object.freeze({ id: species.fruitId, title: species.fruitTitle, itemKey: `produce:${species.fruitId}` })),
 ]);
 
 export function producePrice(cropId: string): number {
   return Object.prototype.hasOwnProperty.call(PRODUCE_PRICES, cropId) ? PRODUCE_PRICES[cropId]! : 0;
 }
 
-export type SaleLine = Readonly<{ cropId: string; title: string; held: number; quantity: number; price: number; /** Fruit has no crop model to portray; its colour stands in. */ color: string }>;
+// ---------------------------------------------------------------- cooked dishes
+
+/** The Kitchen's premium on the ingredients' raw price, by stars (platform-api's farm-market-catalog is the payer). */
+export const DISH_PREMIUM: Readonly<Record<DishStars, number>> = Object.freeze({ 1: 1.25, 2: 1.45, 3: 1.7 });
+
+/** What one cook of a recipe would fetch sold raw at the Produce Merchant. */
+export function recipeRawValue(recipeId: string): number {
+  const recipe = RECIPE_CATALOG.find((entry) => entry.id === recipeId);
+  return recipe ? Object.entries(recipe.ingredients).reduce((sum, [id, count]) => sum + producePrice(id) * count, 0) : 0;
+}
+
+export function dishPrice(recipeId: string, stars: DishStars): number {
+  const raw = recipeRawValue(recipeId);
+  return raw > 0 ? Math.ceil(raw * DISH_PREMIUM[stars]) : 0;
+}
+
+export const DISH_PRICES: Readonly<Record<string, number>> = Object.freeze(Object.fromEntries(
+  RECIPE_CATALOG.flatMap((recipe) => DISH_STARS.map((stars) => [dishKey(recipe.id, stars), dishPrice(recipe.id, stars)])),
+));
+
+/** Everything the Kitchen buys: every dish, best stars first within a recipe. */
+export const SELLABLE_DISHES: readonly Sellable[] = Object.freeze(RECIPE_CATALOG.flatMap((recipe) => [...DISH_STARS].reverse().map((stars) => Object.freeze({
+  id: dishKey(recipe.id, stars),
+  title: `${recipe.title} ${starsLabel(stars)}`,
+  itemKey: `dish:${dishKey(recipe.id, stars)}`,
+}))));
+
+/** The price of whatever a sale line names: a crop, a fruit or a dish. */
+export function salePrice(id: string): number {
+  const dish = parseDishKey(id);
+  return dish ? dishPrice(dish.recipe.id, dish.stars) : producePrice(id);
+}
+
+export type SaleLine = Readonly<{
+  /** The id the sale names: a crop or fruit id, or a dish's "recipe@stars". */
+  cropId: string;
+  title: string;
+  held: number;
+  quantity: number;
+  price: number;
+  /** The item model that portrays it (farm-item-models.mts). */
+  itemKey: string;
+}>;
 
 /**
- * The merchant's board: every crop and fruit the player holds any of, in
- * catalog order, with the quantity they have picked to sell (clamped to what they hold).
+ * A stall's board: everything it buys that the player holds any of, in its
+ * order, with the quantity they have picked to sell (clamped to what they hold).
+ * The Produce Merchant's by default; the Kitchen passes SELLABLE_DISHES and the pantry.
  */
-export function saleLines(produce: Readonly<Record<string, number>>, picked: Readonly<Record<string, number>>): SaleLine[] {
-  return SELLABLE
+export function saleLines(stock: Readonly<Record<string, number>>, picked: Readonly<Record<string, number>>, sellable: readonly Sellable[] = SELLABLE_PRODUCE): SaleLine[] {
+  return sellable
     .map((item) => {
-      const held = Math.max(0, Math.floor(Number(produce[item.id]) || 0));
+      const held = Math.max(0, Math.floor(Number(stock[item.id]) || 0));
       const quantity = Math.min(held, MAX_SALE_QUANTITY, Math.max(0, Math.floor(Number(picked[item.id]) || 0)));
-      return { cropId: item.id, title: item.title, held, quantity, price: producePrice(item.id), color: item.color };
+      return { cropId: item.id, title: item.title, held, quantity, price: salePrice(item.id), itemKey: item.itemKey };
     })
     .filter((line) => line.held > 0);
 }

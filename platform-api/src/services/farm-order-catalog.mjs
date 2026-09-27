@@ -15,9 +15,17 @@
 // is the plan's main defence against a single optimal crop.
 //
 // Tiers gate on Farming level: the large order is a capability a level buys.
+//
+// THE KITCHEN'S ORDERS (Phase 6). Two more notices go up every day asking for
+// cooked dishes rather than produce: a kitchen order at Cooking 1 and a
+// banquet at Cooking 10. They only ask for recipes their gate teaches, pay a
+// premium on the dishes' two-star Market price, and pay Cooking XP. They are
+// drawn from their own seeded stream after the produce notices, so adding
+// them left every produce order that was ever posted exactly as it was.
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
-import { farmProducePrice } from "./farm-market-catalog.mjs";
+import { farmDishPrice, farmProducePrice } from "./farm-market-catalog.mjs";
 import { farmHarvestXp } from "./farm-skill-catalog.mjs";
+import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
 export const FARM_ORDER_DAY_MS = 24 * 60 * 60 * 1000;
 /** An order's XP is this share of what growing its produce earned. */
 export const ORDER_XP_SHARE = 0.5;
@@ -40,6 +48,12 @@ export const FARM_ORDER_CUSTOMERS = Object.freeze([
     { name: "The Mayor's Garden Party", note: "Everything must look perfect. EVERYTHING." },
     { name: "Copperpot Catering", note: "Wedding on Saturday. The bride is very particular." },
 ].map((entry) => Object.freeze(entry)));
+export const FARM_KITCHEN_ORDER_TIERS = Object.freeze([
+    Object.freeze({ tier: "kitchen", minLevel: 1, recipes: 1, dishes: Object.freeze([1, 2]), premium: 1.3 }),
+    Object.freeze({ tier: "banquet", minLevel: 10, recipes: 2, dishes: Object.freeze([2, 3]), premium: 1.4 }),
+]);
+/** A dish order's Cooking XP is this share of what cooking its dishes earned. */
+export const DISH_ORDER_XP_SHARE = 0.5;
 export function farmOrderDay(now) {
     return Math.floor(now / FARM_ORDER_DAY_MS);
 }
@@ -102,6 +116,8 @@ export function farmOrderBoard(day) {
             day,
             slot,
             tier: tier.tier,
+            kind: "produce",
+            skill: "farming",
             minLevel: tier.minLevel,
             customer: customer.name,
             note: customer.note,
@@ -112,13 +128,57 @@ export function farmOrderBoard(day) {
         });
     }));
 }
+/** What the dishes would fetch at two stars at the Market's Kitchen. */
+export function farmDishOrderValue(lines) {
+    return Object.entries(lines).reduce((sum, [recipeId, count]) => sum + farmDishPrice(recipeId, 2) * count, 0);
+}
+export function farmDishOrderXp(lines) {
+    const xp = Object.entries(lines).reduce((sum, [recipeId, count]) => sum + (FARM_RECIPE_RULES[recipeId]?.xp ?? 0) * count, 0);
+    return Math.max(1, Math.round(xp * DISH_ORDER_XP_SHARE));
+}
+/** Day `day`'s dish notices, in the slots after the produce notices; customers not already on the board. */
+function farmKitchenOrders(day, firstSlot, taken) {
+    const random = mulberry32(seedFor(`farm-orders:kitchen:v1:${day}`));
+    const customers = new Set(FARM_ORDER_CUSTOMERS.filter((entry) => taken.has(entry.name)));
+    return FARM_KITCHEN_ORDER_TIERS.map((tier, index) => {
+        const customer = pick(FARM_ORDER_CUSTOMERS, random, customers);
+        const taught = Object.keys(FARM_RECIPE_RULES).filter((recipeId) => FARM_RECIPE_RULES[recipeId].minLevel <= tier.minLevel);
+        const recipesTaken = new Set();
+        const lines = {};
+        for (let line = 0; line < Math.min(tier.recipes, taught.length); line += 1) {
+            const recipeId = pick(taught, random, recipesTaken);
+            lines[recipeId] = tier.dishes[0] + Math.floor(random() * (tier.dishes[1] - tier.dishes[0] + 1));
+        }
+        const slot = firstSlot + index;
+        return Object.freeze({
+            id: `d${day}-${slot}`,
+            day,
+            slot,
+            tier: tier.tier,
+            kind: "dish",
+            skill: "cooking",
+            minLevel: tier.minLevel,
+            customer: customer.name,
+            note: customer.note,
+            lines: Object.freeze(lines),
+            tickets: Math.ceil((farmDishOrderValue(lines) * tier.premium) / 5) * 5,
+            xp: farmDishOrderXp(lines),
+            endsAt: (day + 1) * FARM_ORDER_DAY_MS,
+        });
+    });
+}
+/** Day `day`'s whole board: the produce notices, then the kitchen's. */
+export function farmFullOrderBoard(day) {
+    const produce = farmOrderBoard(day);
+    return Object.freeze([...produce, ...farmKitchenOrders(day, produce.length, new Set(produce.map((order) => order.customer)))]);
+}
 const ORDER_ID = /^d(\d{1,7})-(\d)$/;
 /** The order an id names, if it is on day `day`'s board. An id from any other day is not. */
 export function findFarmOrder(orderId, day) {
     const match = typeof orderId === "string" ? ORDER_ID.exec(orderId) : null;
     if (!match || Number(match[1]) !== day)
         return null;
-    return farmOrderBoard(day)[Number(match[2])] ?? null;
+    return farmFullOrderBoard(day)[Number(match[2])] ?? null;
 }
 /** An id that is well formed but for another day: the board has turned over. */
 export function isStaleFarmOrderId(orderId, day) {

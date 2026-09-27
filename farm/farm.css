@@ -148,6 +148,7 @@ button, a { font: inherit; }
 .farming-skill__bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--farm-leaf); transition: width .4s ease; }
 .farming-skill.is-levelled .farming-skill__bar i { background: var(--farm-accent); }
 .farming-skill--wood .farming-skill__bar i { background: #c98a4b; }
+.farming-skill--cook .farming-skill__bar i { background: #e0673a; }
 
 /* The felling meter: a marker sweeps the bar; E when it is in the green. */
 .chop-meter { position: fixed; left: 50%; bottom: 200px; z-index: 6; width: min(420px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: rgba(20, 26, 16, .86); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
@@ -169,10 +170,9 @@ button, a { font: inherit; }
 .sapling-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .sapling-card { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); border-left: 4px solid var(--fruit, #8a5a34); }
 .sapling-card[aria-pressed="true"] { background: rgba(143, 196, 94, .18); box-shadow: inset 0 0 0 2px var(--farm-leaf); }
-.sapling-card__pick { display: grid; gap: 2px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sapling-card__pick { display: grid; grid-template-columns: 42px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .sapling-card__pick:disabled { cursor: default; opacity: .7; }
 .sapling-card__pick small { font-size: 12px; opacity: .8; }
-.seed-card__image.is-fruit::after { content: ""; width: 58%; height: 58%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), transparent 35%), var(--fruit); box-shadow: 0 3px 4px rgba(0,0,0,.35); }
 
 .nap-dialog { width: min(440px, calc(100vw - 36px)); padding: 0; border: 1px solid var(--farm-line); border-radius: 18px; background: var(--farm-ink); color: #f8fbf4; box-shadow: 0 30px 90px rgba(0,0,0,.65); }
 .nap-dialog::backdrop { background: rgba(3, 7, 15, .68); backdrop-filter: blur(4px); }
@@ -312,6 +312,99 @@ button, a { font: inherit; }
 .editor-seed-grid { padding: 4px 0 18px; grid-template-columns: 1fr; }
 .editor-seed-grid .seed-card { grid-template-columns: 48px minmax(0, 1fr) auto; }
 .editor-seed-grid .seed-card__buy { grid-column: 3; grid-row: 1 / 3; white-space: nowrap; color: #fff0a8; }
-.produce-grid { display: grid; gap: 5px; }
-.produce-row { display: flex; justify-content: space-between; padding: 9px 11px; border-radius: 8px; background: rgba(255,255,255,.05); color: #d6e3c8; }
-.produce-row strong { color: var(--farm-accent); }
+
+/* Every stack as a tile: the item's model, its name, how many. */
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
+.item-grid--wide { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+.item-tile { display: grid; justify-items: center; align-content: start; gap: 3px; padding: 8px 6px 7px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); text-align: center; }
+.item-tile .seed-card__image { width: 64px; height: 56px; }
+.item-tile__name { color: #d6e3c8; font-size: 11.5px; line-height: 1.2; }
+.item-tile__count { color: var(--farm-accent); font: 800 12px ui-monospace, monospace; }
+.item-tile.is-empty { opacity: .38; }
+.item-tile.is-empty .seed-card__image img { filter: grayscale(.8); }
+.item-tile .farm-button { width: 100%; margin-top: 4px; padding: 6px 8px; font-size: 11px; }
+.item-empty { margin: 0; padding: 12px; border: 1px dashed rgba(255,255,255,.16); border-radius: 11px; color: #b9c9ad; font-size: 12.5px; line-height: 1.45; }
+
+/* The cookbook: the recipe list beside the chosen recipe. */
+.kitchen-panel { width: min(820px, calc(100vw - 36px)); }
+.kitchen-panel__body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+.recipe-list { min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 6px; padding: 12px; border-right: 1px solid rgba(255,255,255,.1); }
+.recipe-card { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); color: #f8fbf4; text-align: left; cursor: pointer; }
+.recipe-card:hover { border-color: var(--farm-leaf); }
+.recipe-card[aria-pressed="true"] { border-color: var(--farm-accent); background: rgba(255,211,61,.14); }
+.recipe-card[data-state="locked"] { opacity: .5; }
+.recipe-card[data-state="locked"] .recipe-card__dish img { filter: grayscale(1) brightness(.7); }
+.recipe-card__dish, .recipe-detail__dish { display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: radial-gradient(circle at 50% 62%, rgba(255,210,150,.22), rgba(20,35,18,.15) 68%, transparent 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.recipe-card__dish { width: 58px; height: 50px; }
+.recipe-card__dish img, .recipe-detail__dish img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0,0,0,.4)); }
+.recipe-card__text strong { display: block; font-size: 13.5px; }
+.recipe-card__text small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11.5px; }
+.recipe-card[data-state="ready"] .recipe-card__text small { color: var(--farm-leaf); }
+.recipe-detail-pane { min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
+.recipe-detail { display: grid; gap: 10px; }
+.recipe-detail__head { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; }
+.recipe-detail__dish { width: 150px; height: 128px; }
+.recipe-detail__title { display: block; margin-top: 3px; font-size: 20px; }
+.recipe-detail__blurb { margin: 6px 0 0; color: #d6e3c8; font-size: 13px; line-height: 1.45; }
+.recipe-detail .pets-section__title { margin: 6px 0 0; }
+.recipe-ingredients { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.recipe-ingredients li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 10px; background: rgba(255,255,255,.04); font-size: 13px; font-weight: 700; }
+.recipe-ingredients .seed-card__image { width: 44px; height: 40px; }
+.recipe-ingredients small { color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
+.recipe-ingredients li.is-short small { color: #ffb08a; }
+.recipe-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.recipe-step { counter-increment: step; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.07); color: #fff6cf; font: 800 11px ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+.recipe-step::before { content: counter(step) " · "; color: var(--farm-leaf); }
+.recipe-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 4px 0 0; font-size: 12.5px; }
+.recipe-facts dt { color: #b9c9ad; }
+.recipe-facts dd { margin: 0; color: #fff6cf; font-weight: 700; }
+.recipe-detail__cook { justify-self: stretch; margin-top: 4px; padding: 12px; font-weight: 800; }
+.recipe-detail__cook:disabled { opacity: .55; cursor: not-allowed; }
+
+/* The cooking games' readout: at the top, so the stove and the board stay in view. */
+.cooking-hud { position: fixed; left: 50%; top: 104px; z-index: 6; width: min(460px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 9px; padding: 13px 15px; border-radius: 16px; background: rgba(20, 26, 16, .88); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
+.cooking-hud[hidden] { display: none; }
+.cooking-hud__head { display: grid; gap: 2px; }
+.cooking-hud__head strong { font-size: 16px; }
+.cooking-hud__head small { color: var(--farm-leaf); font: 800 10.5px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.cooking-hud__stage { display: grid; gap: 8px; }
+.cooking-hud__hint { margin: 0; color: rgba(255,246,207,.82); font-size: 12.5px; }
+.cooking-hud__word:not(:empty)::before { content: " · "; color: rgba(255,246,207,.6); }
+.cooking-hud__word { font-weight: 800; }
+.cooking-hud__word[data-quality="perfect"], .cooking-hud__word[data-quality="golden"], .cooking-hud__word[data-quality="hit"] { color: #d8f07a; }
+.cooking-hud__word[data-quality="good"] { color: #9fdc74; }
+.cooking-hud__word[data-quality="poor"], .cooking-hud__word[data-quality="miss"], .cooking-hud__word[data-quality="pale"], .cooking-hud__word[data-quality="dark"] { color: #e0a080; }
+.cooking-hud__word[data-quality="burnt"] { color: #ff7a5a; }
+.cooking-hud__steps { display: flex; justify-content: center; gap: 6px; }
+.cook-step { padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.07); color: rgba(255,246,207,.6); font: 800 10px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.cook-step.is-now { background: rgba(255,211,61,.2); color: var(--farm-accent); box-shadow: inset 0 0 0 1px var(--farm-accent); }
+.cook-step.is-done { color: var(--farm-leaf); }
+.cook-bar { position: relative; height: 24px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.cook-bar--board { background: linear-gradient(90deg, #a07a4c, #c9a06a 50%, #a07a4c); }
+.cook-bar--heat { background: linear-gradient(90deg, #2d3f5a, #6a4a2a 45%, #c8421e 80%, #ff7a2a); }
+.cook-bar--bake { background: linear-gradient(90deg, #f1e3b8, #e8c26a 45%, #c98a3e 65%, #7a3a1a 85%, #2a1a12); }
+.cook-bar__good, .cook-bar__perfect { position: absolute; top: 0; bottom: 0; }
+.cook-bar__good { background: rgba(111, 174, 74, .55); box-shadow: inset 0 0 0 1px rgba(216,240,122,.4); }
+.cook-bar__perfect { background: rgba(216, 240, 122, .75); }
+.cook-bar__marker { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.9); }
+.cook-pips { display: flex; justify-content: center; gap: 6px; }
+.cook-pip { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.14); }
+.cook-pip[data-state="perfect"] { background: #d8f07a; }
+.cook-pip[data-state="good"] { background: #6fae4a; }
+.cook-pip[data-state="poor"] { background: #c86a4a; }
+.cook-arrow { font: 900 52px/1 "Arial Black", sans-serif; color: var(--farm-accent); text-shadow: 0 3px 12px rgba(255,211,61,.4); min-height: 52px; }
+.cook-timer { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.cook-timer i { display: block; height: 100%; background: #e0673a; }
+.cooking-hud.is-result .cooking-hud__hint { color: var(--farm-leaf); font-weight: 700; }
+.cook-result { display: grid; justify-items: center; gap: 4px; }
+.cook-result__dish { display: grid; place-items: center; width: 180px; height: 150px; }
+.cook-result__dish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45)); }
+.cook-result__stars { color: var(--farm-accent); font-size: 28px; letter-spacing: .12em; text-shadow: 0 2px 10px rgba(255,211,61,.45); }
+
+@media (max-width: 720px) {
+  .kitchen-panel__body { grid-template-columns: 1fr; overflow-y: auto; }
+  .recipe-list { overflow: visible; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .recipe-detail-pane { overflow: visible; }
+  .recipe-detail__head { grid-template-columns: 110px minmax(0, 1fr); }
+  .recipe-detail__dish { width: 110px; height: 96px; }
+}

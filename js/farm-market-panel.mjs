@@ -1,10 +1,12 @@
-// The Produce Merchant's counter, on screen: the crops the player holds, a
-// count to sell for each, the total, and one Sell button. The maths is the pure
-// `farm-market-prices.mts`; the sale itself is whatever `sell` the page injects
-// (the server call). The panel never decides what was sold — it shows the
-// produce the page hands back after the server answers.
-import { MAX_SALE_QUANTITY, saleItems, saleLines, saleTotal } from "./farm-market-prices.mjs";
+// A Market counter, on screen: the goods the player holds that this stall buys
+// (the Produce Merchant's crops and fruit, the Kitchen's dishes), each shown as
+// its model, a count to sell for each, the total, and one Sell button. The
+// maths is the pure `farm-market-prices.mts`; the sale itself is whatever
+// `sell` the page injects (the server call). The panel never decides what was
+// sold — it shows the stock the page hands back after the server answers.
+import { MAX_SALE_QUANTITY, SELLABLE_PRODUCE, saleItems, saleLines, saleTotal } from "./farm-market-prices.mjs";
 export function createMarketSalePanel(elements, options) {
+    const sellable = options.sellable ?? SELLABLE_PRODUCE;
     let produce = {};
     let picked = {};
     let busy = false;
@@ -29,12 +31,9 @@ export function createMarketSalePanel(elements, options) {
         const image = document.createElement("img");
         image.alt = "";
         const show = (url) => { image.src = url; portrait.replaceChildren(image); };
-        const ready = options.thumbnail?.(line.cropId, show);
+        const ready = options.thumbnail?.(line.itemKey, show);
         if (ready)
             show(ready);
-        if (line.color)
-            portrait.style.setProperty("--fruit", line.color);
-        portrait.classList.toggle("is-fruit", Boolean(line.color));
         const label = document.createElement("div");
         label.className = "sale-row__label";
         const title = document.createElement("strong");
@@ -78,11 +77,11 @@ export function createMarketSalePanel(elements, options) {
         return item;
     }
     function render() {
-        const lines = saleLines(produce, picked);
+        const lines = saleLines(produce, picked, sellable);
         if (!lines.length) {
             const empty = document.createElement("li");
             empty.className = "sale-empty";
-            empty.textContent = "Your harvest basket is empty. Grow something on the farm and bring it back.";
+            empty.textContent = options.emptyNote ?? "Your harvest basket is empty. Grow something on the farm and bring it back.";
             elements.list.replaceChildren(empty);
         }
         else {
@@ -95,7 +94,7 @@ export function createMarketSalePanel(elements, options) {
         elements.pickAllButton.disabled = busy || !lines.length;
     }
     async function sell() {
-        const items = saleItems(saleLines(produce, picked));
+        const items = saleItems(saleLines(produce, picked, sellable));
         if (busy || !Object.keys(items).length)
             return;
         busy = true;
@@ -121,7 +120,7 @@ export function createMarketSalePanel(elements, options) {
     elements.closeButton.addEventListener("click", close);
     elements.sellButton.addEventListener("click", () => void sell());
     elements.pickAllButton.addEventListener("click", () => {
-        picked = Object.fromEntries(saleLines(produce, {}).map((line) => [line.cropId, line.held]));
+        picked = Object.fromEntries(saleLines(produce, {}, sellable).map((line) => [line.cropId, line.held]));
         render();
     });
     elements.root.hidden = true;

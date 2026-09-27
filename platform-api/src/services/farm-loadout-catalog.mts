@@ -36,7 +36,8 @@ import { findFarmSpecies } from "./farm-economy-catalog.mjs";
 import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
 import { farmCropRule } from "./farm-crop-catalog.mjs";
 import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, verifyFarmClock } from "./farm-time-policy.mjs";
-import { emptyFarmingRecord, emptyWoodcuttingRecord, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
+import { emptyFarmSkillRecords, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
+import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { TREE_PLOT_ITEM_ID, admitNewTrees, boundTreeGrowth, normalizeFarmTreeRows } from "./farm-tree-catalog.mjs";
 
 export const FARM_GAME_SLUG = "farm";
@@ -87,7 +88,7 @@ function normalizeRotation(value: any): number | null {
 
 export function defaultFarmGarage(): any {
   // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {} }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, skills: { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord() } };
+  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {} }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, skills: emptyFarmSkillRecords() };
 }
 
 function normalizeCropCounts(value: any): any {
@@ -106,6 +107,17 @@ function normalizeSupplyCounts(value: any): any {
   for (const [id, raw] of Object.entries(input).slice(0, 64)) {
     if (!ITEM_ID_PATTERN.test(id) || typeof raw !== "number" || !Number.isFinite(raw)) continue;
     output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
+  }
+  return output;
+}
+
+/** The pantry: cooked dishes by "recipe@stars" (services/farm-recipe-catalog), known recipes only. */
+function normalizeDishCounts(value: any): any {
+  const input = value && typeof value === "object" ? value : {};
+  const output: any = {};
+  for (const [key, raw] of Object.entries(input).slice(0, 96)) {
+    if (!parseFarmDishKey(key) || typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    output[key] = Math.min(99, Math.max(0, Math.floor(raw)));
   }
   return output;
 }
@@ -143,6 +155,8 @@ function normalizeAgriculture(value: any, decorIds: ReadonlySet<string>): any {
       seeds: normalizeCropCounts(inventory.seeds), produce: normalizeCropCounts(inventory.produce), supplies: normalizeSupplyCounts(inventory.supplies),
       // Productive-tree saplings (bought) and felled logs (server-minted), by species (services/farm-tree-catalog).
       saplings: normalizeCropCounts(inventory.saplings), logs: normalizeCropCounts(inventory.logs),
+      // Cooked dishes (server-minted at the Kitchen Range, services/farm-recipe-catalog).
+      dishes: normalizeDishCounts(inventory.dishes),
     },
     crops,
   };
@@ -182,11 +196,14 @@ function capNewCrops(crops: any[], storedCrops: any[], capacity: number): any[] 
  *   - LOGS are the server's like produce; SAPLINGS can only fall like seeds,
  *     and a new tree stands only where a sapling was spent for it, within
  *     its skill's level and capacity (services/farm-tree-catalog);
- *   - each tree grows no further than its own stamp moved, like a crop.
+ *   - each tree grows no further than its own stamp moved, like a crop;
+ *   - DISHES are the server's like produce: only a cook makes one, only a
+ *     sale or a dish order takes one, and the Cooking record is pinned with
+ *     the others.
  */
 function guardFarmSave(garage: any, current: any, context: any): void {
   const inventory = garage.agriculture.inventory;
-  const storedInventory = current?.agriculture?.inventory ?? { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {} };
+  const storedInventory = current?.agriculture?.inventory ?? { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {} };
   const atMost = (submitted: any, stored: any) => Object.fromEntries(Object.entries(stored ?? {})
     .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted?.[id]) || 0)]));
   if (current) {
@@ -198,8 +215,9 @@ function guardFarmSave(garage: any, current: any, context: any): void {
   // picks, fellings, sales, orders). A first save starts with none.
   inventory.produce = { ...(storedInventory.produce ?? {}) };
   inventory.logs = { ...(storedInventory.logs ?? {}) };
-  // So are the skill records: XP is minted by harvests, fellings and orders, never a save.
-  garage.skills = current?.skills ? normalizeFarmSkillRecords(current.skills) : { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord() };
+  inventory.dishes = { ...(storedInventory.dishes ?? {}) };
+  // So are the skill records: XP is minted by harvests, fellings, cooks and orders, never a save.
+  garage.skills = current?.skills ? normalizeFarmSkillRecords(current.skills) : emptyFarmSkillRecords();
 
   const now = typeof context.now === "number" && Number.isFinite(context.now) ? context.now : Date.now();
   const storedAt = current?.clock ? (current.clock.verifiedAt ?? (typeof context.currentSavedAt === "number" ? context.currentSavedAt : null)) : null;
@@ -413,7 +431,7 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
     // The productive trees, one per Tree Plot (services/farm-tree-catalog). A save bounds them below.
     const treePlotIds = new Set<string>((garage.decor ?? []).filter((row: any) => row.itemId === TREE_PLOT_ITEM_ID).map((row: any) => String(row.instanceId)));
     garage.trees = normalizeFarmTreeRows(input.trees, treePlotIds);
-    // The Farming and Woodcutting records (services/farm-skill-catalog). Server-owned: a save pins them below.
+    // The Farming, Woodcutting and Cooking records (services/farm-skill-catalog). Server-owned: a save pins them below.
     garage.skills = normalizeFarmSkillRecords(input.skills);
     const clock = input.clock && typeof input.clock === "object" ? input.clock : {};
     garage.clock = {

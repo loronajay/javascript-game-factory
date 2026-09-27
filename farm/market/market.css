@@ -15,7 +15,8 @@
 .sale-panel { width: min(520px, calc(100vw - 36px)); }
 .sale-note { margin: 0 0 12px; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
 .sale-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
-.sale-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto 56px; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
+.sale-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto 56px; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
+.sale-row .seed-card__image { width: 54px; height: 48px; }
 .sale-row__label strong { display: block; font-size: 13.5px; }
 .sale-row__label small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11px; }
 .sale-row__stepper { display: flex; align-items: center; gap: 4px; }
@@ -49,8 +50,8 @@
 .order-card__head strong { font-size: 15px; }
 .order-card__note { margin: 0; color: #c9d7bd; font: italic 12.5px/1.4 Georgia, serif; }
 .order-card__lines { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.order-card__lines li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; }
-.order-card__lines .seed-card__image { width: 30px; height: 30px; }
+.order-card__lines li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; }
+.order-card__lines .seed-card__image { width: 42px; height: 38px; }
 .order-card__lines small { color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
 .order-card__lines li.is-short small { color: #ffb08a; }
 .order-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
@@ -59,7 +60,7 @@
 .order-card__reward small { color: var(--farm-leaf); font: 700 11px ui-monospace, monospace; }
 .order-card__fill:disabled { opacity: .55; cursor: not-allowed; }
 .orders-footer { padding-top: 10px; padding-bottom: 12px; }
-.orders-footer .pets-status:empty::before { content: "Deliver from your basket: the produce comes off, the tickets and XP go on."; color: #9fb294; }
+.orders-footer .pets-status:empty::before { content: "Deliver from your basket or pantry: the goods come off, the tickets and XP go on."; color: #9fb294; }
 
 @media (max-width: 720px) {
   .sale-row { grid-template-columns: 36px minmax(0, 1fr) 48px; }

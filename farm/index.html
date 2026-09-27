@@ -60,7 +60,7 @@
       <span id="farmClockPhase">Morning</span>
       <strong id="farmClock">8:00 AM</strong>
     </div>
-    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small><div id="farmingSkill" class="farming-skill" hidden><small id="farmingSkillLabel">Farming 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="farmingSkillBar"></i></span></div><div id="woodcuttingSkill" class="farming-skill farming-skill--wood" hidden><small id="woodcuttingSkillLabel">Woodcutting 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="woodcuttingSkillBar"></i></span></div></div>
+    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small><div id="farmingSkill" class="farming-skill" hidden><small id="farmingSkillLabel">Farming 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="farmingSkillBar"></i></span></div><div id="woodcuttingSkill" class="farming-skill farming-skill--wood" hidden><small id="woodcuttingSkillLabel">Woodcutting 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="woodcuttingSkillBar"></i></span></div><div id="cookingSkill" class="farming-skill farming-skill--cook" hidden><small id="cookingSkillLabel">Cooking 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="cookingSkillBar"></i></span></div></div>
     <section id="chopMeter" class="chop-meter" aria-live="polite" hidden>
       <strong data-chop-title>Felling</strong>
       <div class="chop-meter__bar" aria-hidden="true"><span class="chop-meter__good" data-chop-good></span><span class="chop-meter__perfect" data-chop-perfect></span><i class="chop-meter__marker" data-chop-marker></i></div>
@@ -112,18 +112,43 @@
         </section>
         <section class="pets-section">
           <h3 class="pets-section__title">Harvest basket</h3>
-          <div id="produceGrid" class="produce-grid"></div>
+          <div id="produceGrid" class="item-grid"></div>
+        </section>
+        <section class="pets-section">
+          <h3 class="pets-section__title">Pantry · cooked at a Kitchen Range</h3>
+          <div id="pantryGrid" class="item-grid"></div>
         </section>
         <section class="pets-section">
           <h3 class="pets-section__title">Log pile · for the Sawmill</h3>
-          <div id="logsGrid" class="produce-grid"></div>
+          <div id="logsGrid" class="item-grid"></div>
         </section>
         <section class="pets-section">
           <h3 class="pets-section__title">Pet supplies</h3>
-          <div id="suppliesGrid" class="produce-grid"></div>
+          <div id="suppliesGrid" class="item-grid item-grid--wide"></div>
         </section>
       </div>
     </aside>
+
+    <aside id="kitchenPanel" class="inventory-panel kitchen-panel" aria-label="Cookbook" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">KITCHEN RANGE · <span id="kitchenLevel">Cooking 1</span></span><strong>Cookbook</strong></div>
+        <button id="closeKitchen" class="farm-button" type="button" title="Step back from the stove (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="kitchen-panel__body">
+        <div id="recipeList" class="recipe-list" role="list"></div>
+        <div id="recipeDetail" class="recipe-detail-pane"></div>
+      </div>
+      <footer class="sale-footer">
+        <p id="kitchenStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <section id="cookingHud" class="cooking-hud" aria-live="polite" hidden>
+      <header class="cooking-hud__head"><strong data-cook-title>Cooking</strong><small data-cook-step></small></header>
+      <div class="cooking-hud__stage" data-cook-stage></div>
+      <p class="cooking-hud__hint"><span data-cook-hint></span><span class="cooking-hud__word" data-cook-word></span></p>
+      <div class="cooking-hud__steps" data-cook-steps></div>
+    </section>
 
     <dialog id="napDialog" class="nap-dialog" aria-labelledby="napHeading">
       <form method="dialog">

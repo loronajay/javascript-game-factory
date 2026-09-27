@@ -40,6 +40,9 @@ export function createTicketWalletClient(options = {}) {
         harvestFarmTree(layout, plotId) {
             return api.harvestFarmTree({ layout, plotId });
         },
+        cookFarmDish(layout, recipeId, scores, cookId) {
+            return api.cookFarmDish({ layout, recipeId, scores, cookId });
+        },
         sellFarmProduce(items, saleId) {
             return api.sellFarmProduce({ items, saleId });
         },

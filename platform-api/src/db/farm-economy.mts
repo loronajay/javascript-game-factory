@@ -2,12 +2,15 @@ import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply } from "../services/farm-economy-catalog.mjs";
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
-import { farmProducePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
+import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
+import { parseFarmDishKey } from "../services/farm-recipe-catalog.mjs";
 import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder, type FarmingRecord } from "../services/farm-skill-catalog.mjs";
 import { farmTreeReady, farmTreeRule } from "../services/farm-tree-catalog.mjs";
+import { normalizeCookingRecord, recordFarmDishOrder } from "../services/farm-skill-catalog.mjs";
+import { takeFarmDishes } from "../services/farm-recipe-catalog.mjs";
 import {
   FARM_ORDER_DAY_MS,
-  farmOrderBoard,
+  farmFullOrderBoard,
   farmOrderDay,
   farmOrderTransactionKey,
   findFarmOrder,
@@ -32,7 +35,7 @@ function cleanName(value: unknown, fallback: string): string {
   return value.replace(/[<>]/g, "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 20) || fallback;
 }
 
-async function transaction<T>(pool: any, work: (client: any) => Promise<T>): Promise<T> {
+export async function transaction<T>(pool: any, work: (client: any) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query("begin");
@@ -47,7 +50,7 @@ async function transaction<T>(pool: any, work: (client: any) => Promise<T>): Pro
   }
 }
 
-async function lockedFarm(client: any, playerId: string): Promise<{ layout: any; owned: Set<string> } | null> {
+export async function lockedFarm(client: any, playerId: string): Promise<{ layout: any; owned: Set<string> } | null> {
   const result = await client.query(
     `select garage from game_loadouts where player_id = $1 and game_slug = 'farm' for update`,
     [playerId],
@@ -69,7 +72,7 @@ async function duplicatePurchase(client: any, playerId: string, transactionKey: 
   return Boolean(result.rows?.length);
 }
 
-async function saveFarm(client: any, playerId: string, layout: any): Promise<void> {
+export async function saveFarm(client: any, playerId: string, layout: any): Promise<void> {
   await client.query(
     `update game_loadouts set garage = $3::jsonb, updated_at = now()
      where player_id = $1 and game_slug = $2`,
@@ -191,7 +194,7 @@ const PLOT_ID = /^[A-Za-z0-9_-]{1,40}$/;
  * already knows — the same guard a save runs, inside the locked transaction —
  * or null when there is no initialised farm. Crop harvests, picks and fellings share it.
  */
-async function verifiedSubmittedFarm(client: any, playerId: string, submitted: any, now: number): Promise<{ verified: any; owned: Set<string> } | null> {
+export async function verifiedSubmittedFarm(client: any, playerId: string, submitted: any, now: number): Promise<{ verified: any; owned: Set<string> } | null> {
   const stored = await client.query(
     `select garage, updated_at from game_loadouts where player_id = $1 and game_slug = 'farm' for update`,
     [playerId],
@@ -317,12 +320,13 @@ export async function harvestFarmTree(pool: any, input: any, now: number = Date.
 const SALE_ID = PURCHASE_ID;
 
 /**
- * The Market Square's Produce Merchant buys raw produce. Everything about the
+ * The Market Square buys what a farm makes: the Produce Merchant raw produce,
+ * the Kitchen cooked dishes (a line keyed "recipe@stars"). Everything about the
  * sale is decided here, in one locked transaction: the farm row is held, the
- * counts are checked against the STORED produce (which only a harvest can
- * raise), the price is this server's, the produce comes off and the tickets go
- * on together, and the ledger row is keyed by the client's sale id so a retry
- * of a sale that already landed changes nothing and says so.
+ * counts are checked against the STORED basket and pantry (which only a
+ * harvest or a cook can raise), the price is this server's, the goods come off
+ * and the tickets go on together, and the ledger row is keyed by the client's
+ * sale id so a retry of a sale that already landed changes nothing and says so.
  */
 export async function sellFarmProduce(pool: any, input: any) {
   const playerId = required(input?.playerId, "playerId");
@@ -340,20 +344,24 @@ export async function sellFarmProduce(pool: any, input: any) {
     }
     const agriculture = farm.layout.agriculture;
     const produce: Record<string, number> = { ...(agriculture?.inventory?.produce ?? {}) };
+    const dishes: Record<string, number> = { ...(agriculture?.inventory?.dishes ?? {}) };
     let earned = 0;
-    for (const [cropId, quantity] of Object.entries(lines)) {
-      const held = Number(produce[cropId]) || 0;
-      if (held < quantity) return { ok: false, error: "not_enough_produce", cropId, held, layout: farm.layout };
-      produce[cropId] = held - quantity;
-      earned += farmProducePrice(cropId) * quantity;
+    for (const [itemId, quantity] of Object.entries(lines)) {
+      const dish = Boolean(parseFarmDishKey(itemId));
+      const stack = dish ? dishes : produce;
+      const held = Number(stack[itemId]) || 0;
+      if (held < quantity) return { ok: false, error: dish ? "not_enough_dishes" : "not_enough_produce", cropId: itemId, held, layout: farm.layout };
+      stack[itemId] = held - quantity;
+      earned += farmSalePrice(itemId) * quantity;
     }
+    const cooked = Object.keys(lines).some((itemId) => parseFarmDishKey(itemId));
     const award = await awardTicketsInTransaction(client, {
-      playerId, transactionKey, amount: earned, reason: "farm_produce_sale",
-      metadata: { items: lines, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, farmProducePrice(id)])) },
+      playerId, transactionKey, amount: earned, reason: cooked ? "farm_dish_sale" : "farm_produce_sale",
+      metadata: { items: lines, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, farmSalePrice(id)])) },
     });
     const next = normalizeFarmGarage({
       ...farm.layout,
-      agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce } },
+      agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce, dishes } },
     }, { ownedEntitlementIds: farm.owned });
     await saveFarm(client, playerId, next);
     return { ok: true, duplicate: false, earned, sold: lines, balance: award.balance, layout: next };
@@ -382,8 +390,9 @@ function presentOrder(order: FarmOrder, filled: boolean) {
 
 /**
  * The board as this player sees it: today's orders, which they have filled,
- * their Farming level (the client greys out what it gates) and their basket.
- * A player with no farm yet reads the board at level 1 with an empty basket.
+ * their Farming and Cooking levels (the client greys out what they gate), their
+ * basket and their pantry. A player with no farm yet reads the board at level
+ * 1 with nothing to deliver.
  */
 export async function getFarmOrderBoard(pool: any, input: any, now: number = Date.now()) {
   const playerId = required(input?.playerId, "playerId");
@@ -391,13 +400,16 @@ export async function getFarmOrderBoard(pool: any, input: any, now: number = Dat
   const stored = await pool.query(`select garage from game_loadouts where player_id = $1 and game_slug = 'farm'`, [playerId]);
   const layout = stored.rows?.[0] ? normalizeFarmGarage(stored.rows[0].garage) : null;
   const farming = farmingOf(layout);
+  const cooking = normalizeCookingRecord(layout?.skills?.cooking);
   const filled = await filledOrderIds(pool, playerId, day);
   return {
     day,
     endsAt: (day + 1) * FARM_ORDER_DAY_MS,
-    orders: farmOrderBoard(day).map((order) => presentOrder(order, filled.has(order.id))),
+    orders: farmFullOrderBoard(day).map((order) => presentOrder(order, filled.has(order.id))),
     farming: farmingSummary(farming, farming.xp),
+    cooking: farmingSummary(cooking, cooking.xp),
     produce: layout?.agriculture?.inventory?.produce ?? {},
+    dishes: layout?.agriculture?.inventory?.dishes ?? {},
   };
 }
 
@@ -408,7 +420,8 @@ export async function getFarmOrderBoard(pool: any, input: any, now: number = Dat
  * tickets go on under the ledger key `farm:order:<id>` (which is what makes a
  * fill once-only, per player, forever), the Farming XP lands, and any farm
  * achievement it completes is awarded. A retry of a fill that already landed
- * changes nothing and says so.
+ * changes nothing and says so. A dish order is the same against the pantry
+ * and the Cooking level (`fillDishOrder`).
  */
 export async function fillFarmOrder(pool: any, input: any, now: number = Date.now()) {
   const playerId = required(input?.playerId, "playerId");
@@ -426,6 +439,7 @@ export async function fillFarmOrder(pool: any, input: any, now: number = Date.no
       const wallet = await client.query(`select balance from ticket_wallets where player_id = $1`, [playerId]);
       return { ok: true, duplicate: true, order: presentOrder(order, true), earned: 0, xp: 0, farming: summary, achievements: [], balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
     }
+    if (order.kind === "dish") return fillDishOrder(client, playerId, order, farm, transactionKey);
     if (summary.level < order.minLevel) return { ok: false, error: "level_too_low", minLevel: order.minLevel, level: summary.level, layout: farm.layout };
     const agriculture = farm.layout.agriculture;
     const produce: Record<string, number> = { ...(agriculture?.inventory?.produce ?? {}) };
@@ -453,4 +467,37 @@ export async function fillFarmOrder(pool: any, input: any, now: number = Date.no
       farming: farmingSummary(farming, before.xp), achievements, balance: award.balance, layout: next,
     };
   });
+}
+
+/** A dish order, inside `fillFarmOrder`'s transaction: the Cooking level, the pantry (plainest dishes first), Cooking XP. */
+async function fillDishOrder(client: any, playerId: string, order: FarmOrder, farm: { layout: any; owned: Set<string> }, transactionKey: string) {
+  const before = normalizeCookingRecord(farm.layout.skills?.cooking);
+  const level = farmingLevelForXp(before.xp);
+  const farming = farmingOf(farm.layout);
+  if (level < order.minLevel) return { ok: false, error: "level_too_low", skill: "cooking", minLevel: order.minLevel, level, layout: farm.layout };
+  const agriculture = farm.layout.agriculture;
+  let dishes: Record<string, number> = { ...(agriculture?.inventory?.dishes ?? {}) };
+  for (const [recipeId, count] of Object.entries(order.lines)) {
+    const taken = takeFarmDishes(dishes, recipeId, count);
+    if (!taken) return { ok: false, error: "not_enough_dishes", recipeId, layout: farm.layout };
+    dishes = taken;
+  }
+  const award = await awardTicketsInTransaction(client, {
+    playerId, transactionKey, amount: order.tickets, reason: "farm_order",
+    metadata: { orderId: order.id, customer: order.customer, lines: order.lines, xp: order.xp, skill: "cooking" },
+  });
+  const cooking = recordFarmDishOrder(before, order.xp);
+  const next = normalizeFarmGarage({
+    ...farm.layout,
+    agriculture: { ...agriculture, inventory: { ...agriculture.inventory, dishes } },
+    skills: { ...farm.layout.skills, cooking },
+  }, { ownedEntitlementIds: farm.owned });
+  await saveFarm(client, playerId, next);
+  const achievements = await awardServerAchievementsInTransaction(client, {
+    playerId, gameSlug: "farm", facts: { farming, woodcutting: farm.layout.skills?.woodcutting, cooking }, sourceId: `order:${order.id}`,
+  });
+  return {
+    ok: true, duplicate: false, order: presentOrder(order, true), earned: order.tickets, xp: order.xp, skill: "cooking",
+    farming: farmingSummary(farming, farming.xp), cooking: farmingSummary(cooking, before.xp), achievements, balance: award.balance, layout: next,
+  };
 }

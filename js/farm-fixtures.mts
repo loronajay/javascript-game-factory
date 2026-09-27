@@ -180,11 +180,15 @@ function cottageFixtures({ footprint, shell }: Building): FarmFixture[] {
   const t = shell!.wallThickness;
   const halfW = footprint.width / 2;
   const halfD = footprint.depth / 2;
+  // The dining table sits in the front-left corner by the window, so the back wall, the middle of the
+  // room and the right-hand side are left free to furnish.
+  const tableX = -halfW + t + 1.7;
+  const tableZ = halfD - t - 2.3;
   return [
-    fixture("table", { x: 0, z: 0.2, width: 1.2, depth: 0.8, top: 0.79 }),
+    fixture("table", { x: tableX, z: tableZ, width: 1.2, depth: 0.8, top: 0.79 }),
     // Two stools, each facing the table across it.
-    fixture("stool-north", { kind: "seat", x: 0, z: -0.5, rotationY: 0, width: 0.36, depth: 0.36, top: 0.475 }),
-    fixture("stool-south", { kind: "seat", x: 0, z: 0.9, rotationY: Math.PI, width: 0.36, depth: 0.36, top: 0.475 }),
+    fixture("stool-north", { kind: "seat", x: tableX, z: tableZ - 0.7, rotationY: 0, width: 0.36, depth: 0.36, top: 0.475 }),
+    fixture("stool-south", { kind: "seat", x: tableX, z: tableZ + 0.7, rotationY: Math.PI, width: 0.36, depth: 0.36, top: 0.475 }),
     fixture("hearth", { x: halfW - 1.2, z: -halfD + t + 0.2, width: 1.4, depth: 0.4, top: 1.3 }),
   ];
 }

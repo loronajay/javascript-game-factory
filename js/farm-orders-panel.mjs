@@ -4,7 +4,7 @@
 // `load` and `fill` the page injects (the server calls). The panel never
 // decides an order was filled — it shows what the page hands back after the
 // server answers.
-import { boardTurnoverLabel, orderTierLabel, orderView } from "./farm-orders.mjs";
+import { SKILL_TITLES, boardTurnoverLabel, orderTierLabel, orderView } from "./farm-orders.mjs";
 export function createOrderBoardPanel(elements, options) {
     const now = options.now ?? (() => Date.now());
     let board = null;
@@ -23,10 +23,10 @@ export function createOrderBoardPanel(elements, options) {
         if (view.state === "filled")
             return "Filled ✓";
         if (view.state === "locked")
-            return `Needs Farming ${view.order.minLevel}`;
+            return `Needs ${SKILL_TITLES[view.order.skill]} ${view.order.minLevel}`;
         if (view.state === "short") {
             const missing = view.lines.filter((line) => line.short > 0);
-            return missing.length === 1 ? `Need ${missing[0].short} more ${missing[0].title}` : "Missing produce";
+            return missing.length === 1 ? `Need ${missing[0].short} more ${missing[0].title}` : view.order.kind === "dish" ? "Missing dishes" : "Missing produce";
         }
         return `Deliver for ${view.order.tickets.toLocaleString()} tickets`;
     }
@@ -35,11 +35,12 @@ export function createOrderBoardPanel(elements, options) {
         item.className = "order-card";
         item.dataset.orderId = view.order.id;
         item.dataset.state = view.state;
+        item.dataset.kind = view.order.kind;
         const head = document.createElement("header");
         head.className = "order-card__head";
         const tier = document.createElement("span");
         tier.className = "order-card__tier";
-        tier.textContent = orderTierLabel(view.order.tier) + (view.order.minLevel > 1 ? ` · Farming ${view.order.minLevel}+` : "");
+        tier.textContent = orderTierLabel(view.order.tier) + (view.order.minLevel > 1 ? ` · ${SKILL_TITLES[view.order.skill]} ${view.order.minLevel}+` : "");
         const customer = document.createElement("strong");
         customer.textContent = view.order.customer;
         head.replaceChildren(tier, customer);
@@ -57,7 +58,7 @@ export function createOrderBoardPanel(elements, options) {
             const image = document.createElement("img");
             image.alt = "";
             const show = (url) => { image.src = url; portrait.replaceChildren(image); };
-            const ready = options.thumbnail?.(line.cropId, show);
+            const ready = options.thumbnail?.(line.itemKey, show);
             if (ready)
                 show(ready);
             const label = document.createElement("span");
@@ -74,7 +75,7 @@ export function createOrderBoardPanel(elements, options) {
         const tickets = document.createElement("strong");
         tickets.textContent = `${view.order.tickets.toLocaleString()} tickets`;
         const xp = document.createElement("small");
-        xp.textContent = `+${view.order.xp.toLocaleString()} Farming XP`;
+        xp.textContent = `+${view.order.xp.toLocaleString()} ${SKILL_TITLES[view.order.skill]} XP`;
         reward.replaceChildren(tickets, xp);
         const button = document.createElement("button");
         button.type = "button";
@@ -92,9 +93,11 @@ export function createOrderBoardPanel(elements, options) {
             elements.turnover.textContent = "";
             return;
         }
-        elements.level.textContent = `Farming ${board.level}`;
+        elements.level.textContent = board.levels.cooking > 1 || board.orders.some((order) => order.kind === "dish")
+            ? `Farming ${board.levels.farming} · Cooking ${board.levels.cooking}`
+            : `Farming ${board.level}`;
         elements.turnover.textContent = boardTurnoverLabel(board.endsAt, now());
-        const views = board.orders.map((order) => orderView(order, board.produce, board.level));
+        const views = board.orders.map((order) => orderView(order, board));
         if (!views.length) {
             const empty = document.createElement("li");
             empty.className = "sale-empty";
@@ -112,10 +115,13 @@ export function createOrderBoardPanel(elements, options) {
         const outcome = await options.fill(orderId).catch(() => ({ ok: false, message: "The board could not be reached. Nothing was delivered." }));
         busyId = "";
         if (board) {
+            const levels = outcome.levels ?? board.levels;
             board = Object.freeze({
                 ...board,
                 produce: outcome.produce ?? board.produce,
-                level: outcome.level ?? board.level,
+                dishes: outcome.dishes ?? board.dishes,
+                levels,
+                level: levels.farming,
                 orders: board.orders.map((order) => (order.id === orderId && outcome.filled ? Object.freeze({ ...order, filled: true }) : order)),
             });
         }
