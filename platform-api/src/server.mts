@@ -30,7 +30,7 @@ import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-reco
 import { getPlayerAchievements, submitAchievementRun } from "./db/achievements.mjs";
 import { submitGameResult } from "./db/game-results.mjs";
 import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tickets.mjs";
-import { adoptFarmPet, harvestFarmCrop, purchaseFarmSupply } from "./db/farm-economy.mjs";
+import { adoptFarmPet, harvestFarmCrop, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import {
   getAccountSuspension,
   isAdminPlayer,
@@ -431,6 +431,7 @@ async function bootstrap(): Promise<void> {
     adoptFarmPet: (params: any) => adoptFarmPet(pool, params),
     purchaseFarmSupply: (params: any) => purchaseFarmSupply(pool, params),
     harvestFarmCrop: (params: any) => harvestFarmCrop(pool, params),
+    sellFarmProduce: (params: any) => sellFarmProduce(pool, params),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     spendValor: (params: any) => spendValorForEntitlement(pool, params),
     resetCampaign: (params: any) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

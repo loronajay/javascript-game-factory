@@ -567,6 +567,10 @@ export function createPlatformApiClient(options = {}) {
         harvestFarmCrop({ layout, plotId, cellId }) {
             return post("/games/farm/harvests", { layout, plotId, cellId }, "harvest", {}, true);
         },
+        /** The Produce Merchant: crops and counts only — the server prices the sale and pays it. */
+        sellFarmProduce({ items, saleId }) {
+            return post("/games/farm/market/sales", { items, saleId }, "sale", {}, true);
+        },
         recordGameProgressClaim(gameSlug, claim = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);

@@ -8,18 +8,23 @@ export interface FarmMusicTrack {
   readonly src: string;
 }
 
+/** Resolved from this module, not the page: the farm and the Market Square (a folder deeper) play the same files. */
+function trackUrl(file: string): string {
+  return new URL(`../farm/assets/sounds/soundtrack/${file}`, import.meta.url).href;
+}
+
 export const FARM_MUSIC_TRACKS: readonly FarmMusicTrack[] = Object.freeze([
   Object.freeze({
     id: "farm-life",
     title: "Farm Life",
     file: "farm/assets/sounds/soundtrack/farm-life.mp3",
-    src: "./assets/sounds/soundtrack/farm-life.mp3",
+    src: trackUrl("farm-life.mp3"),
   }),
   Object.freeze({
     id: "blue-skies",
     title: "Blue Skies",
     file: "farm/assets/sounds/soundtrack/blue-skies.mp3",
-    src: "./assets/sounds/soundtrack/blue-skies.mp3",
+    src: trackUrl("blue-skies.mp3"),
   }),
 ]);
 

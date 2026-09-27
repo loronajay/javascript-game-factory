@@ -14,12 +14,13 @@ import * as THREE_VENDOR from "./vendor/three.module.js";
 import { createLayoutStore } from "./arcade-room-store.mjs";
 import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
+import { gatewayAt, perimeterGates } from "./farm-gateway.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions } from "./farm-scene.mjs";
 import { groundHeightAt, underwater, waterDepthAt } from "./farm-pond.mjs";
 import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody } from "./farm-body.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot } from "./farm-interaction.mjs";
 import { canNap, formatNapMinutes, napBankReadyIn } from "./farm-nap-bank.mjs";
-import { FARM_BOUNDS, createDefaultFarmLayout, farmCacheKey, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withNapTaken, withProductionCheckpoint } from "./farm-layout.mjs";
+import { FARM_BOUNDS, FARM_LAYOUT_SPEC, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withNapTaken, withProductionCheckpoint } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -94,13 +95,6 @@ function toggleFarmMusic() {
 }
 musicButton.addEventListener("click", toggleFarmMusic);
 renderMusicButton();
-/** The farm's document, on the shared store: slug `farm`, its own cache bucket, its own normalizer. */
-export const FARM_LAYOUT_SPEC = Object.freeze({
-    slug: "farm",
-    cacheKey: farmCacheKey,
-    normalize: normalizeFarmLayout,
-    createDefault: createDefaultFarmLayout,
-});
 // Whose farm this is. `?id=` names a player to visit; without it, this is the
 // signed-in player's own farm. The shared store keeps signed-out farms on this
 // device and treats the database as canonical for signed-in players.
@@ -397,7 +391,8 @@ function updateInteraction() {
         return;
     }
     if (doorInReach) {
-        setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach));
+        const road = perimeterGates(layout.decor, FARM_BOUNDS).some((gate) => gate.instanceId === doorInReach.doorId);
+        setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · the road to the Market Square" : ""));
         return;
     }
     if (ladderInReach) {
@@ -932,7 +927,7 @@ document.addEventListener("mousemove", (event) => {
     player.pitch = looked.pitch;
 });
 function updatePlayer(dt) {
-    if (!farmEntered || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
+    if (!farmEntered || leavingForMarket || petsPanel.isOpen() || inventoryPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
         return;
     const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
     if (!step.moved)
@@ -1164,6 +1159,31 @@ liveNeedsCheckpoint = () => {
     petsPanel.render(layout);
     farmEditor.replaceLayout(layout);
 };
+// The front gate is the road to the Market Square: open it and walk into the gap.
+// The farm is saved first (the square reads the produce the account holds), then
+// the page goes; the pagehide save still runs behind it as it always does.
+let leavingForMarket = false;
+function checkGateway() {
+    if (!farmEntered || leavingForMarket || farmEditor.isEditing() || body.mode !== "walking")
+        return;
+    if (!gatewayAt(layout.decor, openDoors, player, FARM_BOUNDS))
+        return;
+    if (carrying) {
+        setPrompt(`Set ${petSim.find(carrying)?.name ?? "your pet"} down before heading to the market`);
+        return;
+    }
+    leavingForMarket = true;
+    keys.clear();
+    document.exitPointerLock?.();
+    document.body.classList.add("is-leaving");
+    status.textContent = "Off down the road to the Market Square…";
+    setPrompt("Off down the road to the Market Square…");
+    const departure = canPersistFarm ? layoutStore.save(stampPresence(progressedLayout())) : Promise.resolve(null);
+    void departure.catch(() => null).then(() => {
+        const back = visiting ? `?farm=${encodeURIComponent(layoutStore.ownerPlayerId)}` : "";
+        location.href = `market/index.html${back}`;
+    });
+}
 const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;
@@ -1176,6 +1196,7 @@ function frame(now) {
         if (farmEntered)
             updateFarmTime(TICK_SECONDS);
         updatePlayer(TICK_SECONDS);
+        checkGateway();
         petSim.tick(TICK_SECONDS, { x: player.x, z: player.z, yaw: player.yaw, y: body.y });
         updateInteraction();
         updateCarryPatience(TICK_SECONDS);

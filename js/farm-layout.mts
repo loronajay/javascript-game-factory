@@ -25,6 +25,7 @@ import { createStarterAgriculture, normalizeAgriculture, type FarmAgriculture } 
 import { NAP_BANK_CAPACITY_MINUTES, napBankAt } from "./farm-nap-bank.mjs";
 import { createPetProfile, normalizePetProfile, type PetProfile } from "./farm-pet-care.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
+import type { LayoutDocumentSpec } from "./arcade-room-store.mjs";
 
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
 export const FARM_LAYOUT_VERSION = 3;
@@ -455,3 +456,11 @@ export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean
     && first.decor.length === second.decor.length
     && first.decor.every((item, index) => farmDecorRowsEqual(item, second.decor[index]));
 }
+
+/** The farm's document, on the shared store: slug `farm`, its own cache bucket, its own normalizer. */
+export const FARM_LAYOUT_SPEC: LayoutDocumentSpec<FarmLayout> = Object.freeze({
+  slug: "farm",
+  cacheKey: farmCacheKey,
+  normalize: normalizeFarmLayout,
+  createDefault: createDefaultFarmLayout,
+});

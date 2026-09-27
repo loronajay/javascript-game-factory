@@ -174,7 +174,12 @@ function sprinkle(count: number, random: () => number): Sprinkle[] {
   return out;
 }
 
-export function createFarmScenery(THREE: ThreeNamespace, scene: any): FarmScenery {
+export type FarmSceneryOptions = Readonly<{
+  /** The tufts and flowers underfoot. Off for a paved ground (the Market Square); the hills, trees and sky stay. */
+  groundCover?: boolean;
+}>;
+
+export function createFarmScenery(THREE: ThreeNamespace, scene: any, options: FarmSceneryOptions = {}): FarmScenery {
   const random = seeded(2026);
   createHills(THREE, scene, random);
   createTreeline(THREE, scene, random);
@@ -199,6 +204,11 @@ export function createFarmScenery(THREE: ThreeNamespace, scene: any): FarmScener
   const stems = new THREE.InstancedMesh(stemGeometry, new THREE.MeshStandardMaterial({ color: "#4f9a3a", roughness: 0.95 }), SCENERY.flowers);
   stems.name = "farm-flower-stems";
   scene.add(stems);
+  if (options.groundCover === false) {
+    tufts.visible = false;
+    flowers.visible = false;
+    stems.visible = false;
+  }
 
   const tuftSpots = sprinkle(SCENERY.tufts, random);
   const flowerSpots = sprinkle(SCENERY.flowers, random);

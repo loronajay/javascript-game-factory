@@ -1,0 +1,43 @@
+/* The Market Square: the farm's shell (../farm.css) and the shared presence
+   chrome (../../css/space-presence.css), plus the ticket chip and the Produce
+   Merchant's counter. */
+
+#marketCanvas { display: block; width: 100%; height: 100%; outline: 0; }
+
+.market-tickets { display: inline-flex; align-items: baseline; gap: 7px; padding: 10px 15px; border: 1px solid var(--farm-accent); border-radius: 999px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
+.market-tickets[hidden] { display: none; }
+.market-tickets span { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.market-tickets strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; }
+
+/* Chat sits bottom-left where the farm keeps its clock; the square has no clock. */
+.market-shell .room-chat { bottom: 20px; }
+
+.sale-panel { width: min(520px, calc(100vw - 36px)); }
+.sale-note { margin: 0 0 12px; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
+.sale-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.sale-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto 56px; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
+.sale-row__label strong { display: block; font-size: 13.5px; }
+.sale-row__label small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11px; }
+.sale-row__stepper { display: flex; align-items: center; gap: 4px; }
+.sale-row__stepper button { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.07); color: #fff; font-weight: 900; cursor: pointer; }
+.sale-row__stepper button:hover:not(:disabled) { border-color: var(--farm-accent); }
+.sale-row__stepper button:disabled { opacity: .35; cursor: not-allowed; }
+.sale-row__stepper input { width: 46px; height: 28px; padding: 0 4px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(0,0,0,.25); color: #fff; font: 800 13px ui-monospace, monospace; text-align: center; }
+.sale-row__stepper input:focus { outline: 0; border-color: var(--farm-accent); }
+.sale-row__all { font: 800 10px ui-monospace, monospace !important; letter-spacing: .06em; }
+.sale-row__subtotal { color: var(--farm-accent); font: 900 14px ui-monospace, monospace; text-align: right; }
+.sale-empty { padding: 18px 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 11px; color: #c9d7bd; text-align: center; font-size: 13px; }
+.sale-footer { display: grid; gap: 10px; padding: 14px 18px 16px; border-top: 1px solid rgba(255,255,255,.1); }
+.sale-footer__total { display: flex; align-items: baseline; gap: 8px; }
+.sale-footer__total span { color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+.sale-footer__total strong { color: #fff6cf; font: 900 26px ui-monospace, monospace; }
+.sale-footer__total small { color: #c9d7bd; }
+.sale-footer__actions { display: flex; gap: 8px; }
+.sale-footer__sell { flex: 1; }
+.sale-footer__actions button:disabled { opacity: .45; cursor: not-allowed; }
+.sale-footer .pets-status { margin: 0; }
+
+@media (max-width: 720px) {
+  .sale-row { grid-template-columns: 36px minmax(0, 1fr) 48px; }
+  .sale-row__stepper { grid-column: 2 / 4; }
+}

@@ -157,7 +157,7 @@ function sprinkle(count, random) {
     }
     return out;
 }
-export function createFarmScenery(THREE, scene) {
+export function createFarmScenery(THREE, scene, options = {}) {
     const random = seeded(2026);
     createHills(THREE, scene, random);
     createTreeline(THREE, scene, random);
@@ -181,6 +181,11 @@ export function createFarmScenery(THREE, scene) {
     const stems = new THREE.InstancedMesh(stemGeometry, new THREE.MeshStandardMaterial({ color: "#4f9a3a", roughness: 0.95 }), SCENERY.flowers);
     stems.name = "farm-flower-stems";
     scene.add(stems);
+    if (options.groundCover === false) {
+        tufts.visible = false;
+        flowers.visible = false;
+        stems.visible = false;
+    }
     const tuftSpots = sprinkle(SCENERY.tufts, random);
     const flowerSpots = sprinkle(SCENERY.flowers, random);
     const tuftTones = ["#7fbf52", "#6fae48", "#8dc45a", "#9ad264"].map((hex) => new THREE.Color(hex));

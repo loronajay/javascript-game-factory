@@ -20,13 +20,14 @@
 // for murky water while the camera is below a pond's surface.
 
 import { createSurfaceMaterial, applySurfaceMaterial } from "./arcade-room-surfaces.mjs";
+import type { SurfaceStyle } from "./arcade-room-catalog/surfaces.mjs";
 import { DEFAULT_GROUND_ID, findGround } from "./farm-catalog/ground.mjs";
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
 import { FARM_BOUNDS, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { MAX_PONDS, pondRegions, type PondRegion } from "./farm-pond.mjs";
 import { decorBaseHeight } from "./farm-scene.mjs";
 import { createFarmDecorModel, type BarnDoors } from "./farm-props.mjs";
-import { createFarmScenery } from "./farm-scenery.mjs";
+import { createFarmScenery, type FarmSceneryOptions } from "./farm-scenery.mjs";
 import { celestialOrbit, generateStarField, type StarSize } from "./farm-sky.mjs";
 import { farmLightProfile } from "./farm-time.mjs";
 
@@ -44,6 +45,8 @@ export type FarmWorld = Readonly<{
   ground: any;
   /** Re-dress the field with a ground catalog id (unknown ids fall back to the meadow). */
   applyGround: (groundId: string) => void;
+  /** Re-dress it with a surface style directly: a ground no one can buy for their farm (the Market Square's paving). */
+  applyGroundStyle: (style: SurfaceStyle) => void;
   /** Bring the placed models into step with the layout's decor rows. */
   sync: (layout: FarmLayout) => void;
   /** Every placed model's root, for raycasting; each carries `userData.decorInstanceId`. */
@@ -243,7 +246,7 @@ function disposeModel(group: any): void {
 
 type PlacedModel = { row: FarmDecorRow; group: any; doors: BarnDoors | null; fixtureDoors: Readonly<Record<string, BarnDoors>>; animate: ((dt: number) => void) | null };
 
-export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
+export function createFarmWorld(THREE: ThreeNamespace, scene: any, options: FarmSceneryOptions = {}): FarmWorld {
   const { width, depth } = FARM_BOUNDS;
 
   scene.background = new THREE.Color(SKY.horizon);
@@ -305,7 +308,7 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
   scene.add(apron);
 
   // The countryside past the fence and the tufts underfoot — nothing the player places.
-  const scenery = createFarmScenery(THREE, scene);
+  const scenery = createFarmScenery(THREE, scene, options);
 
   const decorRoot = new THREE.Group();
   decorRoot.name = "farm-decor";
@@ -381,7 +384,10 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
   }
 
   function applyGround(groundId: string): void {
-    const style = groundStyle(groundId);
+    applyGroundStyle(groundStyle(groundId));
+  }
+
+  function applyGroundStyle(style: SurfaceStyle): void {
     applySurfaceMaterial(THREE, ground, style, span);
     applySurfaceMaterial(THREE, apron, style, apronSpan);
     cutPondHoles(ground.material, holes);
@@ -439,6 +445,7 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any): FarmWorld {
   return Object.freeze({
     ground,
     applyGround,
+    applyGroundStyle,
     sync,
     models: () => [...placed.values()].map((entry) => entry.group),
     modelFor: (instanceId) => placed.get(instanceId)?.group,

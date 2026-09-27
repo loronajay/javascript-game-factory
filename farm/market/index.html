@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Market Square | Javascript Game Factory</title>
+  <link rel="stylesheet" href="../../css/space-presence.css">
+  <link rel="stylesheet" href="../farm.css">
+  <link rel="stylesheet" href="market.css">
+</head>
+<body>
+  <main class="farm-shell market-shell">
+    <canvas id="marketCanvas" tabindex="0" aria-label="The Market Square, in 3D"></canvas>
+
+    <header class="farm-header">
+      <a id="marketHomeLink" href="../index.html" class="back-link">← Back to the farm</a>
+      <div>
+        <span class="eyebrow">SHARED SPACE · DOWN THE FARM ROAD</span>
+        <h1>Market Square</h1>
+      </div>
+      <div class="farm-header__actions">
+        <span id="marketTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
+        <button id="toggleMarketMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
+      </div>
+    </header>
+
+    <section id="startGate" class="start-gate">
+      <div class="start-card">
+        <span class="start-card__tag">EVERYONE'S SQUARE</span>
+        <h2>Market day.</h2>
+        <p>The road from the farm ends in a walled square. Marigold at the Produce Merchant buys your harvest for tickets; the other stalls open as the farm grows. Whoever else is here, you'll see them.</p>
+        <button id="enterMarket" type="button">Walk in</button>
+        <small id="marketStatus">WASD to move · E to use · Enter to chat · out the south gate to go home</small>
+      </div>
+    </section>
+
+    <div id="marketVisitors" class="visitors-chip" aria-live="polite" hidden>
+      <span id="marketVisitorsLabel" class="visitors-chip__label">IN THE SQUARE</span>
+      <span id="marketVisitorsNames" class="visitors-chip__names"></span>
+    </div>
+    <section id="marketChat" class="room-chat" data-open="false" aria-label="Market chat" hidden>
+      <ol id="marketChatLog" class="room-chat__log" aria-live="polite"></ol>
+      <input id="marketChatInput" class="room-chat__input" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Say something to the square… (Enter to send, Esc to cancel)" aria-label="Chat message">
+    </section>
+
+    <div id="marketPrompt" class="farm-prompt" aria-live="polite"></div>
+    <div class="control-hint" aria-hidden="true">
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
+    </div>
+
+    <aside id="salePanel" class="inventory-panel sale-panel" aria-label="Produce Merchant" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">PRODUCE MERCHANT · MARIGOLD</span><strong>Sell your harvest</strong></div>
+        <button id="closeSale" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Prices are the merchant's: what the seed cost you, plus a fair day's margin for every day it grew. Orders and cooking will pay better when they open.</p>
+        <ol id="saleList" class="sale-list"></ol>
+      </div>
+      <footer class="sale-footer">
+        <div class="sale-footer__total"><span>Total</span><strong id="saleTotal">0</strong><small>tickets</small></div>
+        <div class="sale-footer__actions">
+          <button id="pickAllProduce" class="farm-button" type="button">Pick everything</button>
+          <button id="sellProduce" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Pick something to sell</button>
+        </div>
+        <p id="saleStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+  </main>
+  <script type="module" src="../../js/platform-config.mjs"></script>
+  <script type="module" src="../../js/farm-market.mjs"></script>
+</body>
+</html>

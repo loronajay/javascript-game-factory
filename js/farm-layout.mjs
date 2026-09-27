@@ -398,3 +398,10 @@ export function farmLayoutsEqual(first, second) {
         && first.decor.length === second.decor.length
         && first.decor.every((item, index) => farmDecorRowsEqual(item, second.decor[index]));
 }
+/** The farm's document, on the shared store: slug `farm`, its own cache bucket, its own normalizer. */
+export const FARM_LAYOUT_SPEC = Object.freeze({
+    slug: "farm",
+    cacheKey: farmCacheKey,
+    normalize: normalizeFarmLayout,
+    createDefault: createDefaultFarmLayout,
+});

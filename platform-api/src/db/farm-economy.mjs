@@ -1,7 +1,8 @@
-import { spendTicketsInTransaction } from "./tickets.mjs";
+import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply } from "../services/farm-economy-catalog.mjs";
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
+import { farmProducePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
 const MAX_PETS = 12;
 const MAX_STACK = 99;
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -208,5 +209,53 @@ export async function harvestFarmCrop(pool, input, now = Date.now()) {
             },
         }, { ownedEntitlementIds: owned });
         return answer({ ok: true, cropId: crop.cropId, quantity: amount, layout });
+    });
+}
+const SALE_ID = PURCHASE_ID;
+/**
+ * The Market Square's Produce Merchant buys raw produce. Everything about the
+ * sale is decided here, in one locked transaction: the farm row is held, the
+ * counts are checked against the STORED produce (which only a harvest can
+ * raise), the price is this server's, the produce comes off and the tickets go
+ * on together, and the ledger row is keyed by the client's sale id so a retry
+ * of a sale that already landed changes nothing and says so.
+ */
+export async function sellFarmProduce(pool, input) {
+    const playerId = required(input?.playerId, "playerId");
+    const saleId = required(input?.saleId, "saleId");
+    if (!SALE_ID.test(saleId))
+        throw new TypeError("invalid saleId");
+    const lines = normalizeSaleLines(input?.items);
+    if (!lines)
+        return { ok: false, error: "invalid_sale" };
+    const transactionKey = `farm:sale:${saleId}`;
+    return transaction(pool, async (client) => {
+        const farm = await lockedFarm(client, playerId);
+        if (!farm || farm.layout.onboarding?.status !== "complete")
+            return { ok: false, error: "farm_not_initialized" };
+        if (await duplicatePurchase(client, playerId, transactionKey)) {
+            const wallet = await client.query(`select balance from ticket_wallets where player_id = $1`, [playerId]);
+            return { ok: true, duplicate: true, earned: 0, sold: {}, balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
+        }
+        const agriculture = farm.layout.agriculture;
+        const produce = { ...(agriculture?.inventory?.produce ?? {}) };
+        let earned = 0;
+        for (const [cropId, quantity] of Object.entries(lines)) {
+            const held = Number(produce[cropId]) || 0;
+            if (held < quantity)
+                return { ok: false, error: "not_enough_produce", cropId, held, layout: farm.layout };
+            produce[cropId] = held - quantity;
+            earned += farmProducePrice(cropId) * quantity;
+        }
+        const award = await awardTicketsInTransaction(client, {
+            playerId, transactionKey, amount: earned, reason: "farm_produce_sale",
+            metadata: { items: lines, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, farmProducePrice(id)])) },
+        });
+        const next = normalizeFarmGarage({
+            ...farm.layout,
+            agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce } },
+        }, { ownedEntitlementIds: farm.owned });
+        await saveFarm(client, playerId, next);
+        return { ok: true, duplicate: false, earned, sold: lines, balance: award.balance, layout: next };
     });
 }

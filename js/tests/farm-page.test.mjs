@@ -46,9 +46,11 @@ test("the farm links owners to the Pet Games event menu", () => {
 
 test("the farm is playable signed in or out, saves locally or to a loaded account, and keeps visits read-only", () => {
   assert.match(source, /createLayoutStore\(FARM_LAYOUT_SPEC, \{ visitPlayerId \}\)/, "signed-out farms use the store's device persistence while signed-in farms remain account-backed");
-  assert.match(source, /slug: "farm"/);
-  assert.match(source, /cacheKey: farmCacheKey/);
-  assert.match(source, /normalize: normalizeFarmLayout/);
+  // The spec lives in the pure layout module, where the Market Square reads the same document.
+  const layoutSource = readFileSync(resolve(repoRoot, "js", "farm-layout.mts"), "utf8");
+  assert.match(layoutSource, /slug: "farm"/);
+  assert.match(layoutSource, /cacheKey: farmCacheKey/);
+  assert.match(layoutSource, /normalize: normalizeFarmLayout/);
   assert.match(source, /new URLSearchParams\(location\.search\)\.get\("id"\)/);
   assert.doesNotMatch(source, /localStorage/, "the store owns the cache");
   assert.match(source, /const canManageFarm = !visiting/);
@@ -125,7 +127,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
-  assert.match(source, /if \(!farmEntered \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel or while napping");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
   assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay \}\)/);
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
@@ -207,7 +209,7 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
   assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
-  assert.match(source, /if \(!farmEntered \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);

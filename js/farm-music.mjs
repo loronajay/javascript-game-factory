@@ -1,17 +1,21 @@
 // The farm owns this soundtrack. It starts only after the Enter gesture, streams
 // through one audio element, and keeps one shuffled order for the whole visit.
+/** Resolved from this module, not the page: the farm and the Market Square (a folder deeper) play the same files. */
+function trackUrl(file) {
+    return new URL(`../farm/assets/sounds/soundtrack/${file}`, import.meta.url).href;
+}
 export const FARM_MUSIC_TRACKS = Object.freeze([
     Object.freeze({
         id: "farm-life",
         title: "Farm Life",
         file: "farm/assets/sounds/soundtrack/farm-life.mp3",
-        src: "./assets/sounds/soundtrack/farm-life.mp3",
+        src: trackUrl("farm-life.mp3"),
     }),
     Object.freeze({
         id: "blue-skies",
         title: "Blue Skies",
         file: "farm/assets/sounds/soundtrack/blue-skies.mp3",
-        src: "./assets/sounds/soundtrack/blue-skies.mp3",
+        src: trackUrl("blue-skies.mp3"),
     }),
 ]);
 const FARM_MUSIC_VOLUME = 0.24;

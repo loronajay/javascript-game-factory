@@ -37,5 +37,8 @@ export function createTicketWalletClient(options = {}) {
         harvestFarmCrop(layout, plotId, cellId) {
             return api.harvestFarmCrop({ layout, plotId, cellId });
         },
+        sellFarmProduce(items, saleId) {
+            return api.sellFarmProduce({ items, saleId });
+        },
     };
 }

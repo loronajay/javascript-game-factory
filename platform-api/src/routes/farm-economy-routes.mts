@@ -5,12 +5,14 @@ export async function handleFarmEconomyRoute(context: any): Promise<boolean> {
   const adopting = pathname === "/games/farm/adoptions" && method === "POST";
   const buyingSupply = pathname === "/games/farm/supplies/purchases" && method === "POST";
   const harvesting = pathname === "/games/farm/harvests" && method === "POST";
-  if (!adopting && !buyingSupply && !harvesting) return false;
+  const selling = pathname === "/games/farm/market/sales" && method === "POST";
+  if (!adopting && !buyingSupply && !harvesting && !selling) return false;
   if (!authClaims?.playerId) {
     writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
     return true;
   }
   if (harvesting) return handleHarvest(context);
+  if (selling) return handleSale(context);
   const action = adopting ? services?.adoptFarmPet : services?.purchaseFarmSupply;
   if (typeof action !== "function") {
     writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
@@ -70,6 +72,40 @@ async function handleHarvest(context: any): Promise<boolean> {
     writeJson(res, 200, { harvest }, requestOrigin);
   } catch {
     writeJson(res, 400, { status: "error", error: "invalid_farm_harvest", timestamp }, requestOrigin);
+  }
+  return true;
+}
+
+/**
+ * POST /games/farm/market/sales — self only. The body names crops and counts
+ * and an idempotency key; the price and the payout are the server's
+ * (db/farm-economy.mts `sellFarmProduce`). Any price the client sends is ignored.
+ */
+async function handleSale(context: any): Promise<boolean> {
+  const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+  if (typeof services?.sellFarmProduce !== "function") {
+    writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+    return true;
+  }
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+    return true;
+  }
+  try {
+    const sale = await services.sellFarmProduce({
+      playerId: authClaims.playerId,
+      items: body.value?.items,
+      saleId: body.value?.saleId,
+    });
+    if (!sale?.ok) {
+      const conflict = new Set(["not_enough_produce"]);
+      writeJson(res, conflict.has(sale?.error) ? 409 : 400, { status: "error", ...sale, timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { sale }, requestOrigin);
+  } catch {
+    writeJson(res, 400, { status: "error", error: "invalid_farm_sale", timestamp }, requestOrigin);
   }
   return true;
 }

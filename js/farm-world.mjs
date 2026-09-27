@@ -207,7 +207,7 @@ function disposeModel(group) {
     });
     group.parent?.remove(group);
 }
-export function createFarmWorld(THREE, scene) {
+export function createFarmWorld(THREE, scene, options = {}) {
     const { width, depth } = FARM_BOUNDS;
     scene.background = new THREE.Color(SKY.horizon);
     scene.fog = new THREE.Fog(SKY.horizon, SKY.fog.near, SKY.fog.far);
@@ -265,7 +265,7 @@ export function createFarmWorld(THREE, scene) {
     apron.receiveShadow = true;
     scene.add(apron);
     // The countryside past the fence and the tufts underfoot — nothing the player places.
-    const scenery = createFarmScenery(THREE, scene);
+    const scenery = createFarmScenery(THREE, scene, options);
     const decorRoot = new THREE.Group();
     decorRoot.name = "farm-decor";
     scene.add(decorRoot);
@@ -337,7 +337,9 @@ export function createFarmWorld(THREE, scene) {
         }
     }
     function applyGround(groundId) {
-        const style = groundStyle(groundId);
+        applyGroundStyle(groundStyle(groundId));
+    }
+    function applyGroundStyle(style) {
         applySurfaceMaterial(THREE, ground, style, span);
         applySurfaceMaterial(THREE, apron, style, apronSpan);
         cutPondHoles(ground.material, holes);
@@ -396,6 +398,7 @@ export function createFarmWorld(THREE, scene) {
     return Object.freeze({
         ground,
         applyGround,
+        applyGroundStyle,
         sync,
         models: () => [...placed.values()].map((entry) => entry.group),
         modelFor: (instanceId) => placed.get(instanceId)?.group,

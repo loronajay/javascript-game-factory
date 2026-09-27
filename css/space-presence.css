@@ -1,0 +1,81 @@
+/* Live company in a walkable space: the "here now" chip and the chat box.
+   Shared by the arcade room (/room/) and the Market Square (/farm/market/),
+   both of which run arcade-room-presence + arcade-room-chat(-view). A page
+   tints these with its own stylesheet; the class names are the chat view's. */
+
+/* Who else is in the arcade, pinned top-right under the header while anyone is. */
+.visitors-chip {
+  position: fixed;
+  z-index: 5;
+  right: 18px;
+  top: 96px;
+  display: grid;
+  row-gap: 3px;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 9px 14px;
+  border: 1px solid rgba(103, 220, 255, .5);
+  border-radius: 10px;
+  background: rgba(7, 16, 27, .9);
+  color: #e6f6ff;
+  pointer-events: none;
+  box-shadow: 0 15px 45px rgba(0,0,0,.4);
+}
+.visitors-chip[hidden] { display: none; }
+.visitors-chip__label { font-size: 10px; letter-spacing: .18em; font-weight: 800; color: #67dcff; }
+.visitors-chip__names { font-size: 13px; font-weight: 700; line-height: 1.35; }
+.is-playing .visitors-chip, .is-editing .visitors-chip { display: none; }
+
+/* Arcade chat, bottom-left like an in-match chat: a fading log while closed, a box while open. */
+.room-chat {
+  position: fixed;
+  z-index: 5;
+  left: 18px;
+  bottom: 20px;
+  width: min(420px, calc(100vw - 36px));
+  display: grid;
+  row-gap: 6px;
+  pointer-events: none;
+}
+.room-chat[hidden] { display: none; }
+.room-chat__log {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+  max-height: 34vh;
+  overflow-y: auto;
+  display: grid;
+  row-gap: 3px;
+  border-radius: 10px;
+  color: #e6f6ff;
+  font-size: 13px;
+  line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.7);
+  scrollbar-width: thin;
+}
+.room-chat[data-open="true"] .room-chat__log {
+  background: rgba(7, 16, 27, .88);
+  border: 1px solid rgba(103, 220, 255, .35);
+  pointer-events: auto;
+}
+.room-chat__line { overflow-wrap: anywhere; }
+.room-chat__name { color: #67dcff; font-weight: 800; }
+.room-chat__line--self .room-chat__name { color: #ffd33d; }
+.room-chat__line--system { color: #9db0c0; font-style: italic; }
+.room-chat__input {
+  display: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 211, 61, .6);
+  border-radius: 10px;
+  background: rgba(7, 16, 27, .94);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  box-shadow: 0 15px 45px rgba(0,0,0,.4);
+}
+.room-chat__input::placeholder { color: #7f93a6; }
+.room-chat[data-open="true"] .room-chat__input { display: block; pointer-events: auto; }
+.room-chat[data-open="true"] .room-chat__input:focus { border-color: #ffd33d; box-shadow: 0 0 0 3px rgba(255, 211, 61, .18), 0 15px 45px rgba(0,0,0,.4); }
+.is-playing .room-chat, .is-editing .room-chat { display: none; }
