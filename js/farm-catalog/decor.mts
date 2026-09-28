@@ -247,10 +247,11 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("sunflowers", { title: "Sunflowers", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#ffd33d", "#4f9a3a"], model: "sunflowers" }),
   item("lavender", { title: "Lavender", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#9a7fd6", "#6f8f5a"], model: "lavender" }),
   item("stump", { title: "Tree Stump", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#9a7248", "#5d3a1f"], model: "stump" }),
-  // Water: dug into the field. The player wades in; ground animals keep out; swimmers use the whole volume.
-  item("pond-round", { title: "Round Pond", category: "water", footprint: { width: 5, depth: 5 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2 }, swatch: ["#3f7fb8", "#7a5a34"], model: "pond" }),
-  item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 8, depth: 4.5 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 1.8 }, swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
-  item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 6, depth: 6 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2.4 }, swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
+  // Water: dug into the field. These footprints leave room for a swimmer's home, toys, and open water.
+  // Existing layouts inherit catalog footprints, so enlarging these also expands ponds players already placed.
+  item("pond-round", { title: "Round Pond", category: "water", footprint: { width: 10, depth: 10 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2 }, swatch: ["#3f7fb8", "#7a5a34"], model: "pond" }),
+  item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 14, depth: 8 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 1.8 }, swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
+  item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 12, depth: 12 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2.4 }, swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
   // Props.
   item("hay-bale", { title: "Hay Bale", category: "prop", footprint: { width: 1.4, depth: 1 }, swatch: ["#d8b24a", "#b08b2f"], model: "hay-bale", unlock: STARTER }),
   item("trough", { title: "Water Trough", category: "prop", footprint: { width: 1.8, depth: 0.7 }, swatch: ["#7e8790", "#3f7fb8"], model: "trough", unlock: STARTER }),

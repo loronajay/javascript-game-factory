@@ -8,7 +8,7 @@ import { farmCropQuality, farmProduceKey, parseFarmProduceKey, takeFarmProduce }
 import { parseFarmDishKey } from "../services/farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "../services/farm-carpentry-catalog.mjs";
 import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder, type FarmingRecord } from "../services/farm-skill-catalog.mjs";
-import { farmTreeReady, farmTreeRule } from "../services/farm-tree-catalog.mjs";
+import { farmTreeReady, farmTreeRule, farmTreeYield } from "../services/farm-tree-catalog.mjs";
 import { normalizeCookingRecord, recordFarmDishOrder } from "../services/farm-skill-catalog.mjs";
 import { takeFarmDishes } from "../services/farm-recipe-catalog.mjs";
 import {
@@ -303,14 +303,18 @@ export async function harvestFarmTree(pool: any, input: any, now: number = Date.
     const trees: any[] = verified.trees ?? [];
     const tree = trees.find((entry) => entry.plotId === plotId);
     if (!tree) return answer({ ok: false, error: "empty", layout: verified });
+    if (tree.diedOf) return answer({ ok: false, error: "dead", layout: verified });
     if (!farmTreeReady(tree)) return answer({ ok: false, error: "not_ready", layout: verified });
     const rule = farmTreeRule(tree.speciesId)!;
+    // What wilting cost is the verified row's: its penalty never falls in a save.
+    const amount = farmTreeYield(tree);
     const skills = normalizeFarmSkillRecords(verified.skills);
     const inventory = { ...verified.agriculture.inventory };
     const fruit = rule.kind === "fruit";
-    if (fruit) inventory.produce = { ...inventory.produce, [tree.speciesId]: Math.min(MAX_STACK, (Number(inventory.produce?.[tree.speciesId]) || 0) + rule.yield) };
-    else inventory.logs = { ...inventory.logs, [tree.speciesId]: Math.min(MAX_STACK, (Number(inventory.logs?.[tree.speciesId]) || 0) + rule.yield) };
-    const nextTree = fruit ? { ...tree, fruitMinutes: 0 } : { ...tree, stump: true, growthMinutes: 0, fruitMinutes: 0 };
+    if (fruit) inventory.produce = { ...inventory.produce, [tree.speciesId]: Math.min(MAX_STACK, (Number(inventory.produce?.[tree.speciesId]) || 0) + amount) };
+    else inventory.logs = { ...inventory.logs, [tree.speciesId]: Math.min(MAX_STACK, (Number(inventory.logs?.[tree.speciesId]) || 0) + amount) };
+    // The next fruit, or the stump's regrowth, starts clean.
+    const nextTree = fruit ? { ...tree, fruitMinutes: 0, carePenalty: 0 } : { ...tree, stump: true, growthMinutes: 0, fruitMinutes: 0, carePenalty: 0 };
     const nextSkills = fruit
       ? { ...skills, farming: recordFarmFruit(skills.farming, tree.speciesId, rule.xp) }
       : { ...skills, woodcutting: recordFarmFelling(skills.woodcutting, tree.speciesId, rule.xp) };
@@ -327,7 +331,7 @@ export async function harvestFarmTree(pool: any, input: any, now: number = Date.
       sourceId: `tree:${plotId}:${fruit ? `pick-${picks}` : `fell-${nextSkills.woodcutting.fellings}`}`,
     });
     return answer({
-      ok: true, kind: rule.kind, speciesId: tree.speciesId, quantity: rule.yield, xp: rule.xp, skill,
+      ok: true, kind: rule.kind, speciesId: tree.speciesId, quantity: amount, xp: rule.xp, skill,
       level: farmingSummary(nextSkills[skill], skills[skill].xp), achievements, layout,
     });
   });

@@ -255,8 +255,8 @@ function capNewCrops(crops: any[], storedCrops: any[], capacity: number): any[] 
  *   - PLANKS and FURNITURE are the server's too: only the Sawmill makes a
  *     plank and only the Workbench a piece (the Carpentry record is pinned),
  *     and a save may place no more of a piece than the stored count owns;
- *   - COMPOST rises by at most one for each stored dead crop the save dug
- *     out, and a crop newly marked fertilized must have been paid for by
+ *   - COMPOST rises by at most one for each stored dead crop or dead tree
+ *     the save dug out, and a crop newly marked fertilized must have been paid for by
  *     compost that went (guardCompost).
  */
 function guardFarmSave(garage: any, current: any, context: any): void {
@@ -291,9 +291,9 @@ function guardFarmSave(garage: any, current: any, context: any): void {
   const bounded = boundCropGrowth(garage.agriculture.crops, storedCrops, storedClockMinutes, verified, (cropId) => farmCropRule(cropId)?.growMinutes ?? 0);
   const level = farmingLevelForXp(garage.skills.farming.xp);
   garage.agriculture.crops = capNewCrops(bounded, storedCrops, farmCropCapacity(garage.decor ?? [], level));
-  guardCompost(garage.agriculture, current ? storedInventory.compost ?? 0 : 0, storedCrops);
-
   const storedTrees = Array.isArray(current?.trees) ? current.trees : [];
+  guardCompost(garage.agriculture, current ? storedInventory.compost ?? 0 : 0, storedCrops, deadTreesDugOut(garage.trees, storedTrees));
+
   garage.trees = admitNewTrees(boundTreeGrowth(garage.trees, storedTrees, storedClockMinutes, verified), storedTrees, {
     storedSaplings: current ? storedInventory.saplings ?? {} : {},
     submittedSaplings: inventory.saplings ?? {},
@@ -311,10 +311,10 @@ function guardFarmSave(garage: any, current: any, context: any): void {
  * that left the heap; any beyond that are saved unfertilized. A stored
  * fertilized crop stays fertilized (boundCropGrowth).
  */
-function guardCompost(agriculture: any, storedCompost: number, storedCrops: any[]): void {
+function guardCompost(agriculture: any, storedCompost: number, storedCrops: any[], treesDugOut = 0): void {
   const key = (row: any) => `${row.plotId}:${row.cellId}:${row.cropId}`;
   const standing = new Set(agriculture.crops.map(key));
-  const dugOut = storedCrops.filter((row) => row?.diedOf && !standing.has(key(row))).length;
+  const dugOut = storedCrops.filter((row) => row?.diedOf && !standing.has(key(row))).length + treesDugOut;
   const ceiling = Math.min(99, storedCompost + dugOut);
   const compost = Math.min(stackCount(agriculture.inventory.compost), ceiling);
   let paid = ceiling - compost;
@@ -328,6 +328,12 @@ function guardCompost(agriculture: any, storedCompost: number, storedCrops: any[
     return { ...row, fertilized: false };
   });
   agriculture.inventory.compost = compost;
+}
+
+/** Stored trees that died of thirst and are no longer in the submitted save: each is one compost. */
+function deadTreesDugOut(trees: any[], storedTrees: any[]): number {
+  const standing = new Set(trees.map((row: any) => `${row.plotId}:${row.speciesId}`));
+  return storedTrees.filter((row: any) => row?.diedOf && !standing.has(`${row.plotId}:${row.speciesId}`)).length;
 }
 
 function normalizePetProfile(value: any): any | null {

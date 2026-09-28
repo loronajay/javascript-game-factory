@@ -5,7 +5,8 @@
 // This is deliberately NOT the farm clock. The clock stays paused while the
 // player is away (see resumeFarmClock), so pets never go hungry, age or die off
 // screen. Only production moves — crops and the productive trees — at a
-// fraction of active speed and for a capped span.
+// fraction of active speed and for a capped span. Both drink, so both can go
+// thirsty and wilt while away, and neither can die of it.
 //
 // A farm never progresses until its owner has stepped onto it at least once:
 // `checkpointAt` is 0 until the first entry, and 0 means no away time at all.
@@ -96,12 +97,20 @@ export function summarizeOfflineProduction(before, after, span, now, treesBefore
     const treeGrowth = new Map();
     let fruitReady = 0;
     let timberReady = 0;
+    let treesThirsty = 0;
+    let treesWilted = 0;
     for (const row of treesAfter) {
         const was = earlierTrees.get(row.plotId);
         const species = findTreeSpecies(row.speciesId);
         if (!was || !species)
             continue;
         const current = treeStatus(row, now);
+        if (current.dead)
+            continue;
+        if (current.wilted && !was.wilted)
+            treesWilted += 1;
+        else if (current.thirsty && !current.wilted)
+            treesThirsty += 1;
         if (current.ready && !was.ready) {
             if (species.kind === "fruit")
                 fruitReady += 1;
@@ -134,7 +143,9 @@ export function summarizeOfflineProduction(before, after, span, now, treesBefore
             .map(([title, entry]) => line(`${title}${entry.count > 1 ? ` ×${entry.count}` : ""}: ${percent(entry.before / entry.count)} → ${percent(entry.after / entry.count)} grown`, "info")),
         ...(fruitReady ? [line(`${plural(fruitReady, "fruit tree is", "fruit trees are")} ready to pick.`, "good")] : []),
         ...(timberReady ? [line(`${plural(timberReady, "tree is", "trees are")} ready to fell.`, "good")] : []),
+        ...(treesThirsty ? [line(`${plural(treesThirsty, "tree is", "trees are")} thirsty.`, "warn")] : []),
+        ...(treesWilted ? [line(`${plural(treesWilted, "tree", "trees")} wilted — water ${treesWilted === 1 ? "it" : "them"} to save ${treesWilted === 1 ? "it" : "them"}.`, "warn")] : []),
         ...(capped ? [line("Only your first 24 hours away count toward growth.", "info")] : []),
     ];
-    return Object.freeze({ awayMs: span.awayMs, capped, crops: Object.freeze(crops), ripened, thirsty, wilted, died: Object.freeze(died), fruitReady, timberReady, lines: Object.freeze(lines) });
+    return Object.freeze({ awayMs: span.awayMs, capped, crops: Object.freeze(crops), ripened, thirsty, wilted, died: Object.freeze(died), fruitReady, timberReady, treesThirsty, treesWilted, lines: Object.freeze(lines) });
 }

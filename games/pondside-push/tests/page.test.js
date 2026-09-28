@@ -12,7 +12,7 @@ test("the cabinet exposes pet selection, best-of-five score, controls, and Pet G
   }
   assert.match(html, /\.\.\/pet-games\//);
   assert.match(html, /First to 3/);
-  assert.match(html, /scripts\/main\.js\?v=20260926-impact-grass/);
+  assert.match(html, /scripts\/main\.js\?v=20260927-countdown/);
 });
 
 test("the 3D browser entry uses real farm animals and a fixed timestep", () => {
@@ -24,6 +24,8 @@ test("the 3D browser entry uses real farm animals and a fixed timestep", () => {
   assert.match(source, /yawForFacing\(player\.facingX, player\.facingY\)/);
   assert.match(source, /const TICK_SECONDS = 1 \/ 60/);
   assert.match(source, /while \(accumulator >= TICK_SECONDS\)/);
+  assert.match(source, /isCountdownBlocking\(roundCountdown\)/);
+  assert.match(source, /stepRoundCountdown\(roundCountdown, TICK_SECONDS\)/);
   assert.match(source, /stepMatch\(match, controls, TICK_SECONDS\)/);
   assert.doesNotMatch(source, /getContext\(["']2d/);
 });

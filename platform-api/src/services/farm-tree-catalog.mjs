@@ -9,6 +9,10 @@
 // tickets, in a Tree Plot, and the number standing at once is capped by skill.
 import { offlineGrowthAllowance } from "./farm-time-policy.mjs";
 const DAY = 24 * 60;
+/** A tree drinks like a crop (js/farm-crops.mts): the same soil capacity, thirst clock and wilting cap. */
+const MOISTURE_CAPACITY_MINUTES = 18 * 60;
+const DEATH_DRY_MINUTES = 3 * DAY;
+const MAX_CARE_PENALTY = 0.6;
 const fruit = (price, level, growDays, everyDays, yieldCount) => Object.freeze({
     kind: "fruit", saplingPrice: price, minLevel: level, growMinutes: growDays * DAY, fruitEveryMinutes: everyDays * DAY,
     regrowMinutes: 0, yield: yieldCount, xp: Math.round(60 * everyDays),
@@ -85,6 +89,10 @@ export function normalizeFarmTreeRows(value, treePlotIds) {
             fruitMinutes: rule.kind === "fruit" ? bounded(row.fruitMinutes, rule.fruitEveryMinutes) : 0,
             stump,
             lastFarmMinute: bounded(row.lastFarmMinute, 1_000_000_000),
+            moistureMinutes: bounded(row.moistureMinutes, MOISTURE_CAPACITY_MINUTES),
+            dryMinutes: bounded(row.dryMinutes, DEATH_DRY_MINUTES),
+            carePenalty: bounded(row.carePenalty, MAX_CARE_PENALTY),
+            diedOf: row.diedOf === "thirst" ? "thirst" : "",
         });
     }
     return trees;
@@ -98,7 +106,9 @@ const treeKey = (row) => `${row.plotId}:${row.speciesId}`;
  * stays a stump until it has had the time to grow back; a standing tree is
  * never turned into a stump by a save (only a felling does that), and fruit
  * only accrues once the tree is mature. A tree planted since the stored save
- * counts from the stored clock.
+ * counts from the stored clock. As with a crop, death is permanent and the
+ * wilting penalty never falls in a save (only a pick or a felling, which the
+ * server makes, starts a tree's next harvest clean).
  */
 export function boundTreeGrowth(trees, storedTrees, storedClockMinutes, verified) {
     const stored = new Map(storedTrees.map((row) => [treeKey(row), row]));
@@ -108,25 +118,36 @@ export function boundTreeGrowth(trees, storedTrees, storedClockMinutes, verified
         const previous = stored.get(treeKey(row));
         const floorStamp = previous ? finite(previous.lastFarmMinute) : storedClockMinutes;
         const stamp = Math.min(Math.max(finite(row.lastFarmMinute, floorStamp), floorStamp), Math.max(floorStamp, verified.farmMinutes));
-        const allowance = Math.max(0, stamp - floorStamp) + offline;
+        const care = {
+            carePenalty: Math.max(finite(row.carePenalty), previous ? finite(previous.carePenalty) : 0),
+            diedOf: previous?.diedOf || row.diedOf || "",
+        };
+        // A dead tree never changes again: it stands as it died until it is dug out.
+        if (previous?.diedOf) {
+            return { ...row, ...care, lastFarmMinute: stamp, stump: previous.stump === true, growthMinutes: finite(previous.growthMinutes), fruitMinutes: finite(previous.fruitMinutes) };
+        }
         const before = previous ?? { growthMinutes: 0, fruitMinutes: 0, stump: false };
-        if (before.stump) {
-            const regrown = before.growthMinutes + allowance;
-            if (!row.stump && regrown >= rule.regrowMinutes)
-                return { ...row, lastFarmMinute: stamp, stump: false, growthMinutes: rule.growMinutes, fruitMinutes: 0 };
-            const claimed = row.stump ? finite(row.growthMinutes) : regrown;
-            return { ...row, lastFarmMinute: stamp, stump: true, growthMinutes: Math.max(0, Math.min(claimed, regrown, rule.regrowMinutes)), fruitMinutes: 0 };
-        }
-        const claimedGrowth = row.stump ? before.growthMinutes : finite(row.growthMinutes);
-        const growthMinutes = Math.max(0, Math.min(claimedGrowth, before.growthMinutes + allowance, rule.growMinutes));
-        let fruitMinutes = 0;
-        if (rule.kind === "fruit" && growthMinutes >= rule.growMinutes) {
-            // Only the part of the allowance left once the tree was grown can have gone to fruit.
-            const toFruit = Math.max(0, allowance - Math.max(0, rule.growMinutes - before.growthMinutes));
-            fruitMinutes = Math.max(0, Math.min(finite(row.fruitMinutes), before.fruitMinutes + toFruit, rule.fruitEveryMinutes));
-        }
-        return { ...row, lastFarmMinute: stamp, stump: false, growthMinutes, fruitMinutes };
+        return { ...row, ...boundedGrowth(row, before, rule, Math.max(0, stamp - floorStamp) + offline), ...care, lastFarmMinute: stamp };
     });
+}
+/** How far a living tree may have grown, regrown or fruited in `allowance` farm minutes since `before`. */
+function boundedGrowth(row, before, rule, allowance) {
+    if (before.stump) {
+        const regrown = before.growthMinutes + allowance;
+        if (!row.stump && regrown >= rule.regrowMinutes)
+            return { stump: false, growthMinutes: rule.growMinutes, fruitMinutes: 0 };
+        const claimed = row.stump ? finite(row.growthMinutes) : regrown;
+        return { stump: true, growthMinutes: Math.max(0, Math.min(claimed, regrown, rule.regrowMinutes)), fruitMinutes: 0 };
+    }
+    const claimedGrowth = row.stump ? before.growthMinutes : finite(row.growthMinutes);
+    const growthMinutes = Math.max(0, Math.min(claimedGrowth, before.growthMinutes + allowance, rule.growMinutes));
+    let fruitMinutes = 0;
+    if (rule.kind === "fruit" && growthMinutes >= rule.growMinutes) {
+        // Only the part of the allowance left once the tree was grown can have gone to fruit.
+        const toFruit = Math.max(0, allowance - Math.max(0, rule.growMinutes - before.growthMinutes));
+        fruitMinutes = Math.max(0, Math.min(finite(row.fruitMinutes), before.fruitMinutes + toFruit, rule.fruitEveryMinutes));
+    }
+    return { stump: false, growthMinutes, fruitMinutes };
 }
 /**
  * Which submitted trees a save may keep. Stored trees always survive (a farm
@@ -159,12 +180,19 @@ export function admitNewTrees(trees, storedTrees, context) {
     const accepted = new Set(kept);
     return trees.filter((row) => accepted.has(row));
 }
-/** Ready to pick (fruit) or to fell (timber), on the verified row. */
+/** Ready to pick (fruit) or to fell (timber), on the verified row. A dead tree never is. */
 export function farmTreeReady(row) {
     const rule = farmTreeRule(row?.speciesId);
-    if (!rule || row.stump)
+    if (!rule || row.stump || row.diedOf)
         return false;
     if (!(finite(row.growthMinutes) >= rule.growMinutes))
         return false;
     return rule.kind === "timber" || finite(row.fruitMinutes) >= rule.fruitEveryMinutes;
+}
+/** What a ready tree pays: the species' yield less the verified row's wilting, never below one (js/farm-trees.mts `treeHarvestYield`). */
+export function farmTreeYield(row) {
+    const rule = farmTreeRule(row?.speciesId);
+    if (!rule || row.diedOf)
+        return 0;
+    return Math.max(1, Math.round(rule.yield * (1 - Math.min(MAX_CARE_PENALTY, Math.max(0, finite(row.carePenalty))))));
 }

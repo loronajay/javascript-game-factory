@@ -204,24 +204,26 @@ export function normalizeAgriculture(value, validPlotIds) {
     }
     return freezeAgriculture({ inventory: inventoryWith(5, source.inventory), crops });
 }
-const DRY_CLOCK = { key: "dryMinutes", wilt: WILT_DRY_MINUTES, death: DEATH_DRY_MINUTES, cause: "thirst" };
+/** The thirst clock. Productive trees (farm-trees.mts) run it too: a tree is watered exactly like a crop. */
+export const DRY_CLOCK = Object.freeze({ key: "dryMinutes", wilt: WILT_DRY_MINUTES, death: DEATH_DRY_MINUTES, cause: "thirst" });
 const UNTENDED_CLOCK = { key: "untendedMinutes", wilt: WILT_UNTENDED_MINUTES, death: DEATH_UNTENDED_MINUTES, cause: "neglect" };
 /**
  * Run the given stress clocks for `span` minutes. Wilting costs WILT_PENALTY
  * once, then time spent wilted accrues WILT_STRESS_PENALTY pro rata; the first
- * clock to reach its death threshold kills the crop and nothing else accrues.
+ * clock to reach its death threshold kills the plant and nothing else accrues.
  */
-function accrueStress(row, span, clocks, lethal) {
+export function accrueStress(row, span, clocks, lethal) {
     if (span <= 0 || !clocks.length || row.diedOf)
         return row;
+    const clockOf = (clock) => row[clock.key] ?? 0;
     // Whichever clock reaches death first bounds the span everything accrues over.
     // Non-lethal time (away) has a ceiling short of death instead, and never kills.
-    const ceiling = (clock) => lethal ? clock.death : Math.max(row[clock.key], clock.death - OFFLINE_RESCUE_MINUTES);
+    const ceiling = (clock) => lethal ? clock.death : Math.max(clockOf(clock), clock.death - OFFLINE_RESCUE_MINUTES);
     let lived = span;
     let cause = "";
     if (lethal) {
         for (const clock of clocks) {
-            const untilDeath = clock.death - row[clock.key];
+            const untilDeath = clock.death - clockOf(clock);
             if (untilDeath <= lived) {
                 lived = Math.max(0, untilDeath);
                 cause = clock.cause;
@@ -229,10 +231,10 @@ function accrueStress(row, span, clocks, lethal) {
         }
     }
     // However many clocks run, a minute stressed is one minute against its grade.
-    let next = { ...row, stressMinutes: row.stressMinutes + lived };
+    let next = typeof row.stressMinutes === "number" ? { ...row, stressMinutes: row.stressMinutes + lived } : { ...row };
     let penalty = row.carePenalty;
     for (const clock of clocks) {
-        const before = row[clock.key];
+        const before = clockOf(clock);
         const after = Math.min(ceiling(clock), before + lived);
         if (before < clock.wilt && after >= clock.wilt)
             penalty += WILT_PENALTY;

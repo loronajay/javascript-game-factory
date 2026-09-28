@@ -9,6 +9,7 @@ import { farmMaterial } from "../../../js/farm-materials.mjs";
 import { loadFarmPets } from "../../pet-games/shared/farm-source.js";
 import { cpuFieldFor, speciesStyle } from "../../pet-games/shared/pets.js";
 import { cpuControls } from "./cpu.js";
+import { countdownLabel, createRoundCountdown, isCountdownBlocking, stepRoundCountdown } from "./countdown.js";
 import { ARENA_RADIUS, createMatch, resetRound, stepMatch, WINS_TO_MATCH } from "./match.js";
 import { yawForFacing } from "./presentation.js";
 
@@ -74,7 +75,7 @@ let screen = "setup";
 let previousTime = null;
 let accumulator = 0;
 let lastResolvedRound = 0;
-let bannerUntil = 0;
+let roundCountdown = null;
 let resultDelay = -1;
 
 function buildArena() {
@@ -249,12 +250,12 @@ function startMatch() {
   match.players.forEach(createPetView);
   lastResolvedRound = 0;
   resultDelay = -1;
+  roundCountdown = createRoundCountdown();
   screen = "match";
   setupPanel.hidden = true;
   resultPanel.hidden = true;
   scoreboard.hidden = false;
-  roundBanner.textContent = "ROUND 1";
-  bannerUntil = performance.now() + 1200;
+  roundBanner.textContent = "ROUND 1 · 3";
   renderScoreboard();
   canvas.focus();
 }
@@ -269,6 +270,12 @@ function playerControls() {
 
 function simulationTick() {
   if (!match) return;
+  if (roundCountdown && !roundCountdown.complete) {
+    stepRoundCountdown(roundCountdown, TICK_SECONDS);
+    const label = countdownLabel(roundCountdown);
+    roundBanner.textContent = label ? `ROUND ${match.round} · ${label}` : "";
+    if (isCountdownBlocking(roundCountdown)) return;
+  }
   if (match.phase === "playing") {
     const controls = { [match.players[0].id]: playerControls() };
     for (const rival of match.players.slice(1)) controls[rival.id] = cpuControls(rival, match.players, match.tick);
@@ -304,9 +311,9 @@ function nextRound() {
   else {
     resetRound(match);
     resultDelay = -1;
+    roundCountdown = createRoundCountdown();
     resultPanel.hidden = true;
-    roundBanner.textContent = `ROUND ${match.round}`;
-    bannerUntil = performance.now() + 1000;
+    roundBanner.textContent = `ROUND ${match.round} · 3`;
     renderScoreboard();
     canvas.focus();
   }
@@ -315,6 +322,7 @@ function nextRound() {
 function backToSetup() {
   screen = "setup";
   match = null;
+  roundCountdown = null;
   clearViews();
   scoreboard.hidden = true;
   resultPanel.hidden = true;
@@ -394,7 +402,6 @@ function loop(timestamp) {
   const impact = match ? Math.max(0, ...match.players.map((player) => player.impact)) : 0;
   camera.position.set(Math.sin(timestamp * 0.12) * impact * 0.14, 18 + Math.cos(timestamp * 0.15) * impact * 0.08, 20);
   camera.lookAt(0, 0, 0);
-  if (timestamp > bannerUntil) roundBanner.textContent = "";
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }

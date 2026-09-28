@@ -8,6 +8,10 @@
 // felled, fruit on it or not); growth between quarter hours is a scale on the
 // model already standing. Fruit hangs only when a tree is ready to pick, and a
 // felled tree is a stump with a shoot coming back out of it.
+//
+// A tree is watered like a crop, and reads like one: watered mulch is dark and
+// wet; a thirsty tree pales, a wilted one browns and sags, and a dead one is a
+// grey, leaning ruin with no fruit on it (farm-trees.mts `treeStatus`).
 
 import { createBirch, createFruitTree, createPine, createStump, createTree, createWillow } from "./farm-props-plants.mjs";
 import { findTreeSpecies, type TreeSpecies } from "./farm-catalog/trees.mjs";
@@ -15,7 +19,14 @@ import { treeStatus, type FarmTree, type TreeStatus } from "./farm-trees.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 
 type ThreeNamespace = Record<string, any>;
-type TreeView = { group: any; model: any; key: string; shake: number };
+type TreeView = { group: any; model: any; key: string; shake: number; wet: any };
+
+/** How a suffering tree reads, on its own model: a colour its materials lean toward, and a lean. */
+export const TREE_WITHERING: Readonly<Partial<Record<TreeStatus["condition"], Readonly<{ tint: number; amount: number; lean: number }>>>> = Object.freeze({
+  thirsty: Object.freeze({ tint: 0xb9b27a, amount: 0.3, lean: 0 }),
+  wilted: Object.freeze({ tint: 0xa47a3e, amount: 0.65, lean: 0.06 }),
+  dead: Object.freeze({ tint: 0x6f665a, amount: 0.85, lean: 0.14 }),
+});
 
 /** How tall a tree stands for its growth: a knee-high sapling up to the full model. */
 export function treeScale(status: TreeStatus): number {
@@ -48,9 +59,23 @@ function buildTree(THREE: ThreeNamespace, species: TreeSpecies, seed: number, fr
 function dispose(root: any): void {
   root.traverse?.((node: any) => {
     node.geometry?.dispose?.();
-    // Materials come from the farm's shared material cache; only geometry is this view's.
+    // Materials come from the farm's shared material cache; only geometry is this
+    // view's — except the copies a withering tree was given, which are its own.
+    if (node.userData?.witheredMaterial) node.material?.dispose?.();
   });
   root.parent?.remove(root);
+}
+
+/** Lean every material of a model toward a withered colour. Materials are copied first: the cache's are shared. */
+function wither(THREE: ThreeNamespace, model: any, tint: number, amount: number): void {
+  const toward = new THREE.Color(tint);
+  model.traverse?.((node: any) => {
+    if (!node.isMesh || !node.material?.color) return;
+    const copy = node.material.clone();
+    copy.color.lerp(toward, amount);
+    node.material = copy;
+    node.userData.witheredMaterial = true;
+  });
 }
 
 export type FarmTreesView = Readonly<{
@@ -68,13 +93,33 @@ export function createFarmTreesView(THREE: ThreeNamespace, scene: any): FarmTree
 
   function modelFor(row: FarmTree, species: TreeSpecies, status: TreeStatus): any {
     const seed = seedOf(row.plotId);
-    if (status.stage !== "stump") return buildTree(THREE, species, seed, status.action === "pick");
-    const group = new THREE.Group();
-    group.add(createStump(THREE));
-    const shoot = buildTree(THREE, species, seed, false);
-    shoot.name = "shoot";
-    group.add(shoot);
-    return group;
+    let model: any;
+    if (status.stage !== "stump") model = buildTree(THREE, species, seed, status.action === "pick");
+    else {
+      model = new THREE.Group();
+      model.add(createStump(THREE));
+      const shoot = buildTree(THREE, species, seed, false);
+      shoot.name = "shoot";
+      model.add(shoot);
+    }
+    const withering = TREE_WITHERING[status.condition];
+    if (withering) {
+      wither(THREE, model, withering.tint, withering.amount);
+      model.userData.lean = withering.lean;
+    }
+    return model;
+  }
+
+  /** Dark, wet mulch over the plot's own while the soil holds water. */
+  function wetMulch(): any {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.66, 0.66, 0.004, 24),
+      new THREE.MeshStandardMaterial({ color: 0x2a1c12, roughness: 0.55, transparent: true, opacity: 0.7, polygonOffset: true, polygonOffsetFactor: -1 }),
+    );
+    mesh.position.y = 0.062;
+    mesh.receiveShadow = true;
+    mesh.name = "wet-mulch";
+    return mesh;
   }
 
   function sync(layout: FarmLayout, farmMinutes: number): void {
@@ -86,13 +131,15 @@ export function createFarmTreesView(THREE: ThreeNamespace, scene: any): FarmTree
       if (!plot || !species) continue;
       seen.add(row.plotId);
       const status = treeStatus(row, farmMinutes);
-      const key = `${species.id}|${status.stage === "stump" ? "stump" : "tree"}|${status.action === "pick" ? "fruit" : ""}`;
+      const key = `${species.id}|${status.stage === "stump" ? "stump" : "tree"}|${status.action === "pick" ? "fruit" : ""}|${status.condition}`;
       let view = views.get(row.plotId);
       if (!view) {
         const group = new THREE.Group();
         group.userData.treePlotId = row.plotId;
         root.add(group);
-        view = { group, model: null, key: "", shake: 0 };
+        const wet = wetMulch();
+        group.add(wet);
+        view = { group, model: null, key: "", shake: 0, wet };
         views.set(row.plotId, view);
       }
       if (view.key !== key) {
@@ -103,6 +150,7 @@ export function createFarmTreesView(THREE: ThreeNamespace, scene: any): FarmTree
       }
       view.group.position.set(plot.x, 0, plot.z);
       view.group.rotation.y = plot.rotationY;
+      view.wet.visible = status.moist;
       if (status.stage === "stump") {
         view.model.scale.setScalar(1);
         const shoot = view.model.getObjectByName("shoot");
@@ -113,9 +161,11 @@ export function createFarmTreesView(THREE: ThreeNamespace, scene: any): FarmTree
       } else {
         view.model.scale.setScalar(treeScale(status));
       }
+      if (view.shake <= 0) view.model.rotation.z = view.model.userData.lean ?? 0;
     }
     for (const [plotId, view] of views) {
       if (seen.has(plotId)) continue;
+      view.wet.material.dispose();
       dispose(view.group);
       views.delete(plotId);
     }
@@ -131,7 +181,7 @@ export function createFarmTreesView(THREE: ThreeNamespace, scene: any): FarmTree
       if (view.shake <= 0 || !view.model) continue;
       view.shake = Math.max(0, view.shake - dt * 3.2);
       const wobble = Math.sin(view.shake * 38) * 0.05 * view.shake;
-      view.model.rotation.z = wobble;
+      view.model.rotation.z = (view.model.userData.lean ?? 0) + wobble;
       view.model.rotation.x = wobble * 0.6;
     }
   }

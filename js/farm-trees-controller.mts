@@ -7,12 +7,13 @@
 // the felling keys while a tree is being chopped.
 //
 // E at a Tree Plot does the one thing its state calls for: plant the selected
-// sapling, pick ripe fruit, start felling a grown timber tree, or (pressed
+// sapling, clear a tree that died of thirst onto the compost heap, pick ripe
+// fruit, start felling a grown timber tree, water a thirsty tree, or (pressed
 // twice) dig out a stump. An account farm's picks and fellings are the
 // server's (the page injects `submitHarvest`); a signed-out farm does them here.
 
 import { findTreeSpecies, type TreeSpecies } from "./farm-catalog/trees.mjs";
-import { describeTree, digOutStump, findTreePlotInReach, harvestFarmTree, plantFarmTree, treeStatus, treesOfKind, type TreePlotTarget } from "./farm-trees.mjs";
+import { clearDeadFarmTree, describeTree, digOutStump, findTreePlotInReach, harvestFarmTree, plantFarmTree, treeStatus, treesOfKind, waterFarmTree, type TreePlotTarget } from "./farm-trees.mjs";
 import { forestryCapacity, orchardCapacity } from "./farm-capacity.mjs";
 import { skillLevelForXp } from "./farm-skills.mjs";
 import { startChop, swingAxe, type ChopState } from "./farm-chop.mjs";
@@ -120,8 +121,11 @@ export function createFarmTreesController(deps: TreesControllerDeps): FarmTreesC
     const species = findTreeSpecies(row.speciesId)!;
     const status = treeStatus(row, deps.clockMinutes());
     if (busy) return species.kind === "fruit" ? "Picking…" : "Timber!";
-    if (status.action === "pick") return `Press E to pick ${species.yield} ${species.fruitPlural}`;
-    if (status.action === "fell") return `Press E to fell the ${species.title} · ${species.yield} logs`;
+    if (status.dead) return `${describeTree(species, status)} · Press E to clear it onto the compost heap`;
+    if (status.action === "pick") return `Press E to pick ${status.harvestYield} ${species.fruitPlural}`;
+    if (status.action === "fell") return `Press E to fell the ${species.title} · ${status.harvestYield} logs`;
+    const wilting = status.wilted ? "wilting " : "";
+    if (status.thirsty) return `Press E to water the ${wilting}${species.title}${status.stage === "stump" ? " stump" : ""}`;
     if (status.stage === "stump") {
       if (digArmed?.plotId === row.plotId) return `Press E again to dig out the ${species.title} stump for good`;
       return `${describeTree(species, status)} · press E twice to dig it out`;
@@ -170,6 +174,7 @@ export function createFarmTreesController(deps: TreesControllerDeps): FarmTreesC
         if (Array.isArray(result?.achievements) && result.achievements.length) deps.onAchievements(result.achievements);
         if (result?.ok) deps.setStatus(`${done(Number(result.quantity) || species.yield, skillNote(result, species))} Saved to your account.`);
         else if (result?.error === "not_ready") deps.setStatus(`The ${species.title} is not ready yet by the farm's records — it needs a little longer.`);
+        else if (result?.error === "dead") deps.setStatus(`The ${species.title} died of thirst — it gives nothing now. Press E to clear it.`);
         else deps.setStatus(species.kind === "fruit" ? "That pick did not go through. Try again in a moment." : "That felling did not go through. Try again in a moment.");
         return;
       }
@@ -193,6 +198,14 @@ export function createFarmTreesController(deps: TreesControllerDeps): FarmTreesC
     if (!row) return plant(plotId);
     const species = findTreeSpecies(row.speciesId)!;
     const status = treeStatus(row, deps.clockMinutes());
+    if (status.dead) {
+      const layout = deps.layout();
+      const cleared = clearDeadFarmTree(layout.trees, layout.agriculture.inventory, plotId, deps.clockMinutes());
+      if (!cleared.ok) return false;
+      const next = withFarmTrees(withFarmAgriculture(layout, { ...layout.agriculture, inventory: cleared.inventory }), cleared.trees);
+      void persist(next).then((saved) => deps.setStatus(`Cleared the dead ${species.title} onto the compost heap (+1 compost) — the plot is free. ${saved}`));
+      return true;
+    }
     if (status.action === "pick") {
       void harvest(plotId, species);
       return true;
@@ -206,6 +219,13 @@ export function createFarmTreesController(deps: TreesControllerDeps): FarmTreesC
       deps.meter.show(`Felling the ${species.title}`);
       deps.meter.render(chop.state, seconds());
       document.exitPointerLock?.();
+      return true;
+    }
+    if (status.thirsty) {
+      const layout = deps.layout();
+      const watered = waterFarmTree(layout.trees, layout.agriculture.inventory, plotId, deps.clockMinutes());
+      if (!watered.ok) return false;
+      void persist(withFarmTrees(layout, watered.trees)).then((saved) => deps.setStatus(`Watered the ${species.title}${status.wilted ? " — it will recover, but the wilting has cost this harvest" : ""}. ${saved}`));
       return true;
     }
     if (status.stage === "stump") {
