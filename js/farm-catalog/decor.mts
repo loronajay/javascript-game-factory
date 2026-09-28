@@ -284,6 +284,36 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("tennis-ball", { title: "Tennis Ball", category: "prop", footprint: { width: 0.24, depth: 0.24 }, solid: false, snapDegrees: 45, swatch: ["#cbea45", "#f5f0d0"], model: "tennis-ball", unlock: STARTER }),
   item("rope-toy", { title: "Rope Toy", category: "prop", footprint: { width: 0.55, depth: 0.18 }, solid: false, snapDegrees: 45, swatch: ["#d9b36c", "#8c5638"], model: "rope-toy", unlock: STARTER }),
   item("bone", { title: "Bone", category: "prop", footprint: { width: 0.48, depth: 0.2 }, solid: false, snapDegrees: 45, swatch: ["#eee5ce", "#b8a98c"], model: "bone", unlock: STARTER }),
+  // Every other species' three toys (farm-props-toys.mts), cross-referenced the same way by
+  // its care row. Low toys are walked over; anything a body would stand against is solid.
+  // A swimmer's toys are `aquatic`: they stand on a pond bed like its home.
+  item("splash-tub", { title: "Splash Tub", category: "prop", footprint: { width: 0.8, depth: 0.8 }, solid: false, snapDegrees: 45, swatch: ["#9aa6ad", "#6fb6d9"], model: "toy-splash-tub" }),
+  item("pecking-bell", { title: "Pecking Bell", category: "prop", footprint: { width: 0.3, depth: 0.3 }, solid: false, snapDegrees: 45, swatch: ["#d9b44a", "#6d4b2f"], model: "toy-pecking-bell" }),
+  item("rubber-duckling", { title: "Rubber Duckling", category: "prop", footprint: { width: 0.22, depth: 0.22 }, solid: false, snapDegrees: 45, swatch: ["#f6d23b", "#f08a24"], model: "toy-rubber-duckling" }),
+  item("bamboo-climber", { title: "Bamboo Climber", category: "prop", footprint: { width: 1, depth: 0.8 }, snapDegrees: 45, swatch: ["#9fbf5a", "#5f8f48"], model: "toy-bamboo-climber" }),
+  item("pinecone-puzzle", { title: "Pinecone Puzzle", category: "prop", footprint: { width: 0.45, depth: 0.45 }, solid: false, snapDegrees: 45, swatch: ["#8a5a34", "#c89a5a"], model: "toy-pinecone-puzzle" }),
+  item("leaf-hammock", { title: "Leaf Hammock", category: "prop", footprint: { width: 1.5, depth: 0.6 }, swatch: ["#5f8f48", "#8a5a34"], model: "toy-leaf-hammock" }),
+  item("log-tunnel", { title: "Log Tunnel", category: "prop", footprint: { width: 1.2, depth: 0.55 }, snapDegrees: 45, swatch: ["#7a5534", "#4a321f"], model: "toy-log-tunnel" }),
+  item("pebble-pile", { title: "Pebble Pile", category: "prop", footprint: { width: 0.55, depth: 0.55 }, solid: false, snapDegrees: 45, swatch: ["#9aa0a2", "#72777a"], model: "toy-pebble-pile" }),
+  item("paddle-pool", { title: "Paddle Pool", category: "prop", footprint: { width: 1.1, depth: 1.1 }, solid: false, snapDegrees: 45, swatch: ["#4fa3d9", "#e8e1cf"], model: "toy-paddle-pool" }),
+  item("beach-ball", { title: "Beach Ball", category: "prop", footprint: { width: 0.7, depth: 0.7 }, snapDegrees: 45, swatch: ["#e8453c", "#2f7fd9"], model: "toy-beach-ball" }),
+  item("scratching-post", { title: "Scratching Post", category: "prop", footprint: { width: 0.45, depth: 0.45 }, snapDegrees: 45, swatch: ["#c9a06a", "#8a5a34"], model: "toy-scratching-post" }),
+  item("watermelon", { title: "Watermelon", category: "prop", footprint: { width: 0.55, depth: 0.4 }, solid: false, snapDegrees: 45, swatch: ["#3f7228", "#e8453c"], model: "toy-watermelon" }),
+  item("tractor-tire", { title: "Tractor Tire", category: "prop", footprint: { width: 1.2, depth: 1.2 }, snapDegrees: 45, swatch: ["#2b2b2b", "#555555"], model: "toy-tractor-tire" }),
+  item("scratch-boulder", { title: "Scratch Boulder", category: "prop", footprint: { width: 1, depth: 0.9 }, swatch: ["#928671", "#6e6555"], model: "toy-scratch-boulder" }),
+  item("pushing-log", { title: "Pushing Log", category: "prop", footprint: { width: 1.6, depth: 0.45 }, snapDegrees: 45, swatch: ["#7a5534", "#c9a06a"], model: "toy-pushing-log" }),
+  item("fruit-mobile", { title: "Fruit Mobile", category: "prop", footprint: { width: 0.4, depth: 0.4 }, swatch: ["#b8457a", "#f0a030"], model: "toy-fruit-mobile" }),
+  item("moth-lantern", { title: "Moth Lantern", category: "prop", footprint: { width: 0.35, depth: 0.35 }, swatch: ["#2b2b2b", "#ffd9a0"], model: "toy-moth-lantern" }),
+  item("swing-perch", { title: "Swing Perch", category: "prop", footprint: { width: 1.1, depth: 0.45 }, swatch: ["#5d3a1f", "#c9a06a"], model: "toy-swing-perch" }),
+  item("chew-ring", { title: "Chew Ring", category: "prop", footprint: { width: 0.7, depth: 0.7 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#f07a3a", "#f5f0d0"], model: "toy-chew-ring" }),
+  item("sunken-chest", { title: "Sunken Chest", category: "prop", footprint: { width: 0.85, depth: 0.55 }, aquatic: true, swatch: ["#7a5534", "#d9b44a"], model: "toy-sunken-chest" }),
+  item("kelp-garden", { title: "Kelp Garden", category: "prop", footprint: { width: 1, depth: 1 }, solid: false, aquatic: true, swatch: ["#3f7a3a", "#6f9a3c"], model: "toy-kelp-garden" }),
+  item("glow-stone", { title: "Glow Stone", category: "prop", footprint: { width: 0.55, depth: 0.55 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#343247", "#67d9d0"], model: "toy-glow-stone" }),
+  item("old-anchor", { title: "Old Anchor", category: "prop", footprint: { width: 0.9, depth: 0.5 }, aquatic: true, swatch: ["#5a4a40", "#8a6a50"], model: "toy-old-anchor" }),
+  item("bubble-stone", { title: "Bubble Stone", category: "prop", footprint: { width: 0.5, depth: 0.5 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#72777a", "#cfefff"], model: "toy-bubble-stone" }),
+  item("glass-float", { title: "Glass Float", category: "prop", footprint: { width: 0.4, depth: 0.4 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#6fc7b8", "#b8a98c"], model: "toy-glass-float" }),
+  item("coral-fan", { title: "Coral Fan", category: "prop", footprint: { width: 0.8, depth: 0.3 }, solid: false, aquatic: true, swatch: ["#d99ac6", "#e86a8a"], model: "toy-coral-fan" }),
+  item("current-spinner", { title: "Current Spinner", category: "prop", footprint: { width: 0.5, depth: 0.5 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#67b6c7", "#f5f0d0"], model: "toy-current-spinner" }),
   item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", unlock: PET_OUTCOME, catalogVisible: false }),
   item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
   item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),
@@ -317,7 +347,7 @@ export function findFarmDecor(id: unknown): FarmDecorDefinition | undefined {
   return typeof id === "string" ? FARM_DECOR_CATALOG.find((entry) => entry.id === id) : undefined;
 }
 
-/** The build-mode tab an item is listed under: its category, except that aquatic dwellings sit with the ponds they live in. */
+/** The build-mode tab an item is listed under: its category, except that aquatic homes and toys sit with the ponds they live in. */
 export function farmDecorTab(definition: FarmDecorDefinition): FarmDecorCategory {
   return definition.aquatic ? "water" : definition.category;
 }

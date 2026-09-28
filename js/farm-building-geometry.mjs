@@ -80,3 +80,22 @@ export function hipRoofMesh(input) {
     }
     return Object.freeze({ positions: Object.freeze(positions), uvs: Object.freeze(uvs) });
 }
+/**
+ * A lower copy of a hip roof with every triangle wound in the opposite
+ * direction. Three.js materials cull back faces by default, so merely lowering
+ * the top mesh leaves the roof invisible from underneath.
+ */
+export function hipRoofUndersideMesh(roof, thickness) {
+    const positions = [];
+    const uvs = [];
+    for (let triangle = 0; triangle < roof.positions.length; triangle += 9) {
+        const uvTriangle = (triangle / 3) * 2;
+        for (const vertex of [2, 1, 0]) {
+            const position = triangle + vertex * 3;
+            positions.push(roof.positions[position], roof.positions[position + 1] - thickness, roof.positions[position + 2]);
+            const uv = uvTriangle + vertex * 2;
+            uvs.push(roof.uvs[uv], roof.uvs[uv + 1]);
+        }
+    }
+    return Object.freeze({ positions: Object.freeze(positions), uvs: Object.freeze(uvs) });
+}

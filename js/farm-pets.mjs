@@ -35,6 +35,7 @@
 // through a wall, which is what makes a stall with its door shut a pen: the
 // pet strolls the stall and never picks the field beyond the door.
 import { findAnimal } from "./farm-catalog/animals.mjs";
+import { petPace } from "./farm-pet-care.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 import { WATER_LEVEL, groundHeightAt, insidePondWater, pondAt } from "./farm-pond.mjs";
 export const ATTENTION_SECONDS = 3;
@@ -328,7 +329,7 @@ export function createPetSim(options) {
                 const wanted = yawToward(pet, target);
                 pet.yaw = turnToward(pet.yaw, wanted, species.turnRate, dt);
                 if (Math.abs(wrapAngle(wanted - pet.yaw)) <= WALK_CONE) {
-                    const distance = Math.min(species.walkSpeed * dt, remaining);
+                    const distance = Math.min(species.walkSpeed * pet.pace * dt, remaining);
                     if (stepAlong(pet, pet.yaw, distance, player)) {
                         pet.moving = true;
                     }
@@ -354,8 +355,9 @@ export function createPetSim(options) {
             pet.hover = Math.min(swimCeiling(species, pet.sizeMultiplier), pet.swimY + Math.sin(pet.phase) * BOB_HEIGHT * 0.4);
         }
     }
-    return Object.freeze({
-        pets: () => pets.map((pet) => ({
+    /** The read-only pose everything outside the sim sees. */
+    function view(pet) {
+        return {
             instanceId: pet.instanceId,
             speciesId: pet.speciesId,
             name: pet.name,
@@ -368,7 +370,11 @@ export function createPetSim(options) {
             radius: pet.radius,
             state: pet.state,
             moving: pet.moving,
-        })),
+            pace: pet.pace,
+        };
+    }
+    return Object.freeze({
+        pets: () => pets.map(view),
         sync(layout) {
             const rows = new Map(layout.pets.map((row) => [row.instanceId, row]));
             for (let index = pets.length - 1; index >= 0; index -= 1) {
@@ -379,6 +385,7 @@ export function createPetSim(options) {
                     pets[index].name = row.name;
                     pets[index].sizeMultiplier = row.profile?.size.current ?? 1;
                     pets[index].paletteId = row.profile?.paletteId ?? "standard";
+                    pets[index].pace = petPace(row.profile);
                     pets[index].radius = pets[index].species.radius * pets[index].sizeMultiplier;
                 }
             }
@@ -417,6 +424,7 @@ export function createPetSim(options) {
                     radius,
                     state: "idle",
                     moving: false,
+                    pace: petPace(row.profile),
                     timer: 0,
                     targetX: spot.x,
                     targetZ: spot.z,
@@ -471,7 +479,7 @@ export function createPetSim(options) {
         },
         carried() {
             const pet = pets.find((candidate) => candidate.state === "carried");
-            return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, sizeMultiplier: pet.sizeMultiplier, paletteId: pet.paletteId, radius: pet.radius, state: pet.state, moving: pet.moving } : null;
+            return pet ? view(pet) : null;
         },
         attention(instanceId) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
@@ -495,7 +503,7 @@ export function createPetSim(options) {
         },
         find(instanceId) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-            return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, sizeMultiplier: pet.sizeMultiplier, paletteId: pet.paletteId, radius: pet.radius, state: pet.state, moving: pet.moving } : null;
+            return pet ? view(pet) : null;
         },
     });
 }

@@ -163,16 +163,17 @@ export function judgePlacement(layout: FarmLayout, instanceId: string, definitio
   if (!insideFieldBox(box, box.footprint, bounds)) return "outside";
   if ((definition.solid || definition.keepOut) && obstacleBlocks(FARM_SPAWN, box, SPAWN_CLEARANCE)) return "spawn";
   let hasInteriorHome = !definition.interior;
-  let hasPond = !definition.aquatic;
+  // Standing in a pond is asked of every pond, not only the ones it collides with: a walk-through pond toy collides with nothing.
+  const hasPond = !definition.aquatic || layout.decor.some((other) => {
+    const otherDefinition = other.instanceId !== instanceId ? definitionOf(other) : undefined;
+    return Boolean(otherDefinition?.pond && aquaticFits(box, farmDecorBox(other, otherDefinition)));
+  });
   for (const other of layout.decor) {
     if (other.instanceId === instanceId) continue;
     const otherDefinition = definitionOf(other);
     if (!otherDefinition || !farmDecorCollides(definition, otherDefinition)) continue;
     // An aquatic dwelling in the water of a pond does not collide with it; a pond may stand over one that fits in it.
-    if (definition.aquatic && otherDefinition.pond && aquaticFits(box, farmDecorBox(other, otherDefinition))) {
-      hasPond = true;
-      continue;
-    }
+    if (definition.aquatic && otherDefinition.pond && aquaticFits(box, farmDecorBox(other, otherDefinition))) continue;
     if (otherDefinition.aquatic && definition.pond && aquaticFits(farmDecorBox(other, otherDefinition), box)) continue;
     if ((definition.interior || definition.indoors) && otherDefinition.shell && interiorFits(box, definition, other, otherDefinition)) {
       hasInteriorHome = true;

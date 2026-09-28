@@ -25,6 +25,18 @@ export function petCareEnvironment(speciesId, decor) {
         toyTitles: Object.freeze(toys.map((toy) => toy.title)),
     });
 }
+/** What this species eats, lives in and plays with, and which of those the farm has right now: the Pets panel's care line. */
+export function petCareSummary(speciesId, decor, supplies) {
+    const care = findPetCare(speciesId);
+    if (!care)
+        return null;
+    const placed = new Set(decor.map((row) => row.itemId));
+    return Object.freeze({
+        food: Object.freeze({ title: care.food.title, count: Math.max(0, Math.floor(supplies[care.food.itemId] ?? 0)) }),
+        home: Object.freeze({ title: care.dwelling.title, placed: placed.has(care.dwelling.itemId) }),
+        toys: Object.freeze(care.toys.map((toy) => Object.freeze({ title: toy.title, placed: placed.has(toy.itemId) }))),
+    });
+}
 /** Daily wellbeing from the currently placed species-appropriate care objects. */
 export function advancePetWellbeing(profile, speciesId, decor, elapsedFarmMinutes) {
     const elapsed = Number.isFinite(elapsedFarmMinutes) ? Math.max(0, elapsedFarmMinutes) : 0;

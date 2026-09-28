@@ -1,6 +1,6 @@
 # Farm Pets & Care — implementation checklist
 
-> Active plan · started 2026-09-22  
+> Active plan · started 2026-09-22 · care coverage completed 2026-09-27 (every species has food, a home and three toys)  
 > Source of truth for pet identity, care, onboarding, inventory supplies, progression, death, and later competition work. `FARM_SCOPE.md` remains the source for the 3D farm/environment architecture.
 
 ## Status key
@@ -13,14 +13,14 @@
 ## Rules locked for this pass
 
 - The first pet is a dog. A first-time farm owner must name it before normal farm play.
-- Later adoptions cost **1,200 tickets**, but tickets are not implemented in this pass. Adoption remains unlocked/free while the system is built and tested.
+- Later adoptions cost **1,200 tickets** and include five servings of that species' food. This is live and server-authoritative (`POST /games/farm/adoptions`, see `FARM_TICKET_ECONOMY.md`).
 - New farms start with **one randomly selected pool of six plant types, one seed of each**, one growing plot, and **20 Dog Food**.
-- Dog Food will cost **15 tickets** when purchasing exists. Every species has its own named food and provisional price, weighted upward for more exotic animals.
+- Dog Food costs **15 tickets**. Every species has its own named food and price, weighted upward for more exotic animals; foods are repeat-purchase supplies bought through `POST /games/farm/supplies/purchases`.
 - A pet may have up to five compatible traits. Trait selection and stat/growth variation happen per adopted pet, not merely per species.
 - Visible stats: gender, age, size, hunger, happiness, speed, and strength. Affection is stored but hidden from the stats UI.
-- Everything stays unlocked during development. Unlock and purchase enforcement comes only after tickets are designed.
+- The starter set (doghouse and the corgi's three toys, plus the farm starters) is permanently free. Every other species' home and toys are buy-once permanent unlocks in the Farm ticket shop; prices live only in `platform-api/src/services/farm-ticket-catalog.mts`.
 - Every species uses the same full individual profile system: gender, age, relative size/growth, affection, hunger, happiness, speed, strength, compatible traits, and palette identity. Speed and strength ranges are weighted by species; the rest follows the same randomized pipeline.
-- Every species has a food and a placeable procedural dwelling with an entrance sized from that species' authoritative body measurements.
+- Every species has a food, a placeable procedural dwelling with an entrance sized from that species' authoritative body measurements, and **exactly three toys of its own**. A toy belongs to one species; a swimmer's home and toys are `aquatic` and stand on a pond bed.
 - Tricks, pet minigames, and breeding are deferred until their animation and gameplay passes are scoped.
 - Pet needs use the existing farm clock without a second time scale: one pet day is one 1,440-minute farm day, during play and naps only. The farm is PAUSED while the player is away (owner decision 2026-09-26): nothing drains, ages or grows off-screen.
 - Hunger drains by **25 points per farm day** before traits; Big Appetite multiplies drain by 1.5 and Light Eater by 0.65. One correct species serving restores 35 hunger.
@@ -37,7 +37,7 @@
 ### Data and persistence
 
 - [x] Pet care is one species-indexed data catalog rather than scattered constants (`js/farm-pet-care.mts`).
-- [x] Every row records future adoption price, species food/price, a data-only dwelling, maximum life, size range, species-weighted stat ranges, and allowed traits; the dog row also records its currently scoped toys.
+- [x] Every row records adoption price, species food/price, its dwelling, its three toys, maximum life, size range, species-weighted stat ranges, and allowed traits. `petCareForItem(itemId)` answers "whose home/toy is this?" for the editor.
 - [x] Every newly adopted pet receives a persisted individual profile: gender, age, current/max size, growth rate, affection, hunger, happiness, speed, strength, 1–3 compatible traits, and palette id.
 - [x] Random generation is injectable and unit tested; values are bounded during load.
 - [x] Mutually exclusive traits cannot be generated or restored together.
@@ -58,10 +58,12 @@
 - [x] Individual size scales the visible animal and the same multiplier drives collision, water fit, carry/drop spacing, and interaction reach.
 - [x] Owners can press G near a hungry pet to consume one matching species food; full pets and missing-food attempts consume nothing.
 - [x] Context prompts and the Pets panel distinguish Full, Content, Hungry, and Starving without exposing affection.
-- [~] The current adoption panel can create/rename/release pets. Ticket charging and lock rules remain off.
+- [x] The adoption panel creates/renames/releases pets; later adoptions are charged 1,200 tickets server-side and include five servings of food.
 - [x] All existing animal models use authoritative profile, food, dwelling, lifespan, and species-weight data.
 - [x] Every species has four named weighted visual palettes (69% classic, 24% uncommon, 6% rare, 1% super rare); selective three-color ramps preserve eyes/facial details, super rares add a pearlescent finish, and persisted Rare/Super Rare identities grant one-time +8%/+15% Speed and Strength bonuses.
 - [x] All ten dwellings are placeable catalog props with distinct procedural models, species identity, and measured entrance contracts.
+- [x] All ten species have three procedural toys each (30 total, `js/farm-props-toys.mts`); some animate (bell, hammock, mobile, lantern moths, swing, kelp, bubbles, float, spinner). Swimmers' toys are listed in the Water tab and placed in ponds; the build-mode card and inspector name the species a home/toy is for.
+- [x] The Pets panel shows a care line per pet: what it eats (and how many servings are held), its home, and its three toys, each marked on the farm or not (`petCareSummary`, pure).
 - [x] Aquatic pets can be picked up like every other pet and can only be put down where their full body fits inside water.
 - [x] New owners see the farm introduction once and must atomically name/save their starter dog before normal play; visitors never receive the owner gate.
 - [x] New farms persist one growing plot, one seed from six randomly chosen unique crops, and 20 Dog Food without rerolling or re-granting on reload.
@@ -111,7 +113,7 @@ These are balancing rows, not claims about real-world animal biology. Food price
 - [x] **Big Appetite** — hunger drains faster; conflicts with Light Eater.
 - [x] **Light Eater** — hunger drains slower; conflicts with Big Appetite.
 - [x] **Fast Grower** — reaches adult size sooner.
-- [~] Appetite modifiers affect hunger now; movement, handling, and growth modifiers remain for their respective passes.
+- [x] Every trait has its live effect: appetite traits change hunger drain; Cuddly/Independent change handling; Fast Grower changes growth; **Zoomies** multiplies wander pace by 1.35 (`petPace`, which also applies a narrow 0.9–1.1× band from Speed — the same curve the pet games use — and speeds the walk clip to match).
 - [x] Every trait also declares how it wants to be treated (rapport deltas per pet/carry/play/feed/early-feed), which drives stat growth.
 - [ ] Add rarity/weight data after the first behavior tuning pass; current selection is uniform.
 
@@ -156,6 +158,7 @@ Speed and Strength are no longer fixed at adoption. `js/farm-pet-growth.mts` is 
 - [x] Name one data-only dwelling for every species.
 - [x] Add dwelling catalog assets and species-appropriate entrances after their 3D models are designed.
 - [x] Add Tennis Ball, Rope Toy, and Bone as data-driven owned/placed items.
+- [x] Give every other species three toys of its own (placeable, priced, aquatic for swimmers), so happiness and Y Play work the same for all ten.
 - [x] The first valid species dwelling grants a one-time persisted +10 affection award; replacing it cannot farm the bonus.
 - [x] Happiness loses 8/day, offset by 5/day for a valid dwelling and 2/day per distinct compatible toy; those items also build affection by 1/day and 0.5/day respectively.
 - [x] Connect Cuddly/Independent to carrying and petting reactions.
@@ -184,16 +187,36 @@ Speed and Strength are no longer fixed at adoption. `js/farm-pet-growth.mts` is 
 
 ### Phase 6 — economy and additional species
 
-- [ ] Design the ticket wallet/earning authority before charging anything.
-- [ ] Charge 1,200 tickets only for adoptions after the starter dog.
-- [ ] Sell species foods at their catalog prices with atomic spend + inventory grant.
-- [ ] Keep developer/test unlock controls separate from production progression.
-- [~] Create one care definition per species: lifespan, food/price, placeable dwelling, stat ranges, traits, and palette plans are present; species-specific toys, behavior modifiers, and animations remain.
-- [ ] Do not enable live needs until the shared elapsed-time rules and each food path are complete.
+- [x] Use the shared account-wide ticket wallet (the Arcade Room's) as the spending authority.
+- [x] Charge 1,200 tickets only for adoptions after the starter dog (includes five food).
+- [x] Sell species foods at their catalog prices with atomic spend + inventory grant (Inventory panel buy buttons).
+- [x] No developer unlock path exists for the Farm: the starter set is the only free set, everything else is an entitlement.
+- [x] One care definition per species: lifespan, food/price, placeable dwelling, three toys, stat ranges, traits, and palettes.
+- [x] Live needs run for every species through the shared farm-time checkpoint.
+- **Deferred:** species-specific *behaviour* beyond the shared pipeline (a bat roosting in its box, a duck taking to a pond) and bespoke animations. Every species uses the Gobkit pack's four clips (idle/attack/dead/walk); new motion belongs with the tricks pass.
+
+## Toy catalog (2026-09-27)
+
+Every row is a decor row under `decor.prop.<id>`, referenced by the species' care row. Low toys are walk-over; anything a body would stand against is solid. Prices are per item, buy-once.
+
+| Species | Toys | Price each |
+|---|---|---:|
+| Corgi | Tennis Ball, Rope Toy, Bone | starter (free) |
+| Duck | Splash Tub, Pecking Bell, Rubber Duckling | 60 |
+| Bat | Fruit Mobile, Moth Lantern, Swing Perch | 70 |
+| Platypus | Log Tunnel, Pebble Pile, Paddle Pool | 80 |
+| Red Panda | Bamboo Climber, Pinecone Puzzle, Leaf Hammock | 90 |
+| Anglerfish (pond) | Glow Stone, Old Anchor, Bubble Stone | 110 |
+| Jellyfish (pond) | Glass Float, Coral Fan, Current Spinner | 120 |
+| Shark (pond) | Chew Ring, Sunken Chest, Kelp Garden | 140 |
+| Hippo | Beach Ball, Scratching Post, Watermelon | 150 |
+| Rhino | Tractor Tire, Scratch Boulder, Pushing Log | 160 |
+
+`js/tests/farm-pet-toys.test.mjs` holds the coverage: three per species, no toy shared, aquatic exactly for swimmers, the corgi's free and the rest purchasable, every model builds, each species' toys lift its happiness and let it play while another species' toys do nothing for it, and every swimmer toy goes into a pond, never onto grass, and moves with its pond. The API's farm ticket parity test already requires every purchasable decor row to carry a price.
 
 ## Explicitly deferred
 
-- [ ] **Tricks:** roll over, backflip, run in a circle, play dead, and teaching progression. Scope with bespoke animations.
+- [ ] **Tricks:** roll over, backflip, run in a circle, play dead, and teaching progression. Scope with bespoke animations. **Next design pass.**
 - [~] **Minigames/competitive trials:** the first offline Barnyard Dash slice now provides player-controlled racing versus CPU and reads canonical farm pets without taking ownership of them. Network authority, rewards, accomplishment records, and the other event concepts remain deferred; see `planning-docs/PET_MINIGAMES_PLAN.md`.
 - [ ] **Breeding:** inheritance, capacity, lifecycle, consent/pairing rules, economy, and UI all require a separate design.
 

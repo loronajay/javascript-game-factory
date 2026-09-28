@@ -21,6 +21,7 @@ import { farmMaterial, scaleUvs, tbox, tcylinder, tsphere } from "./farm-materia
 import { farmDecorFootprint } from "./farm-catalog/decor.mjs";
 import { FARM_BUILDING_BUILDERS } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
+import { FARM_TOY_BUILDERS } from "./farm-props-toys.mjs";
 import { createKitchenRange } from "./farm-props-kitchen.mjs";
 import { createFurniturePiece, createSawmill, createWorkbench, furnitureModelNames } from "./farm-props-furniture.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
@@ -715,41 +716,6 @@ export function createDoghouse(THREE) {
     tcylinder(THREE, group, 0.12, 0.09, 0.08, [0.42, 0.04, 0.85], farmMaterial(THREE, "galvanised", { metresPerTile: 0.4 }), 12);
     return group;
 }
-/** Small dog toys are procedural catalog props, so placement never depends on external art. */
-export function createTennisBall(THREE) {
-    const group = new THREE.Group();
-    const felt = standard(THREE, "#cbea45", 0.9, 0);
-    const seam = standard(THREE, "#f5f0d0", 0.85, 0);
-    sphere(THREE, group, 0.12, [0, 0.12, 0], felt);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.121, 0.008, 5, 20), seam);
-    ring.position.y = 0.12;
-    ring.rotation.x = Math.PI / 2;
-    ring.castShadow = true;
-    group.add(ring);
-    return group;
-}
-export function createRopeToy(THREE) {
-    const group = new THREE.Group();
-    const rope = standard(THREE, "#d9b36c", 1, 0);
-    const cord = cylinder(THREE, group, 0.045, 0.045, 0.42, [0, 0.08, 0], rope, 10);
-    cord.rotation.z = Math.PI / 2;
-    for (const x of [-0.23, 0.23]) {
-        const knot = sphere(THREE, group, 0.085, [x, 0.08, 0], rope);
-        knot.scale.set(0.8, 1, 0.8);
-    }
-    return group;
-}
-export function createBone(THREE) {
-    const group = new THREE.Group();
-    const bone = standard(THREE, "#eee5ce", 0.95, 0);
-    const shaft = cylinder(THREE, group, 0.055, 0.055, 0.32, [0, 0.08, 0], bone, 10);
-    shaft.rotation.z = Math.PI / 2;
-    for (const x of [-0.18, 0.18])
-        for (const z of [-0.055, 0.055]) {
-            sphere(THREE, group, 0.075, [x, 0.08, z], bone);
-        }
-    return group;
-}
 /** A wheelbarrow: a green steel tray on a spoked wheel with two ash handles, parked on its legs, with a load of earth. */
 export function createWheelbarrow(THREE) {
     const group = new THREE.Group();
@@ -1116,9 +1082,8 @@ export const FARM_PROP_BUILDERS = Object.freeze({
     "lamp-post": (THREE) => still(createLampPost(THREE)),
     doghouse: (THREE) => still(createDoghouse(THREE)),
     ...Object.fromEntries(Object.entries(FARM_DWELLING_BUILDERS).map(([name, build]) => [name, (THREE, definition) => still(build(THREE, definition))])),
-    "tennis-ball": (THREE) => still(createTennisBall(THREE)),
-    "rope-toy": (THREE) => still(createRopeToy(THREE)),
-    bone: (THREE) => still(createBone(THREE)),
+    // Every species' three toys (farm-props-toys.mts); a few of them move.
+    ...Object.fromEntries(Object.entries(FARM_TOY_BUILDERS).map(([name, build]) => [name, (THREE) => { const toy = build(THREE); return { group: toy.group, doors: null, fixtureDoors: {}, animate: toy.animate }; }])),
     "pet-tombstone": (THREE) => still(createPetTombstone(THREE)),
     wheelbarrow: (THREE) => still(createWheelbarrow(THREE)),
     wagon: (THREE) => still(createWagon(THREE)),

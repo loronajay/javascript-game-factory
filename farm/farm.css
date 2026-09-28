@@ -281,6 +281,10 @@ button, a { font: inherit; }
 .pet-row__warning--critical { box-shadow: 0 0 12px rgba(255, 78, 78, .16); }
 .pet-row__traits { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .pet-row__traits li { padding: 4px 7px; border: 1px solid rgba(158,226,122,.28); border-radius: 999px; color: #dff6ce; background: rgba(158,226,122,.08); font-size: 10px; }
+.pet-row__care { display: grid; gap: 4px; margin: 0; padding: 7px 9px; border-radius: 7px; background: rgba(0,0,0,.18); color: #cfdcc5; font-size: 10.5px; line-height: 1.4; }
+.pet-row__care strong { display: inline-block; min-width: 38px; color: #9db192; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 9px; }
+.pet-row__care-item { color: #8c9a84; white-space: nowrap; }
+.pet-row__care-item.is-placed { color: #9ee27a; }
 .pet-row__unscoped { margin: 0; color: #9db192; font-size: 11px; }
 .pet-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .pet-card { position: relative; display: grid; gap: 3px; padding: 6px 6px 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); color: #f0f6e8; text-align: center; cursor: pointer; }

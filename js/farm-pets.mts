@@ -37,6 +37,7 @@
 
 import { findAnimal, type AnimalDefinition } from "./farm-catalog/animals.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
+import { petPace } from "./farm-pet-care.mjs";
 import type { FloorObstacle, RoomBounds } from "./arcade-room-layout.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 import { WATER_LEVEL, groundHeightAt, insidePondWater, pondAt, type PondRegion } from "./farm-pond.mjs";
@@ -62,6 +63,8 @@ export type PetBody = Readonly<{
   state: PetState;
   /** True on a tick the pet actually covered ground: what picks the walk clip. */
   moving: boolean;
+  /** This individual's walk relative to its species (Speed and Zoomies, `petPace`); the walk clip plays at it too. */
+  pace: number;
 }>;
 
 type Pet = {
@@ -78,6 +81,7 @@ type Pet = {
   radius: number;
   state: PetState;
   moving: boolean;
+  pace: number;
   /** Seconds left in the current state. */
   timer: number;
   targetX: number;
@@ -412,7 +416,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
         const wanted = yawToward(pet, target);
         pet.yaw = turnToward(pet.yaw, wanted, species.turnRate, dt);
         if (Math.abs(wrapAngle(wanted - pet.yaw)) <= WALK_CONE) {
-          const distance = Math.min(species.walkSpeed * dt, remaining);
+          const distance = Math.min(species.walkSpeed * pet.pace * dt, remaining);
           if (stepAlong(pet, pet.yaw, distance, player)) {
             pet.moving = true;
           } else {
@@ -436,8 +440,9 @@ export function createPetSim(options: PetSimOptions): PetSim {
     }
   }
 
-  return Object.freeze({
-    pets: () => pets.map((pet) => ({
+  /** The read-only pose everything outside the sim sees. */
+  function view(pet: Pet): PetBody {
+    return {
       instanceId: pet.instanceId,
       speciesId: pet.speciesId,
       name: pet.name,
@@ -450,7 +455,12 @@ export function createPetSim(options: PetSimOptions): PetSim {
       radius: pet.radius,
       state: pet.state,
       moving: pet.moving,
-    })),
+      pace: pet.pace,
+    };
+  }
+
+  return Object.freeze({
+    pets: () => pets.map(view),
     sync(layout) {
       const rows = new Map(layout.pets.map((row) => [row.instanceId, row]));
       for (let index = pets.length - 1; index >= 0; index -= 1) {
@@ -460,6 +470,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
           pets[index].name = row.name;
           pets[index].sizeMultiplier = row.profile?.size.current ?? 1;
           pets[index].paletteId = row.profile?.paletteId ?? "standard";
+          pets[index].pace = petPace(row.profile);
           pets[index].radius = pets[index].species.radius * pets[index].sizeMultiplier;
         }
       }
@@ -495,6 +506,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
           radius,
           state: "idle",
           moving: false,
+          pace: petPace(row.profile),
           timer: 0,
           targetX: spot.x,
           targetZ: spot.z,
@@ -545,7 +557,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     },
     carried() {
       const pet = pets.find((candidate) => candidate.state === "carried");
-      return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, sizeMultiplier: pet.sizeMultiplier, paletteId: pet.paletteId, radius: pet.radius, state: pet.state, moving: pet.moving } : null;
+      return pet ? view(pet) : null;
     },
     attention(instanceId) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
@@ -567,7 +579,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     },
     find(instanceId) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-      return pet ? { instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, x: pet.x, z: pet.z, yaw: pet.yaw, hover: pet.hover, sizeMultiplier: pet.sizeMultiplier, paletteId: pet.paletteId, radius: pet.radius, state: pet.state, moving: pet.moving } : null;
+      return pet ? view(pet) : null;
     },
   });
 }

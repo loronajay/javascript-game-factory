@@ -42,6 +42,24 @@ export function petCareEnvironment(speciesId: string, decor: readonly FarmDecorR
   });
 }
 
+export type PetCareSummary = Readonly<{
+  food: Readonly<{ title: string; count: number }>;
+  home: Readonly<{ title: string; placed: boolean }>;
+  toys: readonly Readonly<{ title: string; placed: boolean }>[];
+}>;
+
+/** What this species eats, lives in and plays with, and which of those the farm has right now: the Pets panel's care line. */
+export function petCareSummary(speciesId: string, decor: readonly FarmDecorRow[], supplies: Readonly<Record<string, number>>): PetCareSummary | null {
+  const care = findPetCare(speciesId);
+  if (!care) return null;
+  const placed = new Set(decor.map((row) => row.itemId));
+  return Object.freeze({
+    food: Object.freeze({ title: care.food.title, count: Math.max(0, Math.floor(supplies[care.food.itemId] ?? 0)) }),
+    home: Object.freeze({ title: care.dwelling.title, placed: placed.has(care.dwelling.itemId) }),
+    toys: Object.freeze(care.toys.map((toy) => Object.freeze({ title: toy.title, placed: placed.has(toy.itemId) }))),
+  });
+}
+
 /** Daily wellbeing from the currently placed species-appropriate care objects. */
 export function advancePetWellbeing(profile: PetProfile, speciesId: string, decor: readonly FarmDecorRow[], elapsedFarmMinutes: number): PetProfile {
   const elapsed = Number.isFinite(elapsedFarmMinutes) ? Math.max(0, elapsedFarmMinutes) : 0;

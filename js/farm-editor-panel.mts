@@ -23,6 +23,8 @@ import type { EditPhase } from "./arcade-room-editor-panel.mjs";
 import { PIECE_FINISH_TITLES } from "./farm-catalog/carpentry.mjs";
 import { shelfEntries } from "./farm-workshop.mjs";
 import { starsLabel } from "./farm-kitchen.mjs";
+import { petCareForItem } from "./farm-pet-care.mjs";
+import { findAnimal } from "./farm-catalog/animals.mjs";
 
 export type FarmEditorTab = "ground" | "seeds" | FarmDecorCategory;
 export const FARM_EDITOR_TABS: readonly FarmEditorTab[] = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES, "seeds"]);
@@ -82,7 +84,7 @@ const CATEGORY_HINTS: Readonly<Record<FarmDecorCategory, string>> = Object.freez
   fence: "Click a fence to place a run, then pull its end arrows to stretch it. Runs cross and meet freely, so pens are easy.",
   building: "Every building can be walked into: press E at its door and step inside. Animals keep out of every building's box.",
   plant: "Trees are solid at the trunk; beds and flowers are walked over.",
-  water: "Ponds are dug into the field: walk down the bank and wade in. The shark, the anglerfish and the jellyfish live in them, and their homes sit on the pond bed.",
+  water: "Ponds are dug into the field: walk down the bank and wade in. The shark, the anglerfish and the jellyfish live in them, and their homes and toys sit on the pond bed.",
   prop: "Bits and pieces for the yard.",
   furniture: "Pieces you have made at the Carpenter's Workbench. Placing one takes the finest on the shelf; removing one puts it back.",
 });
@@ -130,6 +132,13 @@ type InspectorRefs = {
   remove: HTMLButtonElement;
   removeHint: HTMLElement;
 };
+
+/** "Duck toy" / "Duck home" for a pet care item, "" for everything else. */
+function petCareLabel(itemId: string): string {
+  const forPet = petCareForItem(itemId);
+  if (!forPet) return "";
+  return `${findAnimal(forPet.care.speciesId)?.title ?? "Pet"} ${forPet.role === "toy" ? "toy" : "home"}`;
+}
 
 export function createFarmEditorPanel(elements: FarmPanelElements, actions: FarmPanelActions, options: FarmPanelOptions = {}): FarmEditorPanel {
   let groundBuilt = false;
@@ -253,11 +262,12 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
       const price = state.ticketPrices.get(definition.id);
       if (owned) card.dataset.addDecor = definition.id;
       else if (price) card.dataset.buyItem = definition.id;
-      card.title = owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`;
+      const forPet = petCareLabel(definition.id);
+      card.title = `${owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`}${forPet ? ` · ${forPet}` : ""}`;
       card.disabled = !owned && !state.canPurchase;
       card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
       const meta = definition.length.enabled ? "stretchable" : definition.pond ? "walk-in" : definition.aquatic ? "in a pond" : definition.shell ? "enterable" : definition.solid ? "solid" : "walk-over";
-      card.append(element("small", "decor-card__meta", owned ? meta : price ? `Buy · ${price.toLocaleString()} tickets` : "Locked"));
+      card.append(element("small", "decor-card__meta", owned ? forPet || meta : `${forPet ? `${forPet} · ` : ""}${price ? `${forPet ? "" : "Buy · "}${price.toLocaleString()} tickets` : "Locked"}`));
       if (definition.doors) {
         card.classList.add("is-interactive");
         card.append(element("span", "decor-card__badge", "PRESS E"));
@@ -351,6 +361,13 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
     const removeHint = element("small", "inspector__hint");
     const removeRow = element("div", "inspector__tools");
     removeRow.append(remove);
+    const petItem = petCareForItem(row.itemId);
+    const petSpecies = petItem ? findAnimal(petItem.care.speciesId)?.title ?? "pet" : "";
+    if (petItem) {
+      nodes.push(element("small", "inspector__hint", petItem.role === "toy"
+        ? `A ${petSpecies} toy. Every different ${petSpecies} toy on the farm makes each ${petSpecies} a little happier every day, and Y next to a ${petSpecies} starts a game with it.`
+        : `A ${petSpecies} home. A ${petSpecies} with its home on the farm stays happier, and its first one earns a one-time bond.`));
+    }
     const memorial = row.memorialId ? state.layout.petHistory.find((entry) => entry.id === row.memorialId) : undefined;
     if (memorial) {
       nodes.push(element("div", "inspector__memorial", `${memorial.name} · ${memorial.lifespanDays.toFixed(1)} days · ${memorial.traits.length ? memorial.traits.join(", ") : "No recorded traits"}`));

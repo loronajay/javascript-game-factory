@@ -227,6 +227,9 @@ export function createPetBodies(THREE, scene) {
                 body.tag.position.y = body.height * pet.sizeMultiplier + TAG_HEIGHT_PADDING;
                 ease(body, pet, dt);
                 play(body, pet.moving ? body.clips.walk : body.clips.idle);
+                // A quicker individual steps quicker, so its feet keep up with the ground it covers.
+                if (body.mixer && body.clips.walk)
+                    body.mixer.clipAction(body.clips.walk).timeScale = pet.pace ?? 1;
                 body.mixer?.update(dt);
                 body.clock += dt;
                 if (body.heart.visible) {

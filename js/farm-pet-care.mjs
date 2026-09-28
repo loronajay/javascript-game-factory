@@ -42,21 +42,41 @@ function care(spec) {
         traitIds: ALL_TRAIT_IDS,
     });
 }
+const toy = (id, title) => Object.freeze({ itemId: `decor.prop.${id}`, title });
+// Every species has exactly three toys of its own, and a swimmer's toys stand
+// in its pond like its home does. A toy belongs to one species: compatibility
+// is a care question, so it is answered here and nowhere else.
 export const PET_CARE = Object.freeze([
     care({ speciesId: "pet.corgi", maxLifeDays: 100, food: { id: "dog-food", title: "Dog Food", price: 15, starter: 20 }, dwelling: { id: "doghouse", title: "Dog House" }, speed: { min: 35, max: 65 }, strength: { min: 25, max: 55 }, toys: [
-            { itemId: "decor.prop.tennis-ball", title: "Tennis Ball" },
-            { itemId: "decor.prop.rope-toy", title: "Rope Toy" },
-            { itemId: "decor.prop.bone", title: "Bone" },
+            toy("tennis-ball", "Tennis Ball"), toy("rope-toy", "Rope Toy"), toy("bone", "Bone"),
         ] }),
-    care({ speciesId: "pet.duck", maxLifeDays: 80, food: { id: "waterfowl-feed", title: "Waterfowl Feed", price: 12 }, dwelling: { id: "duck-coop", title: "Duck Coop" }, speed: { min: 28, max: 55 }, strength: { min: 15, max: 35 } }),
-    care({ speciesId: "pet.red-panda", maxLifeDays: 90, food: { id: "bamboo-bites", title: "Bamboo Bites", price: 24 }, dwelling: { id: "treetop-den", title: "Treetop Den" }, speed: { min: 30, max: 60 }, strength: { min: 20, max: 42 } }),
-    care({ speciesId: "pet.platypus", maxLifeDays: 100, food: { id: "river-grubs", title: "River Grubs", price: 20 }, dwelling: { id: "burrow-lodge", title: "Burrow Lodge" }, speed: { min: 22, max: 50 }, strength: { min: 20, max: 45 } }),
-    care({ speciesId: "pet.hippo", maxLifeDays: 140, food: { id: "river-hay", title: "River Hay", price: 30 }, dwelling: { id: "mud-wallow-shelter", title: "Mud-Wallow Shelter" }, speed: { min: 18, max: 42 }, strength: { min: 65, max: 95 } }),
-    care({ speciesId: "pet.rhino", maxLifeDays: 130, food: { id: "browse-bundle", title: "Browse Bundle", price: 35 }, dwelling: { id: "rhino-shade", title: "Rhino Shade" }, speed: { min: 22, max: 48 }, strength: { min: 75, max: 100 } }),
-    care({ speciesId: "pet.bat", maxLifeDays: 90, food: { id: "fruit-mix", title: "Fruit Mix", price: 18 }, dwelling: { id: "roosting-box", title: "Roosting Box" }, speed: { min: 45, max: 78 }, strength: { min: 10, max: 28 } }),
-    care({ speciesId: "pet.shark", maxLifeDays: 150, food: { id: "shark-feed", title: "Shark Feed", price: 45 }, dwelling: { id: "reef-grotto", title: "Reef Grotto" }, speed: { min: 48, max: 82 }, strength: { min: 60, max: 90 } }),
-    care({ speciesId: "pet.anglerfish", maxLifeDays: 110, food: { id: "deep-sea-feed", title: "Deep-Sea Feed", price: 40 }, dwelling: { id: "darkwater-cave", title: "Darkwater Cave" }, speed: { min: 20, max: 45 }, strength: { min: 18, max: 40 } }),
-    care({ speciesId: "pet.jellyfish", maxLifeDays: 70, food: { id: "plankton-blend", title: "Plankton Blend", price: 28 }, dwelling: { id: "jellyfish-lagoon", title: "Jellyfish Lagoon" }, speed: { min: 12, max: 35 }, strength: { min: 8, max: 25 } }),
+    care({ speciesId: "pet.duck", maxLifeDays: 80, food: { id: "waterfowl-feed", title: "Waterfowl Feed", price: 12 }, dwelling: { id: "duck-coop", title: "Duck Coop" }, speed: { min: 28, max: 55 }, strength: { min: 15, max: 35 }, toys: [
+            toy("splash-tub", "Splash Tub"), toy("pecking-bell", "Pecking Bell"), toy("rubber-duckling", "Rubber Duckling"),
+        ] }),
+    care({ speciesId: "pet.red-panda", maxLifeDays: 90, food: { id: "bamboo-bites", title: "Bamboo Bites", price: 24 }, dwelling: { id: "treetop-den", title: "Treetop Den" }, speed: { min: 30, max: 60 }, strength: { min: 20, max: 42 }, toys: [
+            toy("bamboo-climber", "Bamboo Climber"), toy("pinecone-puzzle", "Pinecone Puzzle"), toy("leaf-hammock", "Leaf Hammock"),
+        ] }),
+    care({ speciesId: "pet.platypus", maxLifeDays: 100, food: { id: "river-grubs", title: "River Grubs", price: 20 }, dwelling: { id: "burrow-lodge", title: "Burrow Lodge" }, speed: { min: 22, max: 50 }, strength: { min: 20, max: 45 }, toys: [
+            toy("log-tunnel", "Log Tunnel"), toy("pebble-pile", "Pebble Pile"), toy("paddle-pool", "Paddle Pool"),
+        ] }),
+    care({ speciesId: "pet.hippo", maxLifeDays: 140, food: { id: "river-hay", title: "River Hay", price: 30 }, dwelling: { id: "mud-wallow-shelter", title: "Mud-Wallow Shelter" }, speed: { min: 18, max: 42 }, strength: { min: 65, max: 95 }, toys: [
+            toy("beach-ball", "Beach Ball"), toy("scratching-post", "Scratching Post"), toy("watermelon", "Watermelon"),
+        ] }),
+    care({ speciesId: "pet.rhino", maxLifeDays: 130, food: { id: "browse-bundle", title: "Browse Bundle", price: 35 }, dwelling: { id: "rhino-shade", title: "Rhino Shade" }, speed: { min: 22, max: 48 }, strength: { min: 75, max: 100 }, toys: [
+            toy("tractor-tire", "Tractor Tire"), toy("scratch-boulder", "Scratch Boulder"), toy("pushing-log", "Pushing Log"),
+        ] }),
+    care({ speciesId: "pet.bat", maxLifeDays: 90, food: { id: "fruit-mix", title: "Fruit Mix", price: 18 }, dwelling: { id: "roosting-box", title: "Roosting Box" }, speed: { min: 45, max: 78 }, strength: { min: 10, max: 28 }, toys: [
+            toy("fruit-mobile", "Fruit Mobile"), toy("moth-lantern", "Moth Lantern"), toy("swing-perch", "Swing Perch"),
+        ] }),
+    care({ speciesId: "pet.shark", maxLifeDays: 150, food: { id: "shark-feed", title: "Shark Feed", price: 45 }, dwelling: { id: "reef-grotto", title: "Reef Grotto" }, speed: { min: 48, max: 82 }, strength: { min: 60, max: 90 }, toys: [
+            toy("chew-ring", "Chew Ring"), toy("sunken-chest", "Sunken Chest"), toy("kelp-garden", "Kelp Garden"),
+        ] }),
+    care({ speciesId: "pet.anglerfish", maxLifeDays: 110, food: { id: "deep-sea-feed", title: "Deep-Sea Feed", price: 40 }, dwelling: { id: "darkwater-cave", title: "Darkwater Cave" }, speed: { min: 20, max: 45 }, strength: { min: 18, max: 40 }, toys: [
+            toy("glow-stone", "Glow Stone"), toy("old-anchor", "Old Anchor"), toy("bubble-stone", "Bubble Stone"),
+        ] }),
+    care({ speciesId: "pet.jellyfish", maxLifeDays: 70, food: { id: "plankton-blend", title: "Plankton Blend", price: 28 }, dwelling: { id: "jellyfish-lagoon", title: "Jellyfish Lagoon" }, speed: { min: 12, max: 35 }, strength: { min: 8, max: 25 }, toys: [
+            toy("glass-float", "Glass Float"), toy("coral-fan", "Coral Fan"), toy("current-spinner", "Current Spinner"),
+        ] }),
 ]);
 /** Complete starting-profile rows, named separately so care and identity remain clear at call sites. */
 export const PET_PROFILE_SPECIES = PET_CARE;
@@ -65,6 +85,31 @@ export function findPetCare(speciesId) {
     return typeof speciesId === "string" ? PET_CARE.find((entry) => entry.speciesId === speciesId) : undefined;
 }
 export const findPetProfileSpecies = findPetCare;
+/** The care row whose home or toy this decor item is, and which of the two; null for ordinary decor. */
+export function petCareForItem(itemId) {
+    if (typeof itemId !== "string")
+        return null;
+    for (const entry of PET_CARE) {
+        if (entry.dwelling.itemId === itemId)
+            return Object.freeze({ care: entry, role: "dwelling" });
+        if (entry.toys.some((candidate) => candidate.itemId === itemId))
+            return Object.freeze({ care: entry, role: "toy" });
+    }
+    return null;
+}
+/** Zoomies wander this much faster than their species. */
+export const ZOOMIES_PACE = 1.35;
+/**
+ * How fast this individual moves around the farm relative to its species'
+ * walk: a narrow band from Speed (0.9–1.1×, the same curve the pet games use)
+ * and the Zoomies trait on top. Movement only; it never touches care maths.
+ */
+export function petPace(profile) {
+    if (!profile)
+        return 1;
+    const fromSpeed = 0.9 + Math.min(100, Math.max(0, profile.stats.speed)) / 500;
+    return round(fromSpeed * (profile.traits.includes("movement.fast") ? ZOOMIES_PACE : 1), 3);
+}
 const unit = (value) => Number.isFinite(value) ? Math.min(0.999999, Math.max(0, value)) : 0;
 const randomIn = (range, random) => range.min + (range.max - range.min) * unit(random());
 const round = (value, places = 2) => Number(value.toFixed(places));

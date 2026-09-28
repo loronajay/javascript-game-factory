@@ -1,5 +1,17 @@
 # Changelog
 
+## The Farm: pet care covers every species (2026-09-27)
+
+**Every species now has food, a home and three toys of its own** — the corgi's Tennis Ball, Rope Toy and Bone were the only toys, so nine species could never be played with (Y) and lost 6 happiness a day the dog did not. Twenty-seven new procedural toys (`js/farm-props-toys.mts`, the dog's three moved in beside them; nine animate), rows in `farm-catalog/decor.mts`, referenced by each care row in `farm-pet-care.mts`. The swimmers' toys are `aquatic`: listed in the Water tab, placed on a pond bed, moved and removed with their pond. The corgi's stay starters; the rest are buy-once Farm shop unlocks priced by species (60–160 tickets, `services/farm-ticket-catalog.mts`). Table in `planning-docs/FARM_PETS_AND_CARE_PLAN.md`.
+
+**Bug fixed on the way:** `judgePlacement` only noticed that an aquatic item stood in a pond when the item *collided* with the pond, and a walk-through item collides with nothing — so every non-solid pond item was refused as `needs_pond`. Invisible until now because the three pond homes are all keep-out.
+
+**Zoomies does something.** It was the one trait with no live effect. `petPace(profile)` is 0.9–1.1× from Speed (the pet games' curve) × 1.35 for Zoomies; the sim walks at it and the walk clip plays at it.
+
+**Players can see what a pet needs.** The Pets panel's care line lists what it eats (and servings held), its home and its three toys, each ticked when on the farm (`petCareSummary`, pure). Build-mode cards and the inspector name the species a home or toy is for (`petCareForItem`).
+
+The pet plan doc caught up with what shipped without it (Phase 6: adoption charging, food sales, per-species care rows). Verified: `js/tests/farm-pet-toys.test.mjs` (9 tests), 726 frontend + 1121 API green; a contact sheet of all 30 toy models and a seeded farm driven headlessly (pond toys on the bed, field toys at scale, the Pets panel's care lines). Next: tricks.
+
 ## The Farm: day prices, the Seed Merchant, crop quality, compost and the Exchange Board (2026-09-27)
 
 **The plan's leftovers, after its eight phases** (`farm/FARM_HARVEST_MARKET_SKILLS_PLAN.md` §10.5, §10.8, §18.1, §7.1). Offline growth deliberately stays at 10% and never lethal.

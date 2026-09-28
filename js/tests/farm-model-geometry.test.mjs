@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt, hipRoofMesh } from "../farm-building-geometry.mjs";
+import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt, hipRoofMesh, hipRoofUndersideMesh } from "../farm-building-geometry.mjs";
 import { SCENERY } from "../farm-scenery.mjs";
 import { FARM_BOUNDS } from "../farm-layout.mjs";
 import { TREE_ARCHETYPES } from "../farm-props-plants.mjs";
@@ -49,6 +49,23 @@ test("the farmhouse hip roof has metre-scaled texture coordinates instead of one
   assert.deepEqual(uvAt(0, 2), uvAt(1, 1), "the front slope does not break the tiles at its internal seam");
   assert.deepEqual(uvAt(2, 0), uvAt(3, 0), "the back slope keeps one texture origin across its diagonal");
   assert.deepEqual(uvAt(2, 2), uvAt(3, 1), "the back slope does not break the tiles at its internal seam");
+});
+
+test("the farmhouse hip roof underside faces down so it remains visible from below", () => {
+  const top = hipRoofMesh({ width: 9, depth: 7, wallHeight: 3, rise: 2.2, overhang: 0.55 });
+  const underside = hipRoofUndersideMesh(top, 0.14);
+  assert.equal(underside.positions.length, top.positions.length);
+  assert.equal(underside.uvs.length, top.uvs.length);
+
+  for (let triangle = 0; triangle < top.positions.length; triangle += 9) {
+    const topY = [top.positions[triangle + 1], top.positions[triangle + 4], top.positions[triangle + 7]];
+    const undersideY = [underside.positions[triangle + 1], underside.positions[triangle + 4], underside.positions[triangle + 7]];
+    assert.deepEqual(undersideY, topY.map((value) => value - 0.14).reverse(), "the underside is offset beneath the tiles");
+
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = underside.positions.slice(triangle, triangle + 9);
+    const normalY = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+    assert.ok(normalY < 0, `underside triangle ${triangle / 9 + 1} faces the room instead of the sky`);
+  }
 });
 
 test("farm trees have species-specific silhouettes instead of sharing one lollipop canopy", () => {

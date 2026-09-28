@@ -16,6 +16,7 @@ import { PET_TRAITS, findPetCare, petGrowthView, visiblePetStats } from "./farm-
 const gainedMarkup = (gained) => gained && gained >= 0.1 ? ` <span class="pet-row__gained" title="Earned by growing up">+${gained.toFixed(1)}</span>` : "";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { petOutcomeWarning } from "./farm-pet-outcomes.mjs";
+import { petCareSummary } from "./farm-pet-happiness.mjs";
 function escapeHtml(value) {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
 }
@@ -97,6 +98,11 @@ export function createPetsPanel(elements, actions, options = {}) {
         <div><dt>Strength</dt><dd>${stats.strength}${gainedMarkup(growth?.gained.strength)}</dd></div>
         ${growth ? `<div class="pet-row__growth pet-row__growth--${growth.outlook.level}"><dt>Growth</dt><dd title="Speed and Strength grow every day until old age. Potential is rolled at adoption (rarer looks roll higher more often); food, happiness, trust and treating it the way its traits like decide how much of it is reached."><span class="pet-row__potential" aria-label="${growth.stars} of 4 stars">${"★".repeat(growth.stars)}<span class="pet-row__potential-empty">${"★".repeat(4 - growth.stars)}</span></span> ${escapeHtml(growth.gradeTitle)} potential · ${escapeHtml(growth.stageTitle)} · ${escapeHtml(growth.outlook.label)}</dd></div>` : ""}
       </dl>` : `<p class="pet-row__unscoped">This pet's profile could not be loaded.</p>`;
+            const care = petCareSummary(pet.speciesId, layout.decor, layout.agriculture.inventory.supplies);
+            const have = (placed, title) => `<span class="pet-row__care-item${placed ? " is-placed" : ""}" title="${placed ? "On the farm" : "Not on the farm yet · build mode"}">${placed ? "✓" : "○"} ${escapeHtml(title)}</span>`;
+            const careMarkup = care ? `<p class="pet-row__care"><span><strong>Eats</strong> ${escapeHtml(care.food.title)} · ${care.food.count} left</span>`
+                + `<span><strong>Home</strong> ${have(care.home.placed, care.home.title)}</span>`
+                + `<span><strong>Toys</strong> ${care.toys.map((toy) => have(toy.placed, toy.title)).join(" ")}</span></p>` : "";
             const traitMarkup = profile?.traits.length ? `<ul class="pet-row__traits">${profile.traits.map((id) => {
                 const trait = PET_TRAITS.find((entry) => entry.id === id);
                 return trait ? `<li title="${escapeHtml(trait.description)}">${escapeHtml(trait.title)}</li>` : "";
@@ -106,7 +112,8 @@ export function createPetsPanel(elements, actions, options = {}) {
                 + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button></div>`
                 + statMarkup
                 + (warning && warning.stage !== "safe" ? `<p class="pet-row__warning pet-row__warning--${warning.stage}"><strong>${escapeHtml(warning.label)}:</strong> ${escapeHtml(warning.message)}</p>` : "")
-                + traitMarkup;
+                + traitMarkup
+                + careMarkup;
             const input = row.querySelector(".pet-row__name");
             const commit = async () => {
                 const next = input.value.trim();

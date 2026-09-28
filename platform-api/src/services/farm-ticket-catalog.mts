@@ -41,6 +41,16 @@ const prices: Readonly<Record<string, number>> = Object.freeze({
   "decor.prop.darkwater-cave": 400, "decor.prop.jellyfish-lagoon": 450,
   "decor.prop.reef-grotto": 500, "decor.prop.mud-wallow-shelter": 550,
   "decor.prop.rhino-shade": 600,
+  // Pet toys: three per species, priced with the species (the corgi's three are starters).
+  "decor.prop.splash-tub": 60, "decor.prop.pecking-bell": 60, "decor.prop.rubber-duckling": 60,
+  "decor.prop.fruit-mobile": 70, "decor.prop.moth-lantern": 70, "decor.prop.swing-perch": 70,
+  "decor.prop.log-tunnel": 80, "decor.prop.pebble-pile": 80, "decor.prop.paddle-pool": 80,
+  "decor.prop.bamboo-climber": 90, "decor.prop.pinecone-puzzle": 90, "decor.prop.leaf-hammock": 90,
+  "decor.prop.glow-stone": 110, "decor.prop.old-anchor": 110, "decor.prop.bubble-stone": 110,
+  "decor.prop.glass-float": 120, "decor.prop.coral-fan": 120, "decor.prop.current-spinner": 120,
+  "decor.prop.chew-ring": 140, "decor.prop.sunken-chest": 140, "decor.prop.kelp-garden": 140,
+  "decor.prop.beach-ball": 150, "decor.prop.scratching-post": 150, "decor.prop.watermelon": 150,
+  "decor.prop.tractor-tire": 160, "decor.prop.scratch-boulder": 160, "decor.prop.pushing-log": 160,
 });
 
 export const FARM_TICKET_ITEMS = Object.freeze(Object.entries(prices).map(([id, price]) => Object.freeze({ id, price })));
