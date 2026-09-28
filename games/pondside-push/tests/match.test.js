@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { ARENA_RADIUS, createMatch, resetRound, stepMatch } from "../scripts/match.js";
+import { ARENA_RADIUS, createMatch, resetRound, stepMatch } from "../scripts/sim/match.js";
 
 const pets = [
   { instanceId: "hero", name: "Biscuit", speciesId: "pet.corgi", paletteId: "standard", stats: { speed: 50, strength: 50, size: 1 } },

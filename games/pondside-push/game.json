@@ -1,11 +1,11 @@
 {
   "title": "Pondside Push",
-  "description": "Build momentum and bump rival farm pets off a circular island in this first-to-three king-of-the-hill match.",
+  "description": "Build momentum and bump rival farm pets off a circular island in this first-to-three king-of-the-hill match — against CPU rivals at Rookie, Pro or Champion, or other players online in rooms of up to four.",
   "category": "Action",
   "featured": false,
   "hidden": true,
   "players": "1-4",
-  "play_modes": ["solo"],
+  "play_modes": ["solo", "online"],
   "dimensions": ["3d"],
   "controls": ["keyboard", "touch"],
   "orientation": "landscape",

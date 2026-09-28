@@ -132,9 +132,11 @@ export async function adoptFarmPet(pool: any, input: any, random: () => number =
 }
 
 /**
- * Buy seeds, saplings or feed. `venue: "market"` is a purchase at the Market
- * Square's Seed Merchant, which charges the day's special price for a seed on
- * special (services/farm-market-day) — and names the `day` it was priced on,
+ * Buy seeds, saplings, feed, retail ingredients or permanent recipe cards.
+ * `venue: "market"` is a purchase in the Market Square. The Seed Merchant
+ * charges the day's special price for a seed on special (services/farm-market-day),
+ * while Marigold's ingredients and Basil's recipe cards are market-only — every
+ * Market purchase names the `day` it was shown on,
  * so a special that ended while the player stood at the counter is refused
  * (`prices_changed`) rather than charged at a price they were not shown.
  */
@@ -147,6 +149,8 @@ export async function purchaseFarmSupply(pool: any, input: any, now: number = Da
   const quantity = Number(input?.quantity);
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) return { ok: false, error: "invalid_quantity" };
   const atMarket = input?.venue === "market";
+  if ((supply.kind === "ingredient" || supply.kind === "recipe") && !atMarket) return { ok: false, error: "market_only" };
+  if (supply.kind === "recipe" && quantity !== 1) return { ok: false, error: "invalid_quantity" };
   const day = farmMarketDay(now);
   if (atMarket && Number(input?.day) !== day) return { ok: false, error: "prices_changed", day };
   const unitPrice = atMarket && supply.kind === "seed" ? farmMarketSeedPrice(supply.cropId!, day) : supply.price;
@@ -166,10 +170,12 @@ export async function purchaseFarmSupply(pool: any, input: any, now: number = Da
       const level = farmingLevelForXp(rule.kind === "fruit" ? skills.farming.xp : skills.woodcutting.xp);
       if (level < rule.minLevel) return { ok: false, error: "level_too_low", minLevel: rule.minLevel, level };
     }
-    const stackKey = supply.kind === "seed" ? "seeds" : supply.kind === "sapling" ? "saplings" : "supplies";
+    const skills = normalizeFarmSkillRecords(farm.layout.skills);
+    if (supply.kind === "recipe" && skills.cooking.learned.includes(supply.recipeId!)) return { ok: false, error: "already_owned" };
+    const stackKey = supply.kind === "seed" ? "seeds" : supply.kind === "sapling" ? "saplings" : supply.kind === "ingredient" ? "produce" : "supplies";
     const stack = agriculture?.inventory?.[stackKey];
     const stackId = supply.cropId ?? supply.speciesId ?? supply.id;
-    const current = Number(stack?.[stackId]) || 0;
+    const current = supply.kind === "recipe" ? 0 : Number(stack?.[stackId]) || 0;
     if (current + quantity > MAX_STACK) return { ok: false, error: "inventory_full" };
     const total = unitPrice * quantity;
     const spend = await spendTicketsInTransaction(client, {
@@ -177,10 +183,14 @@ export async function purchaseFarmSupply(pool: any, input: any, now: number = Da
       metadata: { itemId: supply.id, quantity, kind: supply.kind, unitPrice, ...(atMarket ? { venue: "market", day } : {}) },
     });
     if (!spend.ok) return { ok: false, error: spend.error, balance: spend.balance, price: total, quantity };
-    const inventory = { ...agriculture.inventory, [stackKey]: { ...(agriculture.inventory?.[stackKey] ?? {}), [stackId]: current + quantity } };
+    const inventory = supply.kind === "recipe" ? agriculture.inventory : { ...agriculture.inventory, [stackKey]: { ...(agriculture.inventory?.[stackKey] ?? {}), [stackId]: current + quantity } };
+    const nextSkills = supply.kind === "recipe"
+      ? { ...skills, cooking: { ...skills.cooking, learned: [...skills.cooking.learned, supply.recipeId!] } }
+      : farm.layout.skills;
     const next = normalizeFarmGarage({
       ...farm.layout,
       agriculture: { ...agriculture, inventory },
+      skills: nextSkills,
     }, { ownedEntitlementIds: farm.owned });
     await saveFarm(client, playerId, next);
     return { ok: true, duplicate: false, price: total, quantity, balance: spend.balance, layout: next };

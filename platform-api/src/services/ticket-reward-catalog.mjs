@@ -1,3 +1,4 @@
+import { calculateBarnyardDashTicketReward } from "./barnyard-dash-ticket-rewards.mjs";
 import { calculateBattleshitsTicketReward } from "./battleshits-ticket-rewards.mjs";
 import { calculateBirdDutyTicketReward } from "./bird-duty-ticket-rewards.mjs";
 import { calculateCreatureBattlerTicketReward } from "./creature-battler-ticket-rewards.mjs";
@@ -5,6 +6,7 @@ import { calculateIlluminautsTicketReward } from "./illuminauts-ticket-rewards.m
 import { calculateLoversLostTicketReward } from "./lovers-lost-ticket-rewards.mjs";
 import { calculateMiniHoopsTicketReward } from "./mini-hoops-ticket-rewards.mjs";
 import { calculateMiniTacticsTicketReward } from "./mini-tactics-ticket-rewards.mjs";
+import { calculatePondsidePushTicketReward } from "./pondside-push-ticket-rewards.mjs";
 import { calculatePuckdUpTicketReward } from "./puckd-up-ticket-rewards.mjs";
 import { calculateSharkHallTicketReward } from "./shark-hall-ticket-rewards.mjs";
 import { calculateSumoraiTicketReward } from "./sumorai-ticket-rewards.mjs";
@@ -28,6 +30,8 @@ const REWARD_EVALUATORS = Object.freeze({
     "mini-hoops": calculateMiniHoopsTicketReward,
     "puckd-up": calculatePuckdUpTicketReward,
     "shark-hall": calculateSharkHallTicketReward,
+    "barnyard-dash": calculateBarnyardDashTicketReward,
+    "pondside-push": calculatePondsidePushTicketReward,
 });
 export function evaluateTicketReward(gameSlug, input) {
     const slug = typeof gameSlug === "string" ? gameSlug.trim().toLowerCase() : "";

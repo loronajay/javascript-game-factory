@@ -12,7 +12,7 @@
 // proof. They can only choose between one and three stars (a sale premium of
 // 1.25× to 1.7× on the ingredients' raw price) — never the ingredients, the
 // XP or how many dishes a cook makes, which are all decided here.
-const rule = (minLevel, ingredients, steps, xp) => Object.freeze({ minLevel, ingredients: Object.freeze(ingredients), steps, xp });
+const rule = (minLevel, ingredients, steps, xp, vendorPrice = 0) => Object.freeze({ minLevel, ingredients: Object.freeze(ingredients), steps, xp, vendorPrice });
 export const FARM_RECIPE_RULES = Object.freeze({
     "tomato-sauce": rule(1, { tomato: 3, garlic: 1 }, 2, 80),
     "garden-salad": rule(1, { cabbage: 1, carrot: 1, radish: 1 }, 2, 70),
@@ -31,7 +31,13 @@ export const FARM_RECIPE_RULES = Object.freeze({
     "cherry-pie": rule(30, { cherry: 6, corn: 1 }, 3, 360),
     "peach-cobbler": rule(34, { peach: 4, corn: 1 }, 3, 400),
     "orange-marmalade": rule(38, { orange: 4 }, 3, 440),
+    "summer-skewers": rule(1, { tomato: 1, eggplant: 1, corn: 1 }, 2, 120, 180),
+    "harvest-curry": rule(1, { pumpkin: 1, cauliflower: 1, bean: 2 }, 3, 210, 320),
+    "orchard-parfait": rule(1, { apple: 2, peach: 2, strawberry: 2 }, 2, 190, 480),
+    "market-paella": rule(1, { tomato: 2, bean: 2, corn: 2, garlic: 1 }, 3, 270, 700),
+    "five-fruit-crumble": rule(1, { apple: 1, pear: 1, peach: 1, cherry: 2, blueberry: 2 }, 3, 360, 950),
 });
+export const FARM_VENDOR_RECIPE_IDS = Object.freeze(Object.entries(FARM_RECIPE_RULES).filter(([, entry]) => entry.vendorPrice > 0).map(([id]) => id));
 export function farmRecipeRule(recipeId) {
     return typeof recipeId === "string" && Object.prototype.hasOwnProperty.call(FARM_RECIPE_RULES, recipeId) ? FARM_RECIPE_RULES[recipeId] : null;
 }

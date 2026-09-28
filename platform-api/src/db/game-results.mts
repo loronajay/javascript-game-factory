@@ -20,6 +20,7 @@
 
 import { normalizeGameResult } from "../services/game-result-catalog.mjs";
 import { evaluateTicketReward, type TicketRewardBreakdown } from "../services/ticket-reward-catalog.mjs";
+import { resultGrants } from "../services/game-result-grants.mjs";
 import { awardTicketsInTransaction, getTicketWalletInTransaction } from "./tickets.mjs";
 
 const FENCE_RATIO = 0.9;
@@ -99,6 +100,20 @@ export async function submitGameResult(pool: any, params: any = {}): Promise<any
       reward = { repeatable: { total: 0 }, achievements: [], achievementTotal: 0, total: 0, fence: "time_budget" };
     }
     const awarded = reward.total;
+    // A result can also be worth a thing (services/game-result-grants) — but
+    // only one the fence let through: a forged result wins nothing either.
+    const grants = reward.fence ? [] : resultGrants(gameSlug, result);
+    const granted: Array<{ gameSlug: string; entitlementId: string; isNew: boolean }> = [];
+    for (const grant of grants) {
+      const inserted = await client.query(
+        `insert into game_entitlements (player_id, game_slug, entitlement_id, kind, source, source_id)
+         values ($1, $2, $3, $4, $5, $6)
+         on conflict (player_id, game_slug, entitlement_id) do nothing
+         returning entitlement_id`,
+        [playerId, grant.gameSlug, grant.entitlementId, grant.kind, grant.source, `${gameSlug}:${resultId}`],
+      );
+      granted.push({ gameSlug: grant.gameSlug, entitlementId: grant.entitlementId, isNew: Boolean(inserted.rows?.length) });
+    }
     if (awarded > 0) {
       await awardTicketsInTransaction(client, {
         playerId,
@@ -117,7 +132,7 @@ export async function submitGameResult(pool: any, params: any = {}): Promise<any
     );
     const wallet = await getTicketWalletInTransaction(client, playerId);
     await client.query("commit");
-    return { resultId, tickets: presentTickets(awarded, wallet?.balance ?? null, reward) };
+    return { resultId, tickets: presentTickets(awarded, wallet?.balance ?? null, reward), grants: granted };
   } catch (err) {
     try { await client.query("rollback"); } catch { /* connection already gone */ }
     throw err;

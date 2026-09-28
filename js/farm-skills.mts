@@ -76,6 +76,8 @@ export type CookingRecord = Readonly<{
   orders: number;
   /** Lifetime cooks per recipe. */
   recipes: Readonly<Record<string, number>>;
+  /** Permanent recipe cards bought from Basil; level-taught recipes never appear here. */
+  learned: readonly string[];
 }>;
 
 export type CarpentryRecord = Readonly<{
@@ -93,7 +95,7 @@ export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: Woodcut
 export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
   woodcutting: Object.freeze({ xp: 0, fellings: 0, trees: Object.freeze({}) }),
-  cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}) }),
+  cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}), learned: Object.freeze([]) }),
   carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
 });
 
@@ -110,6 +112,11 @@ function counts(source: any, ids: readonly string[]): Readonly<Record<string, nu
     if (value > 0) output[id] = value;
   }
   return Object.freeze(output);
+}
+
+function learnedRecipes(value: unknown): readonly string[] {
+  const ids = Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  return Object.freeze(Array.from(new Set(ids.filter((id) => RECIPE_CATALOG.some((entry) => entry.id === id && entry.source === "vendor")))));
 }
 
 export function normalizeFarmSkills(value: unknown): FarmSkills {
@@ -138,6 +145,7 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
       perfect: count(cooking.perfect),
       orders: count(cooking.orders),
       recipes: counts(cooking.recipes, RECIPE_CATALOG.map((entry) => entry.id)),
+      learned: learnedRecipes(cooking.learned),
     }) : EMPTY_FARM_SKILLS.cooking,
     carpentry: carpentry ? Object.freeze({
       xp: count(carpentry.xp, FARMING_MAX_XP),

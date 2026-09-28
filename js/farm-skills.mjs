@@ -49,7 +49,7 @@ export function harvestXp(cropId, carePenalty = 0) {
 export const EMPTY_FARM_SKILLS = Object.freeze({
     farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
     woodcutting: Object.freeze({ xp: 0, fellings: 0, trees: Object.freeze({}) }),
-    cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}) }),
+    cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}), learned: Object.freeze([]) }),
     carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
 });
 function count(value, limit = 100_000_000) {
@@ -65,6 +65,10 @@ function counts(source, ids) {
             output[id] = value;
     }
     return Object.freeze(output);
+}
+function learnedRecipes(value) {
+    const ids = Array.isArray(value) ? value.filter((id) => typeof id === "string") : [];
+    return Object.freeze(Array.from(new Set(ids.filter((id) => RECIPE_CATALOG.some((entry) => entry.id === id && entry.source === "vendor")))));
 }
 export function normalizeFarmSkills(value) {
     const source = value && typeof value === "object" ? value : {};
@@ -93,6 +97,7 @@ export function normalizeFarmSkills(value) {
             perfect: count(cooking.perfect),
             orders: count(cooking.orders),
             recipes: counts(cooking.recipes, RECIPE_CATALOG.map((entry) => entry.id)),
+            learned: learnedRecipes(cooking.learned),
         }) : EMPTY_FARM_SKILLS.cooking,
         carpentry: carpentry ? Object.freeze({
             xp: count(carpentry.xp, FARMING_MAX_XP),

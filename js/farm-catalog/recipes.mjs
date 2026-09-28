@@ -37,7 +37,7 @@ function model(spec) {
 }
 function recipe(id, title, spec) {
     return Object.freeze({
-        id, title, blurb: spec.blurb, minLevel: spec.minLevel,
+        id, title, blurb: spec.blurb, minLevel: spec.minLevel, source: spec.source ?? "level", price: spec.price ?? 0,
         ingredients: Object.freeze({ ...spec.ingredients }),
         steps: Object.freeze([...spec.steps]),
         xp: spec.xp,
@@ -48,7 +48,7 @@ const HERB = "#3f8a3a";
 const CARROT = "#f08a24";
 const POTATO = "#e6cf8e";
 const GARLIC = "#f3ecd8";
-export const RECIPE_CATALOG = Object.freeze([
+export const LEVEL_RECIPE_CATALOG = Object.freeze([
     recipe("tomato-sauce", "Tomato Sauce", {
         blurb: "Slow-cooked tomatoes and garlic, sealed under a gingham cloth.",
         minLevel: 1, ingredients: { tomato: 3, garlic: 1 }, steps: ["chop", "simmer"], xp: 80,
@@ -135,6 +135,35 @@ export const RECIPE_CATALOG = Object.freeze([
         model: { vessel: "jar", vesselColor: "#e6f0e8", fill: "#e8761c", cloth: "#e8c23a", bits: [bit("slice", "#f7b04a", 2, 1.2)] },
     }),
 ]);
+/** Recipe cards sold by Basil. These are never granted by the Cooking level tree. */
+export const VENDOR_RECIPE_CATALOG = Object.freeze([
+    recipe("summer-skewers", "Summer Skewers", {
+        blurb: "Charred tomato, eggplant and corn threaded into a bright market supper.",
+        minLevel: 1, source: "vendor", price: 180, ingredients: { tomato: 1, eggplant: 1, corn: 1 }, steps: ["chop", "bake"], xp: 120,
+        model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("wedge", "#c9302c", 3, 1.4), bit("cube", "#47235a", 3, 1.3), bit("kernel", "#f2c83a", 7, 1)] },
+    }),
+    recipe("harvest-curry", "Harvest Curry", {
+        blurb: "Pumpkin, cauliflower and beans simmered in a deep golden market curry.",
+        minLevel: 1, source: "vendor", price: 320, ingredients: { pumpkin: 1, cauliflower: 1, bean: 2 }, steps: ["chop", "stir", "simmer"], xp: 210,
+        model: { vessel: "bowl", vesselColor: "#356b70", fill: "#d58a24", bits: [bit("cube", "#ed8a24", 4, 1.2), bit("round", "#f4ecd2", 4, 1), bit("bean", "#6c2c1e", 6, 0.9)] },
+    }),
+    recipe("orchard-parfait", "Orchard Parfait", {
+        blurb: "Layers of apple, peach and strawberry served cold in a market cup.",
+        minLevel: 1, source: "vendor", price: 480, ingredients: { apple: 2, peach: 2, strawberry: 2 }, steps: ["chop", "stir"], xp: 190,
+        model: { vessel: "cup", vesselColor: "#d8eef0", fill: "#f3e3c5", bits: [bit("slice", "#b7cf52", 3, 1.4), bit("wedge", "#f2a15a", 3, 1.3), bit("half", "#d02e3a", 3, 1)] },
+    }),
+    recipe("market-paella", "Market Paella", {
+        blurb: "Tomato, beans, corn and garlic baked together for a crowded table.",
+        minLevel: 1, source: "vendor", price: 700, ingredients: { tomato: 2, bean: 2, corn: 2, garlic: 1 }, steps: ["chop", "stir", "bake"], xp: 270,
+        model: { vessel: "baking-dish", vesselColor: "#3b4652", fill: "#d4a42e", bits: [bit("cube", "#c9302c", 4, 0.9), bit("bean", "#6c2c1e", 7, 0.9), bit("kernel", "#f2c83a", 9, 0.8)] },
+    }),
+    recipe("five-fruit-crumble", "Five-Fruit Crumble", {
+        blurb: "Apple, pear, peach, cherry and blueberry under a market-day crumble.",
+        minLevel: 1, source: "vendor", price: 950, ingredients: { apple: 1, pear: 1, peach: 1, cherry: 2, blueberry: 2 }, steps: ["chop", "stir", "bake"], xp: 360,
+        model: { vessel: "baking-dish", vesselColor: "#7a4a3a", fill: "#7d2842", crust: "crumble", crustColor: "#d9a45a", bits: [bit("round", "#332b70", 3, 0.7)] },
+    }),
+]);
+export const RECIPE_CATALOG = Object.freeze([...LEVEL_RECIPE_CATALOG, ...VENDOR_RECIPE_CATALOG]);
 export function findRecipe(id) {
     return typeof id === "string" ? RECIPE_CATALOG.find((entry) => entry.id === id) : undefined;
 }

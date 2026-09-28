@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { configuredPlatformApiUrl, defaultPlatformApiUrl } from "../platform-config.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -28,6 +29,26 @@ console.log("\ndeployment-config");
 test("platform-config exposes the shared api override hook", () => {
   const configScript = readFileSync(resolve(repoRoot, "js", "platform-config.mts"), "utf8");
   assert(configScript.includes("__JGF_PLATFORM_API_URL__"), "expected browser override hook");
+});
+
+test("local pages default to the local platform API instead of production", () => {
+  for (const hostname of ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]) {
+    assert(
+      defaultPlatformApiUrl({ hostname }) === "http://127.0.0.1:3001",
+      `expected ${hostname} to stay on the local API`,
+    );
+  }
+  assert(
+    defaultPlatformApiUrl({ hostname: "factory.jayarcade.com" }) === "https://platform-api-production-3db7.up.railway.app",
+    "expected the deployed site to use the production API",
+  );
+  assert(
+    configuredPlatformApiUrl({
+      location: { hostname: "localhost" },
+      __JGF_PLATFORM_API_URL__: "https://platform-api-production-3db7.up.railway.app",
+    }) === "http://127.0.0.1:3001",
+    "even a stale production override must not punch through the localhost boundary",
+  );
 });
 
 test("railway config defines the platform-api service deploy contract", () => {

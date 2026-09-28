@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { racePetProfile } from "../scripts/balance.js";
+import { racePetProfile } from "../scripts/sim/balance.js";
 
 test("speed only spans the locked 90% to 110% movement band", () => {
   assert.equal(racePetProfile({ speed: 0, strength: 50, size: 1 }).speedMultiplier, 0.9);

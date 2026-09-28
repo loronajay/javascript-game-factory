@@ -7,6 +7,36 @@
 // the same global-attach side effect rather than exporting a value, because no
 // consumer imports it — they all read the global.
 const root = globalThis;
-root.__JGF_PLATFORM_API_URL__ =
-    root.__JGF_PLATFORM_API_URL__ || "https://platform-api-production-3db7.up.railway.app";
-export {};
+export const LOCAL_PLATFORM_API_URL = "http://127.0.0.1:3001";
+export const PRODUCTION_PLATFORM_API_URL = "https://platform-api-production-3db7.up.railway.app";
+function isLocalHostname(value) {
+    const hostname = typeof value === "string" ? value.trim().toLowerCase() : "";
+    return hostname === "localhost"
+        || hostname === "127.0.0.1"
+        || hostname === "0.0.0.0"
+        || hostname === "[::1]"
+        || hostname === "::1";
+}
+/** Keep a locally served frontend on the local database and ticket wallet. */
+export function defaultPlatformApiUrl(location) {
+    return isLocalHostname(location?.hostname) ? LOCAL_PLATFORM_API_URL : PRODUCTION_PLATFORM_API_URL;
+}
+function cleanUrl(value) {
+    return typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
+}
+function isLocalUrl(value) {
+    try {
+        return isLocalHostname(new URL(value).hostname);
+    }
+    catch {
+        return false;
+    }
+}
+/** Resolve bootstrap overrides without ever letting a local page select a remote account API. */
+export function configuredPlatformApiUrl(source) {
+    const override = cleanUrl(source.__JGF_PLATFORM_API_URL__ || source.JGF_PLATFORM_API_URL);
+    if (isLocalHostname(source.location?.hostname))
+        return override && isLocalUrl(override) ? override : LOCAL_PLATFORM_API_URL;
+    return override || PRODUCTION_PLATFORM_API_URL;
+}
+root.__JGF_PLATFORM_API_URL__ = configuredPlatformApiUrl(root);

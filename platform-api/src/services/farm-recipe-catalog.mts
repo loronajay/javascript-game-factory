@@ -19,10 +19,12 @@ export type FarmRecipeRule = Readonly<{
   /** How many cooking steps the recipe has: a cook reports exactly this many scores. */
   steps: number;
   xp: number;
+  /** A non-zero price means Basil teaches this recipe only after its card is bought. */
+  vendorPrice: number;
 }>;
 
-const rule = (minLevel: number, ingredients: Record<string, number>, steps: number, xp: number): FarmRecipeRule =>
-  Object.freeze({ minLevel, ingredients: Object.freeze(ingredients), steps, xp });
+const rule = (minLevel: number, ingredients: Record<string, number>, steps: number, xp: number, vendorPrice = 0): FarmRecipeRule =>
+  Object.freeze({ minLevel, ingredients: Object.freeze(ingredients), steps, xp, vendorPrice });
 
 export const FARM_RECIPE_RULES: Readonly<Record<string, FarmRecipeRule>> = Object.freeze({
   "tomato-sauce": rule(1, { tomato: 3, garlic: 1 }, 2, 80),
@@ -42,7 +44,14 @@ export const FARM_RECIPE_RULES: Readonly<Record<string, FarmRecipeRule>> = Objec
   "cherry-pie": rule(30, { cherry: 6, corn: 1 }, 3, 360),
   "peach-cobbler": rule(34, { peach: 4, corn: 1 }, 3, 400),
   "orange-marmalade": rule(38, { orange: 4 }, 3, 440),
+  "summer-skewers": rule(1, { tomato: 1, eggplant: 1, corn: 1 }, 2, 120, 180),
+  "harvest-curry": rule(1, { pumpkin: 1, cauliflower: 1, bean: 2 }, 3, 210, 320),
+  "orchard-parfait": rule(1, { apple: 2, peach: 2, strawberry: 2 }, 2, 190, 480),
+  "market-paella": rule(1, { tomato: 2, bean: 2, corn: 2, garlic: 1 }, 3, 270, 700),
+  "five-fruit-crumble": rule(1, { apple: 1, pear: 1, peach: 1, cherry: 2, blueberry: 2 }, 3, 360, 950),
 });
+
+export const FARM_VENDOR_RECIPE_IDS: readonly string[] = Object.freeze(Object.entries(FARM_RECIPE_RULES).filter(([, entry]) => entry.vendorPrice > 0).map(([id]) => id));
 
 export function farmRecipeRule(recipeId: unknown): FarmRecipeRule | null {
   return typeof recipeId === "string" && Object.prototype.hasOwnProperty.call(FARM_RECIPE_RULES, recipeId) ? FARM_RECIPE_RULES[recipeId]! : null;

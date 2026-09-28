@@ -1,452 +1,380 @@
-import * as THREE from "../../../js/vendor/three.module.js";
-import { GLTFLoader } from "../../../js/vendor/loaders/GLTFLoader.js";
-import { findAnimal, findAnimalPalette } from "../../../js/farm-catalog/animals.mjs";
-import { animalTrack, splitAnimalClips } from "../../../js/farm-animal-clips.mjs";
-import { materialForAnimalPalette } from "../../../js/farm-pet-palettes.mjs";
-import { createFenceRun, createHayBale, createTree } from "../../../js/farm-props.mjs";
-import { farmMaterial } from "../../../js/farm-materials.mjs";
-import { createSurfaceMaterial } from "../../../js/arcade-room-surfaces.mjs";
-import { DEFAULT_GROUND_ID, findGround } from "../../../js/farm-catalog/ground.mjs";
-import { loadFarmPets } from "./farm-source.js?v=20260925-track-fix-2";
-import { cpuFieldFor, speciesStyle } from "./pets.js?v=20260925-track-fix-2";
-import { createRace, raceOrder, stepRace } from "./race.js?v=20260926-course-walls";
-import { DEFAULT_TRACK, roadEdgeSegments, startLineTiles } from "./track.js?v=20260926-course-walls";
+// Barnyard Dash's composition root: screens, input, the fixed 60 Hz loop, and
+// which kind of race is running. The rules live in sim/, the world in
+// scene.js, the menus in menus.js, an online race in online-race.js and the
+// socket in the shared Pet Games lobby client. This file only connects them.
 
-const GAME_WIDTH = 960;
-const GAME_HEIGHT = 640;
+import { loadFarmPets } from "./farm-source.js?v=20260928-pet-online";
+import { cpuFieldFor } from "./pets.js?v=20260928-pet-online";
+import { createRaceScene, GAME_HEIGHT, GAME_WIDTH } from "./scene.js?v=20260928-pet-online";
+import { COURSES, courseOrDefault, findCourse } from "./sim/courses.js?v=20260928-pet-online";
+import { createRace, raceOrder, racerById, stepRace } from "./sim/race.js?v=20260928-pet-online";
+import { CUPS, createGrandPrix, findCup, grandPrixCup, grandPrixFinished, grandPrixStandings, grandPrixSummary, nextGrandPrixRace, recordGrandPrixRace, trophyItemId } from "./grand-prix.js?v=20260928-pet-online";
+import { BARNYARD_ONLINE, createOnlineRace } from "./online-race.js?v=20260928-pet-online";
+import { createLevelPicker, fillCourseSelect, formatTime, ordinal, renderCupChoices, renderPodium, renderStandings } from "./menus.js?v=20260928-pet-online";
+import { createPetPicker } from "../../pet-games/shared/ui/pet-picker.js";
+import { createOnlinePanel } from "../../pet-games/shared/ui/online-panel.js";
+import { createPetLobbyClient } from "../../pet-games/shared/online/lobby-client.js";
+import { CPU_LEVELS, cpuLevelFromIndex, cpuLevelIndex, findCpuLevel } from "../../pet-games/shared/sim/levels.js";
+import { fetchCareer, fileResult, loadAccountGate, loadIdentity, newResultId, onlineResultId, recordLine } from "../../pet-games/shared/platform.js";
+
+const GAME_SLUG = "barnyard-dash";
 const TICK_SECONDS = 1 / 60;
-const WORLD_SCALE = 0.08;
-const MODEL_YAW_OFFSET = Math.PI;
+const $ = (selector) => document.querySelector(selector);
 
-const canvas = document.querySelector("#raceCanvas");
-const stage = document.querySelector("#gameStage");
-const setupPanel = document.querySelector("#setupPanel");
-const petChoices = document.querySelector("#petChoices");
-const fieldSizeSelect = document.querySelector("#fieldSize");
-const startButton = document.querySelector("#startRace");
-const loadNote = document.querySelector("#loadNote");
-const hud = document.querySelector("#raceHud");
-const progressLabel = document.querySelector("#raceProgress");
-const lapLabel = document.querySelector("#raceLap");
-const placeLabel = document.querySelector("#playerPlace");
-const timeLabel = document.querySelector("#raceTime");
-const countdownLabel = document.querySelector("#countdown");
-const resultPanel = document.querySelector("#raceResult");
-const resultKicker = document.querySelector("#resultKicker");
-const resultTitle = document.querySelector("#resultTitle");
-const resultCopy = document.querySelector("#resultCopy");
-const playerResultTime = document.querySelector("#playerResultTime");
-const fieldResult = document.querySelector("#fieldResult");
-const resultStandings = document.querySelector("#resultStandings");
-const touchControls = document.querySelector("#touchControls");
+const canvas = $("#raceCanvas");
+const stage = $("#gameStage");
+const hud = $("#raceHud");
+const countdownLabel = $("#countdown");
+const touchControls = $("#touchControls");
+const panels = {
+  title: $("#titlePanel"),
+  quick: $("#quickPanel"),
+  cup: $("#cupPanel"),
+  cupBoard: $("#cupBoard"),
+  podium: $("#podiumPanel"),
+  online: $("#onlinePanel"),
+  result: $("#raceResult"),
+};
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-renderer.setSize(GAME_WIDTH, GAME_HEIGHT, false);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+const scene = createRaceScene(canvas);
+scene.buildCourse(COURSES[0]);
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9fd6ee);
-scene.fog = new THREE.Fog(0xb8d9c2, 42, 92);
-const camera = new THREE.PerspectiveCamera(55, GAME_WIDTH / GAME_HEIGHT, 0.1, 180);
-camera.position.set(-30, 8, 20);
-const cameraLook = new THREE.Vector3();
-scene.add(new THREE.HemisphereLight(0xdff5ff, 0x42552e, 2.25));
-const sun = new THREE.DirectionalLight(0xfff0c7, 3.2);
-sun.position.set(-24, 38, 18);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -60;
-sun.shadow.camera.right = 60;
-sun.shadow.camera.top = 60;
-sun.shadow.camera.bottom = -60;
-scene.add(sun);
+// ---------------------------------------------------------------- state
 
-const courseRoot = new THREE.Group();
-const racerRoot = new THREE.Group();
-scene.add(courseRoot, racerRoot);
-const obstacleViews = new Map();
-const racerViews = new Map();
-const loader = new GLTFLoader();
-
-let pets = [];
+let identity = { playerId: "", displayName: "Guest" };
+let account = { signedIn: false, message: "", signIn: () => {} };
+let career = null;
 let selectedPet = null;
-let race = null;
-let screen = "setup";
+let screen = "title";
+/** The race being run: { kind: "quick" | "cup" | "online", race, course, ... }. */
+let run = null;
+let cup = null;
+let cupId = CUPS[0].id;
+let lobbyClient = null;
+let lobbyView = null;
 let previousTime = null;
 let accumulator = 0;
-let resultShown = false;
 const held = new Set();
 
-const worldPoint = (point) => new THREE.Vector3((point.x - GAME_WIDTH / 2) * WORLD_SCALE, 0, (point.y - GAME_HEIGHT / 2) * WORLD_SCALE);
+// ---------------------------------------------------------------- screens
 
-function addGround() {
-  const farmGrass = findGround(DEFAULT_GROUND_ID).style;
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(150, 120),
-    createSurfaceMaterial(THREE, farmGrass, { u: 150, v: 120 }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  courseRoot.add(ground);
+function show(name) {
+  screen = name;
+  for (const [key, panel] of Object.entries(panels)) panel.hidden = key !== name;
+  const racing = name === "race";
+  hud.hidden = !racing;
+  touchControls.classList.toggle("is-racing", racing);
+  if (!racing) countdownLabel.textContent = "";
+  if (racing) canvas.focus();
 }
 
-function addRoadSurface() {
-  const points = DEFAULT_TRACK.road.slice(0, -1);
-  const halfWidth = DEFAULT_TRACK.roadWidth * WORLD_SCALE / 2;
-  const vertices = [];
-  const indices = [];
-
-  for (let index = 0; index < points.length; index += 1) {
-    const previous = worldPoint(points[(index - 1 + points.length) % points.length]);
-    const current = worldPoint(points[index]);
-    const next = worldPoint(points[(index + 1) % points.length]);
-    const incoming = new THREE.Vector2(current.x - previous.x, current.z - previous.z).normalize();
-    const outgoing = new THREE.Vector2(next.x - current.x, next.z - current.z).normalize();
-    const incomingNormal = new THREE.Vector2(-incoming.y, incoming.x);
-    const outgoingNormal = new THREE.Vector2(-outgoing.y, outgoing.x);
-    const miter = incomingNormal.clone().add(outgoingNormal).normalize();
-    const denominator = Math.max(0.5, Math.abs(miter.dot(outgoingNormal)));
-    const offset = Math.min(halfWidth * 1.55, halfWidth / denominator);
-    vertices.push(
-      current.x + miter.x * offset, 0.08, current.z + miter.y * offset,
-      current.x - miter.x * offset, 0.08, current.z - miter.y * offset,
-    );
-  }
-
-  for (let index = 0; index < points.length; index += 1) {
-    const next = (index + 1) % points.length;
-    const left = index * 2;
-    const right = left + 1;
-    const nextLeft = next * 2;
-    const nextRight = nextLeft + 1;
-    indices.push(left, right, nextLeft, right, nextRight, nextLeft);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  const road = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xb99862, roughness: 1, side: THREE.DoubleSide }));
-  road.receiveShadow = true;
-  courseRoot.add(road);
+function goHome() {
+  run = null;
+  cup = null;
+  scene.clearRacers();
+  show("title");
+  renderCareer();
 }
 
-function addRacingLine() {
-  const material = new THREE.MeshStandardMaterial({ color: 0xf0ddb3, roughness: 0.95 });
-  for (let index = 1; index < DEFAULT_TRACK.road.length; index += 1) {
-    const from = worldPoint(DEFAULT_TRACK.road[index - 1]);
-    const to = worldPoint(DEFAULT_TRACK.road[index]);
-    const dx = to.x - from.x;
-    const dz = to.z - from.z;
-    const length = Math.hypot(dx, dz);
-    const count = Math.max(1, Math.floor(length / 5.5));
-    for (let markerIndex = 0; markerIndex < count; markerIndex += 1) {
-      const amount = (markerIndex + 0.5) / count;
-      const marker = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.035, 0.16), material);
-      marker.position.set(from.x + dx * amount, 0.115, from.z + dz * amount);
-      marker.rotation.y = -Math.atan2(dz, dx);
-      marker.receiveShadow = true;
-      courseRoot.add(marker);
-    }
-  }
-}
+const picker = createPetPicker($("#petChoices"), {
+  onSelect(pet) {
+    selectedPet = pet;
+    lobbyClient?.setPet(pet);
+  },
+});
 
-function addCourseFence(edge) {
-  const start = worldPoint(edge.start);
-  const end = worldPoint(edge.end);
-  const dx = end.x - start.x;
-  const dz = end.z - start.z;
-  const fence = createFenceRun(THREE, Math.hypot(dx, dz));
-  fence.position.set((start.x + end.x) / 2, 0.1, (start.z + end.z) / 2);
-  fence.rotation.y = -Math.atan2(dz, dx);
-  fence.scale.y = 0.8;
-  courseRoot.add(fence);
-}
+const quickLevel = createLevelPicker($("#quickLevel"), { initial: "pro" });
+const cupLevel = createLevelPicker($("#cupLevel"), { initial: "rookie", onChange: () => renderCups() });
+const courseSelect = $("#courseSelect");
+fillCourseSelect(courseSelect);
+const syncCourseBlurb = () => {
+  const course = findCourse(courseSelect.value);
+  $("#courseBlurb").textContent = course ? course.blurb : "A different course every race.";
+  if (screen === "quick") scene.buildCourse(course ?? COURSES[0]);
+};
+courseSelect.addEventListener("change", syncCourseBlurb);
+syncCourseBlurb();
 
-function addFarmScenery() {
-  const treeSpots = [[-42, -28], [-35, 28], [36, -30], [43, 22], [-5, 34], [18, 35]];
-  treeSpots.forEach(([x, z], index) => {
-    const tree = createTree(THREE, index + 11);
-    tree.position.set(x, 0, z);
-    tree.scale.setScalar(1.15 + (index % 3) * 0.12);
-    courseRoot.add(tree);
+function renderCups() {
+  renderCupChoices($("#cupChoices"), {
+    selected: cupId,
+    career,
+    onSelect(id) {
+      cupId = id;
+      renderCups();
+    },
   });
-  const barn = new THREE.Group();
-  const red = farmMaterial(THREE, "battens", { colors: ["#a8312b", "#6e201d", "#d4634e"], metresPerTile: 1.5 });
-  const roof = farmMaterial(THREE, "shingles", { colors: ["#4a3a33", "#2f2824", "#756157"], metresPerTile: 1.4 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(8, 4.6, 6), red);
-  body.position.y = 2.3;
-  body.castShadow = body.receiveShadow = true;
-  const cap = new THREE.Mesh(new THREE.ConeGeometry(5.2, 3, 4), roof);
-  cap.position.y = 5.2;
-  cap.rotation.y = Math.PI / 4;
-  cap.scale.z = 0.72;
-  cap.castShadow = true;
-  barn.add(body, cap);
-  barn.position.set(-8, 0, 1);
-  courseRoot.add(barn);
 }
 
-function addMud(zone) {
-  const mud = new THREE.Mesh(new THREE.PlaneGeometry(zone.width * WORLD_SCALE, zone.height * WORLD_SCALE), farmMaterial(THREE, "soil", { metresPerTile: 2 }));
-  const position = worldPoint(zone);
-  mud.position.set(position.x, 0.14, position.z);
-  mud.rotation.x = -Math.PI / 2;
-  mud.receiveShadow = true;
-  courseRoot.add(mud);
-}
-
-function addObstacle(obstacle) {
-  const position = worldPoint(obstacle);
-  let view;
-  if (obstacle.kind === "hay") {
-    view = createHayBale(THREE);
-    view.scale.setScalar(1.35);
-  } else {
-    view = createFenceRun(THREE, obstacle.length * WORLD_SCALE);
-    view.scale.y = obstacle.kind === "hurdle" ? 0.72 : 1.1;
-    view.rotation.y = -obstacle.angle;
-  }
-  view.position.set(position.x, 0.16, position.z);
-  obstacleViews.set(obstacle.id, view);
-  courseRoot.add(view);
-}
-
-function addStartFinish() {
-  const light = new THREE.MeshStandardMaterial({ color: 0xf8f1d3, roughness: 0.82 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x17261f, roughness: 0.9 });
-  for (const tileData of startLineTiles(DEFAULT_TRACK)) {
-    const point = worldPoint(tileData);
-    const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(tileData.width * WORLD_SCALE, 0.055, tileData.depth * WORLD_SCALE),
-      tileData.dark ? dark : light,
-    );
-    tile.position.set(point.x, 0.18, point.z);
-    tile.rotation.y = Math.PI / 2 - tileData.angle;
-    tile.receiveShadow = true;
-    courseRoot.add(tile);
-  }
-
-  const finish = DEFAULT_TRACK.finish ?? DEFAULT_TRACK.start;
-  const point = worldPoint(finish);
-  const acrossX = -Math.sin(finish.angle);
-  const acrossZ = Math.cos(finish.angle);
-  const arch = new THREE.Group();
-  const postMaterial = new THREE.MeshStandardMaterial({ color: 0xe6b84a, roughness: 0.7 });
-  const signMaterial = new THREE.MeshStandardMaterial({ color: 0x173c30, roughness: 0.75 });
-  const span = (DEFAULT_TRACK.roadWidth + 6) * WORLD_SCALE;
-  for (const side of [-1, 1]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.3, 0.28), postMaterial);
-    post.position.set(acrossX * span * side / 2, 1.65, acrossZ * span * side / 2);
-    post.castShadow = true;
-    arch.add(post);
-  }
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(span + 0.55, 0.72, 0.32), signMaterial);
-  beam.position.y = 3.1;
-  beam.rotation.y = finish.angle + Math.PI / 2;
-  beam.castShadow = true;
-  arch.add(beam);
-  for (let index = -5; index <= 5; index += 1) {
-    const marker = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.18, 0.38), index % 2 ? light : dark);
-    marker.position.set(acrossX * index * 0.52, 3.1, acrossZ * index * 0.52);
-    marker.rotation.y = finish.angle + Math.PI / 2;
-    marker.castShadow = true;
-    arch.add(marker);
-  }
-  arch.position.set(point.x, 0.12, point.z);
-  courseRoot.add(arch);
-}
-
-function buildCourse() {
-  addGround();
-  addRoadSurface();
-  addRacingLine();
-  roadEdgeSegments(DEFAULT_TRACK).forEach(addCourseFence);
-  DEFAULT_TRACK.mud.forEach(addMud);
-  DEFAULT_TRACK.obstacles.forEach(addObstacle);
-  addFarmScenery();
-  addStartFinish();
-}
-buildCourse();
-
-function createRacerView(racer) {
-  const group = new THREE.Group();
-  const visual = new THREE.Group();
-  group.add(visual);
-  const species = findAnimal(racer.pet.speciesId) ?? findAnimal("pet.corgi");
-  const placeholder = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), new THREE.MeshStandardMaterial({ color: speciesStyle(species.id).color, roughness: 0.85 }));
-  placeholder.scale.set(1.35, 0.8, 0.9);
-  placeholder.position.y = 0.55;
-  placeholder.castShadow = true;
-  visual.add(placeholder);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.92, 32), new THREE.MeshBasicMaterial({ color: racer.player ? 0xffe36e : 0xef6b54, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.04;
-  group.add(ring);
-  racerRoot.add(group);
-  const view = { group, visual, placeholder, mixer: null, walk: null };
-  racerViews.set(racer.id, view);
-
-  const assetUrl = new URL(`../../../farm/assets/animals/${species.file}`, import.meta.url).toString();
-  loader.load(assetUrl, (gltf) => {
-    const model = gltf.scene;
-    const initial = new THREE.Box3().setFromObject(model);
-    const size = initial.getSize(new THREE.Vector3());
-    model.scale.setScalar((species.height * racer.profile.size) / Math.max(size.y, 0.001));
-    const fitted = new THREE.Box3().setFromObject(model);
-    const centre = fitted.getCenter(new THREE.Vector3());
-    model.position.set(-centre.x, -fitted.min.y, -centre.z);
-    model.rotation.y = MODEL_YAW_OFFSET;
-    model.traverse((node) => {
-      if (!node.isMesh) return;
-      const palette = findAnimalPalette(species.id, racer.pet.paletteId) ?? species.palettes[0];
-      const paint = (material) => materialForAnimalPalette(THREE, material, palette);
-      node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
-      node.castShadow = true;
-      node.receiveShadow = true;
-      node.frustumCulled = false;
-    });
-    visual.add(model);
-    placeholder.visible = false;
-    const clips = splitAnimalClips(THREE, animalTrack(gltf), species.clips);
-    if (clips.walk) {
-      view.mixer = new THREE.AnimationMixer(model);
-      view.walk = view.mixer.clipAction(clips.walk).play();
-    }
-  });
-  return view;
-}
-
-function clearRacers() {
-  for (const view of racerViews.values()) racerRoot.remove(view.group);
-  racerViews.clear();
-}
-
-function syncRacerView(racer, dt) {
-  const view = racerViews.get(racer.id) ?? createRacerView(racer);
-  const position = worldPoint(racer);
-  view.group.position.set(position.x, racer.jumpHeight * 1.15 + 0.18, position.z);
-  view.group.rotation.y = -racer.angle - Math.PI / 2;
-  if (view.mixer) {
-    view.walk.timeScale = Math.max(0.35, racer.speed / 65);
-    view.mixer.update(dt);
-  }
-}
-
-function updateCamera(dt) {
-  if (!race) {
-    const orbit = performance.now() * 0.00008;
-    camera.position.set(Math.cos(orbit) * 54, 31, Math.sin(orbit) * 54);
-    camera.lookAt(0, 0, 0);
+function renderCareer() {
+  const line = $("#careerLine");
+  if (!account.signedIn) {
+    line.textContent = "Sign in to keep an online record and win farm trophies.";
     return;
   }
-  const playerPosition = worldPoint(race.player);
-  const forward = new THREE.Vector3(Math.cos(race.player.angle), 0, Math.sin(race.player.angle));
-  const desired = playerPosition.clone().addScaledVector(forward, -10).add(new THREE.Vector3(0, 6.2, 0));
-  const amount = 1 - Math.exp(-5.5 * dt);
-  camera.position.lerp(desired, amount);
-  cameraLook.lerp(playerPosition.clone().addScaledVector(forward, 4).add(new THREE.Vector3(0, 1.1, 0)), amount);
-  camera.lookAt(cameraLook);
+  const trophies = Object.values(career?.cups ?? {}).reduce((sum, byLevel) => sum + Object.values(byLevel).filter((entry) => entry.bestPlace === 1).length, 0);
+  line.textContent = `${recordLine(career, "races")} · ${trophies}/9 cup trophies`;
 }
 
-function petRaceData(pet) {
-  return { ...pet.stats, name: pet.name, speciesId: pet.speciesId, paletteId: pet.paletteId };
+async function refreshCareer() {
+  if (!account.signedIn || !identity.playerId) return;
+  career = await fetchCareer(GAME_SLUG, identity.playerId);
+  renderCareer();
+  renderCups();
+  lobbyView?.render(lobbyViewState());
 }
 
-function escapeHtml(value) {
-  const node = document.createElement("span");
-  node.textContent = value;
-  return node.innerHTML;
-}
+// ---------------------------------------------------------------- local races
 
-function selectPet(pet) {
-  selectedPet = pet;
-  for (const button of petChoices.querySelectorAll("button")) button.setAttribute("aria-checked", String(button.dataset.petId === pet.instanceId));
-}
-
-function renderPetChoices() {
-  petChoices.replaceChildren();
-  for (const pet of pets) {
-    const style = speciesStyle(pet.speciesId);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "pet-card";
-    button.dataset.petId = pet.instanceId;
-    button.setAttribute("role", "radio");
-    button.setAttribute("aria-checked", "false");
-    button.innerHTML = `<strong><i class="pet-dot" style="color:${style.color};background:${style.color}"></i>${escapeHtml(pet.name)}</strong><small>${style.title} · SPD ${Math.round(pet.stats.speed)} · STR ${Math.round(pet.stats.strength)}</small>`;
-    button.addEventListener("click", () => selectPet(pet));
-    petChoices.append(button);
-  }
-  selectPet(pets[0]);
-}
-
-function startRace() {
-  if (!selectedPet) return;
-  const fieldSize = Math.min(8, Math.max(2, Number(fieldSizeSelect.value) || 4));
-  const rivals = cpuFieldFor(selectedPet, fieldSize - 1);
-  race = createRace({ track: DEFAULT_TRACK, playerPet: petRaceData(selectedPet), cpuPets: rivals.map(petRaceData) });
-  clearRacers();
-  race.racers.forEach(createRacerView);
-  screen = "race";
-  resultShown = false;
-  setupPanel.hidden = true;
-  resultPanel.hidden = true;
-  hud.hidden = false;
-  touchControls.classList.add("is-racing");
+function beginLocalRace({ kind, course, entrants, seed, level }) {
+  const race = createRace({ track: course.track, entrants, countdownSeconds: 3, totalLaps: course.laps, seed });
+  run = { kind, course, race, level, localId: "player", startedAt: performance.now(), resultId: null, filed: false };
+  newResultId(kind === "cup" ? "bdcup" : "bdquick").then((id) => { if (run) run.resultId = id; });
+  scene.buildCourse(course);
+  scene.clearRacers();
+  scene.snapCamera(racerById(race, "player"));
+  show("race");
   held.clear();
-  canvas.focus();
 }
 
-function showSetup() {
-  screen = "setup";
-  race = null;
-  clearRacers();
-  resultShown = false;
-  setupPanel.hidden = false;
-  resultPanel.hidden = true;
-  hud.hidden = true;
-  countdownLabel.textContent = "";
-  touchControls.classList.remove("is-racing");
+function startQuickRace() {
+  if (!selectedPet) return;
+  const course = findCourse(courseSelect.value) ?? COURSES[Math.floor(Math.random() * COURSES.length)];
+  const fieldSize = Math.min(8, Math.max(2, Number($("#fieldSize").value) || 4));
+  const level = quickLevel.value;
+  const rivals = cpuFieldFor(selectedPet, fieldSize - 1, { level, seed: `quick:${Date.now()}:${Math.random()}` });
+  beginLocalRace({
+    kind: "quick",
+    course,
+    level,
+    seed: `quick-${Date.now()}`,
+    entrants: [{ id: "player", pet: selectedPet }, ...rivals.map((pet) => ({ id: pet.instanceId, pet, cpu: level }))],
+  });
 }
 
-function formatTime(seconds) {
-  if (!Number.isFinite(seconds)) return "—";
-  return `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(2).padStart(5, "0")}`;
+function startCup() {
+  if (!selectedPet) return;
+  cup = createGrandPrix({ cupId, level: cupLevel.value, playerPet: selectedPet, seed: `${Date.now()}-${Math.random()}` });
+  cup.startedAt = performance.now();
+  newResultId("bdcup").then((id) => { if (cup) cup.resultId = id; });
+  startCupRace();
 }
 
-function ordinal(value) {
-  const suffix = value % 10 === 1 && value % 100 !== 11 ? "st" : value % 10 === 2 && value % 100 !== 12 ? "nd" : value % 10 === 3 && value % 100 !== 13 ? "rd" : "th";
-  return `${value}${suffix}`;
+function startCupRace() {
+  const next = nextGrandPrixRace(cup);
+  if (!next) return;
+  beginLocalRace({ kind: "cup", course: next.course, entrants: next.entrants, seed: next.seed, level: cup.level });
 }
 
-function showResult() {
-  if (!race || resultShown) return;
-  resultShown = true;
-  screen = "result";
-  const order = raceOrder(race);
-  const place = order.findIndex((racer) => racer.player) + 1;
-  resultKicker.textContent = `${ordinal(place)} of ${order.length}`;
-  resultTitle.textContent = place === 1 ? `${race.player.pet.name} wins!` : `${race.player.pet.name} finishes ${ordinal(place)}.`;
-  resultCopy.textContent = place === 1 ? "Clean racing beats raw numbers." : "Brake before corners and time each jump to climb the field.";
-  playerResultTime.textContent = formatTime(race.player.finishedAt);
-  fieldResult.textContent = `${order.length} pets`;
-  resultStandings.replaceChildren(...order.map((racer, index) => {
+function localResultRows(race) {
+  return raceOrder(race).map((racer, index) => ({ racer, place: index + 1 }));
+}
+
+async function finishLocalRace() {
+  const { race, course } = run;
+  const order = localResultRows(race);
+  const mine = order.find((row) => row.racer.id === "player");
+
+  if (run.kind === "cup") {
+    cup = recordGrandPrixRace(cup, {
+      order: order.map((row) => row.racer.id),
+      finishedAt: Object.fromEntries(race.racers.map((racer) => [racer.id, racer.finishedAt])),
+      elapsed: race.elapsed,
+    });
+    showCupBoard();
+    return;
+  }
+
+  showResult({
+    kicker: `${ordinal(mine.place)} of ${order.length} · ${course.title}`,
+    title: mine.place === 1 ? `${mine.racer.pet.name} wins!` : mine.racer.dnf ? `${mine.racer.pet.name} ran out of time.` : `${mine.racer.pet.name} finishes ${ordinal(mine.place)}.`,
+    copy: mine.place === 1 ? "Clean racing beats raw numbers." : "Brake before corners and time each jump to climb the field.",
+    time: mine.racer.finishedAt,
+    rows: order.map(({ racer }) => ({ name: racer.pet.name, time: racer.finishedAt, mine: racer.id === "player" })),
+    again: "Race again",
+  });
+  const resultId = run.resultId;
+  if (!resultId || run.filed) return;
+  run.filed = true;
+  const response = await fileResult(GAME_SLUG, {
+    resultId,
+    mode: "cpu",
+    level: run.level,
+    finalPlace: mine.place,
+    races: [{ courseId: course.id, place: mine.place, fieldSize: order.length, finished: Number.isFinite(mine.racer.finishedAt), timeMs: Number.isFinite(mine.racer.finishedAt) ? Math.round(mine.racer.finishedAt * 1000) : null }],
+    durationMs: Math.round(performance.now() - run.startedAt),
+  });
+  showReward(response);
+  refreshCareer();
+}
+
+// ---------------------------------------------------------------- the Grand Prix between races
+
+function showCupBoard() {
+  const theCup = grandPrixCup(cup);
+  const standings = grandPrixStandings(cup);
+  const done = grandPrixFinished(cup);
+  $("#cupBoardChip").textContent = `${theCup.title.toUpperCase()} · ${findCpuLevel(cup.level).title.toUpperCase()}`;
+  $("#cupBoardKicker").textContent = `After race ${cup.raceIndex} of ${theCup.courses.length}`;
+  const last = cup.results.at(-1);
+  const mine = last.placings.find((row) => row.id === "player");
+  $("#cupBoardTitle").textContent = mine?.place === 1 ? "You won that one!" : `You were ${ordinal(mine?.place ?? 8)}`;
+  renderStandings($("#cupStandings"), standings, last);
+  const next = nextGrandPrixRace(cup);
+  $("#cupNextNote").textContent = next ? `Next: ${next.course.title} · ${next.course.laps} laps. ${next.course.blurb}` : "That was the last race.";
+  $("#cupNext").textContent = done ? "See the podium" : "Next race";
+  run = null;
+  scene.clearRacers();
+  show("cupBoard");
+}
+
+async function finishCup() {
+  const theCup = grandPrixCup(cup);
+  const standings = grandPrixStandings(cup);
+  const mine = standings.find((row) => row.player);
+  const level = findCpuLevel(cup.level);
+  $("#podiumChip").textContent = `${theCup.title.toUpperCase()} · ${level.title.toUpperCase()}`;
+  $("#podiumTitle").textContent = mine.place === 1 ? `${theCup.title} champion!` : mine.place <= 3 ? `${ordinal(mine.place)} on the podium` : `${ordinal(mine.place)} overall`;
+  renderPodium($("#podium"), standings);
+  $("#prizeLine").textContent = account.signedIn ? "Filing your result…" : mine.place === 1 ? "Sign in to take the trophy home to your farm." : "";
+  show("podium");
+  const finished = cup;
+  if (!finished.resultId || finished.filed) return;
+  finished.filed = true;
+  const response = await fileResult(GAME_SLUG, grandPrixSummary(finished, { runId: finished.resultId, durationMs: performance.now() - finished.startedAt }));
+  if (!response) {
+    $("#prizeLine").textContent = account.signedIn ? "The result could not be filed right now." : $("#prizeLine").textContent;
+    return;
+  }
+  const trophy = response.grants?.find((grant) => grant.entitlementId === trophyItemId(finished.cupId, finished.level));
+  const parts = [];
+  if (response.tickets?.awarded) parts.push(`+${response.tickets.awarded} tickets`);
+  if (trophy) parts.push(trophy.isNew ? `A ${theCup.title} trophy is waiting in your farm's build mode (Props).` : `You already have this ${theCup.title} trophy on your farm.`);
+  $("#prizeLine").textContent = parts.join(" · ") || "Result filed.";
+  refreshCareer();
+}
+
+// ---------------------------------------------------------------- results
+
+function showResult({ kicker, title, copy, time, rows, again, online = false }) {
+  $("#resultKicker").textContent = kicker;
+  $("#resultTitle").textContent = title;
+  $("#resultCopy").textContent = copy;
+  $("#playerResultTime").textContent = formatTime(time);
+  $("#fieldResult").textContent = `${rows.length} pets`;
+  $("#resultStandings").replaceChildren(...rows.map((row, index) => {
     const item = document.createElement("li");
-    item.classList.toggle("is-player", racer.player);
-    item.textContent = `${racer.pet.name} · ${formatTime(racer.finishedAt)}`;
+    item.classList.toggle("is-player", row.mine);
+    item.textContent = `${row.name}${row.who ? ` · ${row.who}` : ""} · ${formatTime(row.time)}`;
     item.value = index + 1;
     return item;
   }));
-  resultPanel.hidden = false;
-  hud.hidden = true;
-  touchControls.classList.remove("is-racing");
+  $("#resultReward").textContent = account.signedIn ? "Filing your result…" : "";
+  $("#raceAgain").textContent = again;
+  $("#raceAgain").dataset.online = String(online);
+  $("#changePet").textContent = online ? "Leave room" : "Main menu";
+  show("result");
 }
+
+function showReward(response) {
+  $("#resultReward").textContent = response?.tickets?.awarded ? `+${response.tickets.awarded} tickets` : account.signedIn ? "" : "";
+}
+
+// ---------------------------------------------------------------- online
+
+function lobbyViewState() {
+  return {
+    signedIn: account.signedIn,
+    gateMessage: account.message,
+    client: lobbyClient?.getState(),
+    recordText: account.signedIn ? `Your online record: ${recordLine(career, "races")}` : "",
+  };
+}
+
+function ensureLobby() {
+  if (lobbyClient) return;
+  lobbyClient = createPetLobbyClient(BARNYARD_ONLINE, { resolveIdentity: () => identity });
+  lobbyClient.setPet(selectedPet);
+  lobbyView = createOnlinePanel(panels.online, {
+    eventNoun: "race",
+    maxPlayers: 8,
+    settings: [
+      { key: "mapId", label: "Course", options: [{ value: "", label: "Random course" }, ...COURSES.map((course) => ({ value: course.id, label: course.title }))] },
+      { key: "cpuCount", label: "CPU guests", options: [0, 1, 2, 3, 4, 5, 6].map((count) => ({ value: count, label: count ? `${count} to fill empty chairs` : "None" })), parse: Number },
+      { key: "cpuLevel", label: "CPU level", options: CPU_LEVELS.map((level) => ({ value: cpuLevelIndex(level.id), label: level.title })), parse: Number },
+    ],
+    onQuick: () => lobbyClient.findQuickMatch({ protocolVersion: 1 }),
+    onCreate: () => lobbyClient.createPrivateRoom({ protocolVersion: 1, mapId: "", cpuCount: 0, cpuLevel: 1 }),
+    onJoin: (code) => lobbyClient.joinPrivateRoom(code),
+    onStart: () => lobbyClient.startMatch(),
+    onLeave: () => lobbyClient.leave(),
+    // Only the setting that changed: the server merges it into the room's, so quick successive changes never undo each other.
+    onSetting: (key, value) => lobbyClient.updateSettings({ [key]: value }),
+    onSignIn: () => account.signIn(),
+    onBack: () => goHome(),
+  });
+  lobbyClient.subscribe((state) => {
+    if (screen === "online") lobbyView.render(lobbyViewState());
+    // The server started a race this browser is seated in.
+    if (state.status === "playing" && state.match && !state.ended && run?.kind !== "online") beginOnlineRace(state.match);
+    if (state.status === "idle" && run?.kind === "online") goHome();
+  });
+  lobbyClient.onSnapshot((match, { ended }) => {
+    if (run?.kind !== "online") return;
+    run.session.applySnapshot(match);
+    if (ended) finishOnlineRace(match);
+  });
+}
+
+function openOnline() {
+  ensureLobby();
+  show("online");
+  lobbyView.render(lobbyViewState());
+  if (account.signedIn) lobbyClient.resumeSavedSession();
+}
+
+function beginOnlineRace(match) {
+  const session = createOnlineRace({ match, clientId: lobbyClient.getState().clientId });
+  run = { kind: "online", session, course: session.course, startedAt: performance.now(), localId: session.myId, filed: false };
+  scene.buildCourse(session.course);
+  scene.clearRacers();
+  if (session.me) scene.snapCamera(session.me);
+  show("race");
+  held.clear();
+}
+
+async function finishOnlineRace(match) {
+  if (!run || run.kind !== "online" || run.finished) return;
+  run.finished = true;
+  const results = match.results ?? [];
+  const mineRow = results.find((row) => row.seatId === run.session.myId);
+  const humans = match.seats.length;
+  const names = new Map(match.seats.map((seat) => [seat.seatId, seat.name]));
+  const pets = new Map([...match.seats.map((seat) => [seat.seatId, seat.pet]), ...match.cpus.map((seat) => [seat.seatId, seat.pet])]);
+  showResult({
+    kicker: mineRow ? `${ordinal(mineRow.place)} of ${results.length} · ${run.course.title}` : run.course.title,
+    title: mineRow?.place === 1 ? "You won the room!" : mineRow ? `You finished ${ordinal(mineRow.place)}.` : "Race over.",
+    copy: `${humans} players${match.cpus.length ? ` and ${match.cpus.length} CPU guests` : ""}. Every position here was decided by the server.`,
+    time: mineRow?.finishedAt ?? null,
+    rows: results.map((row) => ({ name: pets.get(row.seatId)?.name ?? row.name, who: row.human ? names.get(row.seatId) : "CPU", time: row.finishedAt, mine: row.seatId === run.session.myId })),
+    again: "Back to the room",
+    online: true,
+  });
+  if (!mineRow || run.filed) return;
+  run.filed = true;
+  const response = await fileResult(GAME_SLUG, {
+    resultId: onlineResultId("bdonline", match.seed, mineRow.seatId),
+    mode: "online",
+    humans,
+    finalPlace: mineRow.place,
+    races: [{ courseId: match.courseId, place: mineRow.place, fieldSize: results.length, finished: Number.isFinite(mineRow.finishedAt), timeMs: Number.isFinite(mineRow.finishedAt) ? Math.round(mineRow.finishedAt * 1000) : null }],
+    durationMs: Math.round((match.race?.elapsed ?? 0) * 1000 + 3000),
+  });
+  showReward(response);
+  refreshCareer();
+}
+
+// ---------------------------------------------------------------- the loop
 
 function currentControls() {
   return {
@@ -459,25 +387,44 @@ function currentControls() {
 }
 
 function tick() {
-  if (screen !== "race" || !race) return;
+  if (screen !== "race" || !run) return;
   const controls = currentControls();
-  race = stepRace(race, controls, TICK_SECONDS);
-  if (race.status === "finished") showResult();
+  if (run.kind === "online") {
+    lobbyClient.sendInputs(run.session.tick(controls));
+    return;
+  }
+  run.race = stepRace(run.race, { player: controls }, TICK_SECONDS);
+  if (run.race.status === "finished" && !run.done) {
+    run.done = true;
+    finishLocalRace();
+  }
+}
+
+function hudFor(race, me) {
+  if (!me) return;
+  const order = raceOrder(race);
+  $("#playerPlace").textContent = ordinal(order.findIndex((racer) => racer.id === me.id) + 1);
+  $("#raceLap").textContent = `Lap ${Math.min(me.lap, race.totalLaps)} / ${race.totalLaps}`;
+  $("#raceProgress").textContent = `Checkpoint ${Math.min(me.checkpoint, race.track.checkpoints.length)} / ${race.track.checkpoints.length}`;
+  $("#raceTime").textContent = formatTime(race.elapsed);
+  countdownLabel.textContent = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.7 ? "GO!" : "";
 }
 
 function render(dt) {
-  if (race) {
-    race.racers.forEach((racer) => syncRacerView(racer, dt));
-    for (const [id, view] of obstacleViews) view.visible = !race.brokenObstacles.includes(id);
-    const order = raceOrder(race);
-    placeLabel.textContent = ordinal(order.findIndex((racer) => racer.player) + 1);
-    lapLabel.textContent = `Lap ${race.player.lap} / ${race.totalLaps}`;
-    progressLabel.textContent = `Checkpoint ${Math.min(race.player.checkpoint, DEFAULT_TRACK.checkpoints.length)} / ${DEFAULT_TRACK.checkpoints.length}`;
-    timeLabel.textContent = formatTime(race.elapsed);
-    countdownLabel.textContent = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.7 ? "GO!" : "";
+  if (run?.kind === "online") {
+    const { race, me } = run.session;
+    scene.syncRacers(race, dt, { localId: run.localId, poses: run.session.poses() });
+    hudFor(race, me ? { ...me } : null);
+    scene.updateCamera(dt, me);
+  } else if (run) {
+    const me = racerById(run.race, "player");
+    scene.syncRacers(run.race, dt, { localId: "player" });
+    hudFor(run.race, me);
+    scene.updateCamera(dt, me);
+  } else {
+    scene.updateCamera(dt, null);
   }
-  updateCamera(dt);
-  renderer.render(scene, camera);
+  scene.render();
 }
 
 function frame(now) {
@@ -497,14 +444,14 @@ function resize() {
   const scale = Math.min(Math.max(320, window.innerWidth - 20) / GAME_WIDTH, Math.max(260, window.innerHeight - 145) / GAME_HEIGHT);
   stage.style.width = `${Math.round(GAME_WIDTH * scale)}px`;
   stage.style.height = `${Math.round(GAME_HEIGHT * scale)}px`;
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-  renderer.setSize(GAME_WIDTH, GAME_HEIGHT, false);
-  camera.aspect = GAME_WIDTH / GAME_HEIGHT;
-  camera.updateProjectionMatrix();
+  scene.resize();
 }
+
+// ---------------------------------------------------------------- wiring
 
 window.addEventListener("resize", resize);
 window.addEventListener("keydown", (event) => {
+  if (screen !== "race") return;
   if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
     event.preventDefault();
     held.add(event.code);
@@ -521,17 +468,48 @@ for (const button of touchControls.querySelectorAll("button")) {
   button.addEventListener("pointercancel", release);
   button.addEventListener("pointerleave", release);
 }
-startButton.addEventListener("click", startRace);
-document.querySelector("#raceAgain").addEventListener("click", startRace);
-document.querySelector("#changePet").addEventListener("click", showSetup);
-document.querySelector("#fullscreen").addEventListener("click", () => document.fullscreenElement ? document.exitFullscreen?.() : stage.requestFullscreen?.());
+
+$("#modeQuick").addEventListener("click", () => { show("quick"); syncCourseBlurb(); });
+$("#modeCup").addEventListener("click", () => { renderCups(); show("cup"); });
+$("#modeOnline").addEventListener("click", openOnline);
+$("#startRace").addEventListener("click", startQuickRace);
+$("#startCup").addEventListener("click", startCup);
+$("#cupNext").addEventListener("click", () => (grandPrixFinished(cup) ? finishCup() : startCupRace()));
+$("#cupQuit").addEventListener("click", goHome);
+$("#podiumAgain").addEventListener("click", () => { cup = null; renderCups(); show("cup"); });
+for (const back of document.querySelectorAll("[data-back], [data-home]")) back.addEventListener("click", goHome);
+$("#raceAgain").addEventListener("click", () => {
+  if ($("#raceAgain").dataset.online === "true") {
+    run = null;
+    scene.clearRacers();
+    lobbyClient.backToLobby();
+    show("online");
+    lobbyView.render(lobbyViewState());
+  } else if (run?.kind === "quick") startQuickRace();
+  else goHome();
+});
+$("#changePet").addEventListener("click", () => {
+  if ($("#raceAgain").dataset.online === "true") lobbyClient?.leave();
+  goHome();
+});
+$("#fullscreen").addEventListener("click", () => (document.fullscreenElement ? document.exitFullscreen?.() : stage.requestFullscreen?.()));
 document.addEventListener("fullscreenchange", resize);
 
 resize();
 requestAnimationFrame(frame);
-const loaded = await loadFarmPets();
-pets = loaded.pets;
-renderPetChoices();
-startButton.disabled = false;
-startButton.textContent = "Start 3D race";
-loadNote.textContent = loaded.source === "fallback" ? "Farm data was unavailable, so a balanced 3D loaner is ready." : pets[0].instanceId === "borrowed-corgi" ? "Adopt and name a farm pet to bring your own racer." : `${pets.length} farm ${pets.length === 1 ? "pet is" : "pets are"} ready.`;
+// Read-only handle for headless checks, the way the farm exposes window.__farm.
+globalThis.__barnyard = { get run() { return run; }, get screen() { return screen; }, get cup() { return cup; } };
+
+const [loaded, who, gate] = await Promise.all([loadFarmPets(), loadIdentity(), loadAccountGate()]);
+identity = who;
+account = gate;
+picker.setPets(loaded.pets);
+for (const id of ["#modeQuick", "#modeCup", "#modeOnline"]) $(id).disabled = false;
+$("#loadNote").textContent = loaded.source === "fallback"
+  ? "Farm data was unavailable, so a balanced 3D loaner is ready."
+  : loaded.pets[0].instanceId === "borrowed-corgi" ? "Adopt and name a farm pet to bring your own racer." : `${loaded.pets.length} farm ${loaded.pets.length === 1 ? "pet is" : "pets are"} ready.`;
+renderCareer();
+renderCups();
+refreshCareer();
+// A tab reloaded mid-race rejoins it.
+if (account.signedIn && sessionStorage.getItem(BARNYARD_ONLINE.storageKey)) openOnline();

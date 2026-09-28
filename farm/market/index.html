@@ -54,7 +54,11 @@
         <button id="closeSale" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
       <div class="inventory-panel__body">
-        <p class="sale-note">Prices are the merchant's: what the seed cost you, plus a fair day's margin for every day it grew, moved a little by the day — up to a fifth either way — and by the grade. Perfect pays two fifths more than Normal, Poor a quarter less. The Order Board across the square pays better for what it asks for.</p>
+        <p class="sale-note">Marigold buys every harvest at the day's price and sells Normal-grade ingredients when the kitchen needs something the farm has not grown yet. Shop prices include her retail margin.</p>
+        <h3 class="vendor-shelf__title">Buy ingredients</h3>
+        <ol id="ingredientShelf" class="sale-list vendor-shelf"></ol>
+        <p id="ingredientStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        <h3 class="vendor-shelf__title">Sell your harvest</h3>
         <p id="saleTurnover" class="sale-turnover"></p>
         <ol id="saleList" class="sale-list"></ol>
       </div>
@@ -89,7 +93,11 @@
         <button id="closeKitchen" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
       <div class="inventory-panel__body">
-        <p class="sale-note">Basil pays for a dish what its ingredients would fetch raw, and then some: a quarter more for a plain dish, nearly three quarters more for a three-star one. Cook it well.</p>
+        <p class="sale-note">Basil sells permanent recipe cards for dishes outside the Cooking level tree. He also buys cooked dishes: a quarter above their raw ingredients for a plain plate, up to nearly three quarters more for three stars.</p>
+        <h3 class="vendor-shelf__title">Buy recipe cards</h3>
+        <ol id="recipeShelf" class="sale-list vendor-shelf"></ol>
+        <p id="recipeStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        <h3 class="vendor-shelf__title">Sell your cooking</h3>
         <ol id="kitchenList" class="sale-list"></ol>
       </div>
       <footer class="sale-footer">

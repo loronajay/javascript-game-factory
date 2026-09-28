@@ -37,6 +37,7 @@ import { advanceAgriculture } from "./farm-crops.mjs";
 import { cropCapacityUse } from "./farm-capacity.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
 import { createFarmSkillsHud } from "./farm-skills-hud.mjs";
+import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
 import { advanceFarmTrees } from "./farm-trees.mjs";
 import { createFarmTreesView } from "./farm-trees-view.mjs";
 import { createFarmTreesController } from "./farm-trees-controller.mjs";
@@ -101,6 +102,7 @@ const napDialog = requiredElement("#napDialog");
 const napStatus = requiredElement("#napStatus");
 const napBankLabel = requiredElement("#napBank");
 const openInventoryButton = requiredElement("#openInventory");
+const openStatsButton = requiredElement("#openStats");
 const starterDogForm = requiredElement("#starterDogForm");
 const starterDogName = requiredElement("#starterDogName");
 const nameStarterDog = requiredElement("#nameStarterDog");
@@ -186,6 +188,7 @@ function applyFarmIdentity() {
         enterButton.textContent = "Enter the farm";
         openPetsButton.hidden = true;
         openInventoryButton.hidden = true;
+        openStatsButton.hidden = true;
         editButton.hidden = true;
         ownerLink.href = `../player/index.html?id=${encodeURIComponent(layoutStore.ownerPlayerId)}`;
         ownerLink.hidden = false;
@@ -421,7 +424,7 @@ function updateInteraction() {
     // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
     if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId))
         doorInReach = null;
-    if (petsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
+    if (petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
         setPrompt("");
         return;
     }
@@ -745,6 +748,7 @@ function applyLayout(next) {
     inventoryPanel.render(layout.agriculture, skillLevels());
     kitchenSync();
     workshopSync();
+    statsPanel.render(layout.skills);
     renderFieldCapacity();
 }
 /** The levels that decide which saplings are on sale. A local farm stays at 1. */
@@ -815,16 +819,29 @@ window.addEventListener("keydown", (event) => {
     }
     // Felling holds the player at the tree: a move key or Escape puts the axe down (the damage done is kept for
     // this visit), and so does opening a panel on top of it.
-    if (trees.chopping() && (event.code === "Escape" || isMoveKey(event.code) || event.code === "KeyI" || event.code === "KeyP")) {
+    if (trees.chopping() && (event.code === "Escape" || isMoveKey(event.code) || event.code === "KeyI" || event.code === "KeyP" || event.code === "KeyK")) {
         trees.cancelChop();
         keys.clear();
         if (event.code === "Escape" || isMoveKey(event.code))
             return;
     }
+    if (event.code === "KeyK" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
+        event.preventDefault();
+        statsPanel.toggle();
+        keys.clear();
+        return;
+    }
+    if (statsPanel.isOpen()) {
+        if (event.code === "Escape")
+            statsPanel.close();
+        keys.clear();
+        return;
+    }
     if (event.code === "KeyI" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
         event.preventDefault();
         if (petsPanel.isOpen())
             petsPanel.close();
+        statsPanel.close();
         inventoryPanel.toggle();
         keys.clear();
         return;
@@ -842,6 +859,7 @@ window.addEventListener("keydown", (event) => {
             petsPanel.close();
         else {
             inventoryPanel.close();
+            statsPanel.close();
             petsPanel.open();
         }
         return;
@@ -893,7 +911,7 @@ window.addEventListener("blur", () => {
     workshop.keyUp("KeyE");
 });
 canvas.addEventListener("click", () => {
-    if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !stationPanelOpen() && !farmEditor.isEditing())
+    if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !farmEditor.isEditing())
         canvas.requestPointerLock?.().catch(() => undefined);
 });
 starterDogForm.addEventListener("submit", async (event) => {
@@ -976,7 +994,7 @@ document.addEventListener("pointerlockchange", () => {
 canvas.addEventListener("pointerdown", () => { draggingLook = !farmEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-    if (petsPanel.isOpen() || inventoryPanel.isOpen() || stationPanelOpen() || stationBusy() || farmEditor.isEditing())
+    if (petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || stationBusy() || farmEditor.isEditing())
         return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;
@@ -985,7 +1003,7 @@ document.addEventListener("mousemove", (event) => {
     player.pitch = looked.pitch;
 });
 function updatePlayer(dt) {
-    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || petsPanel.isOpen() || inventoryPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
+    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
         return;
     const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
     if (!step.moved)
@@ -1136,6 +1154,20 @@ inventoryPanel.render(layout.agriculture, skillLevels());
 renderFieldCapacity();
 if (visiting)
     openInventoryButton.hidden = true;
+const statsPanel = createFarmStatsPanel({
+    root: requiredElement("#statsPanel"),
+    openButton: openStatsButton,
+    closeButton: requiredElement("#closeStats"),
+    summary: requiredElement("#statsSummary"),
+    grid: requiredElement("#statsGrid"),
+}, {
+    beforeOpen: () => { inventoryPanel.close(); petsPanel.close(); },
+});
+statsPanel.render(layout.skills);
+openInventoryButton.addEventListener("click", () => statsPanel.close());
+openPetsButton.addEventListener("click", () => statsPanel.close());
+if (visiting)
+    openStatsButton.hidden = true;
 // The field's producers. Growing plots (farm-crops-controller.mts) and the orchard and forestry
 // (farm-trees-controller.mts); an account farm's harvests, picks and fellings are the server's.
 const crops = createFarmCropsController({
@@ -1297,7 +1329,7 @@ const farmEditor = createFarmEditor({
         inspector: requiredElement("#farmInspector"),
     },
     // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-    canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !stationPanelOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
+    canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
     onEditingChange: (editing) => {
         keys.clear();
         draggingLook = false;

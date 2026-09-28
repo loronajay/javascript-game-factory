@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createRace, raceOrder, stepRace } from "../scripts/race.js";
+import { HOP_SPEED, createRace, raceOrder, racerById, retireRacer, stepRace, withRacer } from "../scripts/sim/race.js";
+import { DEFAULT_TRACK } from "../scripts/sim/track.js";
 
 const PET = Object.freeze({ speed: 50, strength: 50, size: 1 });
 const EMPTY_TRACK = Object.freeze({
@@ -16,45 +17,44 @@ const EMPTY_TRACK = Object.freeze({
   obstacles: Object.freeze([]),
 });
 
+const player = (race) => racerById(race, "player");
+const rival = (race, index = 1) => racerById(race, `cpu-${index}`);
+const setPlayer = (race, patch) => withRacer(race, "player", patch);
+
 function runningRace(track = EMPTY_TRACK) {
   return createRace({ track, playerPet: PET, cpuPets: [PET], countdownSeconds: 0 });
 }
 
 test("a racer only finishes after crossing checkpoints in order", () => {
   let race = createRace({ track: EMPTY_TRACK, playerPet: PET, cpuPets: [PET], countdownSeconds: 0, totalLaps: 1 });
-  race = { ...race, player: { ...race.player, x: 40, y: 0 } };
+  race = setPlayer(race, { x: 40, y: 0 });
   race = stepRace(race, { throttle: true, brake: false, left: false, right: false, jump: false }, 1 / 60);
-  assert.equal(race.player.checkpoint, 0);
-  assert.equal(race.player.finishedAt, null);
+  assert.equal(player(race).checkpoint, 0);
+  assert.equal(player(race).finishedAt, null);
 
-  race = { ...race, player: { ...race.player, x: 20, y: 0 } };
-  race = stepRace(race, {}, 1 / 60);
-  assert.equal(race.player.checkpoint, 1);
-  race = { ...race, player: { ...race.player, x: 40, y: 0 } };
-  race = stepRace(race, {}, 1 / 60);
-  assert.equal(race.player.checkpoint, 2);
-  assert.ok(Number.isFinite(race.player.finishedAt));
+  race = stepRace(setPlayer(race, { x: 20, y: 0 }), {}, 1 / 60);
+  assert.equal(player(race).checkpoint, 1);
+  race = stepRace(setPlayer(race, { x: 40, y: 0 }), {}, 1 / 60);
+  assert.equal(player(race).checkpoint, 2);
+  assert.ok(Number.isFinite(player(race).finishedAt));
 });
 
 test("a race runs for three laps and only finishes on the last ordered crossing", () => {
   let race = runningRace();
   assert.equal(race.totalLaps, 3);
-  assert.equal(race.player.lap, 1);
+  assert.equal(player(race).lap, 1);
 
   for (let lap = 1; lap <= 3; lap += 1) {
-    race = { ...race, player: { ...race.player, x: 20, y: 0 } };
-    race = stepRace(race, {}, 1 / 60);
-    race = { ...race, player: { ...race.player, x: 40, y: 0 } };
-    race = stepRace(race, {}, 1 / 60);
-
+    race = stepRace(setPlayer(race, { x: 20, y: 0 }), {}, 1 / 60);
+    race = stepRace(setPlayer(race, { x: 40, y: 0 }), {}, 1 / 60);
     if (lap < 3) {
-      assert.equal(race.player.lap, lap + 1);
-      assert.equal(race.player.checkpoint, 0);
-      assert.equal(race.player.finishedAt, null);
+      assert.equal(player(race).lap, lap + 1);
+      assert.equal(player(race).checkpoint, 0);
+      assert.equal(player(race).finishedAt, null);
     }
   }
 
-  assert.ok(Number.isFinite(race.player.finishedAt));
+  assert.ok(Number.isFinite(player(race).finishedAt));
 });
 
 test("swept crossings count checkpoints and obstacle impacts between simulation endpoints", () => {
@@ -64,16 +64,15 @@ test("swept crossings count checkpoints and obstacle impacts between simulation 
     obstacles: Object.freeze([Object.freeze({ id: "h1", kind: "hurdle", x: 35, y: 0, radius: 1 })]),
   });
   let race = createRace({ track: narrowTrack, playerPet: PET, cpuPets: [], countdownSeconds: 0, totalLaps: 2 });
-  race = { ...race, player: { ...race.player, speed: 500 } };
-  race = stepRace(race, {}, 0.05);
+  race = stepRace(setPlayer(race, { speed: 500 }), {}, 0.05);
 
-  assert.equal(race.player.lap, 2);
-  assert.equal(race.player.checkpoint, 0);
-  assert.equal(race.player.lastImpact, "hurdle");
-  assert.ok(race.player.x < 35);
+  assert.equal(player(race).lap, 2);
+  assert.equal(player(race).checkpoint, 0);
+  assert.equal(player(race).lastImpact, "hurdle");
+  assert.ok(player(race).x < 35);
 });
 
-test("a narrow hurdle stops racers at its visible rail instead of an oversized collision bubble", () => {
+test("a narrow hurdle stops a racer at its visible rail and bounces it back a run-up", () => {
   const hurdleTrack = Object.freeze({
     ...EMPTY_TRACK,
     obstacles: Object.freeze([Object.freeze({
@@ -81,21 +80,38 @@ test("a narrow hurdle stops racers at its visible rail instead of an oversized c
     })]),
   });
   const base = runningRace(hurdleTrack);
-  const hit = stepRace({ ...base, player: { ...base.player, speed: 500 } }, {}, 0.05);
+  const hit = stepRace(setPlayer(base, { speed: 500 }), {}, 0.05);
+  const radius = player(hit).profile.radius;
 
-  assert.equal(hit.player.lastImpact, "hurdle");
-  assert.ok(hit.player.x >= 20, `stopped too early at x=${hit.player.x}`);
+  assert.equal(player(hit).lastImpact, "hurdle");
+  assert.ok(player(hit).x < 35 - radius, "it never passes through the rail");
+  assert.ok(player(hit).x > 35 - radius - 2 - 25, `bounced implausibly far, to x=${player(hit).x}`);
+});
+
+test("a pet stopped dead in front of a hurdle can always hop it", () => {
+  const hurdleTrack = Object.freeze({
+    ...EMPTY_TRACK,
+    road: Object.freeze([Object.freeze({ x: -100, y: 0 }), Object.freeze({ x: 200, y: 0 })]),
+    roadWidth: 60,
+    checkpoints: Object.freeze([Object.freeze({ x: 150, y: 0, radius: 4 })]),
+    obstacles: Object.freeze([Object.freeze({ id: "h1", kind: "hurdle", x: 35, y: 0, length: 60, thickness: 4, angle: Math.PI / 2 })]),
+  });
+  let race = createRace({ track: hurdleTrack, playerPet: PET, cpuPets: [], countdownSeconds: 0, totalLaps: 1 });
+  race = stepRace(setPlayer(race, { speed: 500 }), {}, 0.05);
+  race = setPlayer(race, { speed: 0 });
+  race = stepRace(race, { throttle: true, jump: true }, 1 / 60);
+  assert.ok(player(race).speed >= HOP_SPEED - 1);
+  for (let tick = 0; tick < 90; tick += 1) race = stepRace(race, { throttle: true }, 1 / 60);
+  assert.ok(player(race).x > 35, `still stuck behind the hurdle at x=${player(race).x}`);
 });
 
 test("throttle and steering are player inputs advanced by a fixed simulation step", () => {
   let race = runningRace();
-  for (let tick = 0; tick < 120; tick += 1) {
-    race = stepRace(race, { throttle: true, right: true }, 1 / 60);
-  }
+  for (let tick = 0; tick < 120; tick += 1) race = stepRace(race, { throttle: true, right: true }, 1 / 60);
 
-  assert.ok(race.player.speed > 0);
-  assert.ok(race.player.x > 0);
-  assert.ok(race.player.angle > 0);
+  assert.ok(player(race).speed > 0);
+  assert.ok(player(race).x > 0);
+  assert.ok(player(race).angle > 0);
 });
 
 test("jump timing clears a low hurdle while staying grounded costs momentum", () => {
@@ -104,14 +120,14 @@ test("jump timing clears a low hurdle while staying grounded costs momentum", ()
     obstacles: Object.freeze([Object.freeze({ id: "h1", kind: "hurdle", x: 7, y: 0, radius: 1.4 })]),
   });
   const base = runningRace(hurdleTrack);
-  const moving = { ...base.player, x: 6, y: 0, speed: 120 };
+  const moving = { x: 6, y: 0, speed: 120 };
 
-  const grounded = stepRace({ ...base, player: moving }, { throttle: true }, 1 / 60);
-  const airborne = stepRace({ ...base, player: { ...moving, jumpHeight: 1, jumpVelocity: 0 } }, { throttle: true }, 1 / 60);
+  const grounded = stepRace(setPlayer(base, moving), { throttle: true }, 1 / 60);
+  const airborne = stepRace(setPlayer(base, { ...moving, jumpHeight: 1, jumpVelocity: 0 }), { throttle: true }, 1 / 60);
 
-  assert.ok(grounded.player.speed < airborne.player.speed);
-  assert.equal(grounded.player.lastImpact, "hurdle");
-  assert.notEqual(airborne.player.lastImpact, "hurdle");
+  assert.ok(player(grounded).speed < player(airborne).speed);
+  assert.equal(player(grounded).lastImpact, "hurdle");
+  assert.notEqual(player(airborne).lastImpact, "hurdle");
 });
 
 test("strength preserves more momentum through mud and breakable gates", () => {
@@ -124,17 +140,16 @@ test("strength preserves more momentum through mud and breakable gates", () => {
   const strongRace = createRace({ track: roughTrack, playerPet: { ...PET, strength: 100 }, cpuPets: [PET], countdownSeconds: 0 });
   const pose = { x: 6, y: 0, speed: 120 };
 
-  const weak = stepRace({ ...weakRace, player: { ...weakRace.player, ...pose } }, { throttle: true }, 1 / 60);
-  const strong = stepRace({ ...strongRace, player: { ...strongRace.player, ...pose } }, { throttle: true }, 1 / 60);
+  const weak = stepRace(setPlayer(weakRace, pose), { throttle: true }, 1 / 60);
+  const strong = stepRace(setPlayer(strongRace, pose), { throttle: true }, 1 / 60);
 
-  assert.ok(strong.player.speed > weak.player.speed);
+  assert.ok(player(strong).speed > player(weak).speed);
   assert.ok(strong.brokenObstacles.includes("g1"));
 });
 
 test("the race supports deterministic fields from 1v1 through eight pets", () => {
-  const full = createRace({ track: EMPTY_TRACK, playerPet: PET, cpuPets: Array.from({ length: 7 }, (_, index) => ({ ...PET, name: `CPU ${index}` })), countdownSeconds: 0 });
-  assert.equal(full.rivals.length, 7);
-  assert.equal(full.racers.length, 8);
+  const full = createRace({ track: EMPTY_TRACK, playerPet: PET, cpuPets: Array.from({ length: 9 }, (_, index) => ({ ...PET, name: `CPU ${index}` })), countdownSeconds: 0 });
+  assert.equal(full.racers.length, 8, "a field is capped at eight");
 
   let a = runningRace();
   let b = runningRace();
@@ -142,45 +157,68 @@ test("the race supports deterministic fields from 1v1 through eight pets", () =>
     a = stepRace(a, {}, 1 / 60);
     b = stepRace(b, {}, 1 / 60);
   }
+  assert.deepEqual(a.racers, b.racers);
+});
 
-  assert.deepEqual(a.rivals, b.rivals);
-  assert.ok(a.rivals[0].x > 0 || a.rivals[0].y !== 22);
+test("people and CPUs are seats keyed by id; a person's controls arrive in a map", () => {
+  let race = createRace({
+    track: DEFAULT_TRACK,
+    entrants: [{ id: "seat-a", pet: PET }, { id: "seat-b", pet: PET }, { id: "cpu-1", pet: PET, cpu: "rookie" }],
+    countdownSeconds: 0,
+  });
+  for (let tick = 0; tick < 60; tick += 1) race = stepRace(race, { "seat-a": { throttle: true } }, 1 / 60);
+  assert.ok(racerById(race, "seat-a").speed > 50, "the seat that pressed throttle moves");
+  assert.equal(racerById(race, "seat-b").speed, 0, "a seat nobody drives stands still");
+  assert.ok(racerById(race, "cpu-1").speed > 0, "a CPU drives itself");
+  assert.equal(racerById(race, "seat-a").human, true);
+  assert.equal(racerById(race, "cpu-1").human, false);
 });
 
 test("grounded racers are separated deterministically instead of ghosting through each other", () => {
-  const base = runningRace();
+  let race = runningRace();
   const sharedPose = { x: 10, y: 0, speed: 0 };
-  const race = stepRace({
-    ...base,
-    player: { ...base.player, ...sharedPose },
-    rivals: [{ ...base.rivals[0], ...sharedPose }],
-  }, {}, 1 / 60);
-  const distance = Math.hypot(race.player.x - race.rivals[0].x, race.player.y - race.rivals[0].y);
+  race = withRacer(setPlayer(race, sharedPose), "cpu-1", sharedPose);
+  race = stepRace(race, {}, 1 / 60);
+  const distance = Math.hypot(player(race).x - rival(race).x, player(race).y - rival(race).y);
 
   assert.ok(distance > 0);
-  assert.ok(distance >= (race.player.profile.radius + race.rivals[0].profile.radius) * 0.7);
+  assert.ok(distance >= (player(race).profile.radius + rival(race).profile.radius) * 0.7);
 });
 
-test("lap progress controls race order and a CPU can complete the revised three-lap course", async () => {
-  const { DEFAULT_TRACK } = await import("../scripts/track.js");
+test("lap progress controls race order and a CPU can complete the three-lap course", () => {
   let race = createRace({ track: DEFAULT_TRACK, playerPet: PET, cpuPets: [PET], countdownSeconds: 0 });
-  race = {
-    ...race,
-    player: { ...race.player, lap: 2, checkpoint: 0 },
-    rivals: [{ ...race.rivals[0], lap: 1, checkpoint: DEFAULT_TRACK.checkpoints.length - 1 }],
-  };
-  race = { ...race, racers: [race.player, ...race.rivals] };
+  race = setPlayer(race, { lap: 2, checkpoint: 0 });
+  race = withRacer(race, "cpu-1", { lap: 1, checkpoint: DEFAULT_TRACK.checkpoints.length - 1 });
   assert.equal(raceOrder(race)[0].id, "player");
 
   race = createRace({ track: DEFAULT_TRACK, playerPet: PET, cpuPets: [PET], countdownSeconds: 0 });
-  for (let tick = 0; tick < 4_000 && race.rivals[0].finishedAt === null; tick += 1) {
-    race = stepRace(race, {}, 1 / 60);
-  }
-  assert.ok(Number.isFinite(race.rivals[0].finishedAt));
+  for (let tick = 0; tick < 6_000 && rival(race).finishedAt === null; tick += 1) race = stepRace(race, {}, 1 / 60);
+  assert.ok(Number.isFinite(rival(race).finishedAt));
 });
 
-test("a full varied CPU field recovers from fences and completes the course", async () => {
-  const { DEFAULT_TRACK } = await import("../scripts/track.js");
+test("after the first pet finishes, the rest have a window; then the race ends with them unfinished", () => {
+  let race = createRace({ track: EMPTY_TRACK, entrants: [{ id: "a", pet: PET }, { id: "b", pet: PET }], countdownSeconds: 0, totalLaps: 1, finishWindowSeconds: 2 });
+  race = withRacer(race, "a", { x: 20, y: 0 });
+  race = stepRace(race, {}, 1 / 60);
+  race = withRacer(race, "a", { x: 40, y: 0 });
+  race = stepRace(race, {}, 1 / 60);
+  assert.ok(Number.isFinite(racerById(race, "a").finishedAt));
+  assert.equal(race.status, "racing");
+  for (let tick = 0; tick < 130; tick += 1) race = stepRace(race, {}, 1 / 60);
+  assert.equal(race.status, "finished");
+  assert.equal(racerById(race, "b").dnf, true);
+  assert.deepEqual(raceOrder(race).map(({ id }) => id), ["a", "b"]);
+});
+
+test("a retired seat is out of the race and never holds it open", () => {
+  let race = createRace({ track: EMPTY_TRACK, entrants: [{ id: "a", pet: PET }, { id: "b", pet: PET }], countdownSeconds: 0, totalLaps: 1 });
+  race = retireRacer(race, "b");
+  assert.equal(racerById(race, "b").dnf, true);
+  race = retireRacer(race, "a");
+  assert.equal(race.status, "finished");
+});
+
+test("a full varied CPU field at every level completes the original course", () => {
   const cpuPets = Array.from({ length: 7 }, (_, index) => ({
     ...PET,
     name: `CPU ${index + 1}`,
@@ -188,11 +226,10 @@ test("a full varied CPU field recovers from fences and completes the course", as
     strength: index * 16,
     size: 0.7 + index * 0.06,
   }));
-  let race = createRace({ track: DEFAULT_TRACK, playerPet: PET, cpuPets, countdownSeconds: 0 });
-
-  for (let tick = 0; tick < 9_000 && race.rivals.some(({ finishedAt }) => finishedAt === null); tick += 1) {
-    race = stepRace(race, {}, 1 / 60);
+  for (const level of ["rookie", "pro", "champion"]) {
+    let race = createRace({ track: DEFAULT_TRACK, playerPet: PET, cpuPets, cpuLevel: level, countdownSeconds: 0, finishWindowSeconds: 300 });
+    race = retireRacer(race, "player");
+    for (let tick = 0; tick < 12_000 && race.status !== "finished"; tick += 1) race = stepRace(race, {}, 1 / 60);
+    assert.deepEqual(race.racers.filter((entry) => entry.cpu && entry.finishedAt === null).map(({ id }) => id), [], level);
   }
-
-  assert.deepEqual(race.rivals.filter(({ finishedAt }) => finishedAt === null).map(({ id }) => id), []);
 });

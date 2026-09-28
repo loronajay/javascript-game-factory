@@ -1,4 +1,5 @@
 import { FARM_PIECE_IDS } from "./farm-carpentry-catalog.mjs";
+import { PET_GAMES_PRIZE_IDS } from "./pet-games-prize-catalog.mjs";
 // Server-authoritative permanent Farm unlocks. Placement/model metadata stays
 // in the browser catalog; this explicit roster owns prices and save admission.
 export const FARM_GAME_SLUG = "farm";
@@ -49,7 +50,9 @@ const prices = Object.freeze({
     "decor.prop.tractor-tire": 160, "decor.prop.scratch-boulder": 160, "decor.prop.pushing-log": 160,
 });
 export const FARM_TICKET_ITEMS = Object.freeze(Object.entries(prices).map(([id, price]) => Object.freeze({ id, price })));
-export const FARM_CATALOG_IDS = new Set([...FARM_STARTER_IDS, ...Object.keys(prices), "decor.prop.pet-tombstone", ...FARM_PIECE_IDS]);
+// Pet Games trophies are catalog items owned by entitlement like a purchase — but
+// never priced: the only way one is owned is a won cup (services/game-result-grants).
+export const FARM_CATALOG_IDS = new Set([...FARM_STARTER_IDS, ...Object.keys(prices), "decor.prop.pet-tombstone", ...FARM_PIECE_IDS, ...PET_GAMES_PRIZE_IDS]);
 export function findFarmTicketItem(itemId) {
     const id = typeof itemId === "string" ? itemId.trim() : "";
     const price = prices[id];

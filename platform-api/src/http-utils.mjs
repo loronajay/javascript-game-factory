@@ -2,27 +2,33 @@ import busboy from "busboy";
 // Credentialed CORS is only granted to allow-listed origins. Reflecting an
 // arbitrary Origin together with access-control-allow-credentials would let any
 // website make authenticated cross-origin requests as a logged-in user and read
-// the responses. The live frontend origin plus any localhost dev origin are
-// allowed by default; extra origins can be added via ALLOWED_ORIGINS (comma list).
+// the responses. The live frontend is allowed by default; a non-production API
+// additionally accepts localhost. Extra origins can be added via ALLOWED_ORIGINS.
+// Localhost is convenient for a local API, but is deliberately not trusted by
+// production: a development page must never carry a real account token into
+// the live ticket wallet or profile database.
 const DEFAULT_ALLOWED_ORIGINS = [
     "https://factory.jayarcade.com",
     // The GitHub Pages origin the site was served from before the custom domain.
     // Pages redirects it, but keep it allow-listed for old links and bookmarks.
     "https://loronajay.github.io",
 ];
-function configuredAllowedOrigins() {
-    const raw = typeof process.env.ALLOWED_ORIGINS === "string" ? process.env.ALLOWED_ORIGINS : "";
+function configuredAllowedOrigins(env) {
+    const raw = typeof env.ALLOWED_ORIGINS === "string" ? env.ALLOWED_ORIGINS : "";
     const extra = raw.split(",").map((value) => value.trim()).filter(Boolean);
     return new Set([...DEFAULT_ALLOWED_ORIGINS, ...extra]);
 }
-function isAllowedOrigin(origin) {
+export function isAllowedOrigin(origin, options = {}) {
     if (!origin)
         return false;
-    if (configuredAllowedOrigins().has(origin))
+    const env = options.env ?? process.env;
+    if (configuredAllowedOrigins(env).has(origin))
         return true;
     try {
         const { hostname } = new URL(origin);
-        return hostname === "localhost" || hostname === "127.0.0.1";
+        const local = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+        const isProduction = options.isProduction ?? env.NODE_ENV === "production";
+        return local && !isProduction;
     }
     catch {
         return false;

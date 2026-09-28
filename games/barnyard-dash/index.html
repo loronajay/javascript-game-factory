@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#17382d">
   <title>Barnyard Dash | Javascript Game Factory</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260928-pet-online">
+  <link rel="stylesheet" href="../pet-games/shared/pet-games-ui.css?v=20260928-pet-online">
 </head>
 <body>
   <main class="cabinet">
@@ -24,17 +25,35 @@
       <aside id="raceHud" class="race-hud" hidden>
         <div><small>YOU</small><strong id="playerPlace">1st</strong></div>
         <div class="race-hud__middle"><small id="raceLap">Lap 1 / 3</small><strong id="raceProgress">Checkpoint 0 / 7</strong></div>
-        <div><small>TIME</small><strong id="raceTime">0:00.00</strong></div>
+        <div><small id="raceHudTag">TIME</small><strong id="raceTime">0:00.00</strong></div>
       </aside>
 
-      <section id="setupPanel" class="panel setup-panel">
+      <!-- Title: pick your pet, then how you want to race. -->
+      <section id="titlePanel" class="panel setup-panel">
         <div class="panel__header">
           <span class="event-chip">EVENT 01 · OBSTACLE RACE</span>
           <p class="kicker">Choose your racer</p>
           <h2>Your pet.<br><em>Your line.</em></h2>
           <p class="lede">Pick a pet, size up the field, and chase the checkered barn through mud, hurdles, hay and sweeping turns.</p>
         </div>
-        <div id="petChoices" class="pet-choices" role="radiogroup" aria-label="Farm pets"></div>
+        <div id="petChoices" class="pet-choices" aria-label="Farm pets"></div>
+        <div class="mode-grid" role="group" aria-label="Race modes">
+          <button id="modeQuick" class="mode-card" type="button" disabled><b>Quick Race</b><small>One race, your course, your rivals</small></button>
+          <button id="modeCup" class="mode-card mode-card--cup" type="button" disabled><b>Grand Prix</b><small>Win cups · trophies for your farm</small></button>
+          <button id="modeOnline" class="mode-card mode-card--online" type="button" disabled><b>Online</b><small>Race other farms · 2–8 pets</small></button>
+        </div>
+        <p id="careerLine" class="career-line" aria-live="polite"></p>
+        <p id="loadNote" class="load-note" aria-live="polite">Loading your farm…</p>
+      </section>
+
+      <!-- Quick race setup. -->
+      <section id="quickPanel" class="panel setup-panel" hidden>
+        <div class="panel__header">
+          <span class="event-chip">QUICK RACE</span>
+          <h2>Set the<br><em>field.</em></h2>
+        </div>
+        <label class="race-options" for="courseSelect"><span>Course</span><select id="courseSelect"></select></label>
+        <p id="courseBlurb" class="option-note"></p>
         <label class="race-options" for="fieldSize">
           <span>Race field</span>
           <select id="fieldSize">
@@ -44,15 +63,66 @@
             <option value="8">Full field · 8 pets</option>
           </select>
         </label>
+        <div id="quickLevel" class="segmented" role="radiogroup" aria-label="CPU difficulty"></div>
         <div class="menu-rules">
           <span><kbd>W</kbd><b>Drive</b><small>Accelerate</small></span>
           <span><kbd>A D</kbd><b>Steer</b><small>Find the line</small></span>
           <span><kbd>S</kbd><b>Brake</b><small>Own the turns</small></span>
           <span><kbd>Space</kbd><b>Jump</b><small>Clear hurdles</small></span>
         </div>
-        <button id="startRace" class="primary" type="button" disabled>Loading your farm…</button>
-        <p id="loadNote" class="load-note" aria-live="polite"></p>
+        <div class="panel-actions">
+          <button id="startRace" class="primary" type="button">Start 3D race</button>
+          <button class="secondary" type="button" data-back>Back</button>
+        </div>
       </section>
+
+      <!-- Grand Prix: pick a cup and a class. -->
+      <section id="cupPanel" class="panel setup-panel" hidden>
+        <div class="panel__header">
+          <span class="event-chip">GRAND PRIX</span>
+          <h2>Race for<br><em>the cup.</em></h2>
+          <p class="lede">A run of races against one grid of seven rivals. Points every race; top the table to take the trophy home to your farm.</p>
+        </div>
+        <div id="cupChoices" class="cup-grid" role="radiogroup" aria-label="Cups"></div>
+        <div id="cupLevel" class="segmented" role="radiogroup" aria-label="Class"></div>
+        <p class="option-note">Bronze for a Rookie win, silver for Pro, gold for Champion. Every podium pays tickets.</p>
+        <div class="panel-actions">
+          <button id="startCup" class="primary" type="button">Start the cup</button>
+          <button class="secondary" type="button" data-back>Back</button>
+        </div>
+      </section>
+
+      <!-- Between Grand Prix races: the table. -->
+      <section id="cupBoard" class="panel setup-panel" hidden>
+        <div class="panel__header">
+          <span id="cupBoardChip" class="event-chip">CLOVER CUP</span>
+          <p id="cupBoardKicker" class="kicker">After race 1 of 3</p>
+          <h2 id="cupBoardTitle">The table</h2>
+        </div>
+        <ol id="cupStandings" class="standings"></ol>
+        <p id="cupNextNote" class="option-note"></p>
+        <div class="panel-actions">
+          <button id="cupNext" class="primary" type="button">Next race</button>
+          <button id="cupQuit" class="secondary" type="button">Quit cup</button>
+        </div>
+      </section>
+
+      <!-- The end of a cup. -->
+      <section id="podiumPanel" class="panel setup-panel" hidden>
+        <div class="panel__header">
+          <span id="podiumChip" class="event-chip">CLOVER CUP · ROOKIE</span>
+          <h2 id="podiumTitle">Champion!</h2>
+        </div>
+        <div id="podium" class="podium" aria-label="Podium"></div>
+        <p id="prizeLine" class="prize-line" aria-live="polite"></p>
+        <div class="panel-actions">
+          <button id="podiumAgain" class="primary" type="button">Back to the cups</button>
+          <button class="secondary" type="button" data-home>Main menu</button>
+        </div>
+      </section>
+
+      <!-- Online: the shared Pet Games lobby panel is mounted here. -->
+      <section id="onlinePanel" class="panel setup-panel" hidden></section>
 
       <section id="raceResult" class="panel result-panel" hidden>
         <p id="resultKicker" class="kicker">Finish</p>
@@ -63,8 +133,9 @@
           <span>Field <strong id="fieldResult">—</strong></span>
         </div>
         <ol id="resultStandings" class="result-standings"></ol>
+        <p id="resultReward" class="prize-line" aria-live="polite"></p>
         <button id="raceAgain" class="primary" type="button">Race again</button>
-        <button id="changePet" class="secondary" type="button">Change pet</button>
+        <button id="changePet" class="secondary" type="button">Main menu</button>
       </section>
 
       <div id="countdown" class="countdown" aria-live="assertive"></div>
@@ -85,6 +156,6 @@
     <footer><span>Stats stay narrow by design: Speed is 90–110% pace.</span><span>Strength preserves momentum through rough terrain and impacts.</span></footer>
   </main>
   <script type="module" src="../../js/platform-config.mjs"></script>
-  <script type="module" src="scripts/main.js?v=20260926-farm-grass"></script>
+  <script type="module" src="scripts/main.js?v=20260928-pet-online"></script>
 </body>
 </html>

@@ -1,143 +1,44 @@
-import * as THREE from "../../../js/vendor/three.module.js";
-import { GLTFLoader } from "../../../js/vendor/loaders/GLTFLoader.js";
-import { findAnimal, findAnimalPalette } from "../../../js/farm-catalog/animals.mjs";
-import { animalTrack, splitAnimalClips } from "../../../js/farm-animal-clips.mjs";
-import { materialForAnimalPalette } from "../../../js/farm-pet-palettes.mjs";
-import { createSurfaceMaterial } from "../../../js/arcade-room-surfaces.mjs";
-import { DEFAULT_GROUND_ID, findGround } from "../../../js/farm-catalog/ground.mjs";
-import { farmMaterial } from "../../../js/farm-materials.mjs";
+// Pondside Push's composition root: screens, input, the fixed 60 Hz loop and
+// which match is running. The rules live in sim/ (session.js runs a whole
+// match: countdown, rounds, the pause after a splash), the island in arena.js,
+// an online match in online-brawl.js and the socket in the shared Pet Games
+// lobby client. This file only connects them.
+
 import { loadFarmPets } from "../../pet-games/shared/farm-source.js";
-import { cpuFieldFor, speciesStyle } from "../../pet-games/shared/pets.js";
-import { cpuControls } from "./cpu.js";
-import { countdownLabel, createRoundCountdown, isCountdownBlocking, stepRoundCountdown } from "./countdown.js";
-import { ARENA_RADIUS, createMatch, resetRound, stepMatch, WINS_TO_MATCH } from "./match.js";
-import { yawForFacing } from "./presentation.js";
+import { cpuFieldFor } from "../../pet-games/shared/pets.js";
+import { createArena } from "./arena.js?v=20260928-pet-online";
+import { matchStandings, sessionBanner, createSession, stepSession } from "./sim/session.js?v=20260928-pet-online";
+import { PONDSIDE_ONLINE, createOnlineBrawl } from "./online-brawl.js?v=20260928-pet-online";
+import { createPetPicker } from "../../pet-games/shared/ui/pet-picker.js";
+import { createOnlinePanel } from "../../pet-games/shared/ui/online-panel.js";
+import { createPetLobbyClient } from "../../pet-games/shared/online/lobby-client.js";
+import { CPU_LEVELS, cpuLevelIndex, normalizeCpuLevel } from "../../pet-games/shared/sim/levels.js";
+import { fetchCareer, fileResult, loadAccountGate, loadIdentity, newResultId, onlineResultId, recordLine } from "../../pet-games/shared/platform.js";
 
-const GAME_WIDTH = 960;
-const GAME_HEIGHT = 640;
+const GAME_SLUG = "pondside-push";
 const TICK_SECONDS = 1 / 60;
-const WORLD_SCALE = 0.035;
-const MODEL_YAW_OFFSET = Math.PI;
+const $ = (selector) => document.querySelector(selector);
 
-const canvas = document.querySelector("#arenaCanvas");
-const stage = document.querySelector("#gameStage");
-const setupPanel = document.querySelector("#setupPanel");
-const petChoices = document.querySelector("#petChoices");
-const startButton = document.querySelector("#startMatch");
-const loadNote = document.querySelector("#loadNote");
-const scoreboard = document.querySelector("#scoreboard");
-const resultPanel = document.querySelector("#roundResult");
-const resultKicker = document.querySelector("#resultKicker");
-const resultTitle = document.querySelector("#resultTitle");
-const resultCopy = document.querySelector("#resultCopy");
-const nextRoundButton = document.querySelector("#nextRound");
-const changePetButton = document.querySelector("#changePet");
-const roundBanner = document.querySelector("#roundBanner");
+const canvas = $("#arenaCanvas");
+const stage = $("#gameStage");
+const scoreboard = $("#scoreboard");
+const roundBanner = $("#roundBanner");
+const touchControls = $("#touchControls");
+const panels = { title: $("#titlePanel"), quick: $("#quickPanel"), online: $("#onlinePanel"), result: $("#roundResult") };
+const arena = createArena(canvas);
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-renderer.setSize(GAME_WIDTH, GAME_HEIGHT, false);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8bcad9);
-scene.fog = new THREE.Fog(0x8bcad9, 35, 82);
-const camera = new THREE.PerspectiveCamera(46, GAME_WIDTH / GAME_HEIGHT, 0.1, 130);
-camera.position.set(0, 18, 20);
-camera.lookAt(0, 0, 0);
-scene.add(new THREE.HemisphereLight(0xe7fbff, 0x385239, 2.5));
-const sun = new THREE.DirectionalLight(0xffe9bc, 3.4);
-sun.position.set(-15, 28, 14);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -25;
-sun.shadow.camera.right = 25;
-sun.shadow.camera.top = 25;
-sun.shadow.camera.bottom = -25;
-scene.add(sun);
-
-const arenaRoot = new THREE.Group();
-const petRoot = new THREE.Group();
-const debugRoot = new THREE.Group();
-debugRoot.visible = false;
-scene.add(arenaRoot, petRoot, debugRoot);
-const loader = new GLTFLoader();
-const views = new Map();
-const held = new Set();
-let pets = [];
+let identity = { playerId: "", displayName: "Guest" };
+let account = { signedIn: false, message: "", signIn: () => {} };
+let career = null;
 let selectedPet = null;
-let match = null;
-let screen = "setup";
+let screen = "title";
+/** The match being played: { kind: "quick" | "online", ... }. */
+let run = null;
+let lobbyClient = null;
+let lobbyView = null;
 let previousTime = null;
 let accumulator = 0;
-let lastResolvedRound = 0;
-let roundCountdown = null;
-let resultDelay = -1;
-
-function buildArena() {
-  const islandRadius = ARENA_RADIUS * WORLD_SCALE;
-  const water = new THREE.Mesh(
-    new THREE.CircleGeometry(48, 96),
-    new THREE.MeshPhysicalMaterial({ color: 0x2b91a8, roughness: 0.2, metalness: 0.04, transparent: true, opacity: 0.9, clearcoat: 0.55, clearcoatRoughness: 0.2 }),
-  );
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = -0.62;
-  water.receiveShadow = true;
-  arenaRoot.add(water);
-
-  const shallows = new THREE.Mesh(
-    new THREE.RingGeometry(islandRadius + 0.45, islandRadius + 2.6, 96),
-    new THREE.MeshBasicMaterial({ color: 0x69c3c4, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
-  );
-  shallows.rotation.x = -Math.PI / 2;
-  shallows.position.y = -0.57;
-  arenaRoot.add(shallows);
-
-  const stone = new THREE.Mesh(new THREE.CylinderGeometry(islandRadius + 0.32, islandRadius + 0.5, 0.75, 64), new THREE.MeshStandardMaterial({ color: 0x8b8063, roughness: 1 }));
-  stone.position.y = -0.34;
-  stone.receiveShadow = true;
-  arenaRoot.add(stone);
-  const farmGrass = findGround(DEFAULT_GROUND_ID).style;
-  const grass = new THREE.Mesh(
-    new THREE.CircleGeometry(islandRadius, 64),
-    createSurfaceMaterial(THREE, farmGrass, { u: islandRadius * 2, v: islandRadius * 2 }),
-  );
-  grass.rotation.x = -Math.PI / 2;
-  grass.position.y = 0.05;
-  grass.receiveShadow = true;
-  arenaRoot.add(grass);
-
-  const centre = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.52, 48), new THREE.MeshBasicMaterial({ color: 0xeed271, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }));
-  centre.rotation.x = -Math.PI / 2;
-  centre.position.y = 0.075;
-  arenaRoot.add(centre);
-
-  const rockMaterial = farmMaterial(THREE, "fieldstone", { colors: ["#847b65", "#625d50", "#aaa083", "#4c493f"], metresPerTile: 1.4 });
-  for (let index = 0; index < 18; index += 1) {
-    const angle = index * Math.PI * 2 / 18 + (index % 3) * 0.07;
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24 + (index % 4) * 0.055, 0), rockMaterial);
-    rock.position.set(Math.cos(angle) * (islandRadius + 0.32), -0.08 + (index % 2) * 0.06, Math.sin(angle) * (islandRadius + 0.32));
-    rock.scale.y = 0.62;
-    rock.rotation.set(index * 0.31, index * 0.57, index * 0.19);
-    rock.castShadow = rock.receiveShadow = true;
-    arenaRoot.add(rock);
-  }
-
-  const padMaterial = new THREE.MeshStandardMaterial({ color: 0x4c923f, roughness: 0.92, side: THREE.DoubleSide });
-  for (const [angle, distance, scale] of [[0.35, 13.5, 0.8], [2.1, 14.2, 1], [3.85, 12.8, 0.7], [5.2, 15.1, 0.9]]) {
-    const pad = new THREE.Mesh(new THREE.CircleGeometry(scale, 18, 0.25, Math.PI * 1.78), padMaterial);
-    pad.rotation.x = -Math.PI / 2;
-    pad.rotation.z = angle;
-    pad.position.set(Math.cos(angle) * distance, -0.54, Math.sin(angle) * distance);
-    arenaRoot.add(pad);
-  }
-
-}
-buildArena();
+const held = new Set();
 
 function escapeHtml(value) {
   const node = document.createElement("span");
@@ -145,120 +46,205 @@ function escapeHtml(value) {
   return node.innerHTML;
 }
 
-function selectPet(pet) {
-  selectedPet = pet;
-  for (const button of petChoices.querySelectorAll("button")) button.setAttribute("aria-checked", String(button.dataset.petId === pet.instanceId));
+function show(name) {
+  screen = name;
+  for (const [key, panel] of Object.entries(panels)) panel.hidden = key !== name;
+  const playing = name === "match";
+  scoreboard.hidden = !playing;
+  touchControls.classList.toggle("is-playing", playing);
+  if (!playing) roundBanner.textContent = "";
+  if (playing) canvas.focus();
 }
 
-function renderPetChoices() {
-  petChoices.replaceChildren();
-  for (const pet of pets) {
-    const style = speciesStyle(pet.speciesId);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "pet-card";
-    button.dataset.petId = pet.instanceId;
-    button.setAttribute("role", "radio");
-    button.innerHTML = `<strong><i class="pet-dot" style="color:${style.color};background:${style.color}"></i>${escapeHtml(pet.name)}</strong><small>${style.title} · SPD ${Math.round(pet.stats.speed)} · STR ${Math.round(pet.stats.strength)}</small>`;
-    button.addEventListener("click", () => selectPet(pet));
-    petChoices.append(button);
+function goHome() {
+  run = null;
+  arena.clear();
+  show("title");
+  renderCareer();
+}
+
+const picker = createPetPicker($("#petChoices"), {
+  onSelect(pet) {
+    selectedPet = pet;
+    lobbyClient?.setPet(pet);
+  },
+});
+
+// A segmented Rookie / Pro / Champion picker, the same one Barnyard Dash uses.
+let quickLevel = "pro";
+function renderLevels() {
+  const root = $("#quickLevel");
+  root.replaceChildren(...CPU_LEVELS.map((level) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "segmented__option";
+    option.dataset.level = level.id;
+    option.setAttribute("role", "radio");
+    option.setAttribute("aria-checked", String(level.id === quickLevel));
+    option.innerHTML = `<b>${level.title}</b><small>${escapeHtml(level.blurb.replace("miss a few jumps", "freeze up at the rim"))}</small>`;
+    option.addEventListener("click", () => { quickLevel = normalizeCpuLevel(level.id); renderLevels(); });
+    return option;
+  }));
+}
+renderLevels();
+
+function renderCareer() {
+  const line = $("#careerLine");
+  if (!account.signedIn) {
+    line.textContent = "Sign in to keep an online record.";
+    return;
   }
-  selectPet(pets[0]);
+  const cpu = career?.cpu;
+  line.textContent = `${recordLine(career, "matches")}${cpu?.matches ? ` · CPU: ${cpu.wins} of ${cpu.matches} won` : ""}`;
 }
 
-function createPetView(player) {
-  const group = new THREE.Group();
-  const visual = new THREE.Group();
-  group.add(visual);
-  const species = findAnimal(player.pet.speciesId) ?? findAnimal("pet.corgi");
-  const style = speciesStyle(species.id);
-  const placeholder = new THREE.Mesh(new THREE.SphereGeometry(0.48, 16, 12), new THREE.MeshStandardMaterial({ color: style.color, roughness: 0.85 }));
-  placeholder.scale.set(1.35, 0.82, 0.95);
-  placeholder.position.y = 0.48;
-  placeholder.castShadow = true;
-  visual.add(placeholder);
-  const marker = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: player.player ? 0xffdf63 : 0xe96551, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }));
-  marker.rotation.x = -Math.PI / 2;
-  marker.position.y = 0.07;
-  group.add(marker);
-  const bumpWave = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.78, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }));
-  bumpWave.rotation.x = -Math.PI / 2;
-  bumpWave.position.y = 0.12;
-  bumpWave.visible = false;
-  group.add(bumpWave);
-  const splash = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.46, 32), new THREE.MeshBasicMaterial({ color: 0xd8fbff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
-  splash.rotation.x = -Math.PI / 2;
-  splash.position.y = -0.54;
-  splash.visible = false;
-  petRoot.add(splash);
-  petRoot.add(group);
+async function refreshCareer() {
+  if (!account.signedIn || !identity.playerId) return;
+  career = await fetchCareer(GAME_SLUG, identity.playerId);
+  renderCareer();
+  lobbyView?.render(lobbyViewState());
+}
 
-  const hitbox = new THREE.Mesh(new THREE.RingGeometry(player.radius * WORLD_SCALE * 0.96, player.radius * WORLD_SCALE, 32), new THREE.MeshBasicMaterial({ color: 0xff3030, side: THREE.DoubleSide }));
-  hitbox.rotation.x = -Math.PI / 2;
-  hitbox.position.y = 0.13;
-  debugRoot.add(hitbox);
-  const view = { group, visual, placeholder, marker, bumpWave, splash, hitbox, mixer: null, walk: null };
-  views.set(player.id, view);
+// ---------------------------------------------------------------- a local match
 
-  const assetUrl = new URL(`../../../farm/assets/animals/${species.file}`, import.meta.url).toString();
-  loader.load(assetUrl, (gltf) => {
-    const model = gltf.scene;
-    const bounds = new THREE.Box3().setFromObject(model);
-    const size = bounds.getSize(new THREE.Vector3());
-    model.scale.setScalar((species.height * player.pet.stats.size) / Math.max(size.y, 0.001));
-    const fitted = new THREE.Box3().setFromObject(model);
-    const centre = fitted.getCenter(new THREE.Vector3());
-    model.position.set(-centre.x, -fitted.min.y, -centre.z);
-    model.rotation.y = MODEL_YAW_OFFSET;
-    model.traverse((node) => {
-      if (!node.isMesh) return;
-      const palette = findAnimalPalette(species.id, player.pet.paletteId) ?? species.palettes[0];
-      const paint = (material) => materialForAnimalPalette(THREE, material, palette);
-      node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
-      node.castShadow = true;
-      node.receiveShadow = true;
-      node.frustumCulled = false;
-    });
-    visual.add(model);
-    placeholder.visible = false;
-    const clips = splitAnimalClips(THREE, animalTrack(gltf), species.clips);
-    if (clips.walk) {
-      view.mixer = new THREE.AnimationMixer(model);
-      view.walk = view.mixer.clipAction(clips.walk).play();
+function startQuickMatch() {
+  if (!selectedPet) return;
+  const size = Math.min(4, Math.max(2, Number($("#fieldSize").value) || 4));
+  const rivals = cpuFieldFor(selectedPet, size - 1, { level: quickLevel, seed: `push:${Date.now()}:${Math.random()}` });
+  const session = createSession({
+    entrants: [{ id: "player", pet: selectedPet }, ...rivals.map((pet) => ({ id: pet.instanceId, pet, cpu: quickLevel }))],
+    seed: `push-${Date.now()}`,
+  });
+  run = { kind: "quick", session, level: quickLevel, localId: "player", startedAt: performance.now(), resultId: null, filed: false };
+  newResultId("ppquick").then((id) => { if (run) run.resultId = id; });
+  arena.clear();
+  show("match");
+  held.clear();
+}
+
+function renderScoreboard(match, names = null) {
+  scoreboard.innerHTML = match.players.map((player) => {
+    const who = names?.get(player.id);
+    const label = `${escapeHtml(player.pet.name)}${who ? ` · ${escapeHtml(who)}` : ""}`;
+    return `<div class="score-chip${player.id === run?.localId ? " player" : ""}${player.left ? " is-gone" : ""}"><small>${label}</small><strong>${"●".repeat(player.wins)}${"○".repeat(Math.max(0, match.winsToMatch - player.wins))}</strong></div>`;
+  }).join("");
+}
+
+function roundCall(session, names = null) {
+  const match = session.match;
+  if (session.phase !== "round-over" && session.phase !== "match-over") return "";
+  const winner = match.players.find((player) => player.id === match.roundWinnerId);
+  if (!winner) return "DOUBLE SPLASH · REPLAY THE ROUND";
+  const mine = winner.id === run?.localId;
+  const who = mine ? "YOU" : (names?.get(winner.id) ?? winner.pet.name).toUpperCase();
+  if (session.phase === "match-over") return mine ? "YOU TAKE THE ISLAND!" : `${who} TAKES THE ISLAND`;
+  return mine ? "YOU HELD THE HILL!" : `${who} STAYED DRY`;
+}
+
+async function finishMatch() {
+  const { session } = run;
+  const standings = matchStandings(session);
+  const localId = run.localId;
+  const mineIndex = standings.findIndex((player) => player.id === localId);
+  const mine = standings[mineIndex];
+  const names = run.kind === "online" ? run.brawl.names : null;
+  const won = mineIndex === 0;
+  $("#resultKicker").textContent = run.kind === "online" ? "Online match complete" : "Match complete";
+  $("#resultTitle").textContent = won ? "Island champion!" : `${standings[0].id === localId ? "You" : names?.get(standings[0].id) ?? standings[0].pet.name} takes it!`;
+  $("#resultCopy").textContent = won ? `${mine.pet.name} reached ${session.match.winsToMatch} wins first.` : `${mine?.pet.name ?? "Your pet"} won ${mine?.wins ?? 0} of the rounds. ${session.match.round} rounds were played.`;
+  $("#resultStandings").replaceChildren(...standings.map((player) => {
+    const item = document.createElement("li");
+    item.classList.toggle("is-player", player.id === localId);
+    const who = names?.get(player.id);
+    item.textContent = `${player.pet.name}${who ? ` · ${who}` : player.cpu ? " · CPU" : ""} · ${player.wins} ${player.wins === 1 ? "win" : "wins"}${player.left ? " · left" : ""}`;
+    return item;
+  }));
+  $("#resultReward").textContent = account.signedIn ? "Filing your result…" : "";
+  $("#nextRound").textContent = run.kind === "online" ? "Back to the room" : "Rematch";
+  $("#changePet").textContent = run.kind === "online" ? "Leave room" : "Main menu";
+  show("result");
+
+  if (run.filed || !mine) return;
+  run.filed = true;
+  const common = {
+    fieldSize: standings.length,
+    finalPlace: mineIndex + 1,
+    roundsWon: mine.wins,
+    roundsPlayed: session.match.round,
+    durationMs: Math.round(performance.now() - run.startedAt),
+  };
+  const result = run.kind === "online"
+    ? { resultId: onlineResultId("pponline", run.brawl.match.seed, localId), mode: "online", humans: run.brawl.match.seats.length, ...common }
+    : run.resultId ? { resultId: run.resultId, mode: "cpu", level: run.level, ...common } : null;
+  if (!result) return;
+  const response = await fileResult(GAME_SLUG, result);
+  $("#resultReward").textContent = response?.tickets?.awarded ? `+${response.tickets.awarded} tickets` : "";
+  refreshCareer();
+}
+
+// ---------------------------------------------------------------- online
+
+function lobbyViewState() {
+  return {
+    signedIn: account.signedIn,
+    gateMessage: account.message,
+    client: lobbyClient?.getState(),
+    recordText: account.signedIn ? `Your online record: ${recordLine(career, "matches")}` : "",
+  };
+}
+
+function ensureLobby() {
+  if (lobbyClient) return;
+  lobbyClient = createPetLobbyClient(PONDSIDE_ONLINE, { resolveIdentity: () => identity });
+  lobbyClient.setPet(selectedPet);
+  lobbyView = createOnlinePanel(panels.online, {
+    eventNoun: "match",
+    maxPlayers: 4,
+    settings: [
+      { key: "cpuCount", label: "CPU guests", options: [0, 1, 2].map((count) => ({ value: count, label: count ? `${count} to fill empty spots` : "None" })), parse: Number },
+      { key: "cpuLevel", label: "CPU level", options: CPU_LEVELS.map((level) => ({ value: cpuLevelIndex(level.id), label: level.title })), parse: Number },
+    ],
+    onQuick: () => lobbyClient.findQuickMatch({ protocolVersion: 1 }),
+    onCreate: () => lobbyClient.createPrivateRoom({ protocolVersion: 1, cpuCount: 0, cpuLevel: 1 }),
+    onJoin: (code) => lobbyClient.joinPrivateRoom(code),
+    onStart: () => lobbyClient.startMatch(),
+    onLeave: () => lobbyClient.leave(),
+    // Only the setting that changed: the server merges it into the room's, so quick successive changes never undo each other.
+    onSetting: (key, value) => lobbyClient.updateSettings({ [key]: value }),
+    onSignIn: () => account.signIn(),
+    onBack: () => goHome(),
+  });
+  lobbyClient.subscribe((state) => {
+    if (screen === "online") lobbyView.render(lobbyViewState());
+    if (state.status === "playing" && state.match && !state.ended && run?.kind !== "online") beginOnlineMatch(state.match);
+    if (state.status === "idle" && run?.kind === "online") goHome();
+  });
+  lobbyClient.onSnapshot((match, { ended }) => {
+    if (run?.kind !== "online") return;
+    run.brawl.applySnapshot(match);
+    if (ended && !run.done) {
+      run.done = true;
+      finishMatch();
     }
   });
 }
 
-function clearViews() {
-  for (const view of views.values()) {
-    petRoot.remove(view.group);
-    petRoot.remove(view.splash);
-    debugRoot.remove(view.hitbox);
-  }
-  views.clear();
+function openOnline() {
+  ensureLobby();
+  show("online");
+  lobbyView.render(lobbyViewState());
+  if (account.signedIn) lobbyClient.resumeSavedSession();
 }
 
-function renderScoreboard() {
-  if (!match) return;
-  scoreboard.innerHTML = match.players.map((player) => `<div class="score-chip${player.player ? " player" : ""}"><small>${escapeHtml(player.pet.name)}</small><strong>${"●".repeat(player.wins)}${"○".repeat(WINS_TO_MATCH - player.wins)}</strong></div>`).join("");
+function beginOnlineMatch(match) {
+  const brawl = createOnlineBrawl({ match, clientId: lobbyClient.getState().clientId });
+  run = { kind: "online", brawl, session: brawl.session, localId: brawl.myId, startedAt: performance.now(), filed: false };
+  arena.clear();
+  show("match");
+  held.clear();
 }
 
-function startMatch() {
-  const field = [selectedPet, ...cpuFieldFor(selectedPet, 3)];
-  match = createMatch(field);
-  clearViews();
-  match.players.forEach(createPetView);
-  lastResolvedRound = 0;
-  resultDelay = -1;
-  roundCountdown = createRoundCountdown();
-  screen = "match";
-  setupPanel.hidden = true;
-  resultPanel.hidden = true;
-  scoreboard.hidden = false;
-  roundBanner.textContent = "ROUND 1 · 3";
-  renderScoreboard();
-  canvas.focus();
-}
+// ---------------------------------------------------------------- the loop
 
 function playerControls() {
   return {
@@ -268,126 +254,17 @@ function playerControls() {
   };
 }
 
-function simulationTick() {
-  if (!match) return;
-  if (roundCountdown && !roundCountdown.complete) {
-    stepRoundCountdown(roundCountdown, TICK_SECONDS);
-    const label = countdownLabel(roundCountdown);
-    roundBanner.textContent = label ? `ROUND ${match.round} · ${label}` : "";
-    if (isCountdownBlocking(roundCountdown)) return;
+function tick() {
+  if (screen !== "match" || !run) return;
+  if (run.kind === "online") {
+    lobbyClient.sendInputs(run.brawl.tick(playerControls()));
+    return;
   }
-  if (match.phase === "playing") {
-    const controls = { [match.players[0].id]: playerControls() };
-    for (const rival of match.players.slice(1)) controls[rival.id] = cpuControls(rival, match.players, match.tick);
-    stepMatch(match, controls, TICK_SECONDS);
-    if (match.phase !== "playing" && lastResolvedRound !== match.round) {
-      lastResolvedRound = match.round;
-      resultDelay = 1.25;
-    }
-  } else {
-    stepMatch(match, {}, TICK_SECONDS);
-    if (resultDelay > 0) {
-      resultDelay -= TICK_SECONDS;
-      if (resultDelay <= 0) showRoundResult();
-    }
+  stepSession(run.session, { player: playerControls() }, TICK_SECONDS);
+  if (run.session.phase === "complete" && !run.done) {
+    run.done = true;
+    finishMatch();
   }
-}
-
-function showRoundResult() {
-  renderScoreboard();
-  const winner = match.players.find((player) => player.id === match.roundWinnerId);
-  const playerWon = winner?.player;
-  const matchOver = match.phase === "match-over";
-  resultKicker.textContent = matchOver ? "Match complete" : `Round ${match.round}`;
-  resultTitle.textContent = matchOver ? (playerWon ? "Island champion!" : `${winner.pet.name} takes it!`) : (playerWon ? "You held the hill!" : `${winner.pet.name} stayed dry!`);
-  resultCopy.textContent = matchOver ? `${winner.pet.name} reached three wins first.` : `${winner.pet.name} was the last pet standing. The score carries into the next round.`;
-  nextRoundButton.textContent = matchOver ? "Rematch" : "Next round";
-  changePetButton.hidden = !matchOver;
-  resultPanel.hidden = false;
-}
-
-function nextRound() {
-  if (match.phase === "match-over") startMatch();
-  else {
-    resetRound(match);
-    resultDelay = -1;
-    roundCountdown = createRoundCountdown();
-    resultPanel.hidden = true;
-    roundBanner.textContent = `ROUND ${match.round} · 3`;
-    renderScoreboard();
-    canvas.focus();
-  }
-}
-
-function backToSetup() {
-  screen = "setup";
-  match = null;
-  roundCountdown = null;
-  clearViews();
-  scoreboard.hidden = true;
-  resultPanel.hidden = true;
-  setupPanel.hidden = false;
-}
-
-function syncViews(dt) {
-  if (!match) return;
-  for (const player of match.players) {
-    const view = views.get(player.id);
-    if (!view) continue;
-    const targetY = 0.12 - player.fallHeight * WORLD_SCALE;
-    view.group.position.set(player.x * WORLD_SCALE, targetY, player.y * WORLD_SCALE);
-    view.group.rotation.y = yawForFacing(player.facingX, player.facingY);
-    view.visual.rotation.x = player.eliminated ? Math.min(Math.PI * 0.46, player.fallHeight * 0.018) : 0;
-    view.hitbox.position.set(player.x * WORLD_SCALE, 0, player.y * WORLD_SCALE);
-    view.group.visible = view.group.position.y > -3.2;
-    view.marker.visible = !player.eliminated;
-    view.splash.position.x = player.x * WORLD_SCALE;
-    view.splash.position.z = player.y * WORLD_SCALE;
-    view.splash.visible = player.splashAge >= 0 && player.splashAge < 0.9;
-    if (view.splash.visible) {
-      const splashScale = 1 + player.splashAge * 3.6;
-      view.splash.scale.setScalar(splashScale);
-      view.splash.material.opacity = Math.max(0, 0.9 - player.splashAge);
-    }
-    view.bumpWave.visible = player.bumpTimer > 0;
-    if (view.bumpWave.visible) {
-      const scale = 1 + (0.16 - player.bumpTimer) * 6;
-      view.bumpWave.scale.setScalar(scale);
-    }
-    if (!player.eliminated) {
-      const squash = player.impact;
-      view.visual.scale.set(1 + squash * 0.24, 1 - squash * 0.28, 1 + squash * 0.24);
-    }
-    if (view.mixer) {
-      const speed = Math.hypot(player.vx, player.vy);
-      view.walk.timeScale = Math.max(0.25, speed / 90);
-      view.mixer.update(dt);
-    }
-  }
-}
-
-/** Toggle measured collision rings: red bodies and the green elimination boundary. */
-function debugDraw(enabled = !debugRoot.visible) {
-  if (!debugRoot.userData.boundary) {
-    const radius = ARENA_RADIUS * WORLD_SCALE;
-    const boundary = new THREE.Mesh(new THREE.RingGeometry(radius - 0.035, radius + 0.035, 64), new THREE.MeshBasicMaterial({ color: 0x35ff72, side: THREE.DoubleSide }));
-    boundary.rotation.x = -Math.PI / 2;
-    boundary.position.y = 0.14;
-    debugRoot.add(boundary);
-    debugRoot.userData.boundary = boundary;
-  }
-  debugRoot.visible = enabled;
-}
-
-function resize() {
-  const rect = stage.getBoundingClientRect();
-  const scale = Math.min(rect.width / GAME_WIDTH, rect.height / GAME_HEIGHT);
-  const width = Math.max(1, Math.floor(GAME_WIDTH * scale));
-  const height = Math.max(1, Math.floor(GAME_HEIGHT * scale));
-  renderer.setSize(width, height, false);
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
 }
 
 function loop(timestamp) {
@@ -396,20 +273,36 @@ function loop(timestamp) {
   previousTime = timestamp;
   while (accumulator >= TICK_SECONDS) {
     accumulator -= TICK_SECONDS;
-    simulationTick();
+    tick();
   }
-  syncViews(Math.min(0.05, TICK_SECONDS + accumulator));
-  const impact = match ? Math.max(0, ...match.players.map((player) => player.impact)) : 0;
-  camera.position.set(Math.sin(timestamp * 0.12) * impact * 0.14, 18 + Math.cos(timestamp * 0.15) * impact * 0.08, 20);
-  camera.lookAt(0, 0, 0);
-  renderer.render(scene, camera);
+  const dt = Math.min(0.05, TICK_SECONDS + accumulator);
+  let impact = 0;
+  if (run) {
+    const { session } = run;
+    const names = run.kind === "online" ? run.brawl.names : null;
+    arena.sync(session.match, dt, { localId: run.localId, positions: run.kind === "online" ? run.brawl.positions() : null });
+    renderScoreboard(session.match, names);
+    roundBanner.textContent = sessionBanner(session) || roundCall(session, names);
+    impact = Math.max(0, ...session.match.players.map((player) => player.impact));
+  }
+  arena.render(timestamp, impact);
   requestAnimationFrame(loop);
 }
 
+function resize() {
+  const rect = stage.getBoundingClientRect();
+  const scale = Math.min(rect.width / 960, rect.height / 640);
+  arena.resize(Math.max(1, Math.floor(960 * scale)), Math.max(1, Math.floor(640 * scale)));
+}
+
+// ---------------------------------------------------------------- wiring
+
 const keyMap = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", Space: "bump" };
 window.addEventListener("keydown", (event) => {
-  if (keyMap[event.code]) { held.add(keyMap[event.code]); event.preventDefault(); }
-  if (event.code === "KeyH") debugDraw();
+  if (event.code === "KeyH") arena.toggleDebug();
+  if (screen !== "match" || !keyMap[event.code]) return;
+  held.add(keyMap[event.code]);
+  event.preventDefault();
 });
 window.addEventListener("keyup", (event) => { if (keyMap[event.code]) held.delete(keyMap[event.code]); });
 window.addEventListener("blur", () => held.clear());
@@ -422,18 +315,37 @@ for (const button of document.querySelectorAll("[data-control]")) {
   button.addEventListener("pointercancel", release);
   button.addEventListener("pointerleave", release);
 }
-startButton.addEventListener("click", startMatch);
-nextRoundButton.addEventListener("click", nextRound);
-changePetButton.addEventListener("click", backToSetup);
-document.querySelector("#fullscreen").addEventListener("click", () => stage.requestFullscreen?.());
+$("#modeQuick").addEventListener("click", () => show("quick"));
+$("#modeOnline").addEventListener("click", openOnline);
+$("#startMatch").addEventListener("click", startQuickMatch);
+for (const back of document.querySelectorAll("[data-back]")) back.addEventListener("click", goHome);
+$("#nextRound").addEventListener("click", () => {
+  if (run?.kind === "online") {
+    run = null;
+    arena.clear();
+    lobbyClient.backToLobby();
+    show("online");
+    lobbyView.render(lobbyViewState());
+  } else startQuickMatch();
+});
+$("#changePet").addEventListener("click", () => {
+  if (run?.kind === "online") lobbyClient?.leave();
+  goHome();
+});
+$("#fullscreen").addEventListener("click", () => stage.requestFullscreen?.());
 window.addEventListener("resize", resize);
 document.addEventListener("fullscreenchange", resize);
+// Read-only handle for headless checks.
+globalThis.__pondside = { get run() { return run; }, get screen() { return screen; } };
 
-const loaded = await loadFarmPets();
-pets = loaded.pets;
-renderPetChoices();
-startButton.disabled = false;
-startButton.textContent = "Enter the arena";
-loadNote.textContent = loaded.source === "fallback" ? "Your farm was unavailable, so Borrowed Biscuit is ready." : "Your farm pets are ready.";
 resize();
 requestAnimationFrame(loop);
+const [loaded, who, gate] = await Promise.all([loadFarmPets(), loadIdentity(), loadAccountGate()]);
+identity = who;
+account = gate;
+picker.setPets(loaded.pets);
+for (const id of ["#modeQuick", "#modeOnline"]) $(id).disabled = false;
+$("#loadNote").textContent = loaded.source === "fallback" ? "Your farm was unavailable, so Borrowed Biscuit is ready." : "Your farm pets are ready.";
+renderCareer();
+refreshCareer();
+if (account.signedIn && sessionStorage.getItem(PONDSIDE_ONLINE.storageKey)) openOnline();

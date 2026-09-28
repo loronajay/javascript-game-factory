@@ -1,3 +1,5 @@
+import { pickRivals, rivalAsPet } from "./sim/rivals.js";
+
 const SPECIES = Object.freeze({
   "pet.corgi": Object.freeze({ title: "Corgi", color: "#d99542" }),
   "pet.duck": Object.freeze({ title: "Duck", color: "#f5d547" }),
@@ -41,38 +43,15 @@ export function playablePets(layout) {
   return pets.length ? pets : [BORROWED_PET];
 }
 
-function hash(text) {
-  let value = 2166136261;
-  for (const character of text) {
-    value ^= character.charCodeAt(0);
-    value = Math.imul(value, 16777619) >>> 0;
-  }
-  return value;
-}
-
-const CPU_SPECIES = Object.freeze(Object.keys(SPECIES));
-const CPU_NAMES = Object.freeze(["Pepper", "Maple", "Comet", "Tumble", "Mochi", "Dash", "Clover"]);
-
-function cpuPetFor(selected, index) {
-  const seed = hash(`${selected.instanceId}:${selected.speciesId}:${index}`);
-  return {
-    instanceId: `cpu-${selected.instanceId}-${index + 1}`,
-    speciesId: CPU_SPECIES[(seed + index * 3) % CPU_SPECIES.length],
-    name: CPU_NAMES[index % CPU_NAMES.length],
-    paletteId: "standard",
-    stats: {
-      // Rivals stay near the balanced loaner baseline. Mirroring the selected
-      // pet's progression here would cancel the farm stats' match advantage.
-      speed: 50 + (seed % 13) - 6,
-      strength: 50 + ((seed >>> 8) % 13) - 6,
-      size: 1 + (((seed >>> 16) % 7) - 3) / 100,
-    },
-  };
-}
-
-export function cpuFieldFor(selected, count) {
+/**
+ * CPU rivals for a local field, drawn from the shared rival pool
+ * (sim/rivals.js). The draw is seeded by the selected pet's identity, never
+ * its stats, so progressing a farm pet can never make its rivals catch up.
+ */
+export function cpuFieldFor(selected, count, { level = "pro", seed = null, exclude = [] } = {}) {
   const total = Math.min(7, Math.max(1, Math.floor(Number(count) || 1)));
-  return Array.from({ length: total }, (_, index) => cpuPetFor(selected, index));
+  const draw = seed ?? `${selected?.instanceId}:${selected?.speciesId}`;
+  return pickRivals({ seed: draw, count: total, level, exclude }).map(rivalAsPet);
 }
 
 export function speciesStyle(speciesId) {

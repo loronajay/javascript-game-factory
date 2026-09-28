@@ -18,6 +18,7 @@ import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs"
 import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-records.mjs";
 import { getPlayerAchievements, submitAchievementRun } from "./db/achievements.mjs";
 import { submitGameResult } from "./db/game-results.mjs";
+import { getPetGameCareer } from "./db/pet-game-career.mjs";
 import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tickets.mjs";
 import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import { cookFarmDish } from "./db/farm-kitchen.mjs";
@@ -280,6 +281,7 @@ async function bootstrap() {
         getPlayerAchievements: (params) => getPlayerAchievements(pool, params),
         getTicketWallet: (playerId) => getTicketWallet(pool, playerId),
         submitGameResult: (params) => submitGameResult(pool, params),
+        getPetGameCareer: (params) => getPetGameCareer(pool, params),
         getTicketShop: (params) => getTicketShop(pool, params),
         purchaseTicketShopItem: (params) => purchaseTicketShopItem(pool, params),
         adoptFarmPet: (params) => adoptFarmPet(pool, params),

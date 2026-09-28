@@ -1,5 +1,6 @@
 import { paletteTier, rollFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
 import { farmTreeRule } from "./farm-tree-catalog.mjs";
+import { farmRecipeRule } from "./farm-recipe-catalog.mjs";
 
 export const FARM_ADOPTION_PRICE = 1200;
 
@@ -59,17 +60,31 @@ const seedPrices: Readonly<Record<string, number>> = Object.freeze({
   blueberry: 13, corn: 11, eggplant: 12, pumpkin: 16,
   strawberry: 9, sunflower: 12, tomato: 10, watermelon: 18,
 });
+// Mirrors js/farm-vendor-stock.mts. Retail is 1.6x standing value, above the
+// Produce Merchant's best (+20%) day so a round trip never creates tickets.
+const ingredientPrices: Readonly<Record<string, number>> = Object.freeze({
+  bean: 20, beetroot: 18, blueberry: 18, cabbage: 39, carrot: 18, cauliflower: 50,
+  corn: 44, eggplant: 29, garlic: 16, potato: 18, pumpkin: 103, radish: 16,
+  strawberry: 13, sunflower: 96, tomato: 20, watermelon: 106,
+  apple: 7, pear: 8, cherry: 5, peach: 10, orange: 8,
+});
 
 export function findFarmSpecies(value: unknown): Species | null {
   return typeof value === "string" ? FARM_SPECIES.find((row) => row.id === value.trim()) ?? null : null;
 }
 
-export type FarmSupply = Readonly<{ id: string; price: number; kind: "supply" | "seed" | "sapling"; cropId?: string; speciesId?: string }>;
+export type FarmSupply = Readonly<{ id: string; price: number; kind: "supply" | "seed" | "sapling" | "ingredient" | "recipe"; cropId?: string; speciesId?: string; recipeId?: string }>;
 
 export function findFarmSupply(value: unknown): FarmSupply | null {
   const id = typeof value === "string" ? value.trim() : "";
   const price = supplyPrices[id];
   if (price) return Object.freeze({ id, price, kind: "supply" as const });
+  const ingredientId = id.startsWith("ingredient.") ? id.slice(11) : "";
+  const ingredientPrice = ingredientPrices[ingredientId];
+  if (ingredientPrice) return Object.freeze({ id, price: ingredientPrice, kind: "ingredient" as const, cropId: ingredientId });
+  const recipeId = id.startsWith("recipe.") ? id.slice(7) : "";
+  const recipe = farmRecipeRule(recipeId);
+  if (recipe?.vendorPrice) return Object.freeze({ id, price: recipe.vendorPrice, kind: "recipe" as const, recipeId });
   // Productive-tree saplings (services/farm-tree-catalog): `sapling.<species>`, level-gated at purchase.
   const tree = id.startsWith("sapling.") ? farmTreeRule(id.slice(8)) : null;
   if (tree) return Object.freeze({ id, price: tree.saplingPrice, kind: "sapling" as const, speciesId: id.slice(8) });

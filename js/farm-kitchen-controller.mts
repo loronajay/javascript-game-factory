@@ -66,7 +66,7 @@ function cookId(): string {
 
 /** The recipes a level-up just taught, by name. */
 function newlyTaught(before: number, after: number): string[] {
-  return RECIPE_CATALOG.filter((recipe) => recipe.minLevel > before && recipe.minLevel <= after).map((recipe) => recipe.title);
+  return RECIPE_CATALOG.filter((recipe) => recipe.source === "level" && recipe.minLevel > before && recipe.minLevel <= after).map((recipe) => recipe.title);
 }
 
 export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKitchenController {
@@ -79,6 +79,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
   let resultUntil = 0;
 
   const cookingLevel = () => skillLevelForXp(deps.layout().skills.cooking.xp);
+  const learnedRecipes = () => deps.layout().skills.cooking.learned;
 
   function update(pose: KitchenPose, allowed: boolean): void {
     if (active || serving) return;
@@ -89,13 +90,13 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
     if (serving) return "Serving…";
     if (active) return "Cooking · Esc to stop — nothing is used until the dish is served";
     if (!target) return "";
-    const ready = RECIPE_CATALOG.filter((recipe) => recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel()).state === "ready").length;
+    const ready = RECIPE_CATALOG.filter((recipe) => recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes()).state === "ready").length;
     return ready ? `Press E to cook · ${ready} recipe${ready === 1 ? "" : "s"} ready` : "Press E to open the cookbook";
   }
 
   function interact(): boolean {
     if (!target || active || serving) return false;
-    deps.panel.open(deps.layout().agriculture.inventory, cookingLevel(), deps.submitCook ? "" : "Cooking on this device · sign in to earn Cooking XP and sell dishes at the Market.");
+    deps.panel.open(deps.layout().agriculture.inventory, cookingLevel(), learnedRecipes(), deps.submitCook ? "" : "Cooking on this device · sign in to earn Cooking XP and buy market recipes.");
     return true;
   }
 
@@ -103,7 +104,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
     const row = target;
     const recipe = findRecipe(recipeId);
     if (!row || !recipe || active) return;
-    if (recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel()).state !== "ready") return;
+    if (recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes()).state !== "ready") return;
     const session = startCooking(recipe.id, cookingLevel(), seconds(), random);
     if (!session) return;
     active = { row, recipe, session };
@@ -161,6 +162,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
             ? "The basket came up short when the farm's records were checked. Nothing was used."
             : result?.error === "pantry_full" ? "The pantry has no room for another of those. Sell some at the Market first."
               : result?.error === "level_too_low" ? "That recipe needs a higher Cooking level by the farm's records."
+                : result?.error === "recipe_not_owned" ? "That recipe card is not in your cookbook. Buy it from Basil at the Market."
                 : "That dish did not go through. Nothing was used — try again in a moment.");
           return;
         }
@@ -176,7 +178,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
       } else {
         const stars = dishStars(scores);
         const layout = deps.layout();
-        const cooked = cookLocally(layout.agriculture.inventory, recipe.id, stars, cookingLevel());
+        const cooked = cookLocally(layout.agriculture.inventory, recipe.id, stars, cookingLevel(), learnedRecipes());
         if (!cooked.ok) {
           deps.view.cancel();
           deps.hud.hide();

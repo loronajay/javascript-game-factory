@@ -1,12 +1,21 @@
 {
   "title": "Barnyard Dash",
   "tagline": "Race your farm pet through mud, hurdles, hay and tight turns.",
-  "description": "A third-person 3D, skill-first pet obstacle race with selectable fields from 1v1 through eight pets. Choose one of your own farm animals, steer every corner, time each jump, and use Speed and Strength advantages without letting stats decide the winner.",
+  "description": "A third-person 3D, skill-first pet obstacle race across five farm courses. Race a quick field of CPU rivals at Rookie, Pro or Champion, chase a Grand Prix cup for a trophy on your farm, or race other players online in rooms of up to eight pets. Speed and Strength help a little; your line and your jumps decide it.",
   "players": "1-8",
-  "categories": ["Racing", "Sports", "Arcade"],
-  "dimensions": ["3d"],
-  "play_modes": ["solo"],
-  "status": "Playable - offline 1v1 and 4/6/8-pet CPU fields",
+  "categories": [
+    "Racing",
+    "Sports",
+    "Arcade"
+  ],
+  "dimensions": [
+    "3d"
+  ],
+  "play_modes": [
+    "solo",
+    "online"
+  ],
+  "status": "Playable - Quick Race, Grand Prix cups, and online races for 2-8 pets",
   "order": 20,
   "featured": false,
   "theme": "farm",

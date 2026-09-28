@@ -18,6 +18,7 @@ import {
   cropHarvestYield,
   deadCropModel,
   CROP_CATALOG,
+  PRODUCE_IDS,
   MOISTURE_CAPACITY_MINUTES,
   GREENHOUSE_CELL_LAYOUT,
   SOIL_CELL_LAYOUT,
@@ -32,6 +33,9 @@ import {
   waterFarmCrop,
 } from "../farm-crops.mjs";
 import { PET_CARE } from "../farm-pet-care.mjs";
+import { INGREDIENT_STOCK, RECIPE_STOCK } from "../farm-vendor-stock.mjs";
+import { LEVEL_RECIPE_CATALOG, VENDOR_RECIPE_CATALOG } from "../farm-catalog/recipes.mjs";
+import { producePrice } from "../farm-market-prices.mjs";
 
 const carrot = CROP_CATALOG.find((crop) => crop.id === "carrot");
 const cropAssets = resolve(import.meta.dirname, "..", "..", "farm", "assets", "crops");
@@ -41,6 +45,21 @@ function glbJson(file) {
   const jsonLength = bytes.readUInt32LE(12);
   return JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").replace(/\0+$/, ""));
 }
+
+test("the Market vendors add retail ingredients and recipes outside the Cooking tree", () => {
+  assert.deepEqual(INGREDIENT_STOCK.map((line) => line.id), PRODUCE_IDS);
+  for (const line of INGREDIENT_STOCK) {
+    assert.equal(line.itemId, `ingredient.${line.id}`);
+    assert.ok(line.price > Math.ceil(producePrice(line.id) * 1.2), `${line.id} cannot be flipped on the best market day`);
+  }
+  assert.ok(VENDOR_RECIPE_CATALOG.length >= 4);
+  assert.deepEqual(RECIPE_STOCK.map((line) => line.recipeId), VENDOR_RECIPE_CATALOG.map((recipe) => recipe.id));
+  for (const recipe of VENDOR_RECIPE_CATALOG) {
+    assert.equal(recipe.source, "vendor");
+    assert.ok(recipe.price >= 100);
+    assert.ok(!LEVEL_RECIPE_CATALOG.includes(recipe));
+  }
+});
 
 test("the farming catalog exposes every growth-cycle crop and the inventory includes pet-food supplies", () => {
   assert.deepEqual(CROP_CATALOG.map((crop) => crop.id), [

@@ -85,6 +85,8 @@ import { farmingLevelForXp } from "./farm-skills.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
+import { INGREDIENT_STOCK, RECIPE_STOCK, type IngredientStockLine, type RecipeStockLine } from "./farm-vendor-stock.mjs";
+import { createVendorShelf } from "./farm-vendor-shelf.mjs";
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 
@@ -321,7 +323,7 @@ function publishPresence(): void {
     z: player.z,
     yaw: player.yaw,
     moving: keys.size > 0 && body.mode === "walking",
-    activity: trading.activity() || (salePanel.isOpen() ? "selling produce" : seedPanel.isOpen() ? "buying seeds" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
+    activity: trading.activity() || (salePanel.isOpen() ? "at the Produce Merchant" : seedPanel.isOpen() ? "buying seeds" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "at the Kitchen" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
   });
 }
 
@@ -371,6 +373,36 @@ const salePanel = createMarketSalePanel({
   lineNote: (key) => trendNote(market, key),
   onRender: () => { saleTurnover.textContent = turnoverNote(market, Date.now()); },
   onClose: () => canvas.focus(),
+});
+
+const vendorPurchaseMessages: Readonly<Record<string, string>> = Object.freeze({
+  insufficient_tickets: "Not enough tickets for that.",
+  inventory_full: "That stack is full (99).",
+  already_owned: "That recipe is already in your cookbook.",
+  prices_changed: "The market day changed while you were choosing. Check the shelf again.",
+  farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
+});
+
+async function buyIngredient(line: IngredientStockLine, quantity: number): Promise<{ ok: boolean; message: string }> {
+  if (!market) await loadMarketDay();
+  if (!market) return { ok: false, message: "Marigold is still opening the till. Try again in a moment." };
+  const purchaseId = `ingredient-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+  const result = await ticketClient.purchaseFarmSupply(`ingredient.${line.id}`, quantity, purchaseId, { venue: "market", day: market.day });
+  takeStock(result?.layout);
+  if (!result?.ok) return { ok: false, message: vendorPurchaseMessages[result?.error] ?? "The purchase did not go through. Nothing was bought." };
+  takeBalance(result.balance);
+  keeperSays(findMarketStall(PRODUCE_STALL_ID)!, "Straight into your harvest basket.");
+  return { ok: true, message: `Bought ${quantity} ${line.title}${quantity === 1 ? "" : "s"} for ${Number(result.price).toLocaleString()} tickets.` };
+}
+
+const ingredientShelf = createVendorShelf({
+  list: requiredElement<HTMLElement>("#ingredientShelf"),
+  status: requiredElement<HTMLElement>("#ingredientStatus"),
+}, {
+  stock: INGREDIENT_STOCK,
+  buy: (line, quantity) => buyIngredient(line as IngredientStockLine, quantity),
+  held: (line) => Number(produce[(line as IngredientStockLine).id]) || 0,
+  thumbnail: itemThumbnails.get,
 });
 
 // ---------------------------------------------------------------- the Seed Merchant
@@ -426,6 +458,28 @@ const kitchenPanel = createMarketSalePanel({
   sellable: SELLABLE_DISHES,
   emptyNote: "Your pantry is empty. Cook something at your farm's Kitchen Range and bring it here.",
   onClose: () => canvas.focus(),
+});
+
+async function buyRecipe(line: RecipeStockLine): Promise<{ ok: boolean; message: string }> {
+  if (!market) await loadMarketDay();
+  if (!market) return { ok: false, message: "Basil is still setting out the recipe cards. Try again in a moment." };
+  const purchaseId = `recipe-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+  const result = await ticketClient.purchaseFarmSupply(`recipe.${line.recipeId}`, 1, purchaseId, { venue: "market", day: market.day });
+  takeStock(result?.layout);
+  if (!result?.ok) return { ok: false, message: vendorPurchaseMessages[result?.error] ?? "The recipe purchase did not go through. Nothing was bought." };
+  takeBalance(result.balance);
+  keeperSays(findMarketStall(KITCHEN_STALL_ID)!, "That's yours for good. Try it at your Kitchen Range!");
+  return { ok: true, message: `${line.title} was added to your cookbook for ${Number(result.price).toLocaleString()} tickets.` };
+}
+
+const recipeShelf = createVendorShelf({
+  list: requiredElement<HTMLElement>("#recipeShelf"),
+  status: requiredElement<HTMLElement>("#recipeStatus"),
+}, {
+  stock: RECIPE_STOCK,
+  buy: (line) => buyRecipe(line as RecipeStockLine),
+  held: (line) => farm.skills.cooking.learned.includes((line as RecipeStockLine).recipeId) ? 1 : 0,
+  thumbnail: itemThumbnails.get,
 });
 
 // ---------------------------------------------------------------- the Order Board
@@ -592,12 +646,16 @@ function workStall(stall: MarketStall): void {
     exchangePanel.open();
     return;
   }
-  if (stall.id === KITCHEN_STALL_ID) kitchenPanel.open(dishes);
+  if (stall.id === KITCHEN_STALL_ID) {
+    recipeShelf.render();
+    kitchenPanel.open(dishes);
+  }
   else if (stall.id === SAWMILL_STALL_ID) sawmill.open();
   else if (stall.id === SEED_STALL_ID) {
     seedPanel.open(seeds);
     if (!market) void loadMarketDay();
   } else {
+    ingredientShelf.render();
     salePanel.open(produce);
     if (!market) void loadMarketDay();
   }

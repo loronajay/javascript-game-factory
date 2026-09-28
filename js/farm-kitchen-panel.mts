@@ -30,7 +30,7 @@ type Options = Readonly<{
 }>;
 
 export type KitchenPanel = Readonly<{
-  open: (inventory: FarmInventory, level: number, note?: string) => void;
+  open: (inventory: FarmInventory, level: number, learned?: readonly string[], note?: string) => void;
   close: () => void;
   isOpen: () => boolean;
   render: (inventory: FarmInventory, level: number) => void;
@@ -47,6 +47,7 @@ function node(tag: string, className = "", text = ""): HTMLElement {
 export function createKitchenPanel(elements: Elements, options: Options): KitchenPanel {
   let inventory: FarmInventory | null = null;
   let level = 1;
+  let learned: readonly string[] = [];
   let selected = RECIPE_CATALOG[0]!.id;
 
   const isOpen = (): boolean => !elements.root.hidden;
@@ -63,7 +64,7 @@ export function createKitchenPanel(elements: Elements, options: Options): Kitche
   }
 
   function stateLine(entry: RecipeAvailability, held: number): string {
-    if (entry.state === "locked") return `Learn at Cooking ${entry.recipe.minLevel}`;
+    if (entry.state === "locked") return entry.lock === "vendor" ? "Buy this recipe from Basil at the Market" : `Learn at Cooking ${entry.recipe.minLevel}`;
     if (entry.state === "short") {
       const missing = entry.lines.filter((line) => line.short > 0);
       return missing.length === 1 ? `Need ${missing[0]!.short} more ${missing[0]!.title}` : `Need ${missing.length} more ingredients`;
@@ -129,15 +130,16 @@ export function createKitchenPanel(elements: Elements, options: Options): Kitche
     inventory = nextInventory;
     level = nextLevel;
     elements.level.textContent = `Cooking ${level}`;
-    const book = cookbook(inventory.produce, level);
+    const book = cookbook(inventory.produce, level, learned);
     elements.list.replaceChildren(...book.map(card));
     const recipe = findRecipe(selected) ?? RECIPE_CATALOG[0]!;
-    elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level)));
+    elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level, learned)));
   }
 
-  function open(nextInventory: FarmInventory, nextLevel: number, note = ""): void {
+  function open(nextInventory: FarmInventory, nextLevel: number, nextLearned: readonly string[] = [], note = ""): void {
+    learned = nextLearned;
     // Open on the first recipe that can be cooked right now, if the last one cannot.
-    const book = cookbook(nextInventory.produce, nextLevel);
+    const book = cookbook(nextInventory.produce, nextLevel, learned);
     if (book.find((entry) => entry.recipe.id === selected)?.state !== "ready") selected = book.find((entry) => entry.state === "ready")?.recipe.id ?? selected;
     elements.status.textContent = note;
     elements.root.hidden = false;

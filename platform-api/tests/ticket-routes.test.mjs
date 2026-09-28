@@ -40,6 +40,38 @@ async function post(app, url, value, token = "") {
   return { statusCode: res.statusCode, json: JSON.parse(res.body) };
 }
 
+async function requestFromOrigin(app, method, url, origin) {
+  const req = { method, url, headers: { origin } };
+  const res = responseSink();
+  await app(req, res);
+  return { statusCode: res.statusCode, headers: res.headers, json: JSON.parse(res.body) };
+}
+
+test("production rejects localhost before a ticket mutation reaches its route", async () => {
+  let purchases = 0;
+  const app = createApp({
+    config: { hasDatabaseUrl: true, isProduction: true },
+    purchaseTicketShopItem: async () => { purchases += 1; return { ok: true }; },
+  });
+
+  const preflight = await requestFromOrigin(app, "OPTIONS", "/tickets/shops/farm/purchases", "http://localhost:4173");
+  const direct = await requestFromOrigin(app, "POST", "/tickets/shops/farm/purchases", "http://127.0.0.1:4173");
+
+  assert.equal(preflight.statusCode, 403);
+  assert.equal(direct.statusCode, 403);
+  assert.equal(direct.headers["access-control-allow-origin"], undefined);
+  assert.equal(direct.json.error, "origin_not_allowed");
+  assert.equal(purchases, 0);
+});
+
+test("development keeps localhost available to the local API", async () => {
+  const app = createApp({ config: { hasDatabaseUrl: true, isProduction: false } });
+  const response = await requestFromOrigin(app, "GET", "/health", "http://localhost:4173");
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["access-control-allow-origin"], "http://localhost:4173");
+});
+
 test("ticket wallet reads require the signed-in player", async () => {
   const calls = [];
   const app = createApp({

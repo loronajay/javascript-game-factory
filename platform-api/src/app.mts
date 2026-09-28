@@ -2,7 +2,7 @@ import {
   extractTokenFromRequest,
   verifyToken,
 } from "./auth-helpers.mjs";
-import { readJsonBody, readMultipartFile, applyCorsHeaders, writeJson } from "./http-utils.mjs";
+import { readJsonBody, readMultipartFile, applyCorsHeaders, isAllowedOrigin, writeJson } from "./http-utils.mjs";
 import { clientIp, createRateLimiter } from "./rate-limit.mjs";
 import { handleAuthRoute } from "./routes/auth-routes.mjs";
 import { handleMessageRoute } from "./routes/message-routes.mjs";
@@ -329,6 +329,8 @@ export function createApp(options: any = {}) {
   // Cabinet result settlement (tickets for games without an achievement run).
   // Null for the same reason: unconfigured must be a 503, never "earned nothing".
   const submitGameResult = typeof options?.submitGameResult === "function" ? options.submitGameResult : null;
+  // A player's Pet Games career (PvP record, CPU wins, best cup finishes), derived from those results.
+  const getPetGameCareer = typeof options?.getPetGameCareer === "function" ? options.getPetGameCareer : null;
   const getTicketShop = typeof options?.getTicketShop === "function" ? options.getTicketShop : null;
   const purchaseTicketShopItem = typeof options?.purchaseTicketShopItem === "function" ? options.purchaseTicketShopItem : null;
   const adoptFarmPet = typeof options?.adoptFarmPet === "function" ? options.adoptFarmPet : null;
@@ -685,7 +687,7 @@ export function createApp(options: any = {}) {
   const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder, cookFarmDish, millFarmLogs, craftFarmPiece };
   const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
   const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
-  const gameResultServices = { submitGameResult };
+  const gameResultServices = { submitGameResult, getPetGameCareer };
   const progressionServices = {
     getGameXpProgress,
   };
@@ -827,6 +829,17 @@ export function createApp(options: any = {}) {
       const method = typeof req?.method === "string" ? req.method.toUpperCase() : "GET";
       const requestUrl = new URL(req?.url || "/", "http://localhost");
       const pathname = requestUrl.pathname;
+
+      // CORS headers alone are not an authority boundary: reject an untrusted
+      // browser origin before auth lookup or route dispatch so even a manually
+      // replayed request cannot spend tickets or mutate a production profile.
+      if (requestOrigin && !isAllowedOrigin(requestOrigin, { isProduction: config.isProduction === true })) {
+        res.statusCode = 403;
+        res.setHeader("vary", "Origin");
+        res.setHeader("content-type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ status: "error", error: "origin_not_allowed", timestamp }));
+        return;
+      }
 
       const rawToken = extractTokenFromRequest(req);
       const verifiedAuthClaims = rawToken && jwtSecret ? verifyToken(rawToken, jwtSecret) : null;

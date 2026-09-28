@@ -4,11 +4,53 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createLayoutStore } from "../arcade-room-store.mjs";
 import { PET_INTERACTIONS, getPetInteraction, getPetInteractionPrompt } from "../farm-interaction.mjs";
+import { buildFarmStats } from "../farm-stats.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..");
 const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
 const source = readFileSync(resolve(repoRoot, "js", "farm.mts"), "utf8");
 const worldSource = readFileSync(resolve(repoRoot, "js", "farm-world.mts"), "utf8");
+
+test("the player stats view includes every farm skill and its lifetime records", () => {
+  const view = buildFarmStats({
+    farming: { xp: 1_000, harvests: 12, orders: 2, crops: { bean: 3, carrot: 9 }, fruit: { apple: 4 } },
+    woodcutting: { xp: 0, fellings: 0, trees: {} },
+    cooking: { xp: 2_000, dishes: 5, perfect: 2, orders: 1, recipes: { "farm-stew": 5 }, learned: [] },
+    carpentry: { xp: 500, milled: 7, pieces: 3, masterwork: 1, patterns: { "decor.furniture.crate": 3 } },
+  });
+
+  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry"]);
+  assert.equal(view.totalXp, 3_500);
+  assert.equal(view.totalLevel, view.skills.reduce((total, skill) => total + skill.level, 0));
+  assert.deepEqual(view.skills[0].stats, [
+    { label: "Crop harvests", value: 12 },
+    { label: "Fruit picks", value: 4 },
+    { label: "Orders filled", value: 2 },
+  ]);
+  assert.deepEqual(view.skills[2].stats, [
+    { label: "Dishes cooked", value: 5 },
+    { label: "Three-star dishes", value: 2 },
+    { label: "Orders filled", value: 1 },
+  ]);
+  assert.deepEqual(view.skills[3].stats, [
+    { label: "Logs milled", value: 7 },
+    { label: "Pieces made", value: 3 },
+    { label: "Masterworks", value: 1 },
+  ]);
+  assert.deepEqual(view.skills[0].breakdown.map((line) => line.label), ["Bean", "Carrot", "Apple Tree"]);
+  assert.deepEqual(view.skills[2].breakdown, [{ label: "Farm Stew", value: 5 }]);
+  assert.deepEqual(view.skills[3].breakdown, [{ label: "Wooden Crate", value: 3 }]);
+});
+
+test("the farm page exposes an owner stats panel and keyboard shortcut", () => {
+  for (const id of ["openStats", "statsPanel", "closeStats", "statsSummary", "statsGrid"]) {
+    assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
+    assert.match(source, new RegExp(`#${id}"`), `farm.mts reads #${id}`);
+  }
+  assert.match(source, /event\.code === "KeyK"/);
+  assert.match(source, /statsPanel\.render\(layout\.skills\)/);
+  assert.match(source, /statsPanel\.isOpen\(\)/, "the stats screen pauses walking like the other farm panels");
+});
 
 test("pet, feed, carry and play remain separate registered interactions", () => {
   assert.deepEqual(PET_INTERACTIONS.map(({ id, code }) => [id, code]), [["pet", "KeyE"], ["feed", "KeyG"], ["pick-up", "KeyC"], ["play", "KeyY"], ["call", "KeyH"]]);
@@ -127,7 +169,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel, at the stove or bench, or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| statsPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel, at the stove or bench, or while napping");
   assert.match(source, /return kitchen\.cooking\(\) \|\| workshop\.crafting\(\);/, "a dish on the stove and a piece on the bench both hold the player");
   assert.match(source, /return kitchenPanel\.isOpen\(\) \|\| workshop\.panelOpen\(\);/, "the cookbook, the pattern book and the Sawmill counter are all station panels");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
@@ -210,10 +252,13 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(panelSource, /if \(!inspector \|\| inspector\.instanceId !== row\.instanceId\) inspector = buildInspector\(row, definition, state\)/);
   assert.doesNotMatch(panelSource, /^import[^;]*three|new THREE\./im);
   assert.match(panelSource, /data-clear-selection/);
+  assert.match(panelSource, /relocateDecor/, "a selected pond exposes an explicit relocation action");
+  assert.match(editorSource, /relocating/, "pond relocation is a click-to-place editor gesture");
+  assert.match(editorSource, /Aquatic pets stay adopted/, "the relocation instruction makes pet ownership safety explicit");
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
-  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !stationPanelOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
+  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !statsPanel\.isOpen\(\) && !stationPanelOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| statsPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);

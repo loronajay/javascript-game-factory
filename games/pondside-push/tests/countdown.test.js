@@ -6,7 +6,7 @@ import {
   createRoundCountdown,
   isCountdownBlocking,
   stepRoundCountdown,
-} from "../scripts/countdown.js";
+} from "../scripts/sim/countdown.js";
 
 test("a round countdown blocks play while showing three, two, one", () => {
   const countdown = createRoundCountdown();

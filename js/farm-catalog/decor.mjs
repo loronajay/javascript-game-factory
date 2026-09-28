@@ -65,6 +65,23 @@ const STARTER = Object.freeze({ type: "starter", source: "The Farm" });
 const PURCHASE = Object.freeze({ type: "purchase", source: "Farm Shop" });
 const PET_OUTCOME = Object.freeze({ type: "achievement", source: "Pet outcome" });
 const CRAFTED = Object.freeze({ type: "crafted", source: "Carpenter's Workbench" });
+const prize = (source) => Object.freeze({ type: "prize", source });
+// ---------------------------------------------------------------- Pet Games trophies
+//
+// A Barnyard Dash Grand Prix cup won at a class is a trophy on the farm: bronze
+// for Rookie, silver for Pro, gold for Champion. The ids are the prize table in
+// platform-api/src/services/pet-games-prize-catalog.mts (a test holds them equal)
+// and `games/barnyard-dash/scripts/grand-prix.js` names them the same way.
+export const TROPHY_CUPS = Object.freeze([
+    Object.freeze({ id: "clover-cup", title: "Clover Cup" }),
+    Object.freeze({ id: "harvest-cup", title: "Harvest Cup" }),
+    Object.freeze({ id: "blue-ribbon-cup", title: "Blue Ribbon Cup" }),
+]);
+export const TROPHY_TIERS = Object.freeze([
+    Object.freeze({ id: "bronze", title: "Bronze", level: "Rookie", color: "#b8753a" }),
+    Object.freeze({ id: "silver", title: "Silver", level: "Pro", color: "#c9ced6" }),
+    Object.freeze({ id: "gold", title: "Gold", level: "Champion", color: "#e8b93a" }),
+]);
 const NO_LENGTH = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 function item(variant, spec) {
     return Object.freeze({
@@ -145,10 +162,11 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("sunflowers", { title: "Sunflowers", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#ffd33d", "#4f9a3a"], model: "sunflowers" }),
     item("lavender", { title: "Lavender", category: "plant", footprint: { width: 2, depth: 0.8 }, solid: false, swatch: ["#9a7fd6", "#6f8f5a"], model: "lavender" }),
     item("stump", { title: "Tree Stump", category: "plant", footprint: { width: 0.8, depth: 0.8 }, swatch: ["#9a7248", "#5d3a1f"], model: "stump" }),
-    // Water: dug into the field. The player wades in; ground animals keep out; swimmers use the whole volume.
-    item("pond-round", { title: "Round Pond", category: "water", footprint: { width: 5, depth: 5 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2 }, swatch: ["#3f7fb8", "#7a5a34"], model: "pond" }),
-    item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 8, depth: 4.5 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 1.8 }, swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
-    item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 6, depth: 6 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2.4 }, swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
+    // Water: dug into the field. These footprints leave room for a swimmer's home, toys, and open water.
+    // Existing layouts inherit catalog footprints, so enlarging these also expands ponds players already placed.
+    item("pond-round", { title: "Round Pond", category: "water", footprint: { width: 10, depth: 10 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2 }, swatch: ["#3f7fb8", "#7a5a34"], model: "pond" }),
+    item("pond-long", { title: "Long Pond", category: "water", footprint: { width: 14, depth: 8 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 1.8 }, swatch: ["#3f7fb8", "#5f9a3c"], model: "pond" }),
+    item("pond-lily", { title: "Lily Pond", category: "water", footprint: { width: 12, depth: 12 }, solid: false, keepOut: true, habitat: "water", pond: { depth: 2.4 }, swatch: ["#3f7fb8", "#ff6f91"], model: "pond-lily" }),
     // Props.
     item("hay-bale", { title: "Hay Bale", category: "prop", footprint: { width: 1.4, depth: 1 }, swatch: ["#d8b24a", "#b08b2f"], model: "hay-bale", unlock: STARTER }),
     item("trough", { title: "Water Trough", category: "prop", footprint: { width: 1.8, depth: 0.7 }, swatch: ["#7e8790", "#3f7fb8"], model: "trough", unlock: STARTER }),
@@ -212,6 +230,16 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("glass-float", { title: "Glass Float", category: "prop", footprint: { width: 0.4, depth: 0.4 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#6fc7b8", "#b8a98c"], model: "toy-glass-float" }),
     item("coral-fan", { title: "Coral Fan", category: "prop", footprint: { width: 0.8, depth: 0.3 }, solid: false, aquatic: true, swatch: ["#d99ac6", "#e86a8a"], model: "toy-coral-fan" }),
     item("current-spinner", { title: "Current Spinner", category: "prop", footprint: { width: 0.5, depth: 0.5 }, solid: false, aquatic: true, snapDegrees: 45, swatch: ["#67b6c7", "#f5f0d0"], model: "toy-current-spinner" }),
+    ...TROPHY_CUPS.flatMap((cup) => TROPHY_TIERS.map((tier) => item(`trophy-${cup.id}-${tier.id}`, {
+        title: `${cup.title} · ${tier.title}`,
+        category: "prop",
+        footprint: { width: 0.6, depth: 0.6 },
+        indoors: true,
+        snapDegrees: 45,
+        swatch: [tier.color, "#5d3a1f"],
+        model: `trophy-${cup.id}`,
+        unlock: prize(`Win the ${cup.title} in Barnyard Dash · ${tier.level} class`),
+    }))),
     item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", unlock: PET_OUTCOME, catalogVisible: false }),
     item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
     item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),

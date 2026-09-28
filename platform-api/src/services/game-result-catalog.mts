@@ -12,12 +12,14 @@
 // id) and `durationMs` (the play time it claims, which the settlement's
 // time-budget fence checks against the wall clock).
 
+import { normalizeBarnyardDashResult } from "./barnyard-dash-ticket-rewards.mjs";
 import { normalizeBattleshitsResult } from "./battleshits-ticket-rewards.mjs";
 import { normalizeBirdDutyResult } from "./bird-duty-ticket-rewards.mjs";
 import { normalizeCreatureBattlerResult } from "./creature-battler-ticket-rewards.mjs";
 import { normalizeIlluminautsResult } from "./illuminauts-ticket-rewards.mjs";
 import { normalizeMiniHoopsResult } from "./mini-hoops-ticket-rewards.mjs";
 import { normalizeMiniTacticsResult } from "./mini-tactics-ticket-rewards.mjs";
+import { normalizePondsidePushResult } from "./pondside-push-ticket-rewards.mjs";
 import { normalizePuckdUpResult } from "./puckd-up-ticket-rewards.mjs";
 import { normalizeSharkHallResult } from "./shark-hall-ticket-rewards.mjs";
 import { normalizeSumoraiResult } from "./sumorai-ticket-rewards.mjs";
@@ -38,6 +40,8 @@ const NORMALIZERS: Readonly<Record<string, (raw: unknown) => NormalizedResult<Ga
   "mini-hoops": normalizeMiniHoopsResult,
   "puckd-up": normalizePuckdUpResult,
   "shark-hall": normalizeSharkHallResult,
+  "barnyard-dash": normalizeBarnyardDashResult,
+  "pondside-push": normalizePondsidePushResult,
 });
 
 function cleanSlug(value: unknown): string {

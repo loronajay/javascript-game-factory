@@ -19,6 +19,7 @@ function node(tag, className = "", text = "") {
 export function createKitchenPanel(elements, options) {
     let inventory = null;
     let level = 1;
+    let learned = [];
     let selected = RECIPE_CATALOG[0].id;
     const isOpen = () => !elements.root.hidden;
     function portrait(itemKey, className) {
@@ -34,7 +35,7 @@ export function createKitchenPanel(elements, options) {
     }
     function stateLine(entry, held) {
         if (entry.state === "locked")
-            return `Learn at Cooking ${entry.recipe.minLevel}`;
+            return entry.lock === "vendor" ? "Buy this recipe from Basil at the Market" : `Learn at Cooking ${entry.recipe.minLevel}`;
         if (entry.state === "short") {
             const missing = entry.lines.filter((line) => line.short > 0);
             return missing.length === 1 ? `Need ${missing[0].short} more ${missing[0].title}` : `Need ${missing.length} more ingredients`;
@@ -94,14 +95,15 @@ export function createKitchenPanel(elements, options) {
         inventory = nextInventory;
         level = nextLevel;
         elements.level.textContent = `Cooking ${level}`;
-        const book = cookbook(inventory.produce, level);
+        const book = cookbook(inventory.produce, level, learned);
         elements.list.replaceChildren(...book.map(card));
         const recipe = findRecipe(selected) ?? RECIPE_CATALOG[0];
-        elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level)));
+        elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level, learned)));
     }
-    function open(nextInventory, nextLevel, note = "") {
+    function open(nextInventory, nextLevel, nextLearned = [], note = "") {
+        learned = nextLearned;
         // Open on the first recipe that can be cooked right now, if the last one cannot.
-        const book = cookbook(nextInventory.produce, nextLevel);
+        const book = cookbook(nextInventory.produce, nextLevel, learned);
         if (book.find((entry) => entry.recipe.id === selected)?.state !== "ready")
             selected = book.find((entry) => entry.state === "ready")?.recipe.id ?? selected;
         elements.status.textContent = note;

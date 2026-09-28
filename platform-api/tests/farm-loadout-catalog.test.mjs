@@ -10,6 +10,8 @@ import {
   normalizeFarmGarage,
 } from "../src/services/farm-loadout-catalog.mjs";
 import { isValidLoadoutSlug } from "../src/db/game-loadouts.mjs";
+import { findFarmSupply } from "../src/services/farm-economy-catalog.mjs";
+import { FARM_VENDOR_RECIPE_IDS } from "../src/services/farm-recipe-catalog.mjs";
 
 const pet = (overrides = {}) => ({ instanceId: "corgi-1", speciesId: "pet.corgi", name: "Biscuit", ...overrides });
 
@@ -59,6 +61,23 @@ test("ordinary farm saves cannot mint paid pets, seeds, or supplies", () => {
   assert.deepEqual(submitted.agriculture.inventory.seeds, { carrot: 2 });
 });
 
+test("market ingredients and recipe cards are server-priced purchase catalog entries", () => {
+  const ingredient = findFarmSupply("ingredient.tomato");
+  assert.deepEqual({ kind: ingredient.kind, cropId: ingredient.cropId }, { kind: "ingredient", cropId: "tomato" });
+  assert.ok(ingredient.price > 0);
+  const recipe = findFarmSupply(`recipe.${FARM_VENDOR_RECIPE_IDS[0]}`);
+  assert.deepEqual({ kind: recipe.kind, recipeId: recipe.recipeId }, { kind: "recipe", recipeId: FARM_VENDOR_RECIPE_IDS[0] });
+  assert.ok(recipe.price >= 100);
+});
+
+test("vendor recipe ownership is normalized and cannot be minted by an ordinary save", () => {
+  const recipeId = FARM_VENDOR_RECIPE_IDS[0];
+  const existing = normalizeFarmGarage({ version: 3, onboarding: { status: "complete" }, skills: { cooking: { learned: [recipeId] } } });
+  assert.deepEqual(existing.skills.cooking.learned, [recipeId]);
+  const submitted = normalizeFarmGarage({ ...existing, skills: { ...existing.skills, cooking: { ...existing.skills.cooking, learned: FARM_VENDOR_RECIPE_IDS } } }, { currentGarage: existing });
+  assert.deepEqual(submitted.skills.cooking.learned, [recipeId]);
+});
+
 test("ordinary saves cannot reroll a server-created pet's identity", () => {
   const profile = {
     gender: "female", ageDays: 1, affection: 50, hunger: 90, starvingMinutes: 0, happiness: 90,
@@ -106,7 +125,7 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     skills: {
       farming: { xp: 0, harvests: 0, orders: 0, crops: {}, fruit: {} },
       woodcutting: { xp: 0, fellings: 0, trees: {} },
-      cooking: { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] },
+      cooking: { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, learned: [], recent: [] },
       carpentry: { xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: {}, recent: [] },
     },
   });

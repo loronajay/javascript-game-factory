@@ -22,6 +22,7 @@ import { farmDecorFootprint } from "./farm-catalog/decor.mjs";
 import { FARM_BUILDING_BUILDERS } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
 import { FARM_TOY_BUILDERS } from "./farm-props-toys.mjs";
+import { FARM_TROPHY_BUILDERS } from "./farm-props-trophies.mjs";
 import { createKitchenRange } from "./farm-props-kitchen.mjs";
 import { createFurniturePiece, createSawmill, createWorkbench, furnitureModelNames } from "./farm-props-furniture.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
@@ -1085,6 +1086,8 @@ export const FARM_PROP_BUILDERS = Object.freeze({
     // Every species' three toys (farm-props-toys.mts); a few of them move.
     ...Object.fromEntries(Object.entries(FARM_TOY_BUILDERS).map(([name, build]) => [name, (THREE) => { const toy = build(THREE); return { group: toy.group, doors: null, fixtureDoors: {}, animate: toy.animate }; }])),
     "pet-tombstone": (THREE) => still(createPetTombstone(THREE)),
+    // Pet Games cup trophies (farm-props-trophies.mts): won, never bought.
+    ...Object.fromEntries(Object.entries(FARM_TROPHY_BUILDERS).map(([name, build]) => [name, (THREE, definition) => still(build(THREE, definition))])),
     wheelbarrow: (THREE) => still(createWheelbarrow(THREE)),
     wagon: (THREE) => still(createWagon(THREE)),
     barrel: (THREE) => still(createBarrel(THREE)),

@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_TRACK, closestPointOnRoad, courseLimit, crossesGate, roadEdgeSegments, segmentCapsuleIntersection, startLineTiles } from "../scripts/track.js";
-import { createRace, stepRace } from "../scripts/race.js";
+import { DEFAULT_TRACK, closestPointOnRoad, courseLimit, crossesGate, roadEdgeSegments, segmentCapsuleIntersection, startLineTiles } from "../scripts/sim/track.js";
+import { createRace, racerById, stepRace, withRacer } from "../scripts/sim/race.js";
+
+const me = (race) => racerById(race, "player");
+const move = (race, patch) => withRacer(race, "player", patch);
 
 test("the course fence is one unbroken line on each side, bends included", () => {
   const edges = roadEdgeSegments(DEFAULT_TRACK);
@@ -22,11 +25,11 @@ test("the fence is a wall: a racer driving straight off the course is held insid
   const PET = { speed: 100, strength: 50, size: 1 };
   let race = createRace({ track: DEFAULT_TRACK, playerPet: PET, cpuPets: [], countdownSeconds: 0 });
   // Face due west off the first straight at full tilt, jumping all the way.
-  race = { ...race, player: { ...race.player, angle: Math.PI, speed: 180 } };
+  race = move(race, { angle: Math.PI, speed: 180 });
   for (let tick = 0; tick < 240; tick += 1) {
     race = stepRace(race, { throttle: true, jump: tick % 20 === 0 }, 1 / 60);
-    const distance = closestPointOnRoad(race.player, DEFAULT_TRACK).distance;
-    assert.ok(distance <= courseLimit(DEFAULT_TRACK, race.player.profile.radius) + 1e-6, `escaped the course at tick ${tick}: ${distance}`);
+    const distance = closestPointOnRoad(me(race), DEFAULT_TRACK).distance;
+    assert.ok(distance <= courseLimit(DEFAULT_TRACK, me(race).profile.radius) + 1e-6, `escaped the course at tick ${tick}: ${distance}`);
   }
 });
 
@@ -60,20 +63,20 @@ test("a lap driven hugging either fence still counts every checkpoint", () => {
       const to = points[segment + 1];
       const length = Math.hypot(to.x - from.x, to.y - from.y);
       const normal = { x: -(to.y - from.y) / length * hug, y: (to.x - from.x) / length * hug };
-      const limit = courseLimit(DEFAULT_TRACK, race.player.profile.radius) - 0.5;
+      const limit = courseLimit(DEFAULT_TRACK, me(race).profile.radius) - 0.5;
       for (let step = 0; step <= length; step += 4) {
         const x = from.x + (to.x - from.x) * step / length + normal.x * limit;
         const y = from.y + (to.y - from.y) * step / length + normal.y * limit;
-        const angle = Math.atan2(y - race.player.y, x - race.player.x);
-        const speed = Math.hypot(x - race.player.x, y - race.player.y) * 60;
-        race = stepRace({ ...race, player: { ...race.player, angle, speed } }, {}, 1 / 60);
+        const angle = Math.atan2(y - me(race).y, x - me(race).x);
+        const speed = Math.hypot(x - me(race).x, y - me(race).y) * 60;
+        race = stepRace(move(race, { angle, speed }), {}, 1 / 60);
       }
     }
     // One more stretch up the home straight to the finish gate.
-    for (let tick = 0; tick < 90 && race.player.finishedAt === null; tick += 1) {
-      race = stepRace({ ...race, player: { ...race.player, angle: -Math.PI / 2, speed: 240 } }, {}, 1 / 60);
+    for (let tick = 0; tick < 90 && me(race).finishedAt === null; tick += 1) {
+      race = stepRace(move(race, { angle: -Math.PI / 2, speed: 240 }), {}, 1 / 60);
     }
-    assert.ok(Number.isFinite(race.player.finishedAt), `hugging side ${hug} stopped at checkpoint ${race.player.checkpoint}`);
+    assert.ok(Number.isFinite(me(race).finishedAt), `hugging side ${hug} stopped at checkpoint ${me(race).checkpoint}`);
   }
 });
 

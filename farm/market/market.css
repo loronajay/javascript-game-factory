@@ -13,6 +13,13 @@
 .market-shell .room-chat { bottom: 20px; }
 
 .sale-panel { width: min(520px, calc(100vw - 36px)); }
+.vendor-shelf__title { margin: 16px 0 8px; color: var(--farm-leaf); font: 900 11px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.vendor-shelf__title:first-of-type { margin-top: 4px; }
+.vendor-shelf__status { min-height: 0; margin: 7px 0 0; }
+.vendor-shelf__status:empty { display: none; }
+.vendor-shelf__row { grid-template-columns: 54px minmax(0, 1fr) auto; }
+.vendor-shelf__actions { justify-content: end; }
+.vendor-shelf__actions .farm-button { padding: 6px 9px; font-size: 11px; white-space: nowrap; }
 .sale-note { margin: 0 0 12px; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
 .sale-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .sale-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto 56px; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }

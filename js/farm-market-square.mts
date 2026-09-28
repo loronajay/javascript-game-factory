@@ -140,7 +140,7 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
     id: PRODUCE_STALL_ID, kind: "stall", title: "Produce Merchant", open: true,
     x: 0, z: -9.4, rotationY: 0, colors: ["#3f8a46", "#f4ecd6"],
-    keeper: Object.freeze({ name: "Marigold", avatarId: "avatar.villager-f", greeting: "Fresh from the field? I'll buy the lot." }),
+    keeper: Object.freeze({ name: "Marigold", avatarId: "avatar.villager-f", greeting: "Ingredients for the pot, or a harvest to sell?" }),
     closedNote: "",
   }),
   stall({
@@ -152,7 +152,7 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
     id: KITCHEN_STALL_ID, kind: "stall", title: "Kitchen", open: true,
     x: 7.4, z: -9.4, rotationY: 0, colors: ["#b8452f", "#f4ecd6"],
-    keeper: Object.freeze({ name: "Basil", avatarId: "avatar.villager-m", greeting: "Something smells good. Cooked it yourself?" }),
+    keeper: Object.freeze({ name: "Basil", avatarId: "avatar.villager-m", greeting: "New recipes on the shelf — and I'll buy what you cook." }),
     closedNote: "",
   }),
   stall({
@@ -242,6 +242,8 @@ export function stallPrompt(entry: MarketStall, signedIn: boolean): string {
   if (entry.id === SAWMILL_STALL_ID) return signedIn ? `Press E to saw logs and sell furniture to ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to saw logs and sell furniture`;
   if (entry.id === SEED_STALL_ID) return signedIn ? `Press E to buy seeds from ${entry.keeper?.name ?? entry.title} · today's specials` : `${entry.title} · sign in to buy seeds`;
   const goods = entry.id === KITCHEN_STALL_ID ? "cooking" : "produce";
-  if (!signedIn) return `${entry.title} · sign in to sell your ${goods}`;
-  return `Press E to sell ${goods} to ${entry.keeper?.name ?? entry.title}`;
+  if (!signedIn) return `${entry.title} · sign in to buy and sell ${goods}`;
+  return entry.id === KITCHEN_STALL_ID
+    ? `Press E to buy recipes and sell cooking to ${entry.keeper?.name ?? entry.title}`
+    : `Press E to buy ingredients and sell produce to ${entry.keeper?.name ?? entry.title}`;
 }

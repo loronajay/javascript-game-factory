@@ -54,6 +54,8 @@ export async function cookFarmDish(pool, input, now = Date.now()) {
             return answer({ ok: true, duplicate: true, recipeId, stars: 0, xp: 0, cooking: farmingSummary(before, before.xp), achievements: [], layout: verified });
         }
         const level = farmingLevelForXp(before.xp);
+        if (rule.vendorPrice > 0 && !before.learned.includes(recipeId))
+            return answer({ ok: false, error: "recipe_not_owned", layout: verified });
         if (level < rule.minLevel)
             return answer({ ok: false, error: "level_too_low", minLevel: rule.minLevel, level, layout: verified });
         const inventory = verified.agriculture.inventory;

@@ -16,7 +16,7 @@ Every event needs an offline CPU mode. Online PvP may be added later, but the ga
 
 ## Event 01 — Barnyard Dash
 
-Status: **first playable offline slice implemented** in `games/barnyard-dash/`.
+Status: **Quick Race, Grand Prix and server-authoritative online (2–8 pets) shipped** in `games/barnyard-dash/` (2026-09-28).
 
 A third-person 3D direct-control obstacle race around a farm course. The player accelerates, brakes, steers, and times jumps. Offline modes range from a 1v1 duel through fields of 4, 6, or 8 total pets, with CPU racers filling every non-player slot.
 
@@ -40,7 +40,7 @@ Next sensible Barnyard Dash passes:
 
 ## Event 02 — Pondside Push
 
-Status: **first playable offline slice implemented** in `games/pondside-push/`.
+Status: **Quick Match vs CPU levels and server-authoritative online (2–4 pets) shipped** in `games/pondside-push/` (2026-09-28). Rounds run themselves (countdown → brawl → splash → next round), and a stand-off always ends: after 15 s the island sinks until it is gone.
 
 A four-pet king-of-the-hill brawl on a circular grass-and-stone island surrounded by water. The player's farm pet faces three deterministic CPU rivals. Holding a clean forward line builds momentum; the bump button produces a short burst and its collision force grows with approach speed. The last pet on the island wins the round, and the first pet to three round wins takes the match.
 
@@ -77,13 +77,23 @@ Strength sets potential force, but accuracy multiplies the delivered result. A 7
 
 Possible formats are distance records, target zones, and different destructible arrangements. Offline CPU is required in its first playable slice.
 
-## Shared work deliberately deferred
+## Shared Pet Games layer (shipped 2026-09-28)
 
-- Online matchmaking and private rooms.
-- Ticket rewards, entry fees, anti-cheat, and result authority.
-- Durable pet accomplishments and memorial-history integration.
-- An in-world Pet Games lobby structure inside the 3D farm. The HTML Pet Games hub now owns event selection.
-- Cross-event seasons, rankings, or stat-specific leagues.
-- Bespoke animation work.
+Both events now share one layer in `games/pet-games/shared/`:
 
-Those features need explicit ownership and trust-boundary design; they are not assumed merely because a playable local event exists.
+- **Rival pool** (`sim/rivals.js`): 42 named CPU pets across all ten species and every coat, in three tiers. A field is a seeded weighted draw — Rookie grids lean on locals, Champion grids on the circuit's best — and a fresh seed per race keeps fields fresh. Rivals never copy the player's stats.
+- **CPU levels** (`sim/levels.js`): Rookie / Pro / Champion. A level means *hands* (each event's `cpu.js` holds its own knob table), never a stronger pet. Tests hold the ordering on real courses and real brawls.
+- **Online** (`online/lobby-client.js`, `online/input-stream.js`, `online/smoothing.js`, `ui/online-panel.js`): quick match, private rooms by code, host settings, CPU guests for empty chairs, reload-safe sessions. Server-authoritative on `factory-network-server` (`games/pet-games/`), which runs the events' `sim/` folders mirrored byte for byte by `games/pet-games/tools/mirror-sim.mjs`. Clients send only sequenced inputs, predict their own pet by replaying unacknowledged inputs, and interpolate everyone else. `tests/online-latency.test.js` runs the real server engines and the real client sessions over a simulated 80 ms RTT with jitter.
+- **Platform** (`platform.js`): results go through `POST /games/:slug/results` (tickets under the time-budget fence), and `GET /games/:slug/career/:playerId` derives the public PvP record, CPU wins and best cup finishes from those results — no new table.
+
+## Barnyard Dash Grand Prix (shipped 2026-09-28)
+
+Five courses (`sim/courses.js`, authored by lap fraction; a lint walks every course hugging each fence) and three cups (`grand-prix.js`): Clover (3 races), Harvest (3), Blue Ribbon (all 5). A cup is one grid of seven pool rivals at a class, points 10-8-6-5-4-3-2-1, reverse-table grids. Every podium pays tickets by class; **winning a cup puts a trophy on the farm** — bronze (Rookie), silver (Pro), gold (Champion) of that cup, nine procedural decor items (`js/farm-props-trophies.mts`) with the new `prize` unlock type, granted as a farm entitlement inside the same settlement transaction (`services/game-result-grants.mts`) and only when the result was not fenced. The server re-scores a cup's points from its placings and refuses a final place those points cannot reach.
+
+## Still deferred
+
+- Fence Hopper and Hay Bale Smash (events 03/04).
+- Server attestation of online results to platform-api (today an online result is the client's report of what the server decided, under the same plausibility + fence standing as every cabinet).
+- Ranked/ELO for Pet Games; seasons; stat-specific leagues.
+- Pondside cups/tournaments; per-pet accomplishments in farm history.
+- An in-world Pet Games venue inside the 3D farm.

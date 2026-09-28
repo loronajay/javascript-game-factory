@@ -23,6 +23,7 @@
         <a href="../room/index.html" class="back-link" title="Walk over to your arcade">My Arcade</a>
         <a id="openPetGames" href="../games/pet-games/index.html" class="farm-button farm-button--games" title="Play games with one of your pets">Pet Games</a>
         <button id="toggleFarmMusic" class="farm-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Mute farm music (M)">Music on <kbd>M</kbd></button>
+        <button id="openStats" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="See all farm skills and lifetime stats (K)">Stats <kbd>K</kbd></button>
         <button id="openPets" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Adopt, name and release animals (P)">Pets <kbd>P</kbd></button>
         <button id="openInventory" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Choose seeds and check the harvest (I)">Inventory <kbd>I</kbd></button>
         <button id="editFarm" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Toggle build mode (B)">Build <kbd>B</kbd></button>
@@ -68,7 +69,7 @@
       <small><kbd>E</kbd> swing<span class="chop-meter__word" data-chop-word></span></small>
     </section>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Pet · Plant · Water · Harvest · Chop</span><span><b>G</b> Feed pet</span><span><b>C</b> Carry pet</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>I</b> Inventory</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Pet · Plant · Water · Harvest · Chop</span><span><b>G</b> Feed pet</span><span><b>C</b> Carry pet</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>K</b> Stats</span><span class="control-hint__owner"><b>I</b> Inventory</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
     </div>
 
     <aside id="petsPanel" class="pets-panel" aria-label="Your pets" hidden>
@@ -134,6 +135,20 @@
           <h3 class="pets-section__title">Compost &amp; pet supplies</h3>
           <div id="suppliesGrid" class="item-grid item-grid--wide"></div>
         </section>
+      </div>
+    </aside>
+
+    <aside id="statsPanel" class="inventory-panel stats-panel" aria-label="Farm player stats" hidden>
+      <header class="pets-panel__head">
+        <div>
+          <span class="eyebrow">YOUR FARM LIFE</span>
+          <strong>Player stats</strong>
+          <small id="statsSummary" class="stats-panel__summary"></small>
+        </div>
+        <button id="closeStats" class="farm-button" type="button" title="Back to the field (K)">Done <kbd>K</kbd></button>
+      </header>
+      <div class="stats-panel__body">
+        <div id="statsGrid" class="farm-stats-grid"></div>
       </div>
     </aside>
 

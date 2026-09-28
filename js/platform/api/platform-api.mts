@@ -578,7 +578,7 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     adoptFarmPet({ speciesId, name, purchaseId }: { speciesId: string; name: string; purchaseId: string }) {
       return post("/games/farm/adoptions", { speciesId, name, purchaseId }, "purchase", {}, true);
     },
-    /** Seeds, saplings and feed. `venue: "market"` buys at the Seed Merchant (the day's specials), naming the `day` it was priced on. */
+    /** Seeds, saplings, feed, Market ingredients and recipe cards. Market purchases name the day shown at the counter. */
     purchaseFarmSupply({ itemId, quantity, purchaseId, venue, day }: { itemId: string; quantity: number; purchaseId: string; venue?: "market"; day?: number }) {
       return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId, ...(venue === "market" ? { venue, day } : {}) }, "purchase", {}, true);
     },

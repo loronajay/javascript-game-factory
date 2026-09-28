@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#173d42">
   <title>Pondside Push | Javascript Game Factory</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260928-pet-online">
+  <link rel="stylesheet" href="../pet-games/shared/pet-games-ui.css?v=20260928-pet-online">
 </head>
 <body>
   <main class="cabinet">
@@ -17,26 +18,56 @@
     <section id="gameStage" class="game-stage" aria-label="Circular Pondside Push arena">
       <canvas id="arenaCanvas" width="960" height="640" tabindex="0" aria-label="3D pet bumping arena"></canvas>
       <div id="scoreboard" class="scoreboard" hidden aria-label="Match score"></div>
-      <section id="setupPanel" class="panel setup-panel">
+
+      <section id="titlePanel" class="panel setup-panel">
         <div class="panel__header">
           <span class="event-chip">EVENT 02 · PONDSIDE BRAWL</span>
           <p class="kicker">Choose your challenger</p>
           <h2>Own the<br><em>island.</em></h2>
           <p class="lede">Pick a pet, hold your line, and send the competition swimming. Last pet dry wins the round; First to 3 takes the match.</p>
         </div>
-        <div id="petChoices" class="pet-choices" role="radiogroup" aria-label="Farm pets"></div>
+        <div id="petChoices" class="pet-choices" aria-label="Farm pets"></div>
+        <div class="mode-grid mode-grid--two" role="group" aria-label="Match modes">
+          <button id="modeQuick" class="mode-card" type="button" disabled><b>Quick Match</b><small>You against CPU rivals</small></button>
+          <button id="modeOnline" class="mode-card mode-card--online" type="button" disabled><b>Online</b><small>Brawl other farms · 2–4 pets</small></button>
+        </div>
+        <p id="careerLine" class="career-line" aria-live="polite"></p>
+        <p id="loadNote" class="load-note" aria-live="polite">Loading your farm…</p>
+      </section>
+
+      <section id="quickPanel" class="panel setup-panel" hidden>
+        <div class="panel__header">
+          <span class="event-chip">QUICK MATCH</span>
+          <h2>Pick your<br><em>rivals.</em></h2>
+        </div>
+        <label class="race-options" for="fieldSize">
+          <span>Island</span>
+          <select id="fieldSize">
+            <option value="2">1v1 · 2 pets</option>
+            <option value="3">Three-way · 3 pets</option>
+            <option value="4" selected>Full island · 4 pets</option>
+          </select>
+        </label>
+        <div id="quickLevel" class="segmented" role="radiogroup" aria-label="CPU difficulty"></div>
         <div class="menu-rules">
           <span><kbd>WASD</kbd><b>Move</b><small>Hold your line</small></span>
           <span><kbd>Space</kbd><b>Bump</b><small>Time the hit</small></span>
           <span><kbd>↟</kbd><b>Momentum</b><small>Speed adds force</small></span>
         </div>
-        <button id="startMatch" class="primary" type="button" disabled>Loading your farm…</button>
-        <p id="loadNote" class="load-note" aria-live="polite"></p>
+        <div class="panel-actions">
+          <button id="startMatch" class="primary" type="button">Enter the arena</button>
+          <button class="secondary" type="button" data-back>Back</button>
+        </div>
       </section>
+
+      <section id="onlinePanel" class="panel setup-panel" hidden></section>
+
       <section id="roundResult" class="panel result-panel" hidden>
-        <p id="resultKicker" class="kicker">Round over</p><h2 id="resultTitle">Splash!</h2><p id="resultCopy" class="lede"></p>
-        <button id="nextRound" class="primary" type="button">Next round</button>
-        <button id="changePet" class="secondary" type="button" hidden>Change pet</button>
+        <p id="resultKicker" class="kicker">Match complete</p><h2 id="resultTitle">Splash!</h2><p id="resultCopy" class="lede"></p>
+        <ol id="resultStandings" class="result-standings"></ol>
+        <p id="resultReward" class="prize-line" aria-live="polite"></p>
+        <button id="nextRound" class="primary" type="button">Rematch</button>
+        <button id="changePet" class="secondary" type="button">Main menu</button>
       </section>
       <div id="roundBanner" class="round-banner" aria-live="assertive"></div>
       <div id="touchControls" class="touch-controls" aria-label="Touch controls">
@@ -44,9 +75,9 @@
         <button class="bump" data-control="bump">BUMP</button>
       </div>
     </section>
-    <footer><span>Keep moving forward to build momentum.</span><span>Your faster approach makes the bump hit harder.</span></footer>
+    <footer><span>Keep moving forward to build momentum.</span><span>Your faster approach makes the bump hit harder.</span><span>Stand-offs don't last: after a while the island starts to sink.</span></footer>
   </main>
   <script type="module" src="../../js/platform-config.mjs"></script>
-  <script type="module" src="scripts/main.js?v=20260927-countdown"></script>
+  <script type="module" src="scripts/main.js?v=20260928-pet-online"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@
 // they are always derived from XP, so a curve retune moves every farm at once.
 import { FARM_CROP_RULES, farmCropRule } from "./farm-crop-catalog.mjs";
 import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
-import { COOK_ID, FARM_RECIPE_RULES, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
+import { COOK_ID, FARM_RECIPE_RULES, FARM_VENDOR_RECIPE_IDS, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
 import { FARM_PIECE_IDS, RECENT_WORKSHOP_IDS, WORKSHOP_ID } from "./farm-carpentry-catalog.mjs";
 export const FARMING_MAX_LEVEL = 99;
 /** A bound on stored XP, comfortably past level 99 (13,034,431). */
@@ -75,7 +75,7 @@ export function emptyWoodcuttingRecord() {
     return { xp: 0, fellings: 0, trees: {} };
 }
 export function emptyCookingRecord() {
-    return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] };
+    return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, learned: [], recent: [] };
 }
 export function emptyCarpentryRecord() {
     return { xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: {}, recent: [] };
@@ -110,6 +110,7 @@ export function normalizeCookingRecord(value) {
     return {
         xp: count(source.xp, FARMING_MAX_XP), dishes: count(source.dishes), perfect: count(source.perfect), orders: count(source.orders),
         recipes: counts(source.recipes, Object.keys(FARM_RECIPE_RULES)),
+        learned: Array.from(new Set((Array.isArray(source.learned) ? source.learned : []).filter((id) => typeof id === "string" && FARM_VENDOR_RECIPE_IDS.includes(id)))),
         recent,
     };
 }

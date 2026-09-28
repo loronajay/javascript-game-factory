@@ -175,7 +175,7 @@ function farmKitchenOrders(day: number, firstSlot: number, taken: ReadonlySet<st
   const customers = new Set(FARM_ORDER_CUSTOMERS.filter((entry) => taken.has(entry.name)));
   return FARM_KITCHEN_ORDER_TIERS.map((tier, index) => {
     const customer = pick(FARM_ORDER_CUSTOMERS, random, customers);
-    const taught = Object.keys(FARM_RECIPE_RULES).filter((recipeId) => FARM_RECIPE_RULES[recipeId]!.minLevel <= tier.minLevel);
+    const taught = Object.keys(FARM_RECIPE_RULES).filter((recipeId) => FARM_RECIPE_RULES[recipeId]!.vendorPrice === 0 && FARM_RECIPE_RULES[recipeId]!.minLevel <= tier.minLevel);
     const recipesTaken = new Set<string>();
     const lines: Record<string, number> = {};
     for (let line = 0; line < Math.min(tier.recipes, taught.length); line += 1) {

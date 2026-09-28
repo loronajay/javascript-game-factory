@@ -47,7 +47,7 @@ export async function handleFarmEconomyRoute(context: any): Promise<boolean> {
   try {
     const purchase = await action(input);
     if (!purchase?.ok) {
-      const conflict = new Set(["insufficient_tickets", "inventory_full", "farm_full", "needs_water", "level_too_low", "prices_changed"]);
+      const conflict = new Set(["insufficient_tickets", "inventory_full", "already_owned", "farm_full", "needs_water", "level_too_low", "prices_changed"]);
       writeJson(res, conflict.has(purchase?.error) ? 409 : 400, { status: "error", ...purchase, timestamp }, requestOrigin);
       return true;
     }

@@ -195,11 +195,13 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             else if (price)
                 card.dataset.buyItem = definition.id;
             const forPet = petCareLabel(definition.id);
-            card.title = `${owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : `${definition.title} is locked`}${forPet ? ` · ${forPet}` : ""}`;
+            // A prize is won, not bought: its card says how.
+            const wonBy = definition.unlock.type === "prize" ? definition.unlock.source : "";
+            card.title = `${owned ? `Add ${definition.title}` : price ? `Buy ${definition.title} for ${price} tickets` : wonBy || `${definition.title} is locked`}${forPet ? ` · ${forPet}` : ""}`;
             card.disabled = !owned && !state.canPurchase;
             card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
             const meta = definition.length.enabled ? "stretchable" : definition.pond ? "walk-in" : definition.aquatic ? "in a pond" : definition.shell ? "enterable" : definition.solid ? "solid" : "walk-over";
-            card.append(element("small", "decor-card__meta", owned ? forPet || meta : `${forPet ? `${forPet} · ` : ""}${price ? `${forPet ? "" : "Buy · "}${price.toLocaleString()} tickets` : "Locked"}`));
+            card.append(element("small", "decor-card__meta", owned ? forPet || meta : wonBy ? "Won in Pet Games" : `${forPet ? `${forPet} · ` : ""}${price ? `${forPet ? "" : "Buy · "}${price.toLocaleString()} tickets` : "Locked"}`));
             if (definition.doors) {
                 card.classList.add("is-interactive");
                 card.append(element("span", "decor-card__badge", "PRESS E"));
@@ -293,6 +295,13 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         remove.dataset.removeDecor = row.instanceId;
         const removeHint = element("small", "inspector__hint");
         const removeRow = element("div", "inspector__tools");
+        if (definition.pond) {
+            const relocate = element("button", "inspector__tool", "Move pond");
+            relocate.type = "button";
+            relocate.dataset.relocateDecor = row.instanceId;
+            relocate.title = "Choose a new spot without releasing aquatic pets";
+            removeRow.append(relocate);
+        }
         removeRow.append(remove);
         const petItem = petCareForItem(row.itemId);
         const petSpecies = petItem ? findAnimal(petItem.care.speciesId)?.title ?? "pet" : "";
@@ -310,7 +319,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             : definition.shell
                 ? "Open on every side: walk straight in. Animals stay out."
                 : definition.pond
-                    ? "Walk in: the bank slopes down to a bed deep enough to swim in. Homes placed in it move with it, and go with it if it is removed. It cannot go while it is the last pond and swimmers live in it."
+                    ? "Move pond keeps every aquatic pet adopted and carries its homes and toys to the new spot. Removing the last stocked pond is still blocked."
                     : definition.aquatic
                         ? "Stands on the pond bed. Drag it anywhere in the water; it has to stay wholly inside the pond."
                         : definition.length.enabled
@@ -409,6 +418,10 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             return;
         if (target.closest("[data-clear-selection]")) {
             actions.clearSelection();
+            return;
+        }
+        if (target.closest("[data-relocate-decor]")) {
+            actions.relocateDecor(inspector.instanceId);
             return;
         }
         const rotate = target.closest("[data-rotate-decor]");

@@ -311,4 +311,58 @@ export function confineToCourse(point, track, radius = 0) {
   };
 }
 
+// Station tables are a property of the road, worked out once per road array.
+const stationTables = new WeakMap();
+
+/** Cumulative arc length at each road vertex: [0, |v0v1|, ...]. */
+function stations(track) {
+  const cached = stationTables.get(track.road);
+  if (cached) return cached;
+  const result = [0];
+  for (let index = 1; index < track.road.length; index += 1) {
+    const from = track.road[index - 1];
+    const to = track.road[index];
+    result.push(result[index - 1] + Math.hypot(to.x - from.x, to.y - from.y));
+  }
+  if (typeof track.road === "object" && track.road) stationTables.set(track.road, result);
+  return result;
+}
+
+/** The length of one lap of the road's centre line. */
+export function roadLength(track) {
+  const table = stations(track);
+  return table[table.length - 1] || 0;
+}
+
+/** How far along the centre line (from the first road vertex) the road point nearest `point` is. */
+export function roadStation(point, track) {
+  const table = stations(track);
+  let best = null;
+  for (let index = 1; index < track.road.length; index += 1) {
+    const candidate = closestPointOnSegment(point, track.road[index - 1], track.road[index]);
+    if (!best || candidate.distance < best.distance) {
+      best = { distance: candidate.distance, station: table[index - 1] + (table[index] - table[index - 1]) * candidate.amount };
+    }
+  }
+  return best ? best.station : 0;
+}
+
+/** The centre-line point `station` units along the road (wrapping on a closed loop), with its heading. */
+export function pointAtStation(track, station) {
+  const table = stations(track);
+  const total = table[table.length - 1] || 1;
+  const wrapped = ((station % total) + total) % total;
+  let index = 1;
+  while (index < table.length - 1 && table[index] < wrapped) index += 1;
+  const from = track.road[index - 1];
+  const to = track.road[index];
+  const span = table[index] - table[index - 1] || 1;
+  const amount = Math.max(0, Math.min(1, (wrapped - table[index - 1]) / span));
+  return {
+    x: from.x + (to.x - from.x) * amount,
+    y: from.y + (to.y - from.y) * amount,
+    angle: Math.atan2(to.y - from.y, to.x - from.x),
+  };
+}
+
 export const DEFAULT_TRACK = withCheckpointGates(COURSE);

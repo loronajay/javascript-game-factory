@@ -106,6 +106,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
   let previewFrame = 0;
   let wheelGestureTimer: ReturnType<typeof setTimeout> | undefined;
   let cameraGesture: "none" | "orbit" | "pan" = "none";
+  let relocating = "";
   const lastPointer = { x: 0, y: 0 };
   const gestureStart = { x: 0, y: 0 };
   const dragOffset = { x: 0, z: 0 };
@@ -146,6 +147,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     addDecor: (itemId) => addDecor(itemId),
     selectDecor: (instanceId) => { select(instanceId); focusSelection(); },
     clearSelection: () => clearSelection(),
+    relocateDecor: (instanceId) => beginRelocate(instanceId),
     removeDecor: (instanceId) => remove(instanceId),
     duplicateDecor: (instanceId) => duplicate(instanceId),
     rotateDecor: (instanceId, direction) => { select(instanceId, true); rotate(direction); },
@@ -334,6 +336,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     const row = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     const definition = row && findFarmDecor(row.itemId);
     if (!row || !definition) return;
+    if (relocating && relocating !== instanceId) relocating = "";
     selection = instanceId;
     tab = farmDecorTab(definition);
     renderScene();
@@ -345,10 +348,27 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
 
   function clearSelection(): void {
     if (!selection) return;
+    relocating = "";
     selection = "";
     renderScene();
     renderPanel();
     setStatus("Nothing selected · click anything on the field, or add something from the catalog.");
+  }
+
+  /** Put a pond into click-to-place mode without ever removing it from the layout. */
+  function beginRelocate(instanceId: string): void {
+    const row = layout.decor.find((candidate) => candidate.instanceId === instanceId);
+    if (!row || !findFarmDecor(row.itemId)?.pond) return;
+    select(instanceId, true);
+    relocating = instanceId;
+    canvas.focus();
+    setStatus("Click the new pond centre on the field · Aquatic pets stay adopted, and homes and toys move with it.");
+  }
+
+  function cancelRelocate(): void {
+    if (!relocating) return;
+    relocating = "";
+    setStatus("Pond move cancelled.");
   }
 
   function addDecor(itemId: string): void {
@@ -547,6 +567,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     void storeLayout();
     editing = false;
     dragging = false;
+    relocating = "";
     handleDrag = null;
     cameraGesture = "none";
     canvas.style.cursor = "";
@@ -583,6 +604,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
   }
 
   function hoverCursor(event: PointerEvent): string {
+    if (relocating) return "crosshair";
     updatePointer(event);
     if (gizmos.pick(raycaster)) return "ew-resize";
     return hitDecor(event) ? "grab" : "";
@@ -618,6 +640,13 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
       return;
     }
     updatePointer(event);
+    if (relocating) {
+      const row = selected();
+      const point = row && groundPoint(event);
+      if (row && point && applyPlacement({ x: point.x, z: point.z, rotationY: row.rotationY })) relocating = "";
+      canvas.style.cursor = relocating ? "crosshair" : "grab";
+      return;
+    }
     const handle = gizmos.pick(raycaster);
     if (handle && selected()) {
       beginHandleDrag(handle);
@@ -728,7 +757,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
       return;
     }
     const bindings: Record<string, () => void> = {
-      Escape: () => { if (selection) clearSelection(); else finish(); },
+      Escape: () => { if (relocating) cancelRelocate(); else if (selection) clearSelection(); else finish(); },
       KeyQ: () => rotate(-1),
       KeyR: () => rotate(1),
       KeyF: () => view.setView("front"),

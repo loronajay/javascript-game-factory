@@ -10,7 +10,7 @@
 
 import { FARM_CROP_RULES, farmCropRule } from "./farm-crop-catalog.mjs";
 import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
-import { COOK_ID, FARM_RECIPE_RULES, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
+import { COOK_ID, FARM_RECIPE_RULES, FARM_VENDOR_RECIPE_IDS, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
 import { FARM_PIECE_IDS, RECENT_WORKSHOP_IDS, WORKSHOP_ID } from "./farm-carpentry-catalog.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
@@ -79,7 +79,7 @@ export type WoodcuttingRecord = { xp: number; fellings: number; trees: Record<st
  * dish orders it filled. `recent` is bookkeeping, not progress: the latest
  * cook ids, so a retried cook request makes its dish once.
  */
-export type CookingRecord = { xp: number; dishes: number; perfect: number; orders: number; recipes: Record<string, number>; recent: string[] };
+export type CookingRecord = { xp: number; dishes: number; perfect: number; orders: number; recipes: Record<string, number>; learned: string[]; recent: string[] };
 /**
  * The Carpentry skill: same curve, earned only by logs the server sawed and
  * pieces it made. `milled` counts logs, `pieces` furniture, `masterwork` the
@@ -103,7 +103,7 @@ export function emptyWoodcuttingRecord(): WoodcuttingRecord {
 }
 
 export function emptyCookingRecord(): CookingRecord {
-  return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] };
+  return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, learned: [], recent: [] };
 }
 
 export function emptyCarpentryRecord(): CarpentryRecord {
@@ -142,6 +142,7 @@ export function normalizeCookingRecord(value: unknown): CookingRecord {
   return {
     xp: count(source.xp, FARMING_MAX_XP), dishes: count(source.dishes), perfect: count(source.perfect), orders: count(source.orders),
     recipes: counts(source.recipes, Object.keys(FARM_RECIPE_RULES)),
+    learned: Array.from(new Set((Array.isArray(source.learned) ? source.learned : []).filter((id: unknown): id is string => typeof id === "string" && FARM_VENDOR_RECIPE_IDS.includes(id)))),
     recent,
   };
 }

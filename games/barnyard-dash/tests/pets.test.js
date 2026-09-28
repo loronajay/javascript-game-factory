@@ -22,11 +22,13 @@ test("a local starter is available when the farm has no eligible pet", () => {
   assert.equal(playablePets({ pets: [] })[0].name, "Borrowed Biscuit");
 });
 
-test("CPU fields are stable, varied matchups and cap the full race at eight pets", () => {
+test("CPU fields are stable, varied, drawn from the rival pool and cap the full race at eight pets", () => {
   const selected = playablePets({ pets: [] })[0];
   assert.deepEqual(cpuFieldFor(selected, 7), cpuFieldFor(selected, 7));
   const rivals = cpuFieldFor(selected, 99);
   assert.equal(rivals.length, 7);
+  assert.equal(new Set(rivals.map((rival) => rival.instanceId)).size, 7, "no rival races twice");
   assert.ok(new Set(rivals.map((rival) => rival.speciesId)).size > 1);
-  assert.ok(rivals.every((rival) => Math.abs((rival.stats.speed + rival.stats.strength) - (selected.stats.speed + selected.stats.strength)) <= 16));
+  assert.ok(rivals.every((rival) => rival.instanceId.startsWith("rival.")));
+  assert.notDeepEqual(cpuFieldFor(selected, 7, { seed: "another race" }), rivals, "a fresh seed brings a fresh field");
 });

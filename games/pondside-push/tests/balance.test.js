@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { bumpPowerForSpeed, movementProfile } from "../scripts/balance.js";
+import { bumpPowerForSpeed, movementProfile } from "../scripts/sim/balance.js";
 
 test("pet speed stays a modest influence while forward momentum supplies the larger payoff", () => {
   const slow = movementProfile({ speed: 0, strength: 50, size: 1 });
