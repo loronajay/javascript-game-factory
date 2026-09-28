@@ -45,7 +45,7 @@ export type FarmScenery = Readonly<{
 }>;
 
 /** The ring of hills: big flattened spheres in muted greens, further ones bluer, all softened by the fog. */
-function createHills(THREE: ThreeNamespace, scene: any, random: () => number): void {
+function createHills(THREE: ThreeNamespace, scene: any, random: () => number, keepClear: (x: number, z: number) => boolean): void {
   const near = standard(THREE, "#4f7a3a", 1, 0);
   const mid = standard(THREE, "#5a8a5a", 1, 0);
   const far = standard(THREE, "#6f9a8a", 1, 0);
@@ -58,13 +58,14 @@ function createHills(THREE: ThreeNamespace, scene: any, random: () => number): v
     const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), radius > 100 ? far : radius > 88 ? mid : near);
     hill.scale.set(width, height, width * 0.8);
     hill.position.set(Math.cos(angle) * radius, -height * 0.25, Math.sin(angle) * radius);
+    if (keepClear(hill.position.x, hill.position.z)) continue;
     hill.receiveShadow = true;
     scene.add(hill);
   }
 }
 
 /** A treeline past the fence: cheap cone-and-sphere trees, denser than the field's, in two staggered rings. */
-function createTreeline(THREE: ThreeNamespace, scene: any, random: () => number): void {
+function createTreeline(THREE: ThreeNamespace, scene: any, random: () => number, keepClear: (x: number, z: number) => boolean): void {
   const needles = standard(THREE, "#2f6b3a", 0.95, 0);
   const needlesLight = standard(THREE, "#3f7f44", 0.95, 0);
   const leaves = standard(THREE, "#3f7f34", 0.95, 0);
@@ -102,6 +103,8 @@ function createTreeline(THREE: ThreeNamespace, scene: any, random: () => number)
     }
     tree.position.set(x, 0, z);
     tree.rotation.y = random() * Math.PI * 2;
+    // Every draw above is made either way, so a kept-clear tree never moves the ones after it.
+    if (keepClear(x, z)) continue;
     scene.add(tree);
   }
 }
@@ -177,12 +180,17 @@ function sprinkle(count: number, random: () => number): Sprinkle[] {
 export type FarmSceneryOptions = Readonly<{
   /** The tufts and flowers underfoot. Off for a paved ground (the Market Square); the hills, trees and sky stay. */
   groundCover?: boolean;
+  /** The flat field and its apron. Off where a place brings its own ground (the Cove's shore and seabed). */
+  field?: boolean;
+  /** Places the countryside leaves open (the Cove's water): no hill or tree of the treeline stands there. */
+  keepClear?: (x: number, z: number) => boolean;
 }>;
 
 export function createFarmScenery(THREE: ThreeNamespace, scene: any, options: FarmSceneryOptions = {}): FarmScenery {
   const random = seeded(2026);
-  createHills(THREE, scene, random);
-  createTreeline(THREE, scene, random);
+  const keepClear = options.keepClear ?? (() => false);
+  createHills(THREE, scene, random, keepClear);
+  createTreeline(THREE, scene, random, keepClear);
   const clouds = createClouds(THREE, scene, random);
 
   // Ground cover: one instanced mesh of tufts, one of flowers. A tuft is a clump of

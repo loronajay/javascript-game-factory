@@ -622,6 +622,46 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     withdrawFarmListing({ listingId }: { listingId: string }) {
       return post(`/games/farm/market/listings/${encodeURIComponent(listingId)}/withdrawal`, {}, "result", {}, true);
     },
+    /** The Cove's shadows swimming now and next: where and how big, never what they are. Public. */
+    fetchFarmFishShadows() {
+      return get("/games/farm/fishing/shadows", "shadows");
+    },
+    /** The Cove Records board: the heaviest of every fish, today and ever. Public. */
+    fetchFarmFishRecords() {
+      return get("/games/farm/fishing/records", "records");
+    },
+    /** My tackle, Fishing level, creel and Fishdex. */
+    fetchFarmFishing() {
+      return get("/games/farm/fishing", "fishing");
+    },
+    /** Put a line in the water. The server decides the water, the bite and when it comes. */
+    castFarmLine({ castId, point, shadowId, rodId, bait }: { castId: string; point: { x: number; z: number }; shadowId: string | null; rodId: string; bait: string }) {
+      return post("/games/farm/fishing/casts", { castId, point, shadowId, rodId, bait }, "result", {}, true);
+    },
+    /** How a cast ended: landed (with its grade), escaped, snapped or missed. */
+    landFarmCast({ castId, outcome, grade }: { castId: string; outcome: string; grade?: string }) {
+      return post(`/games/farm/fishing/casts/${encodeURIComponent(castId)}/landing`, { outcome, grade }, "result", {}, true);
+    },
+    sellFarmFish({ saleId, fishIds }: { saleId: string; fishIds: readonly string[] }) {
+      return post("/games/farm/fishing/sales", { saleId, fishIds }, "result", {}, true);
+    },
+    releaseFarmFish({ fishIds }: { fishIds: readonly string[] }) {
+      return post("/games/farm/fishing/releases", { fishIds }, "result", {}, true);
+    },
+    lockFarmFish({ fishId, locked }: { fishId: string; locked: boolean }) {
+      return post("/games/farm/fishing/locks", { fishId, locked }, "result", {}, true);
+    },
+    buyFarmTackle({ purchaseId, itemId, quantity }: { purchaseId: string; itemId: string; quantity: number }) {
+      return post("/games/farm/fishing/tackle", { purchaseId, itemId, quantity }, "result", {}, true);
+    },
+    /** Fish by id, for anyone: a trading partner's offer, the fish on a Trophy Mount. Public. */
+    fetchFarmFishDetails(ids: readonly string[]) {
+      return get(`/games/farm/fishing/fish?ids=${encodeURIComponent(ids.join(","))}`, "details");
+    },
+    /** Mount a fish from the creel (Old Pike's fee), or take one down back into the creel. */
+    mountFarmFish({ fishId, mounted, purchaseId }: { fishId: string; mounted: boolean; purchaseId?: string }) {
+      return post("/games/farm/fishing/mounts", { fishId, mounted, purchaseId }, "result", {}, true);
+    },
     /** Today's Market prices (every produce grade), which way each moved, and the Seed Merchant's specials. Public. */
     fetchFarmMarketPrices() {
       return get("/games/farm/market/prices", "market");

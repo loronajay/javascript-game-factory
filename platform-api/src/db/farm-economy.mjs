@@ -13,6 +13,8 @@ import { normalizeCookingRecord, recordFarmDishOrder } from "../services/farm-sk
 import { takeFarmDishes } from "../services/farm-recipe-catalog.mjs";
 import { FARM_ORDER_DAY_MS, farmFullOrderBoard, farmOrderDay, farmOrderTransactionKey, findFarmOrder, isStaleFarmOrderId, } from "../services/farm-order-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
+import { emptyFishingRecord, lockedAngler, lockedCreel, normalizeFishingRecord, presentFish, saveAngler, settleFish } from "./farm-fishing.mjs";
+import { parseFishNeed, pickFishForNeed } from "../services/farm-fish-catalog.mjs";
 const MAX_PETS = 12;
 const MAX_STACK = 99;
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -437,7 +439,14 @@ export async function getFarmOrderBoard(pool, input, now = Date.now()) {
     const farming = farmingOf(layout);
     const cooking = normalizeCookingRecord(layout?.skills?.cooking);
     const filled = await filledOrderIds(pool, playerId, day);
+    // The Cove's side of the board: the Fishing level and what is in the creel, so the notices can say what is short.
+    const angler = await pool.query(`select fishing from farm_anglers where player_id = $1`, [playerId]);
+    const fishing = angler.rows?.[0] ? normalizeFishingRecord(angler.rows[0].fishing) : emptyFishingRecord();
+    const creel = await pool.query(`select fish_id, species_id, weight_g, length_mm, size_class, grade, variant, zone, state, locked, caught_at
+     from farm_fish where player_id = $1 and state = 'creel'`, [playerId]);
     return {
+        fishing: farmingSummary(fishing, fishing.xp),
+        creel: (creel.rows ?? []).map(presentFish),
         day,
         endsAt: (day + 1) * FARM_ORDER_DAY_MS,
         orders: farmFullOrderBoard(day).map((order) => presentOrder(order, filled.has(order.id))),
@@ -477,6 +486,8 @@ export async function fillFarmOrder(pool, input, now = Date.now()) {
         }
         if (order.kind === "dish")
             return fillDishOrder(client, playerId, order, farm, transactionKey);
+        if (order.kind === "fish")
+            return fillFishOrder(client, playerId, order, farm, transactionKey);
         if (summary.level < order.minLevel)
             return { ok: false, error: "level_too_low", minLevel: order.minLevel, level: summary.level, layout: farm.layout };
         const agriculture = farm.layout.agriculture;
@@ -507,6 +518,40 @@ export async function fillFarmOrder(pool, input, now = Date.now()) {
             farming: farmingSummary(farming, before.xp), achievements, balance: award.balance, layout: next,
         };
     });
+}
+/**
+ * A fish order, inside `fillFarmOrder`'s transaction: the Fishing level, the
+ * creel (the least valuable fish that meet each line, never a locked one), and
+ * Fishing XP on the angler row. The fish leave the creel as 'ordered'.
+ */
+async function fillFishOrder(client, playerId, order, farm, transactionKey) {
+    const angler = await lockedAngler(client, playerId);
+    const level = farmingLevelForXp(angler.fishing.xp);
+    const farming = farmingOf(farm.layout);
+    if (level < order.minLevel)
+        return { ok: false, error: "level_too_low", skill: "fishing", minLevel: order.minLevel, level, layout: farm.layout };
+    const creel = await lockedCreel(client, playerId);
+    const taken = new Set();
+    for (const [key, count] of Object.entries(order.lines)) {
+        const need = parseFishNeed(key);
+        const picked = need ? pickFishForNeed(creel, need, count, taken) : null;
+        if (!picked)
+            return { ok: false, error: "not_enough_fish", need: key, layout: farm.layout };
+        for (const row of picked)
+            taken.add(row);
+    }
+    const award = await awardTicketsInTransaction(client, {
+        playerId, transactionKey, amount: order.tickets, reason: "farm_order",
+        metadata: { orderId: order.id, customer: order.customer, lines: order.lines, xp: order.xp, skill: "fishing", fish: [...taken].map((row) => String(row.fish_id)) },
+    });
+    await settleFish(client, playerId, [...taken].map((row) => String(row.fish_id)), "ordered");
+    const fishing = { ...angler.fishing, xp: Math.min(200_000_000, angler.fishing.xp + order.xp) };
+    await saveAngler(client, playerId, angler.tackle, fishing);
+    return {
+        ok: true, duplicate: false, order: presentOrder(order, true), earned: order.tickets, xp: order.xp, skill: "fishing",
+        farming: farmingSummary(farming, farming.xp), fishing: farmingSummary(fishing, angler.fishing.xp), achievements: [], balance: award.balance, layout: farm.layout,
+        fishUsed: [...taken].map(presentFish),
+    };
 }
 /** A dish order, inside `fillFarmOrder`'s transaction: the Cooking level, the pantry (plainest dishes first), Cooking XP. */
 async function fillDishOrder(client, playerId, order, farm, transactionKey) {

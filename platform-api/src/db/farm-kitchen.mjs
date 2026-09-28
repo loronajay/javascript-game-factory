@@ -17,6 +17,8 @@ import { COOK_ID, farmDishKey, farmDishStars, farmRecipeRule, normalizeCookScore
 import { farmProduceHeld, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
 import { saveFarm, transaction, verifiedSubmittedFarm } from "./farm-economy.mjs";
+import { lockedCreel, presentFish, settleFish } from "./farm-fishing.mjs";
+import { parseFishNeed, pickFishForNeed } from "../services/farm-fish-catalog.mjs";
 const MAX_STACK = 99;
 function required(value, field) {
     const text = typeof value === "string" ? value.trim() : "";
@@ -67,11 +69,21 @@ export async function cookFarmDish(pool, input, now = Date.now()) {
                 return answer({ ok: false, error: "not_enough_produce", itemId, held: farmProduceHeld(produce, itemId), layout: verified });
             produce = taken;
         }
+        // A fish recipe takes its fish out of the creel too: the least valuable that will do, never a locked one.
+        let fishTaken = [];
+        if (rule.fish) {
+            const need = parseFishNeed(rule.fish.need);
+            const picked = need ? pickFishForNeed(await lockedCreel(client, playerId), need, rule.fish.count) : null;
+            if (!picked)
+                return answer({ ok: false, error: "not_enough_fish", need: rule.fish.need, count: rule.fish.count, layout: verified });
+            fishTaken = picked;
+        }
         const stars = farmDishStars(scores);
         const key = farmDishKey(recipeId, stars);
         const dishes = { ...(inventory.dishes ?? {}) };
         if ((Number(dishes[key]) || 0) >= MAX_STACK)
             return answer({ ok: false, error: "pantry_full", layout: verified });
+        await settleFish(client, playerId, fishTaken.map((row) => String(row.fish_id)), "cooked");
         dishes[key] = (Number(dishes[key]) || 0) + 1;
         const cooking = recordFarmCook(before, recipeId, rule.xp, stars, cookId);
         const layout = normalizeFarmGarage({
@@ -82,6 +94,6 @@ export async function cookFarmDish(pool, input, now = Date.now()) {
         const achievements = await awardServerAchievementsInTransaction(client, {
             playerId, gameSlug: "farm", facts: { farming: skills.farming, woodcutting: skills.woodcutting, cooking }, sourceId: `cook:${cookId}`,
         });
-        return answer({ ok: true, duplicate: false, recipeId, stars, xp: rule.xp, cooking: farmingSummary(cooking, before.xp), achievements, layout });
+        return answer({ ok: true, duplicate: false, recipeId, stars, xp: rule.xp, cooking: farmingSummary(cooking, before.xp), achievements, layout, fishUsed: fishTaken.map(presentFish) });
     });
 }

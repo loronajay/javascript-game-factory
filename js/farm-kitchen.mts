@@ -13,6 +13,7 @@ import { CROP_CATALOG, type FarmInventory } from "./farm-crops.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
 import { DISH_STARS, KITCHEN_RANGE_ITEM_ID, RECIPE_CATALOG, dishKey, findRecipe, type DishStars, type Recipe } from "./farm-catalog/recipes.mjs";
 import { produceHeld, takeProduce } from "./farm-quality.mjs";
+import { fishHeldForNeed, fishNeedPortraitSpecies, fishNeedTitle, parseFishNeed, type CreelFishLike } from "./farm-fish.mjs";
 
 const MAX_STACK = 99;
 
@@ -21,25 +22,39 @@ export function basketItemTitle(id: string): string {
   return CROP_CATALOG.find((crop) => crop.id === id)?.title ?? FRUIT_TREES.find((species) => species.fruitId === id)?.fruitTitle ?? id;
 }
 
-export type IngredientLine = Readonly<{ id: string; title: string; need: number; held: number; short: number }>;
+/**
+ * One thing a recipe takes: produce from the basket, or (`fish` set) fish from
+ * the Cove's creel — `id` is then the fish need and `portrait` a species that
+ * stands for it on the card.
+ */
+export type IngredientLine = Readonly<{ id: string; title: string; need: number; held: number; short: number; fish?: boolean; portrait?: string }>;
 export type RecipeState = "locked" | "short" | "ready";
 export type RecipeLock = "level" | "vendor" | null;
 export type RecipeAvailability = Readonly<{ recipe: Recipe; state: RecipeState; lock: RecipeLock; lines: readonly IngredientLine[] }>;
 
-export function recipeAvailability(recipe: Recipe, produce: Readonly<Record<string, number>>, level: number, learned: readonly string[] = []): RecipeAvailability {
-  const lines = Object.entries(recipe.ingredients).map(([id, need]) => {
+/**
+ * `creel` is the fish the angler holds (the Cove's server read); a signed-out
+ * farm has none, so its fish recipes read as short — catch them at the Cove.
+ */
+export function recipeAvailability(recipe: Recipe, produce: Readonly<Record<string, number>>, level: number, learned: readonly string[] = [], creel: readonly CreelFishLike[] = []): RecipeAvailability {
+  const lines: IngredientLine[] = Object.entries(recipe.ingredients).map(([id, need]) => {
     // Any grade will do; the pot takes the plainest first.
     const held = Math.max(0, Math.floor(produceHeld(produce, id)));
     return Object.freeze({ id, title: basketItemTitle(id), need, held, short: Math.max(0, need - held) });
   });
+  const fishNeed = recipe.fish ? parseFishNeed(recipe.fish.need) : null;
+  if (recipe.fish && fishNeed) {
+    const held = fishHeldForNeed(creel, fishNeed);
+    lines.unshift(Object.freeze({ id: recipe.fish.need, title: fishNeedTitle(fishNeed), need: recipe.fish.count, held, short: Math.max(0, recipe.fish.count - held), fish: true, portrait: fishNeedPortraitSpecies(fishNeed) }));
+  }
   const lock: RecipeLock = recipe.source === "vendor" && !learned.includes(recipe.id) ? "vendor" : level < recipe.minLevel ? "level" : null;
   const state: RecipeState = lock ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
   return Object.freeze({ recipe, state, lock, lines: Object.freeze(lines) });
 }
 
 /** The cookbook in catalog order (which is level order). */
-export function cookbook(produce: Readonly<Record<string, number>>, level: number, learned: readonly string[] = []): readonly RecipeAvailability[] {
-  return Object.freeze(RECIPE_CATALOG.map((recipe) => recipeAvailability(recipe, produce, level, learned)));
+export function cookbook(produce: Readonly<Record<string, number>>, level: number, learned: readonly string[] = [], creel: readonly CreelFishLike[] = []): readonly RecipeAvailability[] {
+  return Object.freeze(RECIPE_CATALOG.map((recipe) => recipeAvailability(recipe, produce, level, learned, creel)));
 }
 
 export type CookOutcome = Readonly<{ ok: boolean; reason: "" | "unknown_recipe" | "level_too_low" | "not_enough_produce" | "pantry_full"; inventory: FarmInventory }>;
@@ -48,6 +63,8 @@ export type CookOutcome = Readonly<{ ok: boolean; reason: "" | "unknown_recipe" 
 export function cookLocally(inventory: FarmInventory, recipeId: string, stars: DishStars, level: number, learned: readonly string[] = []): CookOutcome {
   const recipe = findRecipe(recipeId);
   if (!recipe) return Object.freeze({ ok: false, reason: "unknown_recipe", inventory });
+  // Fish live on the server: a farm cooking on this device has none to put in the pot.
+  if (recipe.fish) return Object.freeze({ ok: false, reason: "not_enough_produce", inventory });
   const availability = recipeAvailability(recipe, inventory.produce, level, learned);
   if (availability.state === "locked") return Object.freeze({ ok: false, reason: "level_too_low", inventory });
   if (availability.state === "short") return Object.freeze({ ok: false, reason: "not_enough_produce", inventory });

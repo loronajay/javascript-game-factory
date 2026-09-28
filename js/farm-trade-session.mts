@@ -23,6 +23,7 @@ import {
   setOfferLine,
   tradeErrorWords,
   tradeStock,
+  type TradeFish,
   type TradeOffer,
   type TradeStack,
   type TradeView,
@@ -49,6 +50,8 @@ export type TradeSessionDeps = Readonly<{
   /** The server answered with the farm as it now stands (a trade landed). */
   onLayout: (layout: unknown) => void;
   onChange: () => void;
+  /** The fish in the player's creel (farm-trade.mts `TradeFish`); none when absent. */
+  creel?: () => readonly TradeFish[];
 }>;
 
 /** How often a table being followed is re-read, and how often an idle player looks for invitations. */
@@ -188,7 +191,7 @@ export function createTradeSession(deps: TradeSessionDeps): TradeSession {
         dirty = !sameOffer(draft, sent);
         if (!dirty) draft = view!.you.offer;
       } else if (result?.error === "not_enough") {
-        draft = fitOfferToStock(draft, tradeStock(deps.farm()));
+        draft = fitOfferToStock(draft, tradeStock(deps.farm(), deps.creel?.() ?? []));
         dirty = !sameOffer(draft, view!.you.offer);
       } else {
         draft = view!.you.offer;
@@ -240,7 +243,7 @@ export function createTradeSession(deps: TradeSessionDeps): TradeSession {
     cancel: () => withBusy(async () => { await act({ type: "cancel" }); }),
     setLine(stack, id, count): void {
       if (!view || view.status !== "open" || view.you.locked) return;
-      const held = Number(tradeStock(deps.farm())[stack][id]) || 0;
+      const held = Number(tradeStock(deps.farm(), deps.creel?.() ?? [])[stack][id]) || 0;
       const next = setOfferLine(draft, stack, id, count, held);
       if (next === draft) return;
       draft = next;

@@ -27,9 +27,19 @@ import { TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
 import { parseFarmProduceKey } from "./farm-quality-catalog.mjs";
 import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "./farm-carpentry-catalog.mjs";
+import { FISH_ID } from "./farm-fish-catalog.mjs";
 
-export const TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture"] as const);
+/**
+ * The stacks a table can carry. `fish` is different from the rest: its lines
+ * are single specimens from the Cove's creel, keyed by fish id with a count of
+ * one, and they live in `farm_fish` rather than on the farm document — so the
+ * farm-inventory maths below skips them, and the database layer checks and
+ * moves them (db/farm-trades.mts).
+ */
+export const TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture", "fish"] as const);
 export type TradeStack = (typeof TRADE_STACKS)[number];
+/** The stacks that live on the farm document. */
+export const FARM_TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture"] as const);
 export type TradeOffer = Readonly<Record<TradeStack, Readonly<Record<string, number>>>>;
 
 /** Distinct lines one side may put on the table. */
@@ -64,11 +74,12 @@ export function tradeableItem(stack: TradeStack, id: string): boolean {
     case "logs":
     case "planks": return TIMBER_IDS.has(id);
     case "furniture": return Boolean(parseFarmPieceKey(id));
+    case "fish": return FISH_ID.test(id);
   }
 }
 
 export function emptyTradeOffer(): TradeOffer {
-  return Object.freeze({ produce: {}, dishes: {}, logs: {}, planks: {}, furniture: {} });
+  return Object.freeze({ produce: {}, dishes: {}, logs: {}, planks: {}, furniture: {}, fish: {} });
 }
 
 /**
@@ -92,6 +103,8 @@ export function normalizeTradeOffer(value: unknown): TradeOffer | null {
     for (const [id, count] of Object.entries(raw as Record<string, unknown>)) {
       if (!tradeableItem(stack, id)) return null;
       if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0 || count > MAX_TRADE_QUANTITY) return null;
+      // A fish is one specimen: it is on the table or it is not.
+      if (stack === "fish" && count > 1) return null;
       if (count === 0) continue;
       offer[stack]![id] = count;
       lines += 1;
@@ -109,8 +122,12 @@ export function tradeOfferIsEmpty(offer: TradeOffer): boolean {
   return tradeOfferLines(offer) === 0;
 }
 
-/** What a farm can put on the table right now: its server-minted stacks, furniture as the SHELF (owned minus placed). */
-export function tradeableStock(layout: any): TradeOffer {
+/**
+ * What a farm can put on the table right now: its server-minted stacks,
+ * furniture as the SHELF (owned minus placed), and the fish ids in its creel
+ * that are not locked (the database layer reads those and passes them in).
+ */
+export function tradeableStock(layout: any, creelFishIds: readonly string[] = []): TradeOffer {
   const inventory = layout?.agriculture?.inventory ?? {};
   const counts = (value: any) => Object.fromEntries(Object.entries(value ?? {}).filter(([, count]) => Number(count) > 0).map(([id, count]) => [id, Number(count)]));
   return Object.freeze({
@@ -119,6 +136,7 @@ export function tradeableStock(layout: any): TradeOffer {
     logs: counts(inventory.logs),
     planks: counts(inventory.planks),
     furniture: counts(unplacedFarmPieces(inventory.furniture ?? {}, layout?.decor ?? [])),
+    fish: Object.fromEntries(creelFishIds.map((id) => [id, 1])),
   });
 }
 
@@ -146,16 +164,17 @@ export type TradeSettlement =
  * either farm. Returns both inventories as they now stand, or why nothing moved.
  * Nothing is minted: the sum of every stack across the two farms is unchanged.
  */
-export function settleFarmTrade(layoutA: any, layoutB: any, offerA: TradeOffer, offerB: TradeOffer): TradeSettlement {
-  const stockA = tradeableStock(layoutA);
-  const stockB = tradeableStock(layoutB);
+export function settleFarmTrade(layoutA: any, layoutB: any, offerA: TradeOffer, offerB: TradeOffer, creelA: readonly string[] = [], creelB: readonly string[] = []): TradeSettlement {
+  const stockA = tradeableStock(layoutA, creelA);
+  const stockB = tradeableStock(layoutB, creelB);
   const shortA = tradeShortfall(offerA, stockA);
   if (shortA) return { ok: false, error: "offer_gone", side: "a", stack: shortA.stack, id: shortA.id };
   const shortB = tradeShortfall(offerB, stockB);
   if (shortB) return { ok: false, error: "offer_gone", side: "b", stack: shortB.stack, id: shortB.id };
   const inventoryA = copyInventory(layoutA);
   const inventoryB = copyInventory(layoutB);
-  for (const stack of TRADE_STACKS) {
+  // Fish cross in the database, not here: only the farm's own stacks move on the documents.
+  for (const stack of FARM_TRADE_STACKS) {
     for (const [id, count] of Object.entries(offerA[stack])) {
       inventoryA[stack][id] = (Number(inventoryA[stack][id]) || 0) - count;
       inventoryB[stack][id] = (Number(inventoryB[stack][id]) || 0) + count;
@@ -166,7 +185,7 @@ export function settleFarmTrade(layoutA: any, layoutB: any, offerA: TradeOffer, 
     }
   }
   for (const [side, inventory] of [["a", inventoryA], ["b", inventoryB]] as const) {
-    for (const stack of TRADE_STACKS) {
+    for (const stack of FARM_TRADE_STACKS) {
       for (const [id, count] of Object.entries(inventory[stack])) {
         if (Number(count) > MAX_TRADE_QUANTITY) return { ok: false, error: "inventory_full", side, stack, id };
       }
@@ -178,7 +197,7 @@ export function settleFarmTrade(layoutA: any, layoutB: any, offerA: TradeOffer, 
 function copyInventory(layout: any): Record<string, any> & Record<TradeStack, Record<string, number>> {
   const inventory = layout?.agriculture?.inventory ?? {};
   const copy: any = { ...inventory };
-  for (const stack of TRADE_STACKS) copy[stack] = { ...(inventory[stack] ?? {}) };
+  for (const stack of FARM_TRADE_STACKS) copy[stack] = { ...(inventory[stack] ?? {}) };
   return copy;
 }
 

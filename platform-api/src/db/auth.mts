@@ -229,6 +229,12 @@ const PLAYER_SCOPED_DELETES: ReadonlyArray<readonly [string, readonly string[]]>
   ["game_friendships", ["player_id_a", "player_id_b"]],
   ["game_friend_requests", ["requester_player_id", "recipient_player_id"]],
   ["game_friend_blocks", ["blocker_player_id", "blocked_player_id"]],
+  // Fishing at the Cove: the tackle box and Fishing record, lines in the water,
+  // and every fish ever landed. The fish go too, so a deleted angler's catches
+  // leave the Cove Records board.
+  ["farm_anglers", ["player_id"]],
+  ["farm_fish_casts", ["player_id"]],
+  ["farm_fish", ["player_id"]],
 ]);
 
 /**

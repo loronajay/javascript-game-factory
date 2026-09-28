@@ -93,9 +93,12 @@ export function createOrderBoardPanel(elements, options) {
             elements.turnover.textContent = "";
             return;
         }
-        elements.level.textContent = board.levels.cooking > 1 || board.orders.some((order) => order.kind === "dish")
-            ? `Farming ${board.levels.farming} · Cooking ${board.levels.cooking}`
-            : `Farming ${board.level}`;
+        const skills = [`Farming ${board.levels.farming}`];
+        if (board.levels.cooking > 1 || board.orders.some((order) => order.kind === "dish"))
+            skills.push(`Cooking ${board.levels.cooking}`);
+        if (board.orders.some((order) => order.kind === "fish"))
+            skills.push(`Fishing ${board.levels.fishing}`);
+        elements.level.textContent = skills.join(" · ");
         elements.turnover.textContent = boardTurnoverLabel(board.endsAt, now());
         const views = board.orders.map((order) => orderView(order, board));
         if (!views.length) {
@@ -120,6 +123,7 @@ export function createOrderBoardPanel(elements, options) {
                 ...board,
                 produce: outcome.produce ?? board.produce,
                 dishes: outcome.dishes ?? board.dishes,
+                fish: outcome.fish ?? board.fish,
                 levels,
                 level: levels.farming,
                 orders: board.orders.map((order) => (order.id === orderId && outcome.filled ? Object.freeze({ ...order, filled: true }) : order)),

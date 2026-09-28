@@ -21,6 +21,7 @@ export function createKitchenPanel(elements, options) {
     let level = 1;
     let learned = [];
     let selected = RECIPE_CATALOG[0].id;
+    const creel = () => options.creel?.() ?? [];
     const isOpen = () => !elements.root.hidden;
     function portrait(itemKey, className) {
         const frame = node("span", className);
@@ -38,6 +39,8 @@ export function createKitchenPanel(elements, options) {
             return entry.lock === "vendor" ? "Buy this recipe from Basil at the Market" : `Learn at Cooking ${entry.recipe.minLevel}`;
         if (entry.state === "short") {
             const missing = entry.lines.filter((line) => line.short > 0);
+            if (missing.length === 1 && missing[0].fish)
+                return `Need ${missing[0].short} more ${missing[0].title} · catch at the Cove`;
             return missing.length === 1 ? `Need ${missing[0].short} more ${missing[0].title}` : `Need ${missing.length} more ingredients`;
         }
         return held ? `Ready · ${held} in the pantry` : "Ready to cook";
@@ -68,7 +71,7 @@ export function createKitchenPanel(elements, options) {
         const needs = node("ul", "recipe-ingredients");
         for (const line of entry.lines) {
             const item = node("li", line.short > 0 ? "is-short" : "");
-            item.append(portrait(`produce:${line.id}`, "seed-card__image"), node("span", "", `${line.need} × ${line.title}`), node("small", "", `you have ${line.held}`));
+            item.append(portrait(line.fish ? `fish:${line.portrait}` : `produce:${line.id}`, "seed-card__image"), node("span", "", `${line.need} × ${line.title}`), node("small", "", line.fish ? `${line.held} in your creel` : `you have ${line.held}`));
             needs.append(item);
         }
         const method = node("ol", "recipe-steps");
@@ -95,15 +98,15 @@ export function createKitchenPanel(elements, options) {
         inventory = nextInventory;
         level = nextLevel;
         elements.level.textContent = `Cooking ${level}`;
-        const book = cookbook(inventory.produce, level, learned);
+        const book = cookbook(inventory.produce, level, learned, creel());
         elements.list.replaceChildren(...book.map(card));
         const recipe = findRecipe(selected) ?? RECIPE_CATALOG[0];
-        elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level, learned)));
+        elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level, learned, creel())));
     }
     function open(nextInventory, nextLevel, nextLearned = [], note = "") {
         learned = nextLearned;
         // Open on the first recipe that can be cooked right now, if the last one cannot.
-        const book = cookbook(nextInventory.produce, nextLevel, learned);
+        const book = cookbook(nextInventory.produce, nextLevel, learned, creel());
         if (book.find((entry) => entry.recipe.id === selected)?.state !== "ready")
             selected = book.find((entry) => entry.state === "ready")?.recipe.id ?? selected;
         elements.status.textContent = note;

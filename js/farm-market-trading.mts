@@ -10,7 +10,7 @@
 
 import { createTradeSession, type TradeApi } from "./farm-trade-session.mjs";
 import { createTradePanel } from "./farm-trade-panel.mjs";
-import { isLive } from "./farm-trade.mjs";
+import { isLive, type TradeFish } from "./farm-trade.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 
 type Thumbnail = (key: string, onReady: (url: string) => void) => string | null;
@@ -23,6 +23,8 @@ export type MarketTradingDeps = Readonly<{
   takeStock: (layout: unknown) => unknown;
   thumbnail?: Thumbnail;
   onClose: () => void;
+  /** The Cove's reads, so fish can go on the table: the player's creel and any fish by id. */
+  fishApi?: Readonly<{ fetchFarmFishing: () => Promise<any>; fetchFarmFishDetails: (ids: readonly string[]) => Promise<any> }> | null;
 }>;
 
 export type MarketTrading = Readonly<{
@@ -47,12 +49,41 @@ function required<T extends Element>(selector: string): T {
 
 export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
   let panel: ReturnType<typeof createTradePanel> | null = null;
+  // Fish on the table: the player's own creel, and a cache of every fish seen by id (theirs and the partner's).
+  let creel: readonly TradeFish[] = [];
+  const known = new Map<string, TradeFish>();
+  const asking = new Set<string>();
+  const remember = (fish: any): TradeFish | null => {
+    if (!fish || typeof fish.id !== "string") return null;
+    const entry = Object.freeze({ id: fish.id, speciesId: String(fish.speciesId), weightG: Number(fish.weightG) || 0, sizeClass: String(fish.sizeClass ?? "average"), variant: String(fish.variant ?? "normal"), locked: fish.locked === true });
+    known.set(entry.id, entry);
+    return entry;
+  };
+  async function loadCreel(): Promise<void> {
+    const answer = await deps.fishApi?.fetchFarmFishing().catch(() => null);
+    if (!Array.isArray(answer?.creel)) return;
+    creel = answer.creel.map(remember).filter((fish: TradeFish | null): fish is TradeFish => Boolean(fish));
+    panel?.render();
+  }
+  /** Fish on the partner's side the page has not seen yet: read them once, then draw them. */
+  function lookUpTheirs(): void {
+    const view = session.snapshot().view;
+    const unknown = Object.keys(view?.them.offer.fish ?? {}).filter((id) => !known.has(id) && !asking.has(id));
+    if (!unknown.length || !deps.fishApi) return;
+    for (const id of unknown) asking.add(id);
+    void deps.fishApi.fetchFarmFishDetails(unknown).then((answer: any) => {
+      for (const fish of Array.isArray(answer?.fish) ? answer.fish : []) remember(fish);
+      panel?.render();
+    }).catch(() => undefined);
+  }
   const session = createTradeSession({
     api: deps.api,
     timers: { set: (run, ms) => setTimeout(run, ms), clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>) },
     farm: deps.farm,
-    onLayout: deps.takeStock,
-    onChange: () => panel?.render(),
+    // A trade that landed moved fish too: read the creel again.
+    onLayout: (layout) => { deps.takeStock(layout); void loadCreel(); },
+    onChange: () => { lookUpTheirs(); panel?.render(); },
+    creel: () => creel,
   });
   panel = createTradePanel({
     invite: required<HTMLElement>("#tradeInvite"),
@@ -71,10 +102,14 @@ export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
     status: required<HTMLElement>("#tradeStatus"),
     lockButton: required<HTMLButtonElement>("#lockTrade"),
     confirmButton: required<HTMLButtonElement>("#confirmTrade"),
-  }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose });
+  }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose, creel: () => creel, fishDetail: (id) => known.get(id) ?? null });
 
   return Object.freeze({
-    start: () => { if (deps.canTrade) session.start(); },
+    start: () => {
+      if (!deps.canTrade) return;
+      session.start();
+      void loadCreel();
+    },
     stop: () => session.stop(),
     invite(member): string {
       if (!deps.canTrade) return "Sign in to trade — only an account farm's goods can change hands.";

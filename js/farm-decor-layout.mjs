@@ -486,12 +486,15 @@ export function farmDecorHandles(layout, instanceId) {
 }
 /** Add a catalog item near a point: the point itself, then rings of spots around it until one is free. */
 export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
+    // A mounted fish stands on one plaque at a time.
+    if (near.fishId && layout.decor.some((row) => row.fishId === near.fishId))
+        return { valid: false, layout, instanceId: "", reason: "blocked" };
     if (layout.decor.length >= MAX_DECOR)
         return { valid: false, layout, instanceId: "", reason: "full" };
     if (definition.pond && pondRegions(layout).length >= MAX_PONDS)
         return { valid: false, layout, instanceId: "", reason: "ponds" };
     const instanceId = nextFarmDecorInstanceId(layout, definition);
-    const item = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0, ...(near.stars ? { stars: near.stars } : {}) };
+    const item = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0, ...(near.stars ? { stars: near.stars } : {}), ...(near.fishId ? { fishId: near.fishId } : {}) };
     const candidate = withFarmDecor(layout, [...layout.decor, item]);
     const attempt = (x, z, rotationY = item.rotationY) => tryPlace(candidate, item, definition, { x, z, rotationY }, bounds);
     const first = attempt(near.x, near.z);

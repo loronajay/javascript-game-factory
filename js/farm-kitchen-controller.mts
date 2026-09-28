@@ -21,6 +21,7 @@ import { skillLevelForXp } from "./farm-skills.mjs";
 import type { KitchenPanel } from "./farm-kitchen-panel.mjs";
 import type { CookingHud } from "./farm-cooking-view.mjs";
 import type { KitchenView } from "./farm-kitchen-view.mjs";
+import type { CreelFishLike } from "./farm-fish.mjs";
 
 /** How long the served dish's card stays up. */
 const RESULT_SECONDS = 4;
@@ -36,6 +37,10 @@ export type KitchenControllerDeps = Readonly<{
   submitCook: ((recipeId: string, scores: readonly number[], cookId: string) => Promise<any>) | null;
   setStatus: (text: string) => void;
   onAchievements: (achievements: readonly unknown[]) => void;
+  /** The fish in the angler's creel (the Cove's server read); empty signed out. */
+  creel?: () => readonly CreelFishLike[];
+  /** A fish recipe was served: the creel changed on the server. */
+  onFishUsed?: () => void;
   random?: () => number;
   /** Seconds, for the cooking games. */
   now?: () => number;
@@ -79,6 +84,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
   let resultUntil = 0;
 
   const cookingLevel = () => skillLevelForXp(deps.layout().skills.cooking.xp);
+  const creel = () => deps.creel?.() ?? [];
   const learnedRecipes = () => deps.layout().skills.cooking.learned;
 
   function update(pose: KitchenPose, allowed: boolean): void {
@@ -90,7 +96,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
     if (serving) return "Serving…";
     if (active) return "Cooking · Esc to stop — nothing is used until the dish is served";
     if (!target) return "";
-    const ready = RECIPE_CATALOG.filter((recipe) => recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes()).state === "ready").length;
+    const ready = RECIPE_CATALOG.filter((recipe) => recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes(), creel()).state === "ready").length;
     return ready ? `Press E to cook · ${ready} recipe${ready === 1 ? "" : "s"} ready` : "Press E to open the cookbook";
   }
 
@@ -104,7 +110,7 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
     const row = target;
     const recipe = findRecipe(recipeId);
     if (!row || !recipe || active) return;
-    if (recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes()).state !== "ready") return;
+    if (recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes(), creel()).state !== "ready") return;
     const session = startCooking(recipe.id, cookingLevel(), seconds(), random);
     if (!session) return;
     active = { row, recipe, session };
@@ -160,12 +166,14 @@ export function createFarmKitchenController(deps: KitchenControllerDeps): FarmKi
           deps.hud.hide();
           deps.setStatus(result?.error === "not_enough_produce"
             ? "The basket came up short when the farm's records were checked. Nothing was used."
+            : result?.error === "not_enough_fish" ? "Your creel came up short when it was counted (a locked fish is never used). Nothing was used."
             : result?.error === "pantry_full" ? "The pantry has no room for another of those. Sell some at the Market first."
               : result?.error === "level_too_low" ? "That recipe needs a higher Cooking level by the farm's records."
                 : result?.error === "recipe_not_owned" ? "That recipe card is not in your cookbook. Buy it from Basil at the Market."
                 : "That dish did not go through. Nothing was used — try again in a moment.");
           return;
         }
+        if (recipe.fish) deps.onFishUsed?.();
         const stars = Number(result.stars) || dishStars(scores);
         const before = Number(result.cooking?.levelBefore) || 1;
         const after = Number(result.cooking?.level) || before;

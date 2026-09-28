@@ -27,6 +27,7 @@ import { farmDishPrice, farmProducePrice } from "./farm-market-catalog.mjs";
 import { farmHarvestXp } from "./farm-skill-catalog.mjs";
 import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
 import { farmSeedFor as seedFor, farmSeededRandom as mulberry32 } from "./farm-seeded-random.mjs";
+import { farmFishNeedValue, farmFishNeedXp, parseFishNeed } from "./farm-fish-catalog.mjs";
 export const FARM_ORDER_DAY_MS = 24 * 60 * 60 * 1000;
 /** An order's XP is this share of what growing its produce earned. */
 export const ORDER_XP_SHARE = 0.5;
@@ -55,6 +56,21 @@ export const FARM_KITCHEN_ORDER_TIERS = Object.freeze([
 ]);
 /** A dish order's Cooking XP is this share of what cooking its dishes earned. */
 export const DISH_ORDER_XP_SHARE = 0.5;
+export const FARM_FISH_ORDER_TIERS = Object.freeze([
+    Object.freeze({
+        tier: "catch", minLevel: 1, lines: 1, count: Object.freeze([2, 4]), premium: 1.6,
+        needs: Object.freeze(["zone=lagoon", "rarity=common", "species=fish.goldfish", "species=fish.tetra", "species=fish.armored-catfish", "zone=lagoon,size=average"]),
+    }),
+    Object.freeze({
+        tier: "special", minLevel: 10, lines: 2, count: Object.freeze([1, 2]), premium: 1.75,
+        needs: Object.freeze([
+            "zone=reef", "rarity=uncommon", "species=fish.red-snapper", "species=fish.puffer", "species=fish.clownfish",
+            "zone=reef,size=large", "species=fish.piranha,size=large", "rarity=rare", "species=fish.koi", "zone=deep",
+        ]),
+    }),
+]);
+/** A fish order's Fishing XP is this share of what landing its fish earned. */
+export const FISH_ORDER_XP_SHARE = 0.5;
 export function farmOrderDay(now) {
     return Math.floor(now / FARM_ORDER_DAY_MS);
 }
@@ -149,10 +165,57 @@ function farmKitchenOrders(day, firstSlot, taken) {
         });
     });
 }
-/** Day `day`'s whole board: the produce notices, then the kitchen's. */
+/** What a fish order's lines would fetch at the Fishmonger, at their cheapest. */
+export function farmFishOrderValue(lines) {
+    return Object.entries(lines).reduce((sum, [key, count]) => {
+        const need = parseFishNeed(key);
+        return sum + (need ? farmFishNeedValue(need) * count : 0);
+    }, 0);
+}
+export function farmFishOrderXp(lines) {
+    const xp = Object.entries(lines).reduce((sum, [key, count]) => {
+        const need = parseFishNeed(key);
+        return sum + (need ? farmFishNeedXp(need) * count : 0);
+    }, 0);
+    return Math.max(1, Math.round(xp * FISH_ORDER_XP_SHARE));
+}
+/** Day `day`'s fish notices, in the slots after the kitchen's; customers not already on the board. */
+function farmFishOrders(day, firstSlot, taken) {
+    const random = mulberry32(seedFor(`farm-orders:cove:v1:${day}`));
+    const customers = new Set(FARM_ORDER_CUSTOMERS.filter((entry) => taken.has(entry.name)));
+    return FARM_FISH_ORDER_TIERS.map((tier, index) => {
+        // Every customer may already be up: then the board's regulars take a second notice.
+        const customer = customers.size >= FARM_ORDER_CUSTOMERS.length ? FARM_ORDER_CUSTOMERS[(day + index) % FARM_ORDER_CUSTOMERS.length] : pick(FARM_ORDER_CUSTOMERS, random, customers);
+        const needsTaken = new Set();
+        const lines = {};
+        for (let line = 0; line < Math.min(tier.lines, tier.needs.length); line += 1) {
+            const key = pick(tier.needs, random, needsTaken);
+            lines[key] = tier.count[0] + Math.floor(random() * (tier.count[1] - tier.count[0] + 1));
+        }
+        const slot = firstSlot + index;
+        return Object.freeze({
+            id: `d${day}-${slot}`,
+            day,
+            slot,
+            tier: tier.tier,
+            kind: "fish",
+            skill: "fishing",
+            minLevel: tier.minLevel,
+            customer: customer.name,
+            note: customer.note,
+            lines: Object.freeze(lines),
+            tickets: Math.ceil((farmFishOrderValue(lines) * tier.premium) / 5) * 5,
+            xp: farmFishOrderXp(lines),
+            endsAt: (day + 1) * FARM_ORDER_DAY_MS,
+        });
+    });
+}
+/** Day `day`'s whole board: the produce notices, then the kitchen's, then the Cove's. */
 export function farmFullOrderBoard(day) {
     const produce = farmOrderBoard(day);
-    return Object.freeze([...produce, ...farmKitchenOrders(day, produce.length, new Set(produce.map((order) => order.customer)))]);
+    const kitchen = farmKitchenOrders(day, produce.length, new Set(produce.map((order) => order.customer)));
+    const upSoFar = [...produce, ...kitchen];
+    return Object.freeze([...upSoFar, ...farmFishOrders(day, upSoFar.length, new Set(upSoFar.map((order) => order.customer)))]);
 }
 const ORDER_ID = /^d(\d{1,7})-(\d)$/;
 /** The order an id names, if it is on day `day`'s board. An id from any other day is not. */

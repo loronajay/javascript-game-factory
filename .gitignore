@@ -144,3 +144,9 @@ games/mini-hoops/tools/room-skeletons/
 # caught the tic-tac-toe bin collider sitting off its own art. Same reasoning as
 # the room sheets: a hand-run visual check, never a committed artefact.
 games/mini-hoops/tools/bin-contact-sheet/
+
+# The Quaternius fish pack's sources. Only the converted GLBs are shipped;
+# farm/assets/fishing/tools/convert.py rebuilds them from a fresh download.
+farm/assets/fishing/Blends/
+farm/assets/fishing/FBX/
+farm/assets/fishing/OBJ/

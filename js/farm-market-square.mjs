@@ -32,16 +32,28 @@ export const MARKET_PAVING = Object.freeze({
 });
 /** The instance id of the gate home. */
 export const MARKET_HOME_GATE = "market-gate-home";
+/** The gate in the north wall, down to the Cove (farm-cove.mts). */
+export const MARKET_COVE_GATE = "market-gate-cove";
+/** Where the Cove gate stands along the north wall: in the lane between the Produce Merchant and the Kitchen. */
+export const COVE_GATE_X = 3.7;
+/** Just inside the north gate, back up from the Cove, looking south into the square. */
+export const MARKET_COVE_SPAWN = Object.freeze({ x: COVE_GATE_X, z: -(MARKET_BOUNDS.depth / 2 - 2.2), yaw: Math.PI });
 // The stone wall is 0.5 deep; its outer face sits on the inset line like the farm's fence.
 const WALL = MARKET_BOUNDS.width / 2 - MARKET_BOUNDS.wallInset - 0.25;
 const GATE_WIDTH = 2.4;
 const SOUTH_RUN = WALL - GATE_WIDTH / 2 + 0.25;
+// The north wall runs either side of the Cove gate.
+const NORTH_WEST_RUN = WALL + 0.25 + (COVE_GATE_X - GATE_WIDTH / 2);
+const NORTH_EAST_RUN = WALL + 0.25 - (COVE_GATE_X + GATE_WIDTH / 2);
 const QUARTER = Math.PI / 2;
 const row = (instanceId, itemId, x, z, rotationY = 0, length = 0) => Object.freeze({ instanceId, itemId, x, z, rotationY, length });
 /** Everything in the square the farm's catalog already draws. */
 export const MARKET_DECOR = Object.freeze([
-    // The walls, and the gate in the south wall that leads back to the farm.
-    row("market-wall-n", "decor.fence.stone-wall", 0, -WALL, 0, WALL * 2 + 0.5),
+    // The walls, the gate in the south wall that leads back to the farm, and the one in the north wall down to the Cove.
+    row("market-wall-nw", "decor.fence.stone-wall", -(WALL + 0.25) + NORTH_WEST_RUN / 2, -WALL, 0, NORTH_WEST_RUN),
+    row("market-wall-ne", "decor.fence.stone-wall", WALL + 0.25 - NORTH_EAST_RUN / 2, -WALL, 0, NORTH_EAST_RUN),
+    row(MARKET_COVE_GATE, "decor.fence.gate", COVE_GATE_X, -WALL, 0),
+    row("market-signpost-cove", "decor.prop.signpost", COVE_GATE_X - 1.9, -WALL + 1.1, Math.PI),
     row("market-wall-w", "decor.fence.stone-wall", -WALL, 0, QUARTER, WALL * 2 + 0.5),
     row("market-wall-e", "decor.fence.stone-wall", WALL, 0, QUARTER, WALL * 2 + 0.5),
     row("market-wall-sw", "decor.fence.stone-wall", -(GATE_WIDTH / 2 + SOUTH_RUN / 2), WALL, 0, SOUTH_RUN),
@@ -61,8 +73,8 @@ export const MARKET_DECOR = Object.freeze([
     row("market-lamp-gate-w", "decor.prop.lamp-post", -1.8, WALL - 1.1),
     // Dressing round the stalls: stock waiting to go out, a wagon being unloaded.
     row("market-crates-1", "decor.prop.crates", -3.9, -10.4, 0.2),
-    row("market-barrel-1", "decor.prop.barrel", 3.6, -10.6),
-    row("market-barrel-2", "decor.prop.barrel", 4.3, -10.1),
+    row("market-barrel-1", "decor.prop.barrel", 6.6, -12.3),
+    row("market-barrel-2", "decor.prop.barrel", 7.4, -12.7),
     row("market-hay-1", "decor.prop.hay-bale", -11.2, -11.3, 0.3),
     row("market-wagon", "decor.prop.wagon", 11.1, -8.6, 0.12),
     row("market-pump", "decor.prop.water-pump", -3.4, 5.6),

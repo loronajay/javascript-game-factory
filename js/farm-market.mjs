@@ -43,7 +43,7 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
@@ -62,6 +62,7 @@ import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
+import { createFishPortraits } from "./farm-fish-portraits.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { INGREDIENT_STOCK, RECIPE_STOCK } from "./farm-vendor-stock.mjs";
 import { createVendorShelf } from "./farm-vendor-shelf.mjs";
@@ -88,6 +89,9 @@ const visitorsChipNames = requiredElement("#marketVisitorsNames");
 // The road home: back to whichever farm the player walked out of.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const homeUrl = fromFarm ? `../index.html?id=${encodeURIComponent(fromFarm)}` : "../index.html";
+// Down the north gate to the Cove, carrying the farm to come home to.
+const coveUrl = fromFarm ? `../cove/index.html?farm=${encodeURIComponent(fromFarm)}` : "../cove/index.html";
+const cameFromCove = new URLSearchParams(location.search).get("from") === "cove";
 homeLink.href = homeUrl;
 if (fromFarm)
     homeLink.textContent = "← Back to their farm";
@@ -201,7 +205,8 @@ function keeperSays(stall, text, now = performance.now()) {
     keeperSaidAt.set(stall.id, now);
     keepers.say(`keeper-${stall.id}`, text, now);
 }
-const player = { x: MARKET_SPAWN.x, z: MARKET_SPAWN.z, yaw: MARKET_SPAWN.yaw, pitch: -0.03 };
+const arrival = cameFromCove ? MARKET_COVE_SPAWN : MARKET_SPAWN;
+const player = { x: arrival.x, z: arrival.z, yaw: arrival.yaw, pitch: -0.03 };
 // `?at=<stall id>` stands the player at that counter, facing it — a QA seam like `?time=`.
 const startStall = findMarketStall(new URLSearchParams(location.search).get("at") ?? "");
 if (startStall) {
@@ -445,6 +450,7 @@ const achievementToaster = createAchievementToaster();
 const orderMessages = Object.freeze({
     not_enough_produce: "Your basket came up short when it was counted. Nothing was delivered.",
     not_enough_dishes: "Your pantry came up short when it was counted. Nothing was delivered.",
+    not_enough_fish: "Your creel came up short when it was counted (a locked fish never goes). Nothing was delivered.",
     level_too_low: "That order needs a higher level. Nothing was delivered.",
     order_expired: "That notice came down while you were reading it — the board has turned over. Nothing was delivered.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
@@ -456,20 +462,29 @@ function takeBalance(value) {
     publishTicketBalance(balance);
     renderTickets();
 }
+/** The board as last read: a fish fill answers with the fish it took, and the creel shown is this one less those. */
+let lastBoard = null;
 async function loadOrderBoard() {
     const board = normalizeOrderBoard(await ticketClient.getFarmOrders());
     // The board carries the basket and pantry as the server holds them now: fresher than the page's.
     if (board) {
         produce = board.produce;
         dishes = board.dishes;
+        lastBoard = board;
     }
     return board;
 }
 async function fillOrder(orderId) {
     const result = await ticketClient.fillFarmOrder(orderId);
     const layout = takeStock(result?.layout);
-    const levels = layout ? { farming: farmingLevelForXp(layout.skills.farming.xp), cooking: farmingLevelForXp(layout.skills.cooking.xp) } : undefined;
-    const stock = { produce, dishes, levels };
+    const fishingLevel = Number(result?.fishing?.level) || lastBoard?.levels.fishing || 1;
+    const levels = layout ? { farming: farmingLevelForXp(layout.skills.farming.xp), cooking: farmingLevelForXp(layout.skills.cooking.xp), fishing: fishingLevel } : undefined;
+    // A fish order took its fish: the creel the board shows is what is left.
+    const used = new Set(Array.isArray(result?.fishUsed) ? result.fishUsed.map((fish) => String(fish?.id)) : []);
+    const fish = lastBoard ? lastBoard.fish.filter((entry) => !used.has(entry.id)) : undefined;
+    if (lastBoard && fish)
+        lastBoard = { ...lastBoard, fish };
+    const stock = { produce, dishes, levels, fish };
     if (!result?.ok) {
         return { ok: false, message: orderMessages[result?.error] ?? "The delivery did not go through. Nothing was taken — try again in a moment.", ...stock };
     }
@@ -480,8 +495,9 @@ async function fillOrder(orderId) {
         return { ok: true, message: "That order was already delivered.", ...stock, filled: true };
     const customer = typeof result.order?.customer === "string" ? result.order.customer : "The customer";
     const cooking = result.skill === "cooking";
-    const summary = cooking ? result.cooking : result.farming;
-    const skill = cooking ? "Cooking" : "Farming";
+    const fishingOrder = result.skill === "fishing";
+    const summary = cooking ? result.cooking : fishingOrder ? result.fishing : result.farming;
+    const skill = cooking ? "Cooking" : fishingOrder ? "Fishing" : "Farming";
     const levelUp = Number(summary?.level) > Number(summary?.levelBefore) ? ` ${skill} level ${summary.level}!` : "";
     return {
         ok: true,
@@ -499,7 +515,7 @@ const ordersPanel = createOrderBoardPanel({
 }, {
     load: loadOrderBoard,
     fill: fillOrder,
-    thumbnail: itemThumbnails.get,
+    thumbnail: (key, onReady) => portraits(key, onReady),
     onClose: () => canvas.focus(),
 });
 // The Sawmill (farm-market-sawmill.mts): Bram saws logs for a ticket a log and buys furniture off the shelf.
@@ -552,12 +568,16 @@ const exchangePanel = createExchangePanel({
     onClose: () => canvas.focus(),
 });
 // Trading with the others in the square (farm-market-trading.mts): T on a person, Y/N on an invitation.
+// Fish can be traded too (the Cove's creel): portraits for them, and the Cove's reads.
+const portraits = createFishPortraits(THREE, itemThumbnails.get);
+const tradeApi = createPlatformApiClient();
 const trading = createMarketTrading({
-    api: createPlatformApiClient(),
+    api: tradeApi,
     canTrade: canSell,
     farm: () => farm,
     takeStock,
-    thumbnail: itemThumbnails.get,
+    thumbnail: portraits,
+    fishApi: tradeApi,
     onClose: () => canvas.focus(),
 });
 window.addEventListener("pagehide", () => trading.stop());
@@ -640,7 +660,8 @@ function updateInteraction() {
         return setPrompt(SEATED_PROMPT);
     if (doorInReach) {
         const home = doorInReach.doorId === MARKET_HOME_GATE;
-        return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? " · the road back to the farm" : ""));
+        const cove = doorInReach.doorId === MARKET_COVE_GATE;
+        return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? " · the road back to the farm" : cove ? " · down to the Cove" : ""));
     }
     if (stallInReach)
         return setPrompt(stallPrompt(stallInReach, canSell));
@@ -694,19 +715,22 @@ function updatePlayer(dt) {
     player.z = step.pose.z;
     body = step.body;
 }
-// Out through the open south gate is the road home.
+// Out through the open south gate is the road home; out through the north gate, the path down to the Cove.
 function checkGateway() {
     if (!entered || leaving || body.mode !== "walking")
         return;
-    if (!gatewayAt(layout.decor, openDoors, player, MARKET_BOUNDS))
+    const gate = gatewayAt(layout.decor, openDoors, player, MARKET_BOUNDS);
+    if (!gate)
         return;
+    const toCove = gate.instanceId === MARKET_COVE_GATE;
     leaving = true;
     keys.clear();
     document.exitPointerLock?.();
-    setPrompt("Back up the road to the farm…");
-    status.textContent = "Back up the road to the farm…";
+    const words = toCove ? "Down the path to the Cove…" : "Back up the road to the farm…";
+    setPrompt(words);
+    status.textContent = words;
     presence.disconnect();
-    location.href = homeUrl;
+    location.href = toCove ? coveUrl : homeUrl;
 }
 window.addEventListener("keydown", (event) => {
     if (panelOpen()) {

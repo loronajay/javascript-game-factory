@@ -93,7 +93,8 @@ export function createFarmEditor(options) {
         setDecorLength: (instanceId, length, phase) => editLength(setFarmDecorLength(layout, instanceId, length), phase),
         purchaseItem: (itemId) => { void purchaseItem(itemId); },
         purchaseSeeds: (cropId, quantity) => { void purchaseSeeds(cropId, quantity); },
-    }, { thumbnail: options.thumbnail, cropThumbnail: options.cropThumbnail });
+        addTrophy: (fishId) => addTrophy(fishId),
+    }, { thumbnail: options.thumbnail, cropThumbnail: options.cropThumbnail, trophies: options.trophies, trophyThumbnail: options.trophyThumbnail });
     function selected() {
         return selection ? layout.decor.find((row) => row.instanceId === selection) : undefined;
     }
@@ -333,6 +334,22 @@ export function createFarmEditor(options) {
         tab = farmDecorTab(definition);
         commit(result.layout, `${definition.title} added · drag it into place · unsaved`);
     }
+    /** Stand a fish mounted at the Cove on a Trophy Mount near the view's target. */
+    function addTrophy(fishId) {
+        const definition = findFarmDecor("decor.prop.trophy-mount");
+        const trophy = options.trophies?.().find((entry) => entry.fishId === fishId);
+        if (!definition || !trophy)
+            return;
+        const target = view.view().target;
+        const result = addFarmDecor(layout, definition, { x: target.x, z: target.z, rotationY: 0, fishId });
+        if (!result.valid) {
+            setStatus(layout.decor.some((row) => row.fishId === fishId) ? `${trophy.title} is already on your farm.` : "No room for a Trophy Mount near here · move the view and try again.", "error");
+            return;
+        }
+        selection = result.instanceId;
+        tab = "furniture";
+        commit(result.layout, `${trophy.title} mounted · drag it into place · unsaved`);
+    }
     function remove(instanceId) {
         const row = layout.decor.find((candidate) => candidate.instanceId === instanceId);
         if (!row)
@@ -353,6 +370,10 @@ export function createFarmEditor(options) {
         const original = layout.decor.find((row) => row.instanceId === instanceId);
         if (original?.memorialId) {
             setStatus("A pet memorial is unique and cannot be copied.", "error");
+            return;
+        }
+        if (original?.fishId) {
+            setStatus("A mounted fish stands on one plaque. Mount another fish at the Cove.", "error");
             return;
         }
         if (original?.stars && !shelfHas(layout.agriculture.inventory.furniture, layout.decor, original.itemId, original.stars)) {

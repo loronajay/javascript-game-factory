@@ -56,12 +56,20 @@ export type FarmPanelActions = Readonly<{
   setDecorLength: (instanceId: string, length: number, phase: EditPhase) => void;
   purchaseItem: (itemId: string) => void;
   purchaseSeeds: (cropId: string, quantity: number) => void;
+  /** Stand a mounted fish on a Trophy Mount. */
+  addTrophy: (fishId: string) => void;
 }>;
+
+/** A fish mounted at the Cove, for the Furniture tab: which fish, how to name it, and its portrait key (`fish:<species>:<variant>`). */
+export type TrophyFishCard = Readonly<{ fishId: string; title: string; detail: string; portrait: string }>;
 
 export type FarmPanelOptions = Readonly<{
   /** A picture of the catalog item for its card, or null to fall back to a two-colour chip. */
   thumbnail?: (definition: FarmDecorDefinition) => string | null;
   cropThumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
+  /** The fish this farmer has mounted at the Cove (none when signed out or visiting). */
+  trophies?: () => readonly TrophyFishCard[];
+  trophyThumbnail?: (itemKey: string, onReady: (url: string) => void) => string | null;
 }>;
 
 export type FarmPanelElements = Readonly<{
@@ -87,7 +95,7 @@ const CATEGORY_HINTS: Readonly<Record<FarmDecorCategory, string>> = Object.freez
   plant: "Trees are solid at the trunk; beds and flowers are walked over.",
   water: "Ponds are dug into the field: walk down the bank and wade in. The shark, the anglerfish and the jellyfish live in them, and their homes and toys sit on the pond bed.",
   prop: "Bits and pieces for the yard.",
-  furniture: "Pieces you have made at the Carpenter's Workbench. Placing one takes the finest on the shelf; removing one puts it back.",
+  furniture: "Pieces you have made at the Carpenter's Workbench, and fish you have mounted at the Cove. Placing one takes it off the shelf; removing one puts it back.",
 });
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
@@ -240,6 +248,28 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
       card.append(element("small", "decor-card__meta", entry.onShelf ? `${stock} on the shelf` : `all ${entry.placed} placed`));
       return card;
     }));
+    // Mounted fish from the Cove, each on its own Trophy Mount.
+    const trophies = options.trophies?.() ?? [];
+    if (!trophies.length) return;
+    const placed = new Set(state.layout.decor.map((row) => row.fishId).filter(Boolean));
+    elements.catalog.append(element("small", "ticket-shop-balance", "Mounted fish · from the Cove"));
+    for (const trophy of trophies) {
+      const card = element("button", "decor-card");
+      card.type = "button";
+      const standing = placed.has(trophy.fishId);
+      if (!standing) card.dataset.addTrophy = trophy.fishId;
+      card.disabled = standing;
+      card.title = standing ? `${trophy.title} is already on your farm` : `Stand ${trophy.title} on a Trophy Mount`;
+      const frame = element("span", "decor-card__icon");
+      const image = element("img");
+      image.alt = "";
+      frame.style.background = "linear-gradient(135deg, #1f4f6b 0 50%, #4a2d18 50% 100%)";
+      const show = (url: string) => { image.src = url; frame.dataset.picture = "true"; frame.replaceChildren(image); };
+      const ready = options.trophyThumbnail?.(trophy.portrait, show);
+      if (ready) show(ready);
+      card.append(frame, element("span", "decor-card__title", trophy.title), element("small", "decor-card__meta", standing ? "on the farm" : trophy.detail));
+      elements.catalog.append(card);
+    }
   }
 
   function renderCatalog(state: FarmPanelState): void {
@@ -455,6 +485,8 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
   elements.catalog.addEventListener("click", (event) => {
     const buy = (event.target as HTMLElement).closest<HTMLElement>("[data-buy-item]");
     if (buy?.dataset.buyItem) { actions.purchaseItem(buy.dataset.buyItem); return; }
+    const trophy = (event.target as HTMLElement).closest<HTMLElement>("[data-add-trophy]");
+    if (trophy?.dataset.addTrophy) { actions.addTrophy(trophy.dataset.addTrophy); return; }
     const card = (event.target as HTMLElement).closest<HTMLElement>("[data-add-decor]");
     if (card?.dataset.addDecor) actions.addDecor(card.dataset.addDecor);
   });

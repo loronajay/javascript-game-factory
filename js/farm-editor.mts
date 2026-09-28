@@ -20,7 +20,7 @@ import { addFarmDecor, alignFarmDecorPlacement, duplicateFarmDecor, farmDecorHan
 import { FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { farmObstacles, type FarmObstacleState } from "./farm-scene.mjs";
 import { bestOnShelf, shelfHas } from "./farm-workshop.mjs";
-import { createFarmEditorPanel, type FarmEditorTab, type FarmPanelElements } from "./farm-editor-panel.mjs";
+import { createFarmEditorPanel, type FarmEditorTab, type FarmPanelElements, type TrophyFishCard } from "./farm-editor-panel.mjs";
 import type { EditPhase } from "./arcade-room-editor-panel.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import type { DecorHandle } from "./arcade-room-decor-resize.mjs";
@@ -66,6 +66,9 @@ export type FarmEditorOptions = Readonly<{
   elements: FarmEditorElements;
   thumbnail?: (definition: FarmDecorDefinition) => string | null;
   cropThumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
+  /** Fish mounted at the Cove, to stand on Trophy Mounts (farm-angler-link.mts). */
+  trophies?: () => readonly TrophyFishCard[];
+  trophyThumbnail?: (itemKey: string, onReady: (url: string) => void) => string | null;
   canEnter: () => boolean;
   onEditingChange: (editing: boolean) => void;
   /** The page hears every layout change (from the panel or a drag) so the sim and the pets panel follow. */
@@ -154,7 +157,8 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     setDecorLength: (instanceId, length, phase) => editLength(setFarmDecorLength(layout, instanceId, length), phase),
     purchaseItem: (itemId) => { void purchaseItem(itemId); },
     purchaseSeeds: (cropId, quantity) => { void purchaseSeeds(cropId, quantity); },
-  }, { thumbnail: options.thumbnail, cropThumbnail: options.cropThumbnail });
+    addTrophy: (fishId) => addTrophy(fishId),
+  }, { thumbnail: options.thumbnail, cropThumbnail: options.cropThumbnail, trophies: options.trophies, trophyThumbnail: options.trophyThumbnail });
 
   function selected(): FarmDecorRow | undefined {
     return selection ? layout.decor.find((row) => row.instanceId === selection) : undefined;
@@ -390,6 +394,22 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     commit(result.layout, `${definition.title} added · drag it into place · unsaved`);
   }
 
+  /** Stand a fish mounted at the Cove on a Trophy Mount near the view's target. */
+  function addTrophy(fishId: string): void {
+    const definition = findFarmDecor("decor.prop.trophy-mount");
+    const trophy = options.trophies?.().find((entry) => entry.fishId === fishId);
+    if (!definition || !trophy) return;
+    const target = view.view().target;
+    const result = addFarmDecor(layout, definition, { x: target.x, z: target.z, rotationY: 0, fishId });
+    if (!result.valid) {
+      setStatus(layout.decor.some((row) => row.fishId === fishId) ? `${trophy.title} is already on your farm.` : "No room for a Trophy Mount near here · move the view and try again.", "error");
+      return;
+    }
+    selection = result.instanceId;
+    tab = "furniture";
+    commit(result.layout, `${trophy.title} mounted · drag it into place · unsaved`);
+  }
+
   function remove(instanceId: string): void {
     const row = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     if (!row) return;
@@ -408,6 +428,10 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     const original = layout.decor.find((row) => row.instanceId === instanceId);
     if (original?.memorialId) {
       setStatus("A pet memorial is unique and cannot be copied.", "error");
+      return;
+    }
+    if (original?.fishId) {
+      setStatus("A mounted fish stands on one plaque. Mount another fish at the Cove.", "error");
       return;
     }
     if (original?.stars && !shelfHas(layout.agriculture.inventory.furniture, layout.decor, original.itemId, original.stars)) {

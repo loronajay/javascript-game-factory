@@ -53,6 +53,9 @@ import { createMillPanel } from "./farm-mill-panel.mjs";
 import { createCraftingHud } from "./farm-carpentry-view.mjs";
 import { createFarmWorkshopController, millOutcome } from "./farm-workshop-controller.mjs";
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
+import { createFishPortraits } from "./farm-fish-portraits.mjs";
+import { createAnglerLink } from "./farm-angler-link.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { applyOfflineProduction, offlineSpan } from "./farm-offline.mjs";
 import { createAwayReport } from "./farm-away-report.mjs";
@@ -1122,6 +1125,17 @@ if (visiting)
 const cropThumbnails = createCropThumbnails(THREE);
 // Every other item — produce, dishes, logs, saplings, feed — is portrayed by its own model.
 const itemThumbnails = createFarmItemThumbnails(THREE);
+// The Cove's fish on the farm (farm-angler-link.mts): the creel the fish recipes cook from, the fish
+// mounted for build mode's Trophy Mounts, and every mount on the field dressed with its fish.
+const portraits = createFishPortraits(THREE, itemThumbnails.get);
+const anglerLink = createAnglerLink({
+    THREE,
+    api: layoutStore.ownerPlayerId ? createPlatformApiClient() : null,
+    ownerId: layoutStore.ownerPlayerId,
+    isOwner: !visiting && layoutStore.accountBacked,
+    modelFor: (instanceId) => world.modelFor(instanceId),
+});
+void anglerLink.refresh();
 const inventoryPanel = createFarmInventoryPanel({
     root: requiredElement("#inventoryPanel"),
     openButton: openInventoryButton,
@@ -1201,9 +1215,10 @@ const kitchenPanel = createKitchenPanel({
     detail: requiredElement("#recipeDetail"),
     status: requiredElement("#kitchenStatus"),
 }, {
-    thumbnail: itemThumbnails.get,
+    thumbnail: portraits,
     cook: (recipeId) => kitchen.begin(recipeId),
     earnsXp: () => serverHarvests,
+    creel: () => anglerLink.creel(),
     onClose: () => canvas.focus(),
 });
 const kitchen = createFarmKitchenController({
@@ -1215,6 +1230,8 @@ const kitchen = createFarmKitchenController({
     submitCook: serverHarvests ? (recipeId, scores, cookId) => submitServerHarvest((sent) => ticketClient.cookFarmDish(sent, recipeId, scores, cookId)) : null,
     setStatus: (text) => { status.textContent = text; },
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
+    creel: () => anglerLink.creel(),
+    onFishUsed: () => { void anglerLink.refresh(); },
 });
 kitchenSync = () => kitchen.sync();
 // The workshop (farm-workshop-controller.mts): E at the Carpenter's Workbench opens the pattern book and
@@ -1306,6 +1323,8 @@ const farmEditor = createFarmEditor({
     },
     thumbnail: (definition) => decorThumbnails.get(definition),
     cropThumbnail: cropThumbnails.get,
+    trophies: () => anglerLink.trophies(),
+    trophyThumbnail: portraits,
     elements: {
         panel: editorPanel,
         editButton,
@@ -1409,6 +1428,8 @@ function frame(now) {
         accumulator -= TICK_SECONDS;
     }
     world.update(frameSeconds);
+    // Trophy Mounts pick up their fish (and a rebuilt model its fish again); cheap when nothing changed.
+    anglerLink.dress(layout);
     treesView.update(frameSeconds);
     kitchenView.update(frameSeconds);
     petBodies.sync(petSim.pets(), frameSeconds);

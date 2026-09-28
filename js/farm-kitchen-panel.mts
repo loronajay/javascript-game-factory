@@ -10,6 +10,7 @@ import { COOK_STEP_TITLES, RECIPE_CATALOG, findRecipe } from "./farm-catalog/rec
 import { cookbook, pantryCount, recipeAvailability, type RecipeAvailability } from "./farm-kitchen.mjs";
 import { dishPrice } from "./farm-market-prices.mjs";
 import type { FarmInventory } from "./farm-crops.mjs";
+import type { CreelFishLike } from "./farm-fish.mjs";
 
 type Elements = Readonly<{
   root: HTMLElement;
@@ -26,6 +27,8 @@ type Options = Readonly<{
   cook: (recipeId: string) => void;
   /** Whether this farm earns Cooking XP (account farms do; a signed-out farm does not). */
   earnsXp: () => boolean;
+  /** The fish in the angler's creel, for the fish recipes (empty signed out). */
+  creel?: () => readonly CreelFishLike[];
   onClose?: () => void;
 }>;
 
@@ -49,6 +52,7 @@ export function createKitchenPanel(elements: Elements, options: Options): Kitche
   let level = 1;
   let learned: readonly string[] = [];
   let selected = RECIPE_CATALOG[0]!.id;
+  const creel = (): readonly CreelFishLike[] => options.creel?.() ?? [];
 
   const isOpen = (): boolean => !elements.root.hidden;
 
@@ -67,6 +71,7 @@ export function createKitchenPanel(elements: Elements, options: Options): Kitche
     if (entry.state === "locked") return entry.lock === "vendor" ? "Buy this recipe from Basil at the Market" : `Learn at Cooking ${entry.recipe.minLevel}`;
     if (entry.state === "short") {
       const missing = entry.lines.filter((line) => line.short > 0);
+      if (missing.length === 1 && missing[0]!.fish) return `Need ${missing[0]!.short} more ${missing[0]!.title} · catch at the Cove`;
       return missing.length === 1 ? `Need ${missing[0]!.short} more ${missing[0]!.title}` : `Need ${missing.length} more ingredients`;
     }
     return held ? `Ready · ${held} in the pantry` : "Ready to cook";
@@ -103,7 +108,11 @@ export function createKitchenPanel(elements: Elements, options: Options): Kitche
     const needs = node("ul", "recipe-ingredients");
     for (const line of entry.lines) {
       const item = node("li", line.short > 0 ? "is-short" : "");
-      item.append(portrait(`produce:${line.id}`, "seed-card__image"), node("span", "", `${line.need} × ${line.title}`), node("small", "", `you have ${line.held}`));
+      item.append(
+        portrait(line.fish ? `fish:${line.portrait}` : `produce:${line.id}`, "seed-card__image"),
+        node("span", "", `${line.need} × ${line.title}`),
+        node("small", "", line.fish ? `${line.held} in your creel` : `you have ${line.held}`),
+      );
       needs.append(item);
     }
     const method = node("ol", "recipe-steps");
@@ -130,16 +139,16 @@ export function createKitchenPanel(elements: Elements, options: Options): Kitche
     inventory = nextInventory;
     level = nextLevel;
     elements.level.textContent = `Cooking ${level}`;
-    const book = cookbook(inventory.produce, level, learned);
+    const book = cookbook(inventory.produce, level, learned, creel());
     elements.list.replaceChildren(...book.map(card));
     const recipe = findRecipe(selected) ?? RECIPE_CATALOG[0]!;
-    elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level, learned)));
+    elements.detail.replaceChildren(detail(recipeAvailability(recipe, inventory.produce, level, learned, creel())));
   }
 
   function open(nextInventory: FarmInventory, nextLevel: number, nextLearned: readonly string[] = [], note = ""): void {
     learned = nextLearned;
     // Open on the first recipe that can be cooked right now, if the last one cannot.
-    const book = cookbook(nextInventory.produce, nextLevel, learned);
+    const book = cookbook(nextInventory.produce, nextLevel, learned, creel());
     if (book.find((entry) => entry.recipe.id === selected)?.state !== "ready") selected = book.find((entry) => entry.state === "ready")?.recipe.id ?? selected;
     elements.status.textContent = note;
     elements.root.hidden = false;

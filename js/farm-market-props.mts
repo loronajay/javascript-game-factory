@@ -21,6 +21,10 @@ import { findRecipe } from "./farm-catalog/recipes.mjs";
 const COUNTER_HEIGHT = 1.02;
 const POST_HEIGHT = 2.5;
 
+/** Where a stall's goods go, for a place that stocks its own (the Cove's Fishmonger and Bait & Tackle). */
+export type StallFrame = Readonly<{ width: number; front: number; back: number; counterHeight: number; postHeight: number }>;
+export type StallStock = (group: any, frame: StallFrame) => void;
+
 function stripedCanvas(THREE: ThreeNamespace, colors: readonly [string, string]): any {
   const canvas = document.createElement("canvas");
   canvas.width = 256;
@@ -140,7 +144,7 @@ function setSawmill(THREE: ThreeNamespace, group: any, width: number, front: num
   void width;
 }
 
-function buildStall(THREE: ThreeNamespace, group: any, stall: MarketStall): void {
+function buildStall(THREE: ThreeNamespace, group: any, stall: MarketStall, stock?: StallStock): void {
   const { width, depth } = stall.footprint;
   const wood = farmMaterial(THREE, "wood", { colors: ["#8a6440", "#5f4128"] });
   const planks = farmMaterial(THREE, "planks", { colors: ["#a07650", "#7a5534", "#5d3f26"] });
@@ -179,6 +183,10 @@ function buildStall(THREE: ThreeNamespace, group: any, stall: MarketStall): void
   tbox(THREE, group, [board + 0.12, 0.56, 0.05], [0, POST_HEIGHT - 0.02, front + 0.24], wood);
   canvasPlane(THREE, group, board, 0.48, [640, 118], (context, w, h) => drawSign(context, w, h, stall.title, stall.colors[0], ""), [0, POST_HEIGHT - 0.02, front + 0.27], false);
 
+  if (stall.open && stock) {
+    stock(group, { width, front, back, counterHeight: COUNTER_HEIGHT, postHeight: POST_HEIGHT });
+    return;
+  }
   if (stall.open && stall.id === SAWMILL_STALL_ID) {
     setSawmill(THREE, group, width, front, back);
     return;
@@ -256,11 +264,11 @@ function drawNotice(context: CanvasRenderingContext2D, width: number, height: nu
 }
 
 /** One stall's group, posed in the square. */
-export function createMarketStallModel(THREE: ThreeNamespace, stall: MarketStall): any {
+export function createMarketStallModel(THREE: ThreeNamespace, stall: MarketStall, stock?: StallStock): any {
   const group = new THREE.Group();
   group.name = `market-stall-${stall.id}`;
   if (stall.kind === "board") buildBoard(THREE, group, stall);
-  else buildStall(THREE, group, stall);
+  else buildStall(THREE, group, stall, stock);
   group.position.set(stall.x, 0, stall.z);
   group.rotation.y = stall.rotationY;
   return group;

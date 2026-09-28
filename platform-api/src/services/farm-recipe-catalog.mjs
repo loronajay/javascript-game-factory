@@ -12,24 +12,34 @@
 // proof. They can only choose between one and three stars (a sale premium of
 // 1.25× to 1.7× on the ingredients' raw price) — never the ingredients, the
 // XP or how many dishes a cook makes, which are all decided here.
-const rule = (minLevel, ingredients, steps, xp, vendorPrice = 0) => Object.freeze({ minLevel, ingredients: Object.freeze(ingredients), steps, xp, vendorPrice });
+const rule = (minLevel, ingredients, steps, xp, vendorPrice = 0, fish = null) => Object.freeze({ minLevel, ingredients: Object.freeze(ingredients), steps, xp, vendorPrice, fish: fish ? Object.freeze({ ...fish }) : null });
+const withFish = (minLevel, need, count, ingredients, steps, xp) => rule(minLevel, ingredients, steps, xp, 0, { need, count });
 export const FARM_RECIPE_RULES = Object.freeze({
+    // In the cookbook's (level) order. A `withFish` row also takes fish from the Cove's creel.
     "tomato-sauce": rule(1, { tomato: 3, garlic: 1 }, 2, 80),
     "garden-salad": rule(1, { cabbage: 1, carrot: 1, radish: 1 }, 2, 70),
     "farm-stew": rule(3, { potato: 2, carrot: 1, garlic: 1 }, 2, 110),
+    "fish-and-chips": withFish(4, "rarity=common", 1, { potato: 2 }, 2, 130),
     "baked-apples": rule(5, { apple: 4 }, 2, 100),
     "sunflower-seeds": rule(6, { sunflower: 1 }, 2, 90),
     "berry-preserves": rule(8, { strawberry: 3, blueberry: 2 }, 2, 140),
+    "grilled-snapper": withFish(9, "species=fish.red-snapper", 1, { garlic: 1, tomato: 1 }, 2, 190),
     "corn-chowder": rule(10, { corn: 2, potato: 1, garlic: 1 }, 3, 180),
     "bean-chili": rule(12, { bean: 3, tomato: 2, garlic: 1 }, 3, 200),
+    "fish-tacos": withFish(13, "zone=reef", 1, { corn: 1, tomato: 1, cabbage: 1 }, 3, 230),
     "roasted-roots": rule(15, { beetroot: 2, carrot: 2, radish: 1 }, 2, 220),
+    "lagoon-fish-pie": withFish(17, "zone=lagoon", 2, { potato: 2, carrot: 1 }, 3, 270),
     "pumpkin-soup": rule(18, { pumpkin: 1, garlic: 1, carrot: 1 }, 3, 260),
     "melon-sorbet": rule(20, { watermelon: 1, strawberry: 2 }, 2, 240),
+    "seared-tuna": withFish(21, "species=fish.tuna", 1, { garlic: 1, radish: 1 }, 2, 320),
     "stuffed-eggplant": rule(22, { eggplant: 2, tomato: 1, garlic: 1 }, 3, 280),
     "pear-tart": rule(24, { pear: 4, corn: 1 }, 3, 300),
     "cauliflower-gratin": rule(26, { cauliflower: 1, potato: 2, garlic: 1 }, 3, 320),
+    "sushi-platter": withFish(27, "rarity=rare", 2, { cabbage: 1, radish: 1 }, 2, 380),
     "cherry-pie": rule(30, { cherry: 6, corn: 1 }, 3, 360),
+    "bouillabaisse": withFish(32, "zone=reef", 3, { tomato: 2, garlic: 1 }, 3, 430),
     "peach-cobbler": rule(34, { peach: 4, corn: 1 }, 3, 400),
+    "swordfish-steaks": withFish(36, "species=fish.swordfish", 1, { orange: 1, garlic: 1 }, 2, 470),
     "orange-marmalade": rule(38, { orange: 4 }, 3, 440),
     "summer-skewers": rule(1, { tomato: 1, eggplant: 1, corn: 1 }, 2, 120, 180),
     "harvest-curry": rule(1, { pumpkin: 1, cauliflower: 1, bean: 2 }, 3, 210, 320),

@@ -12,7 +12,12 @@ import { SELLABLE_DISHES, SELLABLE_FURNITURE, SELLABLE_PRODUCE } from "./farm-ma
 import { TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { PLANK_SPECIES } from "./farm-catalog/carpentry.mjs";
 import { furnitureShelf } from "./farm-workshop.mjs";
-export const TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture"]);
+import { formatWeight, specimenTitle } from "./farm-fish.mjs";
+// FISH on the table are single specimens from the Cove's creel, keyed by fish
+// id with a count of one. They are not in the static goods list (every fish is
+// its own), so a table names them through a resolver the page feeds from its
+// own creel and from the server's public fish read (the partner's).
+export const TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture", "fish"]);
 /** Distinct lines one side may put on the table (the server refuses more). */
 export const MAX_TRADE_LINES = 12;
 export const MAX_TRADE_QUANTITY = 99;
@@ -28,10 +33,20 @@ export function findTradeGood(stack, id) {
     return TRADE_GOODS.find((good) => good.stack === stack && good.id === id);
 }
 export function emptyOffer() {
-    return Object.freeze({ produce: {}, dishes: {}, logs: {}, planks: {}, furniture: {} });
+    return Object.freeze({ produce: {}, dishes: {}, logs: {}, planks: {}, furniture: {}, fish: {} });
 }
-/** What this farm can put on the table right now: the server-minted stacks, furniture off the SHELF only. */
-export function tradeStock(layout) {
+const TRADE_FISH_ID = /^fish-[A-Za-z0-9-]{8,64}$/;
+/** A fish as a line on the table: its name and weight, and its portrait. */
+export function fishTradeGood(fish) {
+    return Object.freeze({
+        stack: "fish",
+        id: fish.id,
+        title: `${specimenTitle(fish.speciesId, fish.variant, fish.sizeClass)} · ${formatWeight(fish.weightG)}`,
+        itemKey: `fish:${fish.speciesId}:${fish.variant}`,
+    });
+}
+/** What this farm can put on the table right now: the server-minted stacks, furniture off the SHELF only, unlocked fish in the creel. */
+export function tradeStock(layout, creel = []) {
     const inventory = layout.agriculture.inventory;
     return Object.freeze({
         produce: inventory.produce,
@@ -39,14 +54,18 @@ export function tradeStock(layout) {
         logs: inventory.logs,
         planks: inventory.planks,
         furniture: furnitureShelf(inventory.furniture, layout.decor),
+        fish: Object.freeze(Object.fromEntries(creel.filter((fish) => !fish.locked).map((fish) => [fish.id, 1]))),
     });
 }
-/** Everything this farm holds that could be offered, in list order. */
-export function stockEntries(layout) {
-    const stock = tradeStock(layout);
-    return Object.freeze(TRADE_GOODS
-        .map((good) => Object.freeze({ ...good, held: Math.max(0, Math.floor(Number(stock[good.stack][good.id]) || 0)) }))
-        .filter((entry) => entry.held > 0));
+/** Everything this farm holds that could be offered, in list order, the creel's fish last. */
+export function stockEntries(layout, creel = []) {
+    const stock = tradeStock(layout, creel);
+    return Object.freeze([
+        ...TRADE_GOODS
+            .map((good) => Object.freeze({ ...good, held: Math.max(0, Math.floor(Number(stock[good.stack][good.id]) || 0)) }))
+            .filter((entry) => entry.held > 0),
+        ...creel.filter((fish) => !fish.locked).map((fish) => Object.freeze({ ...fishTradeGood(fish), held: 1 })),
+    ]);
 }
 export function offerCount(offer, stack, id) {
     return Math.max(0, Math.floor(Number(offer[stack]?.[id]) || 0));
@@ -90,11 +109,18 @@ export function sameOffer(left, right) {
         return a.length === b.length && a.every(([id, count]) => right[stack]?.[id] === count);
     });
 }
-/** An offer as a list to show, in list order. */
-export function offerLines(offer) {
-    return Object.freeze(TRADE_GOODS
-        .filter((good) => offerCount(offer, good.stack, good.id) > 0)
-        .map((good) => Object.freeze({ ...good, count: offerCount(offer, good.stack, good.id) })));
+/** An offer as a list to show, in list order; its fish named by `fish` (a stand-in while a fish's details are on their way). */
+export function offerLines(offer, fish = () => null) {
+    const fishLines = Object.keys(offer.fish ?? {}).map((id) => {
+        const known = fish(id);
+        return Object.freeze({ ...(known ? fishTradeGood(known) : { stack: "fish", id, title: "A fish from the Cove", itemKey: "fish:fish.goldfish:normal" }), count: 1 });
+    });
+    return Object.freeze([
+        ...TRADE_GOODS
+            .filter((good) => offerCount(offer, good.stack, good.id) > 0)
+            .map((good) => Object.freeze({ ...good, count: offerCount(offer, good.stack, good.id) })),
+        ...fishLines,
+    ]);
 }
 const STATUSES = ["invited", "open", "completed", "declined", "cancelled", "expired"];
 function normalizeOffer(value) {
@@ -103,6 +129,11 @@ function normalizeOffer(value) {
         offer[stack] = {};
         for (const [id, count] of Object.entries(value?.[stack] ?? {})) {
             const whole = Math.floor(Number(count) || 0);
+            if (stack === "fish") {
+                if (whole > 0 && TRADE_FISH_ID.test(id))
+                    offer.fish[id] = 1;
+                continue;
+            }
             if (whole > 0 && findTradeGood(stack, id))
                 offer[stack][id] = Math.min(whole, MAX_TRADE_QUANTITY);
         }
@@ -197,6 +228,8 @@ export function noticeWords(notice, them) {
         case "offer_gone_them": return `Some of ${them}'s offer is no longer in their basket, so nothing moved. The table is open again.`;
         case "inventory_full_you": return "You can't hold that many — a stack of yours would pass 99. Nothing moved.";
         case "inventory_full_them": return `${them} can't hold that many — a stack of theirs would pass 99. Nothing moved.`;
+        case "creel_full_you": return "Your creel can't hold that many fish. Sell or let some go first. Nothing moved.";
+        case "creel_full_them": return `${them}'s creel can't hold that many fish. Nothing moved.`;
         case "daily_limit": return "One of you has reached today's trading limit. Nothing moved.";
         case "farm_not_initialized": return "One of the farms isn't ready to trade. Nothing moved.";
         default: return "The table changed. Check both offers and lock again.";
@@ -218,6 +251,6 @@ export function tradeErrorWords(error, them = "They") {
         case "too_many_changes": return "This table has changed too many times. Start a new trade.";
         case "trade_expired": return "The trade timed out.";
         case "not_found": return "That trade is gone.";
-        default: return error.startsWith("offer_gone") || error.startsWith("inventory_full") ? noticeWords(error, them) : "The trade couldn't be reached. Try again in a moment.";
+        default: return error.startsWith("offer_gone") || error.startsWith("inventory_full") || error.startsWith("creel_full") ? noticeWords(error, them) : "The trade couldn't be reached. Try again in a moment.";
     }
 }

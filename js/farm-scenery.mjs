@@ -34,7 +34,7 @@ function seeded(seed) {
     };
 }
 /** The ring of hills: big flattened spheres in muted greens, further ones bluer, all softened by the fog. */
-function createHills(THREE, scene, random) {
+function createHills(THREE, scene, random, keepClear) {
     const near = standard(THREE, "#4f7a3a", 1, 0);
     const mid = standard(THREE, "#5a8a5a", 1, 0);
     const far = standard(THREE, "#6f9a8a", 1, 0);
@@ -47,12 +47,14 @@ function createHills(THREE, scene, random) {
         const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), radius > 100 ? far : radius > 88 ? mid : near);
         hill.scale.set(width, height, width * 0.8);
         hill.position.set(Math.cos(angle) * radius, -height * 0.25, Math.sin(angle) * radius);
+        if (keepClear(hill.position.x, hill.position.z))
+            continue;
         hill.receiveShadow = true;
         scene.add(hill);
     }
 }
 /** A treeline past the fence: cheap cone-and-sphere trees, denser than the field's, in two staggered rings. */
-function createTreeline(THREE, scene, random) {
+function createTreeline(THREE, scene, random, keepClear) {
     const needles = standard(THREE, "#2f6b3a", 0.95, 0);
     const needlesLight = standard(THREE, "#3f7f44", 0.95, 0);
     const leaves = standard(THREE, "#3f7f34", 0.95, 0);
@@ -91,6 +93,9 @@ function createTreeline(THREE, scene, random) {
         }
         tree.position.set(x, 0, z);
         tree.rotation.y = random() * Math.PI * 2;
+        // Every draw above is made either way, so a kept-clear tree never moves the ones after it.
+        if (keepClear(x, z))
+            continue;
         scene.add(tree);
     }
 }
@@ -159,8 +164,9 @@ function sprinkle(count, random) {
 }
 export function createFarmScenery(THREE, scene, options = {}) {
     const random = seeded(2026);
-    createHills(THREE, scene, random);
-    createTreeline(THREE, scene, random);
+    const keepClear = options.keepClear ?? (() => false);
+    createHills(THREE, scene, random, keepClear);
+    createTreeline(THREE, scene, random, keepClear);
     const clouds = createClouds(THREE, scene, random);
     // Ground cover: one instanced mesh of tufts, one of flowers. A tuft is a clump of
     // five thin blades leaning apart — cheap, and from eye height it reads as grass.

@@ -224,6 +224,10 @@ export function normalizeFarmDecorRow(value) {
     const stars = source.stars === 1 || source.stars === 2 || source.stars === 3 ? source.stars : undefined;
     if (crafted && !stars)
         return null;
+    // A trophy mount without a fish is no mount.
+    const fishId = definition.unlock.type === "trophy" && typeof source.fishId === "string" && /^fish-[A-Za-z0-9-]{8,64}$/.test(source.fishId) ? source.fishId : undefined;
+    if (definition.unlock.type === "trophy" && !fishId)
+        return null;
     return {
         instanceId: source.instanceId,
         itemId: definition.id,
@@ -233,6 +237,7 @@ export function normalizeFarmDecorRow(value) {
         length: definition.length.enabled ? clampFarmDecorLength(definition, finiteNumber(source.length) && source.length > 0 ? source.length : definition.length.default) : 0,
         ...(memorialId ? { memorialId } : {}),
         ...(crafted ? { stars } : {}),
+        ...(fishId ? { fishId } : {}),
     };
 }
 function normalizePetMemorial(value) {
@@ -463,7 +468,7 @@ export function withProductionCheckpoint(layout, at) {
 export function farmDecorRowsEqual(first, second) {
     return first.instanceId === second.instanceId && first.itemId === second.itemId
         && first.x === second.x && first.z === second.z && first.rotationY === second.rotationY && first.length === second.length
-        && first.memorialId === second.memorialId && first.stars === second.stars;
+        && first.memorialId === second.memorialId && first.stars === second.stars && first.fishId === second.fishId;
 }
 export function farmLayoutsEqual(first, second) {
     return first.onboarding.status === second.onboarding.status

@@ -19,6 +19,13 @@ import { randomUUID } from "node:crypto";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { DAILY_TRADE_LIMIT, TRADE_ID, TRADE_INVITES_PER_WINDOW, TRADE_INVITE_WINDOW_MS, TRADE_PLAYER_ID, applyTradeAction, completeFarmTrade, expireFarmTrade, farmTradeView, isActiveTrade, newFarmTrade, normalizeTradeAction, normalizeTradeState, reopenFarmTrade, settleFarmTrade, tradeDayStart, tradeShortfall, tradeableStock, } from "../services/farm-trade-policy.mjs";
 import { lockedFarm, saveFarm, transaction } from "./farm-economy.mjs";
+import { lockedCreel } from "./farm-fishing.mjs";
+import { CREEL_CAPACITY } from "../services/farm-fish-catalog.mjs";
+/** The fish ids a player could put on a table: in their creel, not locked. */
+async function tradeableFishIds(client, playerId) {
+    const result = await client.query(`select fish_id from farm_fish where player_id = $1 and state = 'creel' and locked = false`, [playerId]);
+    return (result.rows ?? []).map((row) => String(row.fish_id));
+}
 function required(value, field) {
     const text = typeof value === "string" ? value.trim() : "";
     if (!text)
@@ -150,7 +157,7 @@ export async function actOnFarmTrade(pool, input, now = Date.now()) {
             const farm = await storedFarm(client, playerId);
             if (!farm)
                 return refuse("farm_not_initialized");
-            const short = tradeShortfall(action.offer, tradeableStock(farm));
+            const short = tradeShortfall(action.offer, tradeableStock(farm, await tradeableFishIds(client, playerId)));
             if (short)
                 return refuse("not_enough", { stack: short.stack, itemId: short.id, held: short.held });
         }
@@ -200,9 +207,28 @@ async function settle(client, state, now) {
     }
     const farmA = farms.get(state.a.playerId);
     const farmB = farms.get(state.b.playerId);
-    const exchange = settleFarmTrade(farmA.layout, farmB.layout, state.a.offer, state.b.offer);
+    // The creels are locked in the same order as the farms, and only unlocked fish can cross.
+    const creels = new Map();
+    for (const id of [state.a.playerId, state.b.playerId].sort())
+        creels.set(id, await lockedCreel(client, id));
+    const unlocked = (id) => (creels.get(id) ?? []).filter((row) => !row.locked).map((row) => String(row.fish_id));
+    const exchange = settleFarmTrade(farmA.layout, farmB.layout, state.a.offer, state.b.offer, unlocked(state.a.playerId), unlocked(state.b.playerId));
     if (!exchange.ok)
         return { state: reopenFarmTrade(state, exchange.error === "offer_gone" ? `offer_gone_${exchange.side}` : `inventory_full_${exchange.side}`, now) };
+    const fishA = Object.keys(state.a.offer.fish ?? {});
+    const fishB = Object.keys(state.b.offer.fish ?? {});
+    // Nobody's creel may overflow with what they are handed.
+    for (const [side, id, incoming, outgoing] of [["a", state.a.playerId, fishB.length, fishA.length], ["b", state.b.playerId, fishA.length, fishB.length]]) {
+        if ((creels.get(id)?.length ?? 0) - outgoing + incoming > CREEL_CAPACITY)
+            return { state: reopenFarmTrade(state, `creel_full_${side}`, now) };
+    }
+    // A fish changes hands as the same row. It drops the shadow it came from: that
+    // link only stops its catcher landing one shadow twice, and the new owner may have landed it too.
+    for (const [ids, to] of [[fishA, state.b.playerId], [fishB, state.a.playerId]]) {
+        if (!ids.length)
+            continue;
+        await client.query(`update farm_fish set player_id = $2, locked = false, shadow_id = null where fish_id = any($1::text[]) and state = 'creel'`, [ids, to]);
+    }
     const layouts = new Map();
     for (const [id, farm, inventory] of [[state.a.playerId, farmA, exchange.a], [state.b.playerId, farmB, exchange.b]]) {
         const next = normalizeFarmGarage({

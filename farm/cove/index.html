@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>The Cove | Javascript Game Factory</title>
+  <link rel="stylesheet" href="../../css/space-presence.css">
+  <link rel="stylesheet" href="../farm.css">
+  <link rel="stylesheet" href="../market/market.css">
+  <link rel="stylesheet" href="cove.css">
+</head>
+<body>
+  <main class="farm-shell market-shell cove-shell">
+    <canvas id="coveCanvas" tabindex="0" aria-label="The Cove, in 3D"></canvas>
+
+    <header class="farm-header">
+      <a id="coveBackLink" href="../market/index.html?from=cove" class="back-link">← Back to the Market Square</a>
+      <div>
+        <span class="eyebrow">SHARED SPACE · DOWN THE MARKET PATH</span>
+        <h1>The Cove</h1>
+      </div>
+      <div class="farm-header__actions">
+        <span id="coveTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
+        <button id="toggleCoveMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
+      </div>
+    </header>
+
+    <section id="startGate" class="start-gate">
+      <div class="start-card">
+        <span class="start-card__tag">EVERYONE'S WATER</span>
+        <h2>Gone fishing.</h2>
+        <p>Freshwater in the Lagoon, the reef off the pier, and past the pier's end the Deep. Watch for shadows on the water — cast at one and whatever it is comes to look. Every fish is its own: two Koi are never the same weight.</p>
+        <button id="enterCove" type="button">Walk down</button>
+        <small id="coveStatus">WASD to move · Space to cast, strike, reel and net · A/D to steer a fish · C creel · F Fishdex · Enter to chat</small>
+      </div>
+    </section>
+
+    <div id="coveVisitors" class="visitors-chip" aria-live="polite" hidden>
+      <span id="coveVisitorsLabel" class="visitors-chip__label">AT THE COVE</span>
+      <span id="coveVisitorsNames" class="visitors-chip__names"></span>
+    </div>
+    <section id="coveChat" class="room-chat" data-open="false" aria-label="Cove chat" hidden>
+      <ol id="coveChatLog" class="room-chat__log" aria-live="polite"></ol>
+      <input id="coveChatInput" class="room-chat__input" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Say something to the Cove… (Enter to send, Esc to cancel)" aria-label="Chat message">
+    </section>
+
+    <div id="covePrompt" class="farm-prompt" aria-live="polite"></div>
+    <div id="tackleBar" class="tackle-bar" aria-live="polite"></div>
+    <section id="fishingHud" class="fishing-hud" aria-live="polite" hidden></section>
+    <section id="catchCard" class="catch-card" aria-live="assertive" hidden></section>
+
+    <div class="control-hint" aria-hidden="true">
+      <span><b>WASD</b> Move</span><span><b>Space</b> Cast · Strike · Reel · Net</span><span><b>A/D</b> Steer</span><span><b>W</b> Bow</span><span><b>Q/R</b> Bait · Rod</span><span><b>C/F</b> Creel · Fishdex</span><span><b>E</b> Use</span>
+    </div>
+
+    <aside id="creelPanel" class="inventory-panel sale-panel cove-panel" aria-label="Your creel" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE COVE</span><strong data-heading>Your creel</strong></div>
+        <button class="farm-button" type="button" data-close title="Close (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="exchange-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="creel" aria-selected="true">Creel <kbd>C</kbd></button>
+        <button type="button" role="tab" data-tab="mounted" aria-selected="false">Mounted</button>
+        <button type="button" role="tab" data-tab="dex" aria-selected="false">Fishdex <kbd>F</kbd></button>
+      </div>
+      <div class="inventory-panel__body" data-body></div>
+      <footer class="sale-footer"><p class="pets-status" data-status aria-live="polite"></p></footer>
+    </aside>
+
+    <aside id="fishmongerPanel" class="inventory-panel sale-panel cove-panel" aria-label="Fishmonger" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">FISHMONGER · CORAL</span><strong>Sell your catch</strong></div>
+        <button class="farm-button" type="button" data-close title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body" data-body></div>
+      <footer class="sale-footer">
+        <div class="sale-footer__total"><span>Total</span><strong data-total>0</strong><small>tickets</small></div>
+        <div class="sale-footer__actions">
+          <button class="farm-button" type="button" data-pick-common>Everyday fish</button>
+          <button class="farm-button" type="button" data-pick-all>Everything</button>
+          <button class="farm-button farm-button--accent sale-footer__sell" type="button" data-sell disabled>Pick fish to sell</button>
+        </div>
+        <p class="pets-status" data-status aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <aside id="tacklePanel" class="inventory-panel sale-panel cove-panel" aria-label="Bait and Tackle" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">BAIT &amp; TACKLE · OLD PIKE</span><strong>Rods, lures and worms</strong></div>
+        <button class="farm-button" type="button" data-close title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body" data-body></div>
+      <footer class="sale-footer"><p class="pets-status" data-status aria-live="polite"></p></footer>
+    </aside>
+
+    <aside id="recordsPanel" class="inventory-panel sale-panel cove-panel" aria-label="Cove Records" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">COVE RECORDS</span><strong>The heaviest of every fish</strong></div>
+        <button class="farm-button" type="button" data-close title="Step back from the board (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="exchange-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="today" aria-selected="true">Today</button>
+        <button type="button" role="tab" data-tab="allTime" aria-selected="false">All time</button>
+      </div>
+      <div class="inventory-panel__body" data-body></div>
+    </aside>
+  </main>
+  <script type="module" src="../../js/platform-config.mjs"></script>
+  <script type="module" src="../../js/farm-cove-page.mjs"></script>
+</body>
+</html>

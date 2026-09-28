@@ -264,6 +264,10 @@ export function createFarmWorld(THREE, scene, options = {}) {
     apron.position.y = -0.02;
     apron.receiveShadow = true;
     scene.add(apron);
+    if (options.field === false) {
+        ground.visible = false;
+        apron.visible = false;
+    }
     // The countryside past the fence and the tufts underfoot — nothing the player places.
     const scenery = createFarmScenery(THREE, scene, options);
     const decorRoot = new THREE.Group();

@@ -35,6 +35,7 @@ export function createFarmKitchenController(deps) {
     let serving = false;
     let resultUntil = 0;
     const cookingLevel = () => skillLevelForXp(deps.layout().skills.cooking.xp);
+    const creel = () => deps.creel?.() ?? [];
     const learnedRecipes = () => deps.layout().skills.cooking.learned;
     function update(pose, allowed) {
         if (active || serving)
@@ -48,7 +49,7 @@ export function createFarmKitchenController(deps) {
             return "Cooking · Esc to stop — nothing is used until the dish is served";
         if (!target)
             return "";
-        const ready = RECIPE_CATALOG.filter((recipe) => recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes()).state === "ready").length;
+        const ready = RECIPE_CATALOG.filter((recipe) => recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes(), creel()).state === "ready").length;
         return ready ? `Press E to cook · ${ready} recipe${ready === 1 ? "" : "s"} ready` : "Press E to open the cookbook";
     }
     function interact() {
@@ -62,7 +63,7 @@ export function createFarmKitchenController(deps) {
         const recipe = findRecipe(recipeId);
         if (!row || !recipe || active)
             return;
-        if (recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes()).state !== "ready")
+        if (recipeAvailability(recipe, deps.layout().agriculture.inventory.produce, cookingLevel(), learnedRecipes(), creel()).state !== "ready")
             return;
         const session = startCooking(recipe.id, cookingLevel(), seconds(), random);
         if (!session)
@@ -125,12 +126,15 @@ export function createFarmKitchenController(deps) {
                     deps.hud.hide();
                     deps.setStatus(result?.error === "not_enough_produce"
                         ? "The basket came up short when the farm's records were checked. Nothing was used."
-                        : result?.error === "pantry_full" ? "The pantry has no room for another of those. Sell some at the Market first."
-                            : result?.error === "level_too_low" ? "That recipe needs a higher Cooking level by the farm's records."
-                                : result?.error === "recipe_not_owned" ? "That recipe card is not in your cookbook. Buy it from Basil at the Market."
-                                    : "That dish did not go through. Nothing was used — try again in a moment.");
+                        : result?.error === "not_enough_fish" ? "Your creel came up short when it was counted (a locked fish is never used). Nothing was used."
+                            : result?.error === "pantry_full" ? "The pantry has no room for another of those. Sell some at the Market first."
+                                : result?.error === "level_too_low" ? "That recipe needs a higher Cooking level by the farm's records."
+                                    : result?.error === "recipe_not_owned" ? "That recipe card is not in your cookbook. Buy it from Basil at the Market."
+                                        : "That dish did not go through. Nothing was used — try again in a moment.");
                     return;
                 }
+                if (recipe.fish)
+                    deps.onFishUsed?.();
                 const stars = Number(result.stars) || dishStars(scores);
                 const before = Number(result.cooking?.levelBefore) || 1;
                 const after = Number(result.cooking?.level) || before;

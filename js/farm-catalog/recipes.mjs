@@ -17,7 +17,9 @@
 // copy; a test holds the two equal).
 //
 // Ingredients are harvest-basket ids: the sixteen crops and the five fruits.
-// Every one of them is wanted by at least one recipe.
+// Every one of them is wanted by at least one recipe. A recipe may also want
+// FISH from the Cove's creel: a fish need (farm-fish.mts `parseFishNeed`) and a
+// count. The cook takes the least valuable fish that will do, never a locked one.
 export const COOK_STEP_TITLES = Object.freeze({
     chop: "Chop",
     stir: "Stir",
@@ -41,9 +43,12 @@ function recipe(id, title, spec) {
         ingredients: Object.freeze({ ...spec.ingredients }),
         steps: Object.freeze([...spec.steps]),
         xp: spec.xp,
+        fish: spec.fish ? Object.freeze({ ...spec.fish }) : null,
         model: model(spec.model),
     });
 }
+const FISH_WHITE = "#f1e6d4";
+const BATTER = "#d99a3e";
 const HERB = "#3f8a3a";
 const CARROT = "#f08a24";
 const POTATO = "#e6cf8e";
@@ -64,6 +69,11 @@ export const LEVEL_RECIPE_CATALOG = Object.freeze([
         minLevel: 3, ingredients: { potato: 2, carrot: 1, garlic: 1 }, steps: ["chop", "simmer"], xp: 110,
         model: { vessel: "bowl", vesselColor: "#e9dcc4", fill: "#7a4a26", bits: [bit("cube", POTATO, 5), bit("cube", CARROT, 4, 0.85), bit("leaf", HERB, 2, 0.7)] },
     }),
+    recipe("fish-and-chips", "Fish & Chips", {
+        blurb: "Whatever bit this morning, battered and fried, with a heap of chips.",
+        minLevel: 4, fish: { need: "rarity=common", count: 1 }, ingredients: { potato: 2 }, steps: ["chop", "simmer"], xp: 130,
+        model: { vessel: "plate", vesselColor: "#f4efe6", fill: "#f4efe6", bits: [bit("wedge", BATTER, 2, 3.2), bit("wedge", "#f0d27a", 9, 1.3)] },
+    }),
     recipe("baked-apples", "Baked Apples", {
         blurb: "Whole apples baked soft in their own caramel.",
         minLevel: 5, ingredients: { apple: 4 }, steps: ["chop", "bake"], xp: 100,
@@ -79,6 +89,11 @@ export const LEVEL_RECIPE_CATALOG = Object.freeze([
         minLevel: 8, ingredients: { strawberry: 3, blueberry: 2 }, steps: ["stir", "simmer"], xp: 140,
         model: { vessel: "jar", vesselColor: "#d8eef0", fill: "#5a1d4a", cloth: "#3f6fb8", bits: [bit("round", "#d02e3a", 1, 1.1)] },
     }),
+    recipe("grilled-snapper", "Grilled Snapper", {
+        blurb: "A whole Red Snapper off the pier, grilled with garlic and tomato.",
+        minLevel: 9, fish: { need: "species=fish.red-snapper", count: 1 }, ingredients: { garlic: 1, tomato: 1 }, steps: ["chop", "bake"], xp: 190,
+        model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("wedge", "#c8483a", 1, 5), bit("half", "#c9302c", 3, 1.1), bit("leaf", HERB, 2, 0.9)] },
+    }),
     recipe("corn-chowder", "Corn Chowder", {
         blurb: "Sweet corn and potato in a creamy, peppery broth.",
         minLevel: 10, ingredients: { corn: 2, potato: 1, garlic: 1 }, steps: ["chop", "stir", "simmer"], xp: 180,
@@ -89,10 +104,20 @@ export const LEVEL_RECIPE_CATALOG = Object.freeze([
         minLevel: 12, ingredients: { bean: 3, tomato: 2, garlic: 1 }, steps: ["chop", "stir", "simmer"], xp: 200,
         model: { vessel: "bowl", vesselColor: "#b8452f", fill: "#8e2a16", bits: [bit("bean", "#5a2418", 9), bit("cube", "#c9302c", 3, 0.8), bit("leaf", HERB, 2, 0.6)] },
     }),
+    recipe("fish-tacos", "Fish Tacos", {
+        blurb: "A reef fish, flaked into corn tortillas with cabbage and tomato.",
+        minLevel: 13, fish: { need: "zone=reef", count: 1 }, ingredients: { corn: 1, tomato: 1, cabbage: 1 }, steps: ["chop", "stir", "bake"], xp: 230,
+        model: { vessel: "plate", vesselColor: "#f2ece0", fill: "#f2ece0", bits: [bit("half", "#e8c46a", 3, 3.2), bit("cube", FISH_WHITE, 6, 0.9), bit("leaf", "#a8d46a", 4, 0.9), bit("cube", "#c9302c", 4, 0.6)] },
+    }),
     recipe("roasted-roots", "Roasted Roots", {
         blurb: "Beetroot, carrot and radish roasted until the edges char.",
         minLevel: 15, ingredients: { beetroot: 2, carrot: 2, radish: 1 }, steps: ["chop", "bake"], xp: 220,
         model: { vessel: "plate", vesselColor: "#f4efe6", fill: "#f4efe6", bits: [bit("wedge", "#7a1f3d", 5, 1.8), bit("wedge", CARROT, 5, 1.7), bit("half", "#d8455a", 3, 1.5), bit("leaf", HERB, 2, 1)] },
+    }),
+    recipe("lagoon-fish-pie", "Lagoon Fish Pie", {
+        blurb: "Two lagoon fish under a lid of mashed potato, baked golden.",
+        minLevel: 17, fish: { need: "zone=lagoon", count: 2 }, ingredients: { potato: 2, carrot: 1 }, steps: ["chop", "stir", "bake"], xp: 270,
+        model: { vessel: "baking-dish", vesselColor: "#e6e0d4", fill: "#f2dca0", crust: "crumble", crustColor: "#e6c27a", bits: [bit("cube", CARROT, 3, 0.7)] },
     }),
     recipe("pumpkin-soup", "Pumpkin Soup", {
         blurb: "Served in the pumpkin it came from, with its seeds toasted on top.",
@@ -103,6 +128,11 @@ export const LEVEL_RECIPE_CATALOG = Object.freeze([
         blurb: "Watermelon and strawberry churned to ice on a summer afternoon.",
         minLevel: 20, ingredients: { watermelon: 1, strawberry: 2 }, steps: ["chop", "stir"], xp: 240,
         model: { vessel: "cup", vesselColor: "#cfe8ec", fill: "#f06a78", bits: [bit("round", "#f28a96", 3, 3), bit("round", "#d02e3a", 1, 1.4)] },
+    }),
+    recipe("seared-tuna", "Seared Tuna", {
+        blurb: "Thick slices of tuna from the Deep, seared at the edges and pink inside.",
+        minLevel: 21, fish: { need: "species=fish.tuna", count: 1 }, ingredients: { garlic: 1, radish: 1 }, steps: ["chop", "bake"], xp: 320,
+        model: { vessel: "plate", vesselColor: "#2f3a44", fill: "#2f3a44", bits: [bit("slice", "#c44a5a", 6, 2.4), bit("half", "#d8455a", 3, 0.8)] },
     }),
     recipe("stuffed-eggplant", "Stuffed Eggplant", {
         blurb: "Eggplant halves baked with a tomato-and-garlic filling.",
@@ -119,15 +149,30 @@ export const LEVEL_RECIPE_CATALOG = Object.freeze([
         minLevel: 26, ingredients: { cauliflower: 1, potato: 2, garlic: 1 }, steps: ["chop", "simmer", "bake"], xp: 320,
         model: { vessel: "baking-dish", vesselColor: "#f2ece0", fill: "#e8c26a", bits: [bit("round", "#f4ecd2", 6, 1.6), bit("round", "#a8621e", 10, 0.8)] },
     }),
+    recipe("sushi-platter", "Sushi Platter", {
+        blurb: "Two rare fish, sliced thin and laid out on cabbage-leaf rolls.",
+        minLevel: 27, fish: { need: "rarity=rare", count: 2 }, ingredients: { cabbage: 1, radish: 1 }, steps: ["chop", "stir"], xp: 380,
+        model: { vessel: "plate", vesselColor: "#1f2a30", fill: "#1f2a30", bits: [bit("round", "#f4f1ea", 6, 1.6), bit("slice", "#f08a6a", 6, 1.5), bit("leaf", "#6aa84f", 3, 1)] },
+    }),
     recipe("cherry-pie", "Cherry Pie", {
         blurb: "Dark cherries under a lattice top. The fair's blue-ribbon pie.",
         minLevel: 30, ingredients: { cherry: 6, corn: 1 }, steps: ["stir", "simmer", "bake"], xp: 360,
         model: { vessel: "pie", vesselColor: "#b9bec4", fill: "#8e1026", crust: "lattice", crustColor: "#d9a45a" },
     }),
+    recipe("bouillabaisse", "Bouillabaisse", {
+        blurb: "Three reef fish in a saffron-red broth. A fisherman's feast.",
+        minLevel: 32, fish: { need: "zone=reef", count: 3 }, ingredients: { tomato: 2, garlic: 1 }, steps: ["chop", "stir", "simmer"], xp: 430,
+        model: { vessel: "bowl", vesselColor: "#3f6f9a", fill: "#c8542a", bits: [bit("cube", FISH_WHITE, 6, 1.1), bit("half", "#c9302c", 3, 0.9), bit("leaf", HERB, 2, 0.7)] },
+    }),
     recipe("peach-cobbler", "Peach Cobbler", {
         blurb: "Soft peaches under a buttery crumble, still bubbling.",
         minLevel: 34, ingredients: { peach: 4, corn: 1 }, steps: ["chop", "stir", "bake"], xp: 400,
         model: { vessel: "baking-dish", vesselColor: "#7a4a3a", fill: "#f2a15a", crust: "crumble", crustColor: "#d9a45a" },
+    }),
+    recipe("swordfish-steaks", "Swordfish Steaks", {
+        blurb: "Swordfish from the Deep, grilled over coals and finished with orange.",
+        minLevel: 36, fish: { need: "species=fish.swordfish", count: 1 }, ingredients: { orange: 1, garlic: 1 }, steps: ["chop", "bake"], xp: 470,
+        model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("slice", "#e8d6c0", 2, 4.2), bit("slice", "#f7b04a", 3, 1.4), bit("leaf", HERB, 2, 0.9)] },
     }),
     recipe("orange-marmalade", "Orange Marmalade", {
         blurb: "Bitter-sweet oranges, peel and all, set in a jar.",

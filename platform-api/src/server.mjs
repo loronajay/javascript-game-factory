@@ -25,6 +25,7 @@ import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
+import { buyFarmTackle, castFarmLine, getFarmFishDetails, getFarmFishRecords, getFarmFishShadows, getFarmFishing, landFarmCast, lockFarmFish, mountFarmFish, releaseFarmFish, sellFarmFish } from "./db/farm-fishing.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
 import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
 import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
@@ -299,6 +300,17 @@ async function bootstrap() {
         createFarmListing: (params) => createFarmListing(pool, params),
         buyFarmListing: (params) => buyFarmListing(pool, params),
         withdrawFarmListing: (params) => withdrawFarmListing(pool, params),
+        getFarmFishShadows: (params) => getFarmFishShadows(params),
+        getFarmFishRecords: (params) => getFarmFishRecords(pool, params),
+        getFarmFishing: (params) => getFarmFishing(pool, params),
+        castFarmLine: (params) => castFarmLine(pool, params),
+        landFarmCast: (params) => landFarmCast(pool, params),
+        sellFarmFish: (params) => sellFarmFish(pool, params),
+        releaseFarmFish: (params) => releaseFarmFish(pool, params),
+        lockFarmFish: (params) => lockFarmFish(pool, params),
+        buyFarmTackle: (params) => buyFarmTackle(pool, params),
+        getFarmFishDetails: (params) => getFarmFishDetails(pool, params),
+        mountFarmFish: (params) => mountFarmFish(pool, params),
         getCurrentFarmTrade: (params) => getCurrentFarmTrade(pool, params),
         getFarmTrade: (params) => getFarmTrade(pool, params),
         actOnFarmTrade: (params) => actOnFarmTrade(pool, params),

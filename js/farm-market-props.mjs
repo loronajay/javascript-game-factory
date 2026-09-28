@@ -136,7 +136,7 @@ function setSawmill(THREE, group, width, front, back) {
         tcylinder(THREE, group, 0.022, 0.022, 0.2, [sx * 0.66, 1.9, back + 0.12], farmMaterial(THREE, "wood"), 8, false);
     void width;
 }
-function buildStall(THREE, group, stall) {
+function buildStall(THREE, group, stall, stock) {
     const { width, depth } = stall.footprint;
     const wood = farmMaterial(THREE, "wood", { colors: ["#8a6440", "#5f4128"] });
     const planks = farmMaterial(THREE, "planks", { colors: ["#a07650", "#7a5534", "#5d3f26"] });
@@ -172,6 +172,10 @@ function buildStall(THREE, group, stall) {
     const board = Math.min(width - 0.2, 2.6);
     tbox(THREE, group, [board + 0.12, 0.56, 0.05], [0, POST_HEIGHT - 0.02, front + 0.24], wood);
     canvasPlane(THREE, group, board, 0.48, [640, 118], (context, w, h) => drawSign(context, w, h, stall.title, stall.colors[0], ""), [0, POST_HEIGHT - 0.02, front + 0.27], false);
+    if (stall.open && stock) {
+        stock(group, { width, front, back, counterHeight: COUNTER_HEIGHT, postHeight: POST_HEIGHT });
+        return;
+    }
     if (stall.open && stall.id === SAWMILL_STALL_ID) {
         setSawmill(THREE, group, width, front, back);
         return;
@@ -248,13 +252,13 @@ function drawNotice(context, width, height, title) {
     }
 }
 /** One stall's group, posed in the square. */
-export function createMarketStallModel(THREE, stall) {
+export function createMarketStallModel(THREE, stall, stock) {
     const group = new THREE.Group();
     group.name = `market-stall-${stall.id}`;
     if (stall.kind === "board")
         buildBoard(THREE, group, stall);
     else
-        buildStall(THREE, group, stall);
+        buildStall(THREE, group, stall, stock);
     group.position.set(stall.x, 0, stall.z);
     group.rotation.y = stall.rotationY;
     return group;

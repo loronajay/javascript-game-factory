@@ -3,6 +3,7 @@
 // (platform-api/src/services/farm-market-catalog.mts) and the payout; this is
 // the same derivation off the client's crop catalog so the merchant's board can
 // show them, and platform-api/tests/farm-market.test.mjs holds the two equal.
+import { fishNeedValue, parseFishNeed } from "./farm-fish.mjs";
 import { CROP_CATALOG, FARM_DAY_MINUTES } from "./farm-crops.mjs";
 import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { DISH_STARS, RECIPE_CATALOG, dishKey, parseDishKey } from "./farm-catalog/recipes.mjs";
@@ -50,10 +51,14 @@ export function producePrice(key) {
 // ---------------------------------------------------------------- cooked dishes
 /** The Kitchen's premium on the ingredients' raw price, by stars (platform-api's farm-market-catalog is the payer). */
 export const DISH_PREMIUM = Object.freeze({ 1: 1.25, 2: 1.45, 3: 1.7 });
-/** What one cook of a recipe would fetch sold raw at the Produce Merchant. */
+/** What one cook of a recipe would fetch raw: its produce at the Produce Merchant, its fish (the cheapest that would do) at the Fishmonger. */
 export function recipeRawValue(recipeId) {
     const recipe = RECIPE_CATALOG.find((entry) => entry.id === recipeId);
-    return recipe ? Object.entries(recipe.ingredients).reduce((sum, [id, count]) => sum + producePrice(id) * count, 0) : 0;
+    if (!recipe)
+        return 0;
+    const produce = Object.entries(recipe.ingredients).reduce((sum, [id, count]) => sum + producePrice(id) * count, 0);
+    const need = recipe.fish ? parseFishNeed(recipe.fish.need) : null;
+    return produce + (need ? fishNeedValue(need) * recipe.fish.count : 0);
 }
 export function dishPrice(recipeId, stars) {
     const raw = recipeRawValue(recipeId);

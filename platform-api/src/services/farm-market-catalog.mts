@@ -15,6 +15,7 @@ import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey, type DishStars } from "./farm-recipe-catalog.mjs";
 import { farmPiecePrice, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
 import { QUALITY_PRICE, parseFarmProduceKey } from "./farm-quality-catalog.mjs";
+import { farmFishNeedValue, parseFishNeed } from "./farm-fish-catalog.mjs";
 
 const DAY = 24 * 60;
 
@@ -64,11 +65,13 @@ export function farmProducePrice(cropId: unknown): number {
  */
 export const DISH_PREMIUM: Readonly<Record<DishStars, number>> = Object.freeze({ 1: 1.25, 2: 1.45, 3: 1.7 });
 
-/** The raw produce value of one cook of a recipe. */
+/** The raw value of one cook of a recipe: its produce at the Produce Merchant, its fish at the Fishmonger (the cheapest that would do). */
 export function farmRecipeRawValue(recipeId: string): number {
   const rule = farmRecipeRule(recipeId);
   if (!rule) return 0;
-  return Object.entries(rule.ingredients).reduce((sum, [id, count]) => sum + farmProducePrice(id) * count, 0);
+  const produce = Object.entries(rule.ingredients).reduce((sum, [id, count]) => sum + farmProducePrice(id) * count, 0);
+  const need = rule.fish ? parseFishNeed(rule.fish.need) : null;
+  return produce + (need ? farmFishNeedValue(need) * rule.fish!.count : 0);
 }
 
 export function farmDishPrice(recipeId: string, stars: DishStars): number {

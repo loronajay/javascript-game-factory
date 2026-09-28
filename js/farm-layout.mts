@@ -75,6 +75,8 @@ export type FarmDecorRow = Readonly<{
   memorialId?: string;
   /** A crafted piece's stars (farm-catalog/carpentry.mts): which of the farm's pieces this is, and its finish. */
   stars?: 1 | 2 | 3;
+  /** A Trophy Mount's fish (the Cove's `farm_fish` id): the mount shows it while it is mounted and the owner's. */
+  fishId?: string;
 }>;
 
 export type FarmLayout = Readonly<{
@@ -307,6 +309,9 @@ export function normalizeFarmDecorRow(value: unknown): FarmDecorRow | null {
   const crafted = definition.unlock.type === "crafted";
   const stars = source.stars === 1 || source.stars === 2 || source.stars === 3 ? source.stars : undefined;
   if (crafted && !stars) return null;
+  // A trophy mount without a fish is no mount.
+  const fishId = definition.unlock.type === "trophy" && typeof source.fishId === "string" && /^fish-[A-Za-z0-9-]{8,64}$/.test(source.fishId) ? source.fishId : undefined;
+  if (definition.unlock.type === "trophy" && !fishId) return null;
   return {
     instanceId: source.instanceId,
     itemId: definition.id,
@@ -316,6 +321,7 @@ export function normalizeFarmDecorRow(value: unknown): FarmDecorRow | null {
     length: definition.length.enabled ? clampFarmDecorLength(definition, finiteNumber(source.length) && source.length > 0 ? source.length : definition.length.default) : 0,
     ...(memorialId ? { memorialId } : {}),
     ...(crafted ? { stars } : {}),
+    ...(fishId ? { fishId } : {}),
   };
 }
 
@@ -541,7 +547,7 @@ export function withProductionCheckpoint(layout: FarmLayout, at: number): FarmLa
 export function farmDecorRowsEqual(first: FarmDecorRow, second: FarmDecorRow): boolean {
   return first.instanceId === second.instanceId && first.itemId === second.itemId
     && first.x === second.x && first.z === second.z && first.rotationY === second.rotationY && first.length === second.length
-    && first.memorialId === second.memorialId && first.stars === second.stars;
+    && first.memorialId === second.memorialId && first.stars === second.stars && first.fishId === second.fishId;
 }
 
 export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean {

@@ -28,6 +28,7 @@ import { farmDishPrice, farmProducePrice } from "./farm-market-catalog.mjs";
 import { farmHarvestXp } from "./farm-skill-catalog.mjs";
 import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
 import { farmSeedFor as seedFor, farmSeededRandom as mulberry32 } from "./farm-seeded-random.mjs";
+import { farmFishNeedValue, farmFishNeedXp, parseFishNeed } from "./farm-fish-catalog.mjs";
 
 export const FARM_ORDER_DAY_MS = 24 * 60 * 60 * 1000;
 /** An order's XP is this share of what growing its produce earned. */
@@ -80,15 +81,52 @@ export const FARM_KITCHEN_ORDER_TIERS: readonly FarmKitchenOrderTier[] = Object.
 /** A dish order's Cooking XP is this share of what cooking its dishes earned. */
 export const DISH_ORDER_XP_SHARE = 0.5;
 
+/**
+ * THE COVE'S ORDERS. Two more notices go up every day asking for fish from the
+ * creel: a catch at Fishing 1 and a fishmonger's special at Fishing 10. A line
+ * names a fish need (services/farm-fish-catalog `parseFishNeed`) — a kind of
+ * fish, a water, a rarity, sometimes a size — and the least valuable fish in
+ * the creel that meet it are what a fill takes. They pay a premium on what the
+ * cheapest such fish fetch at the Fishmonger, plus Fishing XP, and they are
+ * drawn from their own seeded stream after the kitchen's notices, so every
+ * order posted before them keeps its id.
+ */
+export type FarmFishOrderTier = Readonly<{
+  tier: "catch" | "special";
+  minLevel: number;
+  /** The needs this tier draws from, and how many fish a line asks for. */
+  needs: readonly string[];
+  lines: number;
+  count: readonly [number, number];
+  premium: number;
+}>;
+
+export const FARM_FISH_ORDER_TIERS: readonly FarmFishOrderTier[] = Object.freeze([
+  Object.freeze({
+    tier: "catch", minLevel: 1, lines: 1, count: Object.freeze([2, 4]) as readonly [number, number], premium: 1.6,
+    needs: Object.freeze(["zone=lagoon", "rarity=common", "species=fish.goldfish", "species=fish.tetra", "species=fish.armored-catfish", "zone=lagoon,size=average"]),
+  }),
+  Object.freeze({
+    tier: "special", minLevel: 10, lines: 2, count: Object.freeze([1, 2]) as readonly [number, number], premium: 1.75,
+    needs: Object.freeze([
+      "zone=reef", "rarity=uncommon", "species=fish.red-snapper", "species=fish.puffer", "species=fish.clownfish",
+      "zone=reef,size=large", "species=fish.piranha,size=large", "rarity=rare", "species=fish.koi", "zone=deep",
+    ]),
+  }),
+]);
+
+/** A fish order's Fishing XP is this share of what landing its fish earned. */
+export const FISH_ORDER_XP_SHARE = 0.5;
+
 export type FarmOrder = Readonly<{
   id: string;
   day: number;
   slot: number;
-  tier: FarmOrderTier["tier"] | FarmKitchenOrderTier["tier"];
-  /** What the lines name: produce from the basket, or cooked dishes (any stars) from the pantry. */
-  kind: "produce" | "dish";
+  tier: FarmOrderTier["tier"] | FarmKitchenOrderTier["tier"] | FarmFishOrderTier["tier"];
+  /** What the lines name: produce from the basket, cooked dishes (any stars) from the pantry, or fish needs from the creel. */
+  kind: "produce" | "dish" | "fish";
   /** The skill that gates the order and that its XP goes to. */
-  skill: "farming" | "cooking";
+  skill: "farming" | "cooking" | "fishing";
   minLevel: number;
   customer: string;
   note: string;
@@ -201,10 +239,60 @@ function farmKitchenOrders(day: number, firstSlot: number, taken: ReadonlySet<st
   });
 }
 
-/** Day `day`'s whole board: the produce notices, then the kitchen's. */
+/** What a fish order's lines would fetch at the Fishmonger, at their cheapest. */
+export function farmFishOrderValue(lines: Readonly<Record<string, number>>): number {
+  return Object.entries(lines).reduce((sum, [key, count]) => {
+    const need = parseFishNeed(key);
+    return sum + (need ? farmFishNeedValue(need) * count : 0);
+  }, 0);
+}
+
+export function farmFishOrderXp(lines: Readonly<Record<string, number>>): number {
+  const xp = Object.entries(lines).reduce((sum, [key, count]) => {
+    const need = parseFishNeed(key);
+    return sum + (need ? farmFishNeedXp(need) * count : 0);
+  }, 0);
+  return Math.max(1, Math.round(xp * FISH_ORDER_XP_SHARE));
+}
+
+/** Day `day`'s fish notices, in the slots after the kitchen's; customers not already on the board. */
+function farmFishOrders(day: number, firstSlot: number, taken: ReadonlySet<string>): FarmOrder[] {
+  const random = mulberry32(seedFor(`farm-orders:cove:v1:${day}`));
+  const customers = new Set(FARM_ORDER_CUSTOMERS.filter((entry) => taken.has(entry.name)));
+  return FARM_FISH_ORDER_TIERS.map((tier, index) => {
+    // Every customer may already be up: then the board's regulars take a second notice.
+    const customer = customers.size >= FARM_ORDER_CUSTOMERS.length ? FARM_ORDER_CUSTOMERS[(day + index) % FARM_ORDER_CUSTOMERS.length]! : pick(FARM_ORDER_CUSTOMERS, random, customers);
+    const needsTaken = new Set<string>();
+    const lines: Record<string, number> = {};
+    for (let line = 0; line < Math.min(tier.lines, tier.needs.length); line += 1) {
+      const key = pick(tier.needs, random, needsTaken);
+      lines[key] = tier.count[0] + Math.floor(random() * (tier.count[1] - tier.count[0] + 1));
+    }
+    const slot = firstSlot + index;
+    return Object.freeze({
+      id: `d${day}-${slot}`,
+      day,
+      slot,
+      tier: tier.tier,
+      kind: "fish" as const,
+      skill: "fishing" as const,
+      minLevel: tier.minLevel,
+      customer: customer.name,
+      note: customer.note,
+      lines: Object.freeze(lines),
+      tickets: Math.ceil((farmFishOrderValue(lines) * tier.premium) / 5) * 5,
+      xp: farmFishOrderXp(lines),
+      endsAt: (day + 1) * FARM_ORDER_DAY_MS,
+    });
+  });
+}
+
+/** Day `day`'s whole board: the produce notices, then the kitchen's, then the Cove's. */
 export function farmFullOrderBoard(day: number): readonly FarmOrder[] {
   const produce = farmOrderBoard(day);
-  return Object.freeze([...produce, ...farmKitchenOrders(day, produce.length, new Set(produce.map((order) => order.customer)))]);
+  const kitchen = farmKitchenOrders(day, produce.length, new Set(produce.map((order) => order.customer)));
+  const upSoFar = [...produce, ...kitchen];
+  return Object.freeze([...upSoFar, ...farmFishOrders(day, upSoFar.length, new Set(upSoFar.map((order) => order.customer)))]);
 }
 
 const ORDER_ID = /^d(\d{1,7})-(\d)$/;

@@ -16,9 +16,15 @@ import { findFruit } from "./farm-catalog/trees.mjs";
 import { DISH_KEYS, findRecipe } from "./farm-catalog/recipes.mjs";
 import { basketItemTitle, pantryCount } from "./farm-kitchen.mjs";
 import { parseProduceKey, produceHeld } from "./farm-quality.mjs";
+import { fishHeldForNeed, fishNeedPortraitSpecies, fishNeedTitle, parseFishNeed, pickFishForNeed, type CreelFishLike } from "./farm-fish.mjs";
+import { normalizeAnglerFish, type AnglerFish } from "./farm-angler.mjs";
 
-export type FarmOrderKind = "produce" | "dish";
-export type FarmOrderSkill = "farming" | "cooking";
+// The Cove's notices (since fishing): fish from the creel, gated on Fishing.
+// A fish line's key is a fish need ("zone=reef,size=large", farm-fish.mts);
+// a fill takes the least valuable fish that meet it, never a locked one.
+
+export type FarmOrderKind = "produce" | "dish" | "fish";
+export type FarmOrderSkill = "farming" | "cooking" | "fishing";
 
 export type FarmOrder = Readonly<{
   id: string;
@@ -42,6 +48,8 @@ export type FarmOrderBoard = Readonly<{
   levels: Readonly<Record<FarmOrderSkill, number>>;
   produce: Readonly<Record<string, number>>;
   dishes: Readonly<Record<string, number>>;
+  /** The creel, as the server read it with the board. */
+  fish: readonly AnglerFish[];
 }>;
 
 function whole(value: unknown): number {
@@ -68,6 +76,7 @@ function counts(value: unknown, known: (id: string) => boolean = isBasketKey): R
 
 const isDishKey = (id: string) => DISH_KEYS.includes(id);
 const isRecipe = (id: string) => Boolean(findRecipe(id));
+const isFishNeed = (id: string) => Boolean(parseFishNeed(id));
 
 /** The API's board answer made safe to draw; null when it is not a board. */
 export function normalizeOrderBoard(value: unknown): FarmOrderBoard | null {
@@ -78,12 +87,12 @@ export function normalizeOrderBoard(value: unknown): FarmOrderBoard | null {
     .map((order: any): FarmOrder => Object.freeze({
       id: text(order.id, 40),
       tier: text(order.tier, 20),
-      kind: order.kind === "dish" ? "dish" as const : "produce" as const,
-      skill: order.skill === "cooking" ? "cooking" as const : "farming" as const,
+      kind: order.kind === "dish" ? "dish" as const : order.kind === "fish" ? "fish" as const : "produce" as const,
+      skill: order.skill === "cooking" ? "cooking" as const : order.skill === "fishing" ? "fishing" as const : "farming" as const,
       minLevel: Math.max(1, whole(order.minLevel)),
       customer: text(order.customer, 60),
       note: text(order.note, 160),
-      lines: Object.freeze(counts(order.lines, order.kind === "dish" ? isRecipe : undefined)),
+      lines: Object.freeze(counts(order.lines, order.kind === "dish" ? isRecipe : order.kind === "fish" ? isFishNeed : undefined)),
       tickets: whole(order.tickets),
       xp: whole(order.xp),
       filled: order.filled === true,
@@ -93,9 +102,10 @@ export function normalizeOrderBoard(value: unknown): FarmOrderBoard | null {
     endsAt: whole(source.endsAt),
     orders: Object.freeze(orders),
     level: farming,
-    levels: Object.freeze({ farming, cooking: Math.max(1, whole(source.cooking?.level)) }),
+    levels: Object.freeze({ farming, cooking: Math.max(1, whole(source.cooking?.level)), fishing: Math.max(1, whole(source.fishing?.level)) }),
     produce: Object.freeze(counts(source.produce)),
     dishes: Object.freeze(counts(source.dishes, isDishKey)),
+    fish: Object.freeze((Array.isArray(source.creel) ? source.creel : []).map(normalizeAnglerFish).filter((fish: AnglerFish | null): fish is AnglerFish => Boolean(fish))),
   });
 }
 
@@ -103,11 +113,23 @@ export type OrderLineView = Readonly<{ cropId: string; title: string; need: numb
 export type OrderState = "filled" | "locked" | "short" | "ready";
 export type OrderView = Readonly<{ order: FarmOrder; state: OrderState; lines: readonly OrderLineView[] }>;
 
-/** What the player holds toward the board's orders: the basket, the pantry and both levels. */
-export type OrderStock = Readonly<{ produce: Readonly<Record<string, number>>; dishes: Readonly<Record<string, number>>; levels: Readonly<Record<FarmOrderSkill, number>> }>;
+/** What the player holds toward the board's orders: the basket, the pantry, the creel and the levels. */
+export type OrderStock = Readonly<{ produce: Readonly<Record<string, number>>; dishes: Readonly<Record<string, number>>; fish?: readonly CreelFishLike[]; levels: Readonly<Record<FarmOrderSkill, number>> }>;
 
 export function orderView(order: FarmOrder, stock: OrderStock): OrderView {
   const dish = order.kind === "dish";
+  if (order.kind === "fish") {
+    // Each line takes its own fish: a fish counted toward one line is not there for the next.
+    const taken = new Set<string>();
+    const lines = Object.entries(order.lines).map(([key, need]) => {
+      const fishNeed = parseFishNeed(key)!;
+      const held = fishHeldForNeed(stock.fish ?? [], fishNeed, taken);
+      for (const fish of pickFishForNeed(stock.fish ?? [], fishNeed, Math.min(held, need), taken) ?? []) taken.add(fish.id);
+      return Object.freeze({ cropId: key, title: fishNeedTitle(fishNeed), need, held, short: Math.max(0, need - held), itemKey: `fish:${fishNeedPortraitSpecies(fishNeed)}` });
+    });
+    const state: OrderState = order.filled ? "filled" : (stock.levels[order.skill] ?? 1) < order.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
+    return Object.freeze({ order, state, lines: Object.freeze(lines) });
+  }
   const lines = Object.entries(order.lines).map(([id, need]) => {
     // An order asks for the crop, not its grade; the server takes the plainest first.
     const held = dish ? pantryCount(stock.dishes, id) : whole(produceHeld(stock.produce, id));
@@ -129,9 +151,9 @@ export function boardTurnoverLabel(endsAt: number, now: number): string {
   return hours > 0 ? `New orders in ${hours}h ${minutes % 60}m` : `New orders in ${minutes}m`;
 }
 
-const TIER_LABELS: Readonly<Record<string, string>> = Object.freeze({ small: "Small order", medium: "Standing order", large: "Large order", kitchen: "Kitchen order", banquet: "Banquet" });
+const TIER_LABELS: Readonly<Record<string, string>> = Object.freeze({ small: "Small order", medium: "Standing order", large: "Large order", kitchen: "Kitchen order", banquet: "Banquet", catch: "Fresh catch", special: "Fishmonger's special" });
 
-export const SKILL_TITLES: Readonly<Record<FarmOrderSkill, string>> = Object.freeze({ farming: "Farming", cooking: "Cooking" });
+export const SKILL_TITLES: Readonly<Record<FarmOrderSkill, string>> = Object.freeze({ farming: "Farming", cooking: "Cooking", fishing: "Fishing" });
 
 export function orderTierLabel(tier: string): string {
   return TIER_LABELS[tier] ?? "Order";

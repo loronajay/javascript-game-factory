@@ -1,5 +1,67 @@
 # Changelog
 
+## The Cove's fish reach the rest of the farm: cooking, orders, trading, trophy mounts (2026-09-28)
+
+A caught fish can now be used across the farm. All four tie-ins read the same **fish need**, a small key that both sides parse the same way (`parseFishNeed` in `services/farm-fish-catalog.mts`, mirrored in `js/farm-fish.mts`). A need names a species, a water or a minimum rarity, and can add a minimum size, e.g. `zone=reef,size=large`. Wherever fish are taken, the rule is the same: the **least valuable fish that meet the need, never a locked one** (`pickFishForNeed`). A need is priced at the cheapest fish that would satisfy it (`farmFishNeedValue`), so a dish or an order never pays for more fish than it asks for.
+
+**Cooking.** There are eight level-taught fish recipes, from Fish & Chips (Cooking 4) to Swordfish Steaks (36). Each has a dish model, and each takes produce plus a fish need and count, e.g. Lagoon Fish Pie is 2 × `zone=lagoon`. `cookFarmDish` takes the fish out of the creel inside the same locked transaction as the produce (`lockedCreel`/`settleFish` → state `cooked`). A dish's price includes its fish. On the page, the cookbook shows a fish line first ("2 × Lagoon fish · 1 in your creel") with a real fish portrait. A signed-out farm has no creel, so its fish recipes read "catch at the Cove". The farm page reads the creel through a new `js/farm-angler-link.mts`, keeping `farm.mts` to a handful of lines.
+
+**Orders.** The Order Board gains two Cove notices a day on their own seeded stream, placed after the kitchen's so every existing id is unchanged: **Fresh catch** (Fishing 1) and **Fishmonger's special** (Fishing 10). They pay a premium over the Fishmonger's price, plus Fishing XP. A fill takes the fish (state `ordered`) and pays through the same ledger key. The board read now includes the Fishing level and the creel, and each fish line counts only fish not already claimed by an earlier line.
+
+**Trading.** Offers gain a `fish` stack: single specimens by id, one each. The farm-inventory maths skips it (`FARM_TRADE_STACKS`). `db/farm-trades.mts` checks an offered fish is in the player's creel and unlocked, both when it's offered and at settlement. It locks both creels in player order, refuses an exchange that would overflow a creel (`creel_full_you/them`), and hands the fish across as the same row. The fish drops its shadow link on the way, so the unique shadow index can't collide. A new public read, `GET /games/farm/fishing/fish?ids=`, lets the table name the partner's fish.
+
+**Trophy mounts.** Old Pike mounts a fish for 25 tickets (`POST /games/farm/fishing/mounts`, state `mounted`, at most 30), and it can be taken back down into the creel. Build mode's Furniture tab lists mounted fish, and each stands on a **Trophy Mount** (`decor.prop.trophy-mount`, `catalogVisible: false`, a new `trophy` unlock type). Its row names only the `fishId`, and no fish can stand on two mounts. `farm-angler-link.mts` dresses each mount at run time: the fish is drawn at its real length on a walnut board that grows to fit it, above an engraved brass plate. **A mount shows its fish only while that fish is mounted and belongs to the farm's owner.** A forged or stale row just shows an empty plaque, so the farm save guard needed no database access.
+
+**Verified:**
+- **API:** 1169 tests pass. New tests cover fish needs on both sides, fish dish pricing, a fish cook taking the cheapest unlocked fish, a year of fish notices beating the Fishmonger, a fish order fill, a fish crossing the trade table as the same row (a locked one refused), mounting and taking down, the public fish read, and Trophy Mount rows on both sides.
+- **Frontend:** 759 tests pass. New tests cover the kitchen's fish line, board counting and trade lines.
+- **Visual:** a headless render of four mounts (a Record clownfish, a Golden Koi, a 3.1 m swordfish on a grown board, and a stranger's fish left bare).
+- **Still failing, predates this work:** `farm-body` "a pond is walked into", which fails the same way at HEAD.
+
+**Not built:** releasing fish into the farm pond (left for a future purchasable fish pack), and fish on the Exchange Board, which would need fish held in escrow on the listing.
+
+## The Cove: fishing, individual fish, and a third shared place (2026-09-28)
+
+**A new shared hub down the Market Square's north gate** (`/farm/cove/`, plan in `planning-docs/FARM_FISHING_PLAN.md`). The Cove is a strip of shore, two waters split by a spit with a lighthouse on its tip, and the dressing a hang-out needs: a campfire with benches, a jetty, a long pier with a wide head, a moored boat, reeds and rocks. There are three fishing zones: the freshwater **Lagoon** west of the spit, the **Reef Shelf** off the pier, and **the Deep** past the pier head. It is the farm's stack by import, like the Market Square: `coveLayout()` uses farm decor rows (the market's two gates now each have a destination), `createFarmWorld` has two new options (`field: false`, `keepClear`), the terrain, water and docks are the Cove's own (`farm-cove-terrain.mts`, all sampled from the pure `farm-cove.mts`), presence and chat run in room `farm:cove`, and the market stall model has a new `stock` seam so the Fishmonger shows fish on ice and Bait & Tackle shows rods, lures and worm tubs.
+
+**Every fish is a specimen, never a count.** The assets are Quaternius's CC0 Ultimate Fish pack, converted to GLB by `farm/assets/fishing/tools/convert.py` (Blender CLI). That gives 35 fish, each with six clips, plus rods, lures, a worm, docks and a boat, and only the GLBs are committed. When a fish bites, the server rolls a **rank**, and that single number sets its weight (a bell around the species' average with thin tails), its length (cube law, and the model is drawn at that length) and its **size class**, from Tiny to Record (the top 0.3%). A **variant** is rolled beside it: Shiny at 1/256, Golden at 1/4096. How cleanly the fish was landed is its **grade**, which uses the same four words and price multipliers as produce. The price is species × weight^0.8 × grade × variant. The pure layer is `js/farm-catalog/fish.mts` and `js/farm-fish.mts`.
+
+**Shadows you cast at, and the same for everyone.** Each five-minute window, the server derives shadow slots per zone. Their paths come from a public seed; the fish in them comes from an HMAC of a secret (`FARM_FISH_SECRET`, falling back to `JWT_SECRET`). `GET /games/farm/fishing/shadows` publishes only the size, the fin (Epic and Legendary) and the path, so every client draws the same fish in the same place with no socket traffic. A lure landing within reach of a shadow hooks that shadow's pre-rolled fish, and each angler catches each shadow once. Casting at empty water is a blind cast that leans towards everyday fish.
+
+**The minigame** (`js/farm-fishing.mts`, pure, 60 Hz, injected random) has four beats:
+- **Cast**: a swinging power meter.
+- **Wait and strike**: nibbles spook the fish; the bite gives a short window.
+- **Fight**: a line-tension gauge with a safe band. Hold to reel. Slack too long throws the hook, and the red zone snaps the line. Steer against the pull with A/D, and bow the rod (W) when a leaper jumps. There are five fight styles, and strength scales with the specimen's size.
+- **Net**: a timing ring.
+
+The grade comes from time in band, near-snaps, and the net. Five rods set line strength, band width and cast range. A scripted-player harness showed the curve works: a sloppy player snaps big fish, and the Deep's Legendaries need the rods built for them. `farm-fishing-controller.mts` sequences the beats, and the view and HUD draw them. A landed fish is held up at its real size, flopping (`Out_Of_Water`).
+
+**Server** (migration 056, `db/farm-fishing.mts`, `services/farm-fish-catalog.mts` mirroring the four pure modules, `routes/farm-fishing-routes.mts`):
+- **Tables**: `farm_anglers` holds the tackle box and the Fishing record. It is kept beside the farm rather than in the farm document, so a cast never carries or locks a whole farm. `farm_fish_casts` allows one open line per player. `farm_fish` is one row per specimen, with a unique index so each shadow is caught once per player.
+- **What the server decides**: the zone (from the Cove's own shape), the bite, the bite time, the specimen and its XP. The client learns the species only at landing.
+- **Refusals**: a landing sooner than `minimumFightSeconds` for that fish is refused, and casts are capped at 150 per rolling hour.
+- **Endpoints**: casts and landings, the Fishmonger (`farm_fish_sale` on the ticket ledger, retry-safe), lock and release, Bait & Tackle (rods gated by level, lures up to nine, worm tubs), and the Cove Records (today's and all-time heaviest per species).
+- **Achievements**: ten fishing achievements, server-awarded in the landing transaction.
+- **Account deletion** covers the three new tables.
+
+Fishing uses the RuneScape curve. The zones open at levels 1, 3 and 15.
+
+**The page** (`farm/cove/`, `js/farm-cove-page.mts`) has:
+- the creel and Fishdex (C/F), with portraits rendered from the GLBs
+- the Fishmonger, Bait & Tackle, and the Cove Records board
+- a tackle bar (Q switches bait, R switches rod)
+- a chat line announcing notable catches
+
+Signed out, the Cove is practice: the same game, with the bite rolled locally and nothing kept.
+
+**Verified:**
+- `platform-api/tests/farm-fishing.test.mjs` (18) holds both copies equal (species, specimen maths, waters, odds and shadows) and runs every flow on an in-memory database.
+- `js/tests/farm-cove.test.mjs` (6) covers the layout, walker, docks and casting reach, and plays a whole practice catch through the controller.
+- 1163 API tests pass.
+- Headless browser runs: a practice catch from the jetty and the pier, and a signed-in catch → creel → Fishdex → sale → tackle → records against the real `createApp` and DB code with intercepted requests.
+
+**Not built yet:** fish in cooking, orders, trading, the Exchange Board, trophy mounts and pond release (plan §9), and visitors' rods drawn for other players (they show "reeling one in!" on their name tag).
+
 ## Pet Games: CPU levels, a rival pool, Barnyard Dash Grand Prix, online PvP and records (2026-09-28)
 
 **Both events grew up** (`planning-docs/PET_MINIGAMES_PLAN.md`). A shared layer in `games/pet-games/shared/`: a **42-pet rival pool** across every species and coat in three tiers (`sim/rivals.js`, a fresh seeded draw per race), **Rookie / Pro / Champion** CPU levels (`sim/levels.js`; each event's `cpu.js` owns the hands — difficulty is never a better pet), and online plumbing (lobby client, sequenced input stream, snapshot smoothing, the shared Online panel, platform glue).

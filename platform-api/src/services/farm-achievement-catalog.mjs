@@ -17,6 +17,7 @@ import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { farmingLevelForXp, normalizeCarpentryRecord, normalizeCookingRecord, normalizeWoodcuttingRecord } from "./farm-skill-catalog.mjs";
 import { FARM_PIECE_IDS } from "./farm-carpentry-catalog.mjs";
 import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
+import { FARM_FISH_RULES } from "./farm-fish-catalog.mjs";
 function def(id, name, description, category, extra = {}) {
     return Object.freeze({ id, name, description, category, parentId: null, tier: 1, points: 10, secret: false, icon: null, ...extra });
 }
@@ -51,6 +52,17 @@ export const FARM_ACHIEVEMENT_DEFINITIONS = Object.freeze([
     def("farm_cabinetmaker", "Cabinetmaker", "Make 50 pieces of furniture.", "progression", { parentId: "farm_handiwork", tier: 2, points: 30 }),
     def("farm_journeyman", "Journeyman", "Reach Carpentry level 10.", "progression", { points: 20 }),
     def("farm_pattern_book", "Every Pattern", "Make every piece in the pattern book at least once.", "mastery", { parentId: "farm_journeyman", tier: 2, points: 50 }),
+    // The Cove: fishing.
+    def("farm_first_catch", "First Catch", "Land your first fish at the Cove.", "progression"),
+    def("farm_angler", "Angler", "Land 100 fish.", "progression", { parentId: "farm_first_catch", tier: 2, points: 20 }),
+    def("farm_old_salt", "Old Salt", "Land 500 fish.", "progression", { parentId: "farm_angler", tier: 3, points: 30 }),
+    def("farm_trophy_hunter", "Trophy Hunter", "Land a Trophy-size fish.", "challenge", { parentId: "farm_first_catch", tier: 2, points: 20 }),
+    def("farm_record_breaker", "Record Breaker", "Land a Record-size fish.", "challenge", { parentId: "farm_trophy_hunter", tier: 3, points: 40 }),
+    def("farm_something_shiny", "Something Shiny", "Land a Shiny fish.", "challenge", { points: 30 }),
+    def("farm_pure_gold", "Pure Gold", "Land a Golden fish.", "challenge", { parentId: "farm_something_shiny", tier: 2, points: 50, secret: true }),
+    def("farm_legend_of_the_deep", "Legend of the Deep", "Land a Legendary fish.", "challenge", { points: 40 }),
+    def("farm_reel_talent", "Reel Talent", "Reach Fishing level 10.", "progression", { points: 20 }),
+    def("farm_full_fishdex", "Full Fishdex", "Land every kind of fish in the Cove at least once.", "mastery", { parentId: "farm_reel_talent", tier: 2, points: 50 }),
 ]);
 export function detectFarmAchievements(facts) {
     const { farming } = facts;
@@ -113,6 +125,29 @@ export function detectFarmAchievements(facts) {
         earned.push("farm_journeyman");
     if (FARM_PIECE_IDS.every((itemId) => (carpentry.patterns[itemId] ?? 0) > 0))
         earned.push("farm_pattern_book");
+    const fishing = facts.fishing;
+    if (fishing) {
+        if (fishing.catches >= 1)
+            earned.push("farm_first_catch");
+        if (fishing.catches >= 100)
+            earned.push("farm_angler");
+        if (fishing.catches >= 500)
+            earned.push("farm_old_salt");
+        if (fishing.trophies >= 1)
+            earned.push("farm_trophy_hunter");
+        if (facts.catch?.sizeClass === "record")
+            earned.push("farm_record_breaker");
+        if (fishing.shiny >= 1)
+            earned.push("farm_something_shiny");
+        if (fishing.golden >= 1)
+            earned.push("farm_pure_gold");
+        if (FARM_FISH_RULES.some((rule) => rule.rarity === "legendary" && (fishing.species[rule.id] ?? 0) > 0))
+            earned.push("farm_legend_of_the_deep");
+        if (farmingLevelForXp(fishing.xp) >= 10)
+            earned.push("farm_reel_talent");
+        if (FARM_FISH_RULES.every((rule) => (fishing.species[rule.id] ?? 0) > 0))
+            earned.push("farm_full_fishdex");
+    }
     return earned;
 }
 export const FARM_ACHIEVEMENTS = Object.freeze({

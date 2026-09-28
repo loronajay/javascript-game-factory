@@ -23,6 +23,7 @@ import {
   MAX_TRADE_QUANTITY,
   type OfferLine,
   type StockEntry,
+  type TradeFish,
   type TradeView,
 } from "./farm-trade.mjs";
 import type { TradeSession, TradeSnapshot } from "./farm-trade-session.mjs";
@@ -53,6 +54,9 @@ export type TradePanelOptions = Readonly<{
   session: TradeSession;
   farm: () => FarmLayout;
   thumbnail?: Thumbnail;
+  /** The player's creel, and any fish (theirs or the partner's) by id, to name fish on the table. */
+  creel?: () => readonly TradeFish[];
+  fishDetail?: (fishId: string) => TradeFish | null;
   /** The table went away (put down or walked away from): the page takes the keyboard back. */
   onClose: () => void;
 }>;
@@ -75,6 +79,7 @@ function node(tag: string, className = "", text = ""): HTMLElement {
 
 export function createTradePanel(elements: TradePanelElements, options: TradePanelOptions): TradePanel {
   const { session } = options;
+  const fishDetail = (fishId: string): TradeFish | null => options.fishDetail?.(fishId) ?? null;
   const isOpen = (): boolean => !elements.root.hidden;
   let shownTable = "";
   // The lists are rebuilt only when what they show changes, not on every poll, so a hover or focus survives.
@@ -149,24 +154,24 @@ export function createTradePanel(elements: TradePanelElements, options: TradePan
     elements.root.dataset.status = view.status;
 
     if (live) {
-      const entries = stockEntries(options.farm());
+      const entries = stockEntries(options.farm(), options.creel?.() ?? []);
       const nextStockKey = JSON.stringify([editable, entries.map((entry) => [entry.stack, entry.id, entry.held, offerCount(snapshot.draft, entry.stack, entry.id)])]);
       if (nextStockKey !== stockKey) {
         stockKey = nextStockKey;
         elements.stock.replaceChildren(...(entries.length
           ? entries.map((entry) => stockRow(entry, snapshot, editable))
-          : [node("li", "sale-empty", "Nothing to trade yet — produce, dishes, logs, planks and furniture on your shelf can all go on the table.")]));
+          : [node("li", "sale-empty", "Nothing to trade yet — produce, dishes, logs, planks, furniture on your shelf and fish from your creel can all go on the table.")]));
       }
     } else {
       // The table has ended: the basket has moved on, so show what this side put up, not steppers against the new counts.
-      const mine = offerLines(view.you.offer);
+      const mine = offerLines(view.you.offer, fishDetail);
       const nextStockKey = JSON.stringify([view.status, mine.map((line) => [line.stack, line.id, line.count])]);
       if (nextStockKey !== stockKey) {
         stockKey = nextStockKey;
         elements.stock.replaceChildren(...(mine.length ? mine.map(lineRow) : [node("li", "sale-empty", "Nothing.")]));
       }
     }
-    const theirs = offerLines(view.them.offer);
+    const theirs = offerLines(view.them.offer, fishDetail);
     const nextTheirsKey = JSON.stringify([view.status, theirs.map((line) => [line.stack, line.id, line.count])]);
     if (nextTheirsKey !== theirsKey) {
       theirsKey = nextTheirsKey;

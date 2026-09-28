@@ -134,8 +134,9 @@ export type FarmDecorDefinition = Readonly<{
   /**
    * `crafted` pieces are counted, never owned outright: the farm's furniture stock decides how many may stand.
    * A `prize` is owned only by winning it (a Pet Games cup): never sold, and its `source` says how it is won.
+   * A `trophy` stands only for a fish the player has mounted at the Cove: its row names the fish.
    */
-  unlock: Readonly<{ type: "starter" | "achievement" | "purchase" | "crafted" | "prize"; source: string }>;
+  unlock: Readonly<{ type: "starter" | "achievement" | "purchase" | "crafted" | "prize" | "trophy"; source: string }>;
   /** Outcome-created props remain valid placed rows but do not appear in the add catalog. */
   catalogVisible: boolean;
 }>;
@@ -346,6 +347,8 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
     model: `trophy-${cup.id}`,
     unlock: prize(`Win the ${cup.title} in Barnyard Dash · ${tier.level} class`),
   }))),
+  // A mounted fish from the Cove: placed from build mode's Furniture tab, one per mounted fish, never bought.
+  item("trophy-mount", { title: "Trophy Mount", category: "prop", footprint: { width: 1, depth: 0.34 }, indoors: true, swatch: ["#4a2d18", "#b8923a"], model: "trophy-mount", unlock: Object.freeze({ type: "trophy", source: "Mount a fish at the Cove" } as const), catalogVisible: false }),
   item("pet-tombstone", { title: "Pet Memorial", category: "prop", footprint: { width: 0.72, depth: 0.34 }, swatch: ["#a7a39a", "#5d5952"], model: "pet-tombstone", unlock: PET_OUTCOME, catalogVisible: false }),
   item("wheelbarrow", { title: "Wheelbarrow", category: "prop", footprint: { width: 0.7, depth: 1.5 }, swatch: ["#3f7228", "#8a5a34"], model: "wheelbarrow" }),
   item("wagon", { title: "Hay Wagon", category: "prop", footprint: { width: 1.6, depth: 2.8 }, swatch: ["#8a5a34", "#d8b24a"], model: "wagon" }),

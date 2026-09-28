@@ -25,6 +25,7 @@ import { FARM_BUILDING_BUILDERS, type BuildingDoors } from "./farm-props-buildin
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
 import { FARM_TOY_BUILDERS } from "./farm-props-toys.mjs";
 import { FARM_TROPHY_BUILDERS } from "./farm-props-trophies.mjs";
+import { FARM_FISH_PROP_BUILDERS } from "./farm-props-fish.mjs";
 import { createKitchenRange } from "./farm-props-kitchen.mjs";
 import { createFurniturePiece, createSawmill, createWorkbench, furnitureModelNames } from "./farm-props-furniture.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
@@ -1105,6 +1106,8 @@ export const FARM_PROP_BUILDERS: Readonly<Record<string, (THREE: ThreeNamespace,
   "pet-tombstone": (THREE) => still(createPetTombstone(THREE)),
   // Pet Games cup trophies (farm-props-trophies.mts): won, never bought.
   ...Object.fromEntries(Object.entries(FARM_TROPHY_BUILDERS).map(([name, build]) => [name, (THREE: ThreeNamespace, definition: FarmDecorDefinition) => still(build(THREE, definition))])),
+  // A fish mounted at the Cove (farm-props-fish.mts): the stand; the fish is added when its row's fish is read.
+  ...Object.fromEntries(Object.entries(FARM_FISH_PROP_BUILDERS).map(([name, build]) => [name, (THREE: ThreeNamespace, definition: FarmDecorDefinition) => still(build(THREE, definition))])),
   wheelbarrow: (THREE) => still(createWheelbarrow(THREE)),
   wagon: (THREE) => still(createWagon(THREE)),
   barrel: (THREE) => still(createBarrel(THREE)),

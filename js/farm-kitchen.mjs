@@ -12,30 +12,43 @@ import { CROP_CATALOG } from "./farm-crops.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
 import { DISH_STARS, KITCHEN_RANGE_ITEM_ID, RECIPE_CATALOG, dishKey, findRecipe } from "./farm-catalog/recipes.mjs";
 import { produceHeld, takeProduce } from "./farm-quality.mjs";
+import { fishHeldForNeed, fishNeedPortraitSpecies, fishNeedTitle, parseFishNeed } from "./farm-fish.mjs";
 const MAX_STACK = 99;
 /** "Tomato", "Apple": the harvest-basket item's own name. */
 export function basketItemTitle(id) {
     return CROP_CATALOG.find((crop) => crop.id === id)?.title ?? FRUIT_TREES.find((species) => species.fruitId === id)?.fruitTitle ?? id;
 }
-export function recipeAvailability(recipe, produce, level, learned = []) {
+/**
+ * `creel` is the fish the angler holds (the Cove's server read); a signed-out
+ * farm has none, so its fish recipes read as short — catch them at the Cove.
+ */
+export function recipeAvailability(recipe, produce, level, learned = [], creel = []) {
     const lines = Object.entries(recipe.ingredients).map(([id, need]) => {
         // Any grade will do; the pot takes the plainest first.
         const held = Math.max(0, Math.floor(produceHeld(produce, id)));
         return Object.freeze({ id, title: basketItemTitle(id), need, held, short: Math.max(0, need - held) });
     });
+    const fishNeed = recipe.fish ? parseFishNeed(recipe.fish.need) : null;
+    if (recipe.fish && fishNeed) {
+        const held = fishHeldForNeed(creel, fishNeed);
+        lines.unshift(Object.freeze({ id: recipe.fish.need, title: fishNeedTitle(fishNeed), need: recipe.fish.count, held, short: Math.max(0, recipe.fish.count - held), fish: true, portrait: fishNeedPortraitSpecies(fishNeed) }));
+    }
     const lock = recipe.source === "vendor" && !learned.includes(recipe.id) ? "vendor" : level < recipe.minLevel ? "level" : null;
     const state = lock ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
     return Object.freeze({ recipe, state, lock, lines: Object.freeze(lines) });
 }
 /** The cookbook in catalog order (which is level order). */
-export function cookbook(produce, level, learned = []) {
-    return Object.freeze(RECIPE_CATALOG.map((recipe) => recipeAvailability(recipe, produce, level, learned)));
+export function cookbook(produce, level, learned = [], creel = []) {
+    return Object.freeze(RECIPE_CATALOG.map((recipe) => recipeAvailability(recipe, produce, level, learned, creel)));
 }
 /** Take a recipe's ingredients and put one dish of `stars` in the pantry. */
 export function cookLocally(inventory, recipeId, stars, level, learned = []) {
     const recipe = findRecipe(recipeId);
     if (!recipe)
         return Object.freeze({ ok: false, reason: "unknown_recipe", inventory });
+    // Fish live on the server: a farm cooking on this device has none to put in the pot.
+    if (recipe.fish)
+        return Object.freeze({ ok: false, reason: "not_enough_produce", inventory });
     const availability = recipeAvailability(recipe, inventory.produce, level, learned);
     if (availability.state === "locked")
         return Object.freeze({ ok: false, reason: "level_too_low", inventory });

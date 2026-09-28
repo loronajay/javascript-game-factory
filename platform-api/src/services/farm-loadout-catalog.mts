@@ -39,6 +39,7 @@ import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, verifyFarmClock } from "./f
 import { emptyFarmSkillRecords, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
 import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { farmPieceKey, farmPieceRule, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
+import { FISH_ID, TROPHY_MOUNT_ITEM_ID } from "./farm-fish-catalog.mjs";
 import { TREE_PLOT_ITEM_ID, admitNewTrees, boundTreeGrowth, normalizeFarmTreeRows } from "./farm-tree-catalog.mjs";
 
 export const FARM_GAME_SLUG = "farm";
@@ -411,6 +412,9 @@ function ownership(context: any): { enforce: boolean; owned: Set<string> } {
 function mayUseCatalogId(id: string, context: any): boolean {
   if (!FARM_CATALOG_IDS.has(id)) return false;
   if (id === "decor.prop.pet-tombstone") return true;
+  // A trophy mount is admitted by the fish it names: it shows that fish only while
+  // the fish is mounted and the farm owner's (db/farm-fishing `getFarmFishDetails`).
+  if (id === TROPHY_MOUNT_ITEM_ID) return true;
   // A crafted piece is not an unlock: it is admitted by count against the furniture the farm owns (boundCraftedRows).
   if (farmPieceRule(id)) return true;
   const state = ownership(context);
@@ -436,6 +440,11 @@ function normalizeDecorRow(raw: any): any | null {
   if (HEX_COLOR.test(color)) row.color = color;
   const memorialId = cleanText(source.memorialId, 40);
   if (itemId === "decor.prop.pet-tombstone" && INSTANCE_ID_PATTERN.test(memorialId)) row.memorialId = memorialId;
+  if (itemId === TROPHY_MOUNT_ITEM_ID) {
+    const fishId = cleanText(source.fishId, 80);
+    if (!FISH_ID.test(fishId)) return null;
+    row.fishId = fishId;
+  }
   // A crafted piece carries the stars it was made with; a piece without them is not a piece.
   if (farmPieceRule(itemId)) {
     const stars = Number(source.stars);
@@ -519,9 +528,15 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
   }
   if (Array.isArray(input.decor)) {
     const decor: any[] = [];
+    const mountedFish = new Set<string>();
     for (const raw of input.decor.slice(0, MAX_DECOR)) {
       const row = normalizeDecorRow(raw);
       if (!row || seen.has(row.instanceId)) continue;
+      // One fish, one plaque.
+      if (row.fishId) {
+        if (mountedFish.has(row.fishId)) continue;
+        mountedFish.add(row.fishId);
+      }
       if (!mayUseCatalogId(row.itemId, context)) continue;
       seen.add(row.instanceId);
       decor.push(row);

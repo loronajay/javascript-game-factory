@@ -15,6 +15,8 @@ import { findFruit } from "./farm-catalog/trees.mjs";
 import { DISH_KEYS, findRecipe } from "./farm-catalog/recipes.mjs";
 import { basketItemTitle, pantryCount } from "./farm-kitchen.mjs";
 import { parseProduceKey, produceHeld } from "./farm-quality.mjs";
+import { fishHeldForNeed, fishNeedPortraitSpecies, fishNeedTitle, parseFishNeed, pickFishForNeed } from "./farm-fish.mjs";
+import { normalizeAnglerFish } from "./farm-angler.mjs";
 function whole(value) {
     const number = Number(value);
     return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
@@ -37,6 +39,7 @@ function counts(value, known = isBasketKey) {
 }
 const isDishKey = (id) => DISH_KEYS.includes(id);
 const isRecipe = (id) => Boolean(findRecipe(id));
+const isFishNeed = (id) => Boolean(parseFishNeed(id));
 /** The API's board answer made safe to draw; null when it is not a board. */
 export function normalizeOrderBoard(value) {
     const source = value && typeof value === "object" ? value : null;
@@ -47,12 +50,12 @@ export function normalizeOrderBoard(value) {
         .map((order) => Object.freeze({
         id: text(order.id, 40),
         tier: text(order.tier, 20),
-        kind: order.kind === "dish" ? "dish" : "produce",
-        skill: order.skill === "cooking" ? "cooking" : "farming",
+        kind: order.kind === "dish" ? "dish" : order.kind === "fish" ? "fish" : "produce",
+        skill: order.skill === "cooking" ? "cooking" : order.skill === "fishing" ? "fishing" : "farming",
         minLevel: Math.max(1, whole(order.minLevel)),
         customer: text(order.customer, 60),
         note: text(order.note, 160),
-        lines: Object.freeze(counts(order.lines, order.kind === "dish" ? isRecipe : undefined)),
+        lines: Object.freeze(counts(order.lines, order.kind === "dish" ? isRecipe : order.kind === "fish" ? isFishNeed : undefined)),
         tickets: whole(order.tickets),
         xp: whole(order.xp),
         filled: order.filled === true,
@@ -62,13 +65,27 @@ export function normalizeOrderBoard(value) {
         endsAt: whole(source.endsAt),
         orders: Object.freeze(orders),
         level: farming,
-        levels: Object.freeze({ farming, cooking: Math.max(1, whole(source.cooking?.level)) }),
+        levels: Object.freeze({ farming, cooking: Math.max(1, whole(source.cooking?.level)), fishing: Math.max(1, whole(source.fishing?.level)) }),
         produce: Object.freeze(counts(source.produce)),
         dishes: Object.freeze(counts(source.dishes, isDishKey)),
+        fish: Object.freeze((Array.isArray(source.creel) ? source.creel : []).map(normalizeAnglerFish).filter((fish) => Boolean(fish))),
     });
 }
 export function orderView(order, stock) {
     const dish = order.kind === "dish";
+    if (order.kind === "fish") {
+        // Each line takes its own fish: a fish counted toward one line is not there for the next.
+        const taken = new Set();
+        const lines = Object.entries(order.lines).map(([key, need]) => {
+            const fishNeed = parseFishNeed(key);
+            const held = fishHeldForNeed(stock.fish ?? [], fishNeed, taken);
+            for (const fish of pickFishForNeed(stock.fish ?? [], fishNeed, Math.min(held, need), taken) ?? [])
+                taken.add(fish.id);
+            return Object.freeze({ cropId: key, title: fishNeedTitle(fishNeed), need, held, short: Math.max(0, need - held), itemKey: `fish:${fishNeedPortraitSpecies(fishNeed)}` });
+        });
+        const state = order.filled ? "filled" : (stock.levels[order.skill] ?? 1) < order.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
+        return Object.freeze({ order, state, lines: Object.freeze(lines) });
+    }
     const lines = Object.entries(order.lines).map(([id, need]) => {
         // An order asks for the crop, not its grade; the server takes the plainest first.
         const held = dish ? pantryCount(stock.dishes, id) : whole(produceHeld(stock.produce, id));
@@ -89,8 +106,8 @@ export function boardTurnoverLabel(endsAt, now) {
     const hours = Math.floor(minutes / 60);
     return hours > 0 ? `New orders in ${hours}h ${minutes % 60}m` : `New orders in ${minutes}m`;
 }
-const TIER_LABELS = Object.freeze({ small: "Small order", medium: "Standing order", large: "Large order", kitchen: "Kitchen order", banquet: "Banquet" });
-export const SKILL_TITLES = Object.freeze({ farming: "Farming", cooking: "Cooking" });
+const TIER_LABELS = Object.freeze({ small: "Small order", medium: "Standing order", large: "Large order", kitchen: "Kitchen order", banquet: "Banquet", catch: "Fresh catch", special: "Fishmonger's special" });
+export const SKILL_TITLES = Object.freeze({ farming: "Farming", cooking: "Cooking", fishing: "Fishing" });
 export function orderTierLabel(tier) {
     return TIER_LABELS[tier] ?? "Order";
 }

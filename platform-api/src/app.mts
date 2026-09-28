@@ -22,6 +22,7 @@ import { handleTicketRoute } from "./routes/ticket-routes.mjs";
 import { handleFarmEconomyRoute } from "./routes/farm-economy-routes.mjs";
 import { handleFarmTradeRoute } from "./routes/farm-trade-routes.mjs";
 import { handleFarmListingRoute } from "./routes/farm-listing-routes.mjs";
+import { handleFarmFishingRoute } from "./routes/farm-fishing-routes.mjs";
 import { handleGameResultRoute } from "./routes/game-result-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
@@ -351,6 +352,17 @@ export function createApp(options: any = {}) {
   const createFarmListing = typeof options?.createFarmListing === "function" ? options.createFarmListing : null;
   const buyFarmListing = typeof options?.buyFarmListing === "function" ? options.buyFarmListing : null;
   const withdrawFarmListing = typeof options?.withdrawFarmListing === "function" ? options.withdrawFarmListing : null;
+  const getFarmFishShadows = typeof options?.getFarmFishShadows === "function" ? options.getFarmFishShadows : null;
+  const getFarmFishRecords = typeof options?.getFarmFishRecords === "function" ? options.getFarmFishRecords : null;
+  const getFarmFishing = typeof options?.getFarmFishing === "function" ? options.getFarmFishing : null;
+  const castFarmLine = typeof options?.castFarmLine === "function" ? options.castFarmLine : null;
+  const landFarmCast = typeof options?.landFarmCast === "function" ? options.landFarmCast : null;
+  const sellFarmFish = typeof options?.sellFarmFish === "function" ? options.sellFarmFish : null;
+  const releaseFarmFish = typeof options?.releaseFarmFish === "function" ? options.releaseFarmFish : null;
+  const lockFarmFish = typeof options?.lockFarmFish === "function" ? options.lockFarmFish : null;
+  const buyFarmTackle = typeof options?.buyFarmTackle === "function" ? options.buyFarmTackle : null;
+  const getFarmFishDetails = typeof options?.getFarmFishDetails === "function" ? options.getFarmFishDetails : null;
+  const mountFarmFish = typeof options?.mountFarmFish === "function" ? options.mountFarmFish : null;
   // Earned advancement, read-only. Null for the leaderboards' reason: an
   // unconfigured backend must answer 503 rather than report a level-1 document a
   // client would cache as the truth. There is no write service — XP is awarded
@@ -687,6 +699,7 @@ export function createApp(options: any = {}) {
   const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder, cookFarmDish, millFarmLogs, craftFarmPiece };
   const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
   const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
+  const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };
   const gameResultServices = { submitGameResult, getPetGameCareer };
   const progressionServices = {
     getGameXpProgress,
@@ -817,6 +830,15 @@ export function createApp(options: any = {}) {
       match: (p: string) => /^\/games\/farm\/market\/listings(\/[^/]+\/(purchases|withdrawal))?$/.test(p),
       bucket: "farm-listings",
       limit: 120,
+      windowMs: 10 * MINUTE_MS,
+    },
+    {
+      // Fishing's writes: casts, landings, sales, releases, locks, tackle. A
+      // cast and its landing are two requests a fish, and the server's own
+      // casts-per-hour fence bounds what they can mint; this only stops hammering.
+      match: (p: string) => /^\/games\/farm\/fishing\/(casts(\/[^/]+\/landing)?|sales|releases|locks|tackle|mounts)$/.test(p),
+      bucket: "farm-fishing",
+      limit: 600,
       windowMs: 10 * MINUTE_MS,
     },
   ];
@@ -1161,6 +1183,11 @@ export function createApp(options: any = {}) {
     if (await handleFarmListingRoute({
       req, res, method, pathname, authClaims, requestOrigin, timestamp,
       services: farmListingServices,
+    })) return;
+
+    if (await handleFarmFishingRoute({
+      req, res, method, pathname, authClaims, requestOrigin, timestamp,
+      services: farmFishingServices,
     })) return;
 
     if (await handleGameSocialRoute({

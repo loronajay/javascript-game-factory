@@ -52,7 +52,7 @@ const prices = Object.freeze({
 export const FARM_TICKET_ITEMS = Object.freeze(Object.entries(prices).map(([id, price]) => Object.freeze({ id, price })));
 // Pet Games trophies are catalog items owned by entitlement like a purchase — but
 // never priced: the only way one is owned is a won cup (services/game-result-grants).
-export const FARM_CATALOG_IDS = new Set([...FARM_STARTER_IDS, ...Object.keys(prices), "decor.prop.pet-tombstone", ...FARM_PIECE_IDS, ...PET_GAMES_PRIZE_IDS]);
+export const FARM_CATALOG_IDS = new Set([...FARM_STARTER_IDS, ...Object.keys(prices), "decor.prop.pet-tombstone", "decor.prop.trophy-mount", ...FARM_PIECE_IDS, ...PET_GAMES_PRIZE_IDS]);
 export function findFarmTicketItem(itemId) {
     const id = typeof itemId === "string" ? itemId.trim() : "";
     const price = prices[id];
