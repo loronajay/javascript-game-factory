@@ -18,6 +18,7 @@
 // test asserts every row names a builder.
 import { box, cylinder, sphere, standard } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, scaleUvs, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
+import { wheelbarrowTrayShell } from "./farm-prop-geometry.mjs";
 import { farmDecorFootprint } from "./farm-catalog/decor.mjs";
 import { FARM_BUILDING_BUILDERS } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
@@ -718,29 +719,74 @@ export function createDoghouse(THREE) {
     tcylinder(THREE, group, 0.12, 0.09, 0.08, [0.42, 0.04, 0.85], farmMaterial(THREE, "galvanised", { metresPerTile: 0.4 }), 12);
     return group;
 }
-/** A wheelbarrow: a green steel tray on a spoked wheel with two ash handles, parked on its legs, with a load of earth. */
+/** A wheelbarrow: a flared green steel tray on a spoked wheel with two ash handles, parked on its legs, with a load of earth. */
 export function createWheelbarrow(THREE) {
     const group = new THREE.Group();
     const paint = farmMaterial(THREE, "galvanised", { colors: ["#3f7228", "#2a4f1a", "#1c3812"], metresPerTile: 0.6, roughness: 0.5, metalness: 0.4 });
     const wood = timber(THREE, "#c9a06a", 0.6);
     const iron = ironMaterial(THREE);
-    const tray = tbox(THREE, group, [0.6, 0.3, 0.8], [0, 0.45, -0.1], paint);
-    tray.rotation.x = 0.1;
-    const load = tsphere(THREE, group, 0.28, [0, 0.55, -0.1], farmMaterial(THREE, "soil"), 10, 8);
-    load.scale.set(1, 0.45, 1.3);
-    const wheel = cylinder(THREE, group, 0.2, 0.2, 0.06, [0, 0.2, -0.58], standard(THREE, "#1b1f24", 0.8, 0.1), 14);
-    wheel.rotation.z = Math.PI / 2;
-    cylinder(THREE, group, 0.05, 0.05, 0.08, [0, 0.2, -0.58], iron, 8).rotation.z = Math.PI / 2;
-    for (let spoke = 0; spoke < 4; spoke += 1) {
-        const bar = box(THREE, group, [0.02, 0.36, 0.02], [0, 0.2, -0.58], iron, false);
-        bar.rotation.x = spoke * Math.PI / 4;
+    const shell = wheelbarrowTrayShell();
+    const positions = [];
+    const uvs = [];
+    for (const face of shell.faces) {
+        const [a, b, c, d] = face.corners;
+        for (const point of [a, b, c, a, c, d])
+            positions.push(...point);
+        uvs.push(0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0);
+    }
+    const trayGeometry = new THREE.BufferGeometry();
+    trayGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    trayGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    trayGeometry.computeVertexNormals();
+    const trayMaterial = typeof paint.clone === "function" ? paint.clone() : paint;
+    trayMaterial.side = THREE.DoubleSide;
+    const tray = new THREE.Mesh(trayGeometry, trayMaterial);
+    tray.castShadow = true;
+    tray.receiveShadow = true;
+    group.add(tray);
+    // Rolled lips give the thin shell a readable edge from every camera angle.
+    const frontLip = tcylinder(THREE, group, 0.022, 0.022, shell.front.topWidth + 0.04, [0, shell.rimHeight + 0.04, shell.front.z], paint, 8);
+    frontLip.rotation.z = Math.PI / 2;
+    const rearLip = tcylinder(THREE, group, 0.024, 0.024, shell.rear.topWidth + 0.04, [0, shell.rimHeight - 0.04, shell.rear.z], paint, 8);
+    rearLip.rotation.z = Math.PI / 2;
+    for (const side of [-1, 1]) {
+        const lip = tcylinder(THREE, group, 0.023, 0.023, 0.97, [side * 0.3, shell.rimHeight, -0.04], paint, 8);
+        lip.rotation.x = Math.PI / 2 + 0.08;
+        lip.rotation.z = side * -0.1;
+    }
+    const soil = farmMaterial(THREE, "soil", { colors: ["#664529", "#3d291b", "#8a6542"], metresPerTile: 0.42 });
+    for (const [x, y, z, r] of [[-0.12, 0.66, -0.08, 0.25], [0.12, 0.64, 0.02, 0.23], [0, 0.69, 0.18, 0.2]]) {
+        const clod = tsphere(THREE, group, r, [x, y, z], soil, 10, 7);
+        clod.scale.set(1.15, 0.42, 1.3);
+    }
+    const shovelShaft = tcylinder(THREE, group, 0.018, 0.022, 0.76, [0.12, 0.84, 0.02], wood, 8, false);
+    shovelShaft.rotation.x = -0.85;
+    shovelShaft.rotation.z = 0.12;
+    const shovelBlade = box(THREE, group, [0.19, 0.035, 0.24], [0.08, 0.59, 0.32], farmMaterial(THREE, "galvanised", { colors: ["#8d989e", "#606c72", "#bbc3c5"], metresPerTile: 0.3 }), false);
+    shovelBlade.rotation.x = -0.28;
+    const shovelGrip = tcylinder(THREE, group, 0.025, 0.025, 0.2, [0.16, 1.1, -0.27], standard(THREE, "#b7332d", 0.7, 0.15), 8, false);
+    shovelGrip.rotation.z = Math.PI / 2;
+    // A true open spoked wheel reads much more clearly than a solid black puck.
+    const tyre = new THREE.Mesh(new THREE.TorusGeometry(0.205, 0.032, 7, 18), standard(THREE, "#1b1f24", 0.82, 0.08));
+    tyre.position.set(0, 0.22, -0.57);
+    tyre.rotation.y = Math.PI / 2;
+    tyre.castShadow = true;
+    group.add(tyre);
+    cylinder(THREE, group, 0.052, 0.052, 0.1, [0, 0.22, -0.57], iron, 10).rotation.z = Math.PI / 2;
+    for (let spoke = 0; spoke < 8; spoke += 1) {
+        const bar = box(THREE, group, [0.018, 0.34, 0.018], [0, 0.22, -0.57], iron, false);
+        bar.rotation.x = spoke * Math.PI / 8;
     }
     for (const x of [-0.22, 0.22]) {
-        const handle = tcylinder(THREE, group, 0.025, 0.025, 1.3, [x, 0.42, 0.15], wood, 6);
-        handle.rotation.x = Math.PI / 2 + 0.12;
-        box(THREE, group, [0.05, 0.36, 0.05], [x, 0.18, 0.25], iron, false);
-        cylinder(THREE, group, 0.03, 0.03, 0.14, [x, 0.5, 0.78], standard(THREE, "#d43a3a", 0.6, 0.2), 8).rotation.x = Math.PI / 2;
+        const handle = tcylinder(THREE, group, 0.026, 0.03, 1.48, [x, 0.42, 0.2], wood, 8);
+        handle.rotation.x = Math.PI / 2 + 0.14;
+        const leg = tcylinder(THREE, group, 0.025, 0.03, 0.43, [x, 0.21, 0.28], iron, 7);
+        leg.rotation.x = -0.18;
+        cylinder(THREE, group, 0.036, 0.036, 0.2, [x, 0.315, 0.99], standard(THREE, "#b7332d", 0.7, 0.15), 9).rotation.x = Math.PI / 2;
+        sphere(THREE, group, 0.026, [x, 0.51, -0.45], iron);
+        sphere(THREE, group, 0.018, [x < 0 ? -0.27 : 0.27, 0.56, 0.1], iron).castShadow = false;
     }
+    tbox(THREE, group, [0.5, 0.035, 0.04], [0, 0.29, 0.34], iron, false);
     return group;
 }
 /** A hay wagon: a plank bed on four spoked wheels with iron tyres, heaped with hay, shafts out the front. */

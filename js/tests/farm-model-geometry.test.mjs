@@ -5,6 +5,7 @@ import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt
 import { SCENERY } from "../farm-scenery.mjs";
 import { FARM_BOUNDS } from "../farm-layout.mjs";
 import { TREE_ARCHETYPES } from "../farm-props-plants.mjs";
+import { aquaticArchStones, lagoonRimStones, wheelbarrowTrayShell } from "../farm-prop-geometry.mjs";
 
 test("the nearest possible hill stays beyond the whole farm instead of clipping the property", () => {
   const propertyRadius = Math.hypot(FARM_BOUNDS.width / 2, FARM_BOUNDS.depth / 2);
@@ -77,4 +78,32 @@ test("farm trees have species-specific silhouettes instead of sharing one lollip
   assert.ok(TREE_ARCHETYPES.willow.drapeCount >= 48);
   assert.ok(TREE_ARCHETYPES.willow.crownWidth > TREE_ARCHETYPES.willow.crownHeight * 1.5);
   assert.ok(TREE_ARCHETYPES.pine.tierCount >= 6);
+});
+
+test("the wheelbarrow tray is an open, tapered shell instead of a solid box", () => {
+  const shell = wheelbarrowTrayShell();
+  assert.equal(shell.faces.length, 5, "the tray has a floor and four walls, but no lid");
+  assert.ok(shell.front.topWidth < shell.rear.topWidth, "the tray narrows toward its wheel");
+  assert.ok(shell.front.bottomWidth < shell.front.topWidth, "the front wall flares outward toward its rim");
+  assert.ok(shell.rear.bottomWidth < shell.rear.topWidth, "the rear wall flares outward toward its rim");
+  assert.ok(shell.rimHeight > shell.floorHeight, "the tray has a useful carrying depth");
+});
+
+test("aquatic cave stones form an irregular arch without plugging the promised entrance", () => {
+  const entrance = { width: 1.45, height: 1.2 };
+  const stones = aquaticArchStones(3.4, 2.5, entrance, "reef");
+  assert.ok(stones.length >= 20, "the grotto has enough layered stone to read as a cave");
+  assert.ok(new Set(stones.map((stone) => stone.scale.join(","))).size >= 8, "the rock silhouette is varied");
+  assert.ok(stones.some((stone) => stone.y > entrance.height + 0.35), "the crown rises above the doorway");
+  assert.ok(stones.every((stone) => stone.z < 0
+    || Math.abs(stone.x) - stone.radius * stone.scale[0] >= entrance.width / 2
+    || stone.y - stone.radius * stone.scale[1] >= entrance.height), "front stones leave the entrance clear");
+});
+
+test("the jellyfish lagoon rim keeps a broad entrance while varying its natural stone ring", () => {
+  const entranceWidth = 0.9;
+  const stones = lagoonRimStones(1.2, entranceWidth);
+  assert.ok(stones.length >= 16);
+  assert.ok(new Set(stones.map((stone) => stone.radius.toFixed(3))).size >= 4);
+  assert.ok(stones.every((stone) => stone.z <= 0 || Math.abs(stone.x) - stone.radius * stone.scale[0] >= entranceWidth / 2), "the +z entrance is unobstructed");
 });
