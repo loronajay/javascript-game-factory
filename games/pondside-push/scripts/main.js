@@ -289,10 +289,9 @@ function loop(timestamp) {
   requestAnimationFrame(loop);
 }
 
+// The stage fills the window below the title bar (CSS); the arena renders at whatever that is.
 function resize() {
-  const rect = stage.getBoundingClientRect();
-  const scale = Math.min(rect.width / 960, rect.height / 640);
-  arena.resize(Math.max(1, Math.floor(960 * scale)), Math.max(1, Math.floor(640 * scale)));
+  arena.resize(Math.max(1, Math.round(stage.clientWidth)), Math.max(1, Math.round(stage.clientHeight)));
 }
 
 // ---------------------------------------------------------------- wiring
@@ -333,8 +332,7 @@ $("#changePet").addEventListener("click", () => {
   goHome();
 });
 $("#fullscreen").addEventListener("click", () => stage.requestFullscreen?.());
-window.addEventListener("resize", resize);
-document.addEventListener("fullscreenchange", resize);
+new ResizeObserver(resize).observe(stage);
 // Read-only handle for headless checks.
 globalThis.__pondside = { get run() { return run; }, get screen() { return screen; } };
 

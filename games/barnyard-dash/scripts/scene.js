@@ -23,6 +23,15 @@ export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 640;
 const WORLD_SCALE = 0.08;
 const MODEL_YAW_OFFSET = Math.PI;
+const BASE_FOV = 55;
+
+/** Keep at least the 3:2 view's width: past it a wider screen just shows more to the sides. */
+function fovForAspect(fov, aspect) {
+  const designAspect = GAME_WIDTH / GAME_HEIGHT;
+  if (aspect >= designAspect) return fov;
+  const halfWidth = Math.tan((fov * Math.PI) / 360) * designAspect;
+  return Math.min(100, (Math.atan(halfWidth / aspect) * 360) / Math.PI);
+}
 
 const worldPoint = (point) => new THREE.Vector3((point.x - GAME_WIDTH / 2) * WORLD_SCALE, 0, (point.y - GAME_HEIGHT / 2) * WORLD_SCALE);
 
@@ -39,7 +48,7 @@ export function createRaceScene(canvas) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fd6ee);
   scene.fog = new THREE.Fog(0xb8d9c2, 42, 110);
-  const camera = new THREE.PerspectiveCamera(55, GAME_WIDTH / GAME_HEIGHT, 0.1, 220);
+  const camera = new THREE.PerspectiveCamera(BASE_FOV, GAME_WIDTH / GAME_HEIGHT, 0.1, 220);
   camera.position.set(-30, 8, 20);
   const cameraLook = new THREE.Vector3();
   scene.add(new THREE.HemisphereLight(0xdff5ff, 0x42552e, 2.25));
@@ -365,10 +374,12 @@ export function createRaceScene(canvas) {
     render() {
       renderer.render(scene, camera);
     },
-    resize() {
+    /** Render at the stage's real size; a narrow screen widens the lens so the course never gets cropped. */
+    resize(width = GAME_WIDTH, height = GAME_HEIGHT) {
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-      renderer.setSize(GAME_WIDTH, GAME_HEIGHT, false);
-      camera.aspect = GAME_WIDTH / GAME_HEIGHT;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.fov = fovForAspect(BASE_FOV, camera.aspect);
       camera.updateProjectionMatrix();
     },
   };

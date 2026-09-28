@@ -5,7 +5,7 @@
 
 import { loadFarmPets } from "./farm-source.js?v=20260928-pet-online";
 import { cpuFieldFor } from "./pets.js?v=20260928-pet-online";
-import { createRaceScene, GAME_HEIGHT, GAME_WIDTH } from "./scene.js?v=20260928-pet-online";
+import { createRaceScene } from "./scene.js?v=20260928-pet-online";
 import { COURSES, courseOrDefault, findCourse } from "./sim/courses.js?v=20260928-pet-online";
 import { createRace, raceOrder, racerById, stepRace } from "./sim/race.js?v=20260928-pet-online";
 import { CUPS, createGrandPrix, findCup, grandPrixCup, grandPrixFinished, grandPrixStandings, grandPrixSummary, nextGrandPrixRace, recordGrandPrixRace, trophyItemId } from "./grand-prix.js?v=20260928-pet-online";
@@ -440,16 +440,14 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// The stage fills the window below the title bar (CSS); the scene renders at whatever that is.
 function resize() {
-  const scale = Math.min(Math.max(320, window.innerWidth - 20) / GAME_WIDTH, Math.max(260, window.innerHeight - 145) / GAME_HEIGHT);
-  stage.style.width = `${Math.round(GAME_WIDTH * scale)}px`;
-  stage.style.height = `${Math.round(GAME_HEIGHT * scale)}px`;
-  scene.resize();
+  scene.resize(Math.max(1, Math.round(stage.clientWidth)), Math.max(1, Math.round(stage.clientHeight)));
 }
 
 // ---------------------------------------------------------------- wiring
 
-window.addEventListener("resize", resize);
+new ResizeObserver(resize).observe(stage);
 window.addEventListener("keydown", (event) => {
   if (screen !== "race") return;
   if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
@@ -493,7 +491,6 @@ $("#changePet").addEventListener("click", () => {
   goHome();
 });
 $("#fullscreen").addEventListener("click", () => (document.fullscreenElement ? document.exitFullscreen?.() : stage.requestFullscreen?.()));
-document.addEventListener("fullscreenchange", resize);
 
 resize();
 requestAnimationFrame(frame);

@@ -87,4 +87,35 @@ for (const course of COURSES) {
       assert.ok(crossesGate(before, checkpoint, checkpoint));
     }
   });
+
+  test(`${course.id}: a pet shoved across a checkpoint line between its steps still counts it`, () => {
+    for (const [index, checkpoint] of track.checkpoints.entries()) {
+      const past = { x: checkpoint.x + checkpoint.gate.tangentX * 2, y: checkpoint.y + checkpoint.gate.tangentY * 2 };
+      assert.ok(crossesGate(past, past, checkpoint), `${course.id} checkpoint ${index}`);
+    }
+  });
+
+  test(`${course.id}: a full field in traffic never owes an extra lap`, () => {
+    const length = roadLength(track);
+    const entrants = Array.from({ length: 8 }, (_, index) => ({
+      id: `c${index}`,
+      pet: { stats: { speed: 40 + (index * 7) % 50, strength: 30 + (index * 13) % 60, agility: 50, stamina: 50 } },
+      cpu: "pro",
+    }));
+    let race = createRace({ track, entrants, totalLaps: course.laps, seed: 2, countdownSeconds: 0 });
+    const run = new Map(race.racers.map((racer) => [racer.id, { last: roadStation(racer, track), distance: 0 }]));
+    while (race.status !== "finished") {
+      race = stepRace(race, {}, 1 / 60);
+      for (const racer of race.racers) {
+        if (racer.finishedAt !== null && racer.finishedAt < race.elapsed) continue;
+        const entry = run.get(racer.id);
+        const station = roadStation(racer, track);
+        entry.distance += ((station - entry.last + length * 1.5) % length) - length / 2;
+        entry.last = station;
+      }
+    }
+    for (const racer of race.racers) {
+      assert.ok(run.get(racer.id).distance / length < course.laps + 0.3, `${course.id} ${racer.id} ran ${(run.get(racer.id).distance / length).toFixed(2)} laps`);
+    }
+  });
 }

@@ -15,6 +15,15 @@ import { yawForFacing } from "./presentation.js";
 
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 640;
+const BASE_FOV = 46;
+
+/** Keep at least the 3:2 view's width: past it a wider screen just shows more round the edges. */
+function fovForAspect(fov, aspect) {
+  const designAspect = GAME_WIDTH / GAME_HEIGHT;
+  if (aspect >= designAspect) return fov;
+  const halfWidth = Math.tan((fov * Math.PI) / 360) * designAspect;
+  return Math.min(100, (Math.atan(halfWidth / aspect) * 360) / Math.PI);
+}
 const WORLD_SCALE = 0.035;
 const MODEL_YAW_OFFSET = Math.PI;
 
@@ -31,7 +40,7 @@ export function createArena(canvas) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x8bcad9);
   scene.fog = new THREE.Fog(0x8bcad9, 35, 82);
-  const camera = new THREE.PerspectiveCamera(46, GAME_WIDTH / GAME_HEIGHT, 0.1, 130);
+  const camera = new THREE.PerspectiveCamera(BASE_FOV, GAME_WIDTH / GAME_HEIGHT, 0.1, 130);
   camera.position.set(0, 18, 20);
   camera.lookAt(0, 0, 0);
   scene.add(new THREE.HemisphereLight(0xe7fbff, 0x385239, 2.5));
@@ -237,10 +246,12 @@ export function createArena(canvas) {
       camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
     },
+    /** Render at the stage's real size; a narrow screen widens the lens so the whole pond stays in view. */
     resize(width, height) {
       renderer.setSize(width, height, false);
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
       camera.aspect = width / height;
+      camera.fov = fovForAspect(BASE_FOV, camera.aspect);
       camera.updateProjectionMatrix();
     },
   };
