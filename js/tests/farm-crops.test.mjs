@@ -159,6 +159,7 @@ test("one seed creates one plant and all six cells in the same plot can be plant
     wilted: false,
     dead: false,
     harvestYield: 0,
+    quality: "perfect",
   });
   assert.equal(plantFarmCrop(planted.agriculture, "soil-1", "cell-0", "radish", 480).reason, "occupied");
   assert.equal(plantFarmCrop(starter, "soil-1", "cell-0", "missing", 480).reason, "unknown_crop");
@@ -356,8 +357,11 @@ test("a crop that nearly died of thirst pays for it at harvest", () => {
   }
   const potato = CROP_CATALOG.find((crop) => crop.id === "potato");
   const harvested = harvestFarmCrop(agriculture, "soil-1", "cell-0", now);
-  assert.ok(harvested.agriculture.inventory.produce.potato < potato.yield);
-  assert.ok(harvested.agriculture.inventory.produce.potato >= 1);
+  // Fewer potatoes, and Poor ones: a close call costs yield and grade (farm-quality.mts).
+  const poor = harvested.agriculture.inventory.produce["potato@poor"];
+  assert.ok(poor < potato.yield);
+  assert.ok(poor >= 1);
+  assert.equal(harvested.agriculture.inventory.produce.potato, 0, "nothing lands in the Normal stack");
 });
 
 test("extra offline minutes give crops life without moving the farm clock", () => {
@@ -387,4 +391,50 @@ test("the withered dead-plant models exist in three sizes and share the pack tex
     assert.equal(existsSync(resolve(cropAssets, file)), true, file);
     assert.equal(glbJson(file).images?.[0]?.uri, "Textures/Texture%20Map.png", file);
   }
+});
+
+// ---------------------------------------------------------------- quality and compost (farm-quality.mts)
+
+import { canFertilizeCrop, fertilizeFarmCrop, tendFarmCrop as tendCrop, waterFarmCrop as waterCrop } from "../farm-crops.mjs";
+
+/** Grow a planted carrot to ripe, watering and tending the moment it asks, `lateBy` farm minutes late each time. */
+function growCarefully(agriculture, lateBy = 0) {
+  let now = lateBy;
+  agriculture = waterCrop(advanceAgriculture(agriculture, now), "soil-1", "cell-0", now).agriculture;
+  while (!only(agriculture, now).mature) {
+    now += 30;
+    agriculture = advanceAgriculture(agriculture, now);
+    const state = only(agriculture, now);
+    if (state.needsCare) agriculture = tendCrop(advanceAgriculture(agriculture, now + lateBy), "soil-1", "cell-0", now + lateBy).agriculture;
+    if (state.thirsty) agriculture = waterCrop(advanceAgriculture(agriculture, now + lateBy), "soil-1", "cell-0", now + lateBy).agriculture;
+    if (state.needsCare || state.thirsty) now += lateBy;
+  }
+  return { agriculture, now };
+}
+
+test("a crop cared for on time is Perfect; one left waiting is graded down, and the harvest fills that grade's stack", () => {
+  const prompt = growCarefully(plant("carrot"), 0);
+  assert.equal(only(prompt.agriculture, prompt.now).quality, "perfect");
+  const harvested = harvestFarmCrop(prompt.agriculture, "soil-1", "cell-0", prompt.now).agriculture;
+  assert.equal(harvested.inventory.produce["carrot@perfect"], CROP_CATALOG.find((crop) => crop.id === "carrot").yield);
+  const slow = growCarefully(plant("carrot"), 180);
+  assert.equal(only(slow.agriculture, slow.now).quality, "fine", "a few hours' stress is Fine, not Perfect");
+});
+
+test("a dead crop dug out goes on the compost heap, and compost worked into a growing crop lifts it a grade", () => {
+  const dead = advanceAgriculture(plant("carrot"), DEATH_DRY_MINUTES + 1);
+  const cleared = clearDeadFarmCrop(dead, "soil-1", "cell-0", DEATH_DRY_MINUTES + 1).agriculture;
+  assert.equal(cleared.inventory.compost, 1);
+  const stressed = normalizeAgriculture({
+    inventory: { seeds: {}, compost: 1 },
+    crops: [{ plotId: "soil-1", cellId: "cell-0", cropId: "carrot", growthMinutes: 60, moistureMinutes: 600, tended: false, lastFarmMinute: 0, stressMinutes: 6 * 60 }],
+  }, new Set(["soil-1"]));
+  assert.equal(only(stressed, 0).quality, "fine");
+  assert.equal(canFertilizeCrop(stressed, stressed.crops[0], 0), true);
+  const fed = fertilizeFarmCrop(stressed, "soil-1", "cell-0", 0);
+  assert.equal(fed.ok, true);
+  assert.equal(fed.agriculture.inventory.compost, 0);
+  assert.equal(only(fed.agriculture, 0).quality, "perfect");
+  assert.equal(fertilizeFarmCrop(fed.agriculture, "soil-1", "cell-0", 0).reason, "fertilized", "once is enough");
+  assert.equal(fertilizeFarmCrop(normalizeAgriculture({ inventory: { compost: 0 }, crops: stressed.crops }, new Set(["soil-1"])), "soil-1", "cell-0", 0).reason, "no_compost");
 });

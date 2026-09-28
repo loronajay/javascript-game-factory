@@ -18,6 +18,7 @@ import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handleTicketRoute } from "./routes/ticket-routes.mjs";
 import { handleFarmEconomyRoute } from "./routes/farm-economy-routes.mjs";
 import { handleFarmTradeRoute } from "./routes/farm-trade-routes.mjs";
+import { handleFarmListingRoute } from "./routes/farm-listing-routes.mjs";
 import { handleGameResultRoute } from "./routes/game-result-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
@@ -336,6 +337,10 @@ export function createApp(options = {}) {
     const getCurrentFarmTrade = typeof options?.getCurrentFarmTrade === "function" ? options.getCurrentFarmTrade : null;
     const getFarmTrade = typeof options?.getFarmTrade === "function" ? options.getFarmTrade : null;
     const actOnFarmTrade = typeof options?.actOnFarmTrade === "function" ? options.actOnFarmTrade : null;
+    const getFarmListings = typeof options?.getFarmListings === "function" ? options.getFarmListings : null;
+    const createFarmListing = typeof options?.createFarmListing === "function" ? options.createFarmListing : null;
+    const buyFarmListing = typeof options?.buyFarmListing === "function" ? options.buyFarmListing : null;
+    const withdrawFarmListing = typeof options?.withdrawFarmListing === "function" ? options.withdrawFarmListing : null;
     // Earned advancement, read-only. Null for the leaderboards' reason: an
     // unconfigured backend must answer 503 rather than report a level-1 document a
     // client would cache as the truth. There is no write service — XP is awarded
@@ -671,6 +676,7 @@ export function createApp(options = {}) {
     const ticketServices = { getTicketWallet, getTicketShop, purchaseTicketShopItem };
     const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder, cookFarmDish, millFarmLogs, craftFarmPiece };
     const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
+    const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
     const gameResultServices = { submitGameResult };
     const progressionServices = {
         getGameXpProgress,
@@ -792,6 +798,14 @@ export function createApp(options = {}) {
             match: (p) => /^\/games\/farm\/trades(\/[^/]+\/actions)?$/.test(p),
             bucket: "farm-trades",
             limit: 300,
+            windowMs: 10 * MINUTE_MS,
+        },
+        {
+            // The Exchange Board's moves: list, buy, withdraw. The server's own daily
+            // caps bound what they can do; this only stops hammering.
+            match: (p) => /^\/games\/farm\/market\/listings(\/[^/]+\/(purchases|withdrawal))?$/.test(p),
+            bucket: "farm-listings",
+            limit: 120,
             windowMs: 10 * MINUTE_MS,
         },
     ];
@@ -1092,6 +1106,11 @@ export function createApp(options = {}) {
             if (await handleFarmTradeRoute({
                 req, res, method, pathname, authClaims, requestOrigin, timestamp,
                 services: farmTradeServices,
+            }))
+                return;
+            if (await handleFarmListingRoute({
+                req, res, method, pathname, authClaims, requestOrigin, timestamp,
+                services: farmListingServices,
             }))
                 return;
             if (await handleGameSocialRoute({

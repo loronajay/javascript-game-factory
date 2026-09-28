@@ -31,8 +31,8 @@ export function createTicketWalletClient(options = {}) {
         adoptFarmPet(speciesId, name, purchaseId) {
             return api.adoptFarmPet({ speciesId, name, purchaseId });
         },
-        purchaseFarmSupply(itemId, quantity, purchaseId) {
-            return api.purchaseFarmSupply({ itemId, quantity, purchaseId });
+        purchaseFarmSupply(itemId, quantity, purchaseId, at) {
+            return api.purchaseFarmSupply({ itemId, quantity, purchaseId, ...(at ?? {}) });
         },
         harvestFarmCrop(layout, plotId, cellId) {
             return api.harvestFarmCrop({ layout, plotId, cellId });
@@ -49,8 +49,11 @@ export function createTicketWalletClient(options = {}) {
         craftFarmPiece(layout, itemId, scores, craftId) {
             return api.craftFarmPiece({ layout, itemId, scores, craftId });
         },
-        sellFarmProduce(items, saleId) {
-            return api.sellFarmProduce({ items, saleId });
+        sellFarmProduce(items, saleId, day) {
+            return api.sellFarmProduce({ items, saleId, day });
+        },
+        getFarmMarketPrices() {
+            return api.fetchFarmMarketPrices();
         },
         getFarmOrders() {
             return api.fetchFarmOrders();

@@ -1,6 +1,12 @@
 import { readJsonBody, writeJson } from "../http-utils.mjs";
+import { farmMarketBoard, farmMarketDay } from "../services/farm-market-day.mjs";
 export async function handleFarmEconomyRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
+    // Today's Market prices are the same for everyone and nobody's business: a public read.
+    if (pathname === "/games/farm/market/prices" && method === "GET") {
+        writeJson(res, 200, { market: farmMarketBoard(farmMarketDay(Date.now())) }, requestOrigin);
+        return true;
+    }
     const adopting = pathname === "/games/farm/adoptions" && method === "POST";
     const buyingSupply = pathname === "/games/farm/supplies/purchases" && method === "POST";
     const harvesting = pathname === "/games/farm/harvests" && method === "POST";
@@ -45,11 +51,11 @@ export async function handleFarmEconomyRoute(context) {
     }
     const input = adopting
         ? { playerId: authClaims.playerId, speciesId: body.value?.speciesId, name: body.value?.name, purchaseId: body.value?.purchaseId }
-        : { playerId: authClaims.playerId, itemId: body.value?.itemId, quantity: body.value?.quantity, purchaseId: body.value?.purchaseId };
+        : { playerId: authClaims.playerId, itemId: body.value?.itemId, quantity: body.value?.quantity, purchaseId: body.value?.purchaseId, ...(body.value?.venue === "market" ? { venue: "market", day: body.value?.day } : {}) };
     try {
         const purchase = await action(input);
         if (!purchase?.ok) {
-            const conflict = new Set(["insufficient_tickets", "inventory_full", "farm_full", "needs_water", "level_too_low"]);
+            const conflict = new Set(["insufficient_tickets", "inventory_full", "farm_full", "needs_water", "level_too_low", "prices_changed"]);
             writeJson(res, conflict.has(purchase?.error) ? 409 : 400, { status: "error", ...purchase, timestamp }, requestOrigin);
             return true;
         }
@@ -261,9 +267,10 @@ async function handleSale(context) {
             playerId: authClaims.playerId,
             items: body.value?.items,
             saleId: body.value?.saleId,
+            day: body.value?.day,
         });
         if (!sale?.ok) {
-            const conflict = new Set(["not_enough_produce", "not_enough_dishes", "not_enough_furniture"]);
+            const conflict = new Set(["not_enough_produce", "not_enough_dishes", "not_enough_furniture", "prices_changed"]);
             writeJson(res, conflict.has(sale?.error) ? 409 : 400, { status: "error", ...sale, timestamp }, requestOrigin);
             return true;
         }

@@ -64,40 +64,75 @@ export const STARTER_FARM_DECOR = Object.freeze([
     row("post-rail-5", "decor.fence.post-rail", GATE_WIDTH / 2 + SOUTH_RUN / 2, EDGE, 0, SOUTH_RUN),
     row("gate-1", "decor.fence.gate", 0, EDGE, 0),
     row("barn-1", "decor.building.barn", -7.5, -8.5, Math.PI / 12),
-    row("oak-1", "decor.plant.oak", 9.5, -9),
-    row("oak-2", "decor.plant.oak", 11.2, -4.5),
-    row("oak-3", "decor.plant.oak", -11.5, 4),
-    row("oak-4", "decor.plant.oak", 7.8, 9.5),
-    // Keep the hay beside the outbuildings and leave its former site open for the farmhouse.
+    // Mature crowns need more visual room than their trunk-sized collision boxes imply.
+    // Keep them on the perimeter so they frame the yard instead of swallowing the buildings.
+    row("oak-1", "decor.plant.oak", 11.5, -10.5),
+    row("oak-2", "decor.plant.oak", 11, 5.5),
+    row("oak-3", "decor.plant.oak", -11, 4),
+    row("oak-4", "decor.plant.oak", 9.5, 10.5),
     row("hay-bale-1", "decor.prop.hay-bale", -8, -2.5, 0.4),
     row("hay-bale-2", "decor.prop.hay-bale", -6.5, -2, -0.2),
-    row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
+    row("trough-1", "decor.prop.trough", -4, -4, Math.PI / 2),
     row("soil-1", "decor.plant.soil-patch", 4.5, 6.5),
-    // The farmhouse occupies the old hay-bale clearing, with its door facing east and its range against the back wall.
-    // The slight east offset clears the barn's rotated footprint while preserving a comfortable gap between them.
-    row("cottage-1", "decor.building.cottage", 0.25, -8.6, Math.PI / 2),
-    row("kitchen-range-1", "decor.prop.kitchen-range", -2.53, -7.4, Math.PI / 2),
+    // The farmhouse backs onto the rear fence, leaving the field open in front of it. The range's
+    // local pose remains against the back wall so it travels with the house as interior furniture.
+    row("cottage-1", "decor.building.cottage", 4.2, -9.3, 6.1021),
+    row("kitchen-range-1", "decor.prop.kitchen-range", 3.5203, -12.2507, 6.1021),
     // Two Tree Plots for the new farm's first sapling of each kind.
     row("tree-plot-1", "decor.plant.tree-plot", -9.5, 10.5),
     row("tree-plot-2", "decor.plant.tree-plot", -6.2, 11.2),
 ]);
-const STARTER_FARMHOUSE_CLUSTER_IDS = Object.freeze(["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2"]);
-const LEGACY_STARTER_FARMHOUSE_CLUSTER = Object.freeze({
-    "cottage-1": Object.freeze({ itemId: "decor.building.cottage", x: -7.5, z: 1.5 }),
-    "kitchen-range-1": Object.freeze({ itemId: "decor.prop.kitchen-range", x: -10.28, z: 2.7 }),
-    "hay-bale-1": Object.freeze({ itemId: "decor.prop.hay-bale", x: -1.2, z: -8.6 }),
-    "hay-bale-2": Object.freeze({ itemId: "decor.prop.hay-bale", x: 0.9, z: -8.9 }),
+const STARTER_HOMESITE_IDS = Object.freeze(["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2", "trough-1", "oak-1", "oak-2", "oak-3", "oak-4"]);
+const pose = (itemId, x, z, rotationY = 0) => {
+    const turn = Math.PI * 2;
+    return Object.freeze({ itemId, x, z, rotationY: Number((((rotationY % turn) + turn) % turn).toFixed(4)) });
+};
+const SHARED_OLD_STARTER_YARD = Object.freeze({
+    "trough-1": pose("decor.prop.trough", 5.5, -1.5, Math.PI / 2),
+    "oak-1": pose("decor.plant.oak", 9.5, -9),
+    "oak-2": pose("decor.plant.oak", 11.2, -4.5),
+    "oak-3": pose("decor.plant.oak", -11.5, 4),
+    "oak-4": pose("decor.plant.oak", 7.8, 9.5),
 });
-/** Repair only the exact shipped cluster; any player-moved piece makes the saved arrangement authoritative. */
-function migrateStarterFarmhouseCluster(decor) {
-    const untouched = STARTER_FARMHOUSE_CLUSTER_IDS.every((instanceId) => {
+const LEGACY_STARTER_HOMESITE = Object.freeze({
+    "cottage-1": pose("decor.building.cottage", -7.5, 1.5, Math.PI / 2),
+    "kitchen-range-1": pose("decor.prop.kitchen-range", -10.28, 2.7, Math.PI / 2),
+    "hay-bale-1": pose("decor.prop.hay-bale", -1.2, -8.6, 0.4),
+    "hay-bale-2": pose("decor.prop.hay-bale", 0.9, -8.9, -0.2),
+    ...SHARED_OLD_STARTER_YARD,
+});
+const CROWDED_STARTER_HOMESITE = Object.freeze({
+    "cottage-1": pose("decor.building.cottage", 0.25, -8.6, Math.PI / 2),
+    "kitchen-range-1": pose("decor.prop.kitchen-range", -2.53, -7.4, Math.PI / 2),
+    "hay-bale-1": pose("decor.prop.hay-bale", -8, -2.5, 0.4),
+    "hay-bale-2": pose("decor.prop.hay-bale", -6.5, -2, -0.2),
+    ...SHARED_OLD_STARTER_YARD,
+});
+const FORWARD_STARTER_HOMESITE = Object.freeze({
+    "cottage-1": pose("decor.building.cottage", 4.2, -2, Math.PI * 2 - Math.PI / 12),
+    "kitchen-range-1": pose("decor.prop.kitchen-range", 3.7604, -4.9959, Math.PI * 2 - Math.PI / 12),
+    "hay-bale-1": pose("decor.prop.hay-bale", -8, -2.5, 0.4),
+    "hay-bale-2": pose("decor.prop.hay-bale", -6.5, -2, -0.2),
+    "trough-1": pose("decor.prop.trough", -4, -4, Math.PI / 2),
+    "oak-1": pose("decor.plant.oak", 11.5, -10.5),
+    "oak-2": pose("decor.plant.oak", 11, 5.5),
+    "oak-3": pose("decor.plant.oak", -11, 4),
+    "oak-4": pose("decor.plant.oak", 9.5, 10.5),
+});
+function matchesStarterHomesite(decor, signature) {
+    return STARTER_HOMESITE_IDS.every((instanceId) => {
         const row = decor.find((candidate) => candidate.instanceId === instanceId);
-        const legacy = LEGACY_STARTER_FARMHOUSE_CLUSTER[instanceId];
-        return row?.itemId === legacy.itemId && row.x === legacy.x && row.z === legacy.z;
+        const expected = signature[instanceId];
+        return row?.itemId === expected.itemId && row.x === expected.x && row.z === expected.z && row.rotationY === expected.rotationY;
     });
-    if (!untouched)
+}
+/** Repair only an exact shipped homesite; moving any participating piece makes the saved arrangement authoritative. */
+function migrateStarterHomesite(decor) {
+    if (!matchesStarterHomesite(decor, LEGACY_STARTER_HOMESITE)
+        && !matchesStarterHomesite(decor, CROWDED_STARTER_HOMESITE)
+        && !matchesStarterHomesite(decor, FORWARD_STARTER_HOMESITE))
         return [...decor];
-    const replacements = new Map(STARTER_FARM_DECOR.filter((row) => STARTER_FARMHOUSE_CLUSTER_IDS.includes(row.instanceId)).map((row) => [row.instanceId, row]));
+    const replacements = new Map(STARTER_FARM_DECOR.filter((row) => STARTER_HOMESITE_IDS.includes(row.instanceId)).map((row) => [row.instanceId, row]));
     return decor.map((row) => replacements.get(row.instanceId) ?? row);
 }
 /** The decor rows crops may grow in, and the ones a tree may. */
@@ -257,7 +292,7 @@ export function normalizeFarmLayout(value) {
             if (decor.length >= MAX_PERSISTED_DECOR)
                 break;
         }
-        decor = migrateStarterFarmhouseCluster(decor);
+        decor = migrateStarterHomesite(decor);
     }
     const habitats = farmHabitats({ decor });
     const pets = [];

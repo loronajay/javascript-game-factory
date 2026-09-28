@@ -61,17 +61,22 @@ export function hipRoofMesh(input) {
     ];
     const positions = [];
     const uvs = [];
-    for (const triangle of triangles) {
-        const [origin, along, third] = triangle;
-        const uVector = [along[0] - origin[0], along[1] - origin[1], along[2] - origin[2]];
-        const uLength = Math.hypot(...uVector);
-        const uAxis = uVector.map((value) => value / uLength);
-        const thirdVector = [third[0] - origin[0], third[1] - origin[1], third[2] - origin[2]];
-        const thirdU = thirdVector[0] * uAxis[0] + thirdVector[1] * uAxis[1] + thirdVector[2] * uAxis[2];
-        const thirdVVector = thirdVector.map((value, index) => value - thirdU * uAxis[index]);
-        const thirdV = Math.hypot(...thirdVVector);
-        positions.push(...origin, ...along, ...third);
-        uvs.push(0, 0, uLength, 0, thirdU, thirdV);
+    const slopeV = (point, edge) => {
+        const run = edge === "front" ? halfDepth - point[2]
+            : edge === "back" ? point[2] + halfDepth
+                : edge === "east" ? halfWidth - point[0]
+                    : point[0] + halfWidth;
+        return Math.hypot(run, point[1] - eaveY);
+    };
+    const faces = ["front", "front", "back", "back", "east", "west"];
+    for (let index = 0; index < triangles.length; index += 1) {
+        const triangle = triangles[index];
+        const face = faces[index];
+        for (const point of triangle) {
+            positions.push(...point);
+            const u = face === "front" || face === "back" ? point[0] + halfWidth : point[2] + halfDepth;
+            uvs.push(u, slopeV(point, face));
+        }
     }
     return Object.freeze({ positions: Object.freeze(positions), uvs: Object.freeze(uvs) });
 }

@@ -194,6 +194,24 @@ function createSackModel(THREE: ThreeNamespace, itemId: string): any | null {
   return group;
 }
 
+/** Compost: a small wooden pail heaped with dark crumbly soil and a few spent leaves. */
+function createCompostModel(THREE: ThreeNamespace): any {
+  const group = new THREE.Group();
+  group.name = "supply-compost";
+  const pail: [number, number][] = [[0, 0], [0.07, 0], [0.074, 0.012], [0.084, 0.12], [0.078, 0.12], [0.068, 0.014], [0, 0.014]];
+  place(THREE, group, lathe(THREE, pail), surface(THREE, "#8a5f38", { roughness: 0.9 }), [0, 0, 0]);
+  // Two iron hoops round the staves.
+  const iron = surface(THREE, "#4a4a4a", { roughness: 0.5 });
+  for (const y of [0.03, 0.1]) place(THREE, group, new THREE.TorusGeometry(0.073 + y * 0.1, 0.004, 6, 24), iron, [0, y, 0], [Math.PI / 2, 0, 0]);
+  // The heap, domed above the rim, with a few crumbs and spent leaves on top.
+  place(THREE, group, new THREE.SphereGeometry(0.078, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), surface(THREE, "#3b2a1c", { roughness: 1 }), [0, 0.11, 0], [0, 0, 0], [1, 0.55, 1]);
+  const crumbs = surface(THREE, "#2a1e14", { roughness: 1 });
+  for (const [x, z] of [[0.03, 0.02], [-0.035, 0.01], [0.005, -0.04], [-0.01, 0.035]] as const) place(THREE, group, new THREE.SphereGeometry(0.012, 6, 5), crumbs, [x, 0.145, z]);
+  leaf(THREE, group, "#8a7a3a", 0.05, [0.02, 0.152, -0.015], [0.2, 0.4, 0]);
+  leaf(THREE, group, "#6f5a2c", 0.045, [-0.025, 0.15, 0.02], [-0.15, 2.1, 0]);
+  return group;
+}
+
 // ---------------------------------------------------------------- planks
 
 /** A short, slightly skewed stack of sawn planks in the species' own wood. */
@@ -216,10 +234,11 @@ export function createFarmItemModel(THREE: ThreeNamespace, key: string): any | n
   const parsed = parseItemKey(key);
   if (!parsed) return null;
   switch (parsed.kind) {
-    case "produce": return createProduceModel(THREE, parsed.id);
+    // A graded key ("tomato@perfect") is still a tomato: the grade is on the label, not the model.
+    case "produce": return createProduceModel(THREE, parsed.id.split("@")[0]!);
     case "log": return createLogModel(THREE, parsed.id);
     case "sapling": return createSaplingModel(THREE, parsed.id);
-    case "supply": return createSackModel(THREE, parsed.id);
+    case "supply": return parsed.id === "compost" ? createCompostModel(THREE) : createSackModel(THREE, parsed.id);
     case "dish": {
       const dish = parseDishKey(parsed.id);
       if (dish) return createDishModel(THREE, dish.recipe, dish.stars);

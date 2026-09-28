@@ -196,6 +196,8 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(editorSource, /createEditorCameraController\(\{/);
   assert.match(editorSource, /createEditHistory<FarmLayout>\(\{ equal: farmLayoutsEqual \}\)/);
   assert.match(editorSource, /createEditorGizmos\(THREE, scene\)/);
+  assert.match(source, /new THREE\.GridHelper\(FARM_BOUNDS\.width, FARM_BOUNDS\.width \* 2/);
+  assert.match(source, /grid\.visible = editing;/, "the half-metre farm grid is visible only while building");
   assert.match(editorSource, /export const FARM_EDITOR_TOGGLE_KEY = "KeyB"/);
   assert.doesNotMatch(editorSource, /localStorage/);
   assert.match(editorSource, /persist\(layout\)/);

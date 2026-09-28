@@ -226,7 +226,9 @@ function buildBoard(THREE: ThreeNamespace, group: any, stall: MarketStall): void
   // Open: five notices pinned up, a little askew — the three produce tiers, then the
   // kitchen's two. What they ask for is read at the board (E); the model only says there is work here.
   const pin = new THREE.MeshStandardMaterial({ color: "#b8452f", roughness: 0.4, metalness: 0.2 });
-  const notices: readonly [number, number, number, string][] = [[-0.98, 1.48, 0.05, "Wanted"], [-0.49, 1.52, -0.04, "Wanted"], [0, 1.46, 0.03, "Wanted"], [0.49, 1.5, -0.05, "Kitchen"], [0.98, 1.47, 0.04, "Kitchen"]];
+  const headings = stall.notices ?? ["Wanted", "Wanted", "Wanted", "Kitchen", "Kitchen"];
+  const notices: readonly [number, number, number, string][] = [[-0.98, 1.48, 0.05], [-0.49, 1.52, -0.04], [0, 1.46, 0.03], [0.49, 1.5, -0.05], [0.98, 1.47, 0.04]]
+    .map(([x, y, tilt], index) => [x!, y!, tilt!, headings[index % headings.length]!] as [number, number, number, string]);
   for (const [x, y, tilt, title] of notices) {
     const note = canvasPlane(THREE, group, 0.44, 0.6, [192, 256], (context, w, h) => drawNotice(context, w, h, title), [x, y, 0.05], false);
     if (note?.rotation) note.rotation.z = tilt;

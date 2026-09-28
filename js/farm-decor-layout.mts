@@ -146,6 +146,18 @@ export function pondContents(layout: FarmLayout, pond: FarmDecorRow): FarmDecorR
   return layout.decor.filter((row) => row.instanceId !== pond.instanceId && definitionOf(row)?.aquatic && homePond([region], row));
 }
 
+/** Placed furniture whose complete footprint is inside this building's usable room. */
+export function buildingContents(layout: FarmLayout, building: FarmDecorRow): FarmDecorRow[] {
+  const buildingDefinition = definitionOf(building);
+  if (!buildingDefinition?.shell) return [];
+  return layout.decor.filter((row) => {
+    if (row.instanceId === building.instanceId) return false;
+    const definition = definitionOf(row);
+    return Boolean(definition && (definition.interior || definition.indoors)
+      && interiorFits(farmDecorBox(row, definition), definition, building, buildingDefinition));
+  });
+}
+
 /** Why a box may not stand where it is asked to, or "ok". */
 export function judgePlacement(layout: FarmLayout, instanceId: string, definition: FarmDecorDefinition, box: FloorObstacle, bounds: RoomBounds = FARM_BOUNDS): PlacementVerdict {
   if (!insideFieldBox(box, box.footprint, bounds)) return "outside";
@@ -191,7 +203,7 @@ function replaceRow(layout: FarmLayout, next: FarmDecorRow): FarmLayout {
   return withFarmDecor(layout, layout.decor.map((item) => (item.instanceId === next.instanceId ? next : item)));
 }
 
-/** A row carried rigidly from one pose of its pond to another. */
+/** A row carried rigidly from one container pose to another. */
 function carried(row: FarmDecorRow, from: RoomPlacement, to: RoomPlacement): FarmDecorRow {
   const local = localPoint(row, from);
   const world = buildingLocalToWorld(to, local);
@@ -203,8 +215,9 @@ function tryPlace(layout: FarmLayout, item: FarmDecorRow, definition: FarmDecorD
   const footprint = farmDecorFootprint(definition, item);
   const clamped = clampBoxToField(wanted, footprint, bounds);
   const next: FarmDecorRow = { ...item, x: clamped.x, z: clamped.z, rotationY: rounded(clamped.rotationY) };
-  // A pond carries what stands in it: the dwellings move with it, then every one must fit where it lands.
-  const contents = definition.pond ? pondContents(layout, item) : [];
+  // Containers own their local contents during a transform: ponds carry aquatic homes and
+  // buildings carry furniture that is actually inside their shell.
+  const contents = definition.pond ? pondContents(layout, item) : definition.shell ? buildingContents(layout, item) : [];
   const moved = new Map(contents.map((row) => [row.instanceId, carried(row, item, next)]));
   const candidate = moved.size ? withFarmDecor(layout, layout.decor.map((row) => moved.get(row.instanceId) ?? row)) : layout;
   const verdict = judgePlacement(candidate, item.instanceId, definition, farmDecorBox(next, definition), bounds);
@@ -349,7 +362,8 @@ export function stretchFarmDecorEnd(layout: FarmLayout, instanceId: string, end:
 export function alignFarmDecorPlacement(layout: FarmLayout, instanceId: string, wanted: RoomPlacement, snap: number): FarmDecorAligned<RoomPlacement> {
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && definitionOf(item);
-  if (!item || !definition || definition.category !== "fence" || snap <= 0) return { value: wanted, guides: [] };
+  if (!item || !definition || snap <= 0) return { value: wanted, guides: [] };
+  if (definition.category !== "fence") return alignFarmDecorBox(layout, item, definition, wanted, snap);
   const moved: FarmDecorRow = { ...item, ...wanted };
   const ends = farmDecorEnds(moved, definition);
   let best: { shift: { x: number; z: number }; distance: number; from: { x: number; z: number }; to: { x: number; z: number } } | null = null;
@@ -365,6 +379,84 @@ export function alignFarmDecorPlacement(layout: FarmLayout, instanceId: string, 
     value: { x: rounded(wanted.x + best.shift.x), z: rounded(wanted.z + best.shift.z), rotationY: wanted.rotationY },
     guides: [{ from: { x: best.to.x, y: 0.02, z: best.to.z }, to: { x: best.to.x, y: 1.2, z: best.to.z } }],
   };
+}
+
+type AxisSpan = Readonly<{ lo: number; mid: number; hi: number }>;
+type AxisCandidate = Readonly<{ value: number; match: "edge" | "mid"; span: readonly [number, number] }>;
+
+function decorSpans(placement: RoomPlacement, footprint: ItemFootprint): Readonly<{ x: AxisSpan; z: AxisSpan }> {
+  const corners = boxCorners(placement, footprint);
+  const xs = corners.map((point) => point.x);
+  const zs = corners.map((point) => point.z);
+  return {
+    x: { lo: Math.min(...xs), mid: placement.x, hi: Math.max(...xs) },
+    z: { lo: Math.min(...zs), mid: placement.z, hi: Math.max(...zs) },
+  };
+}
+
+function alignmentCandidates(span: AxisSpan, across: readonly [number, number]): AxisCandidate[] {
+  return [
+    { value: span.lo, match: "edge", span: across },
+    { value: span.hi, match: "edge", span: across },
+    { value: span.mid, match: "mid", span: across },
+  ];
+}
+
+function closestAxisSnap(mine: AxisSpan, candidates: readonly AxisCandidate[], threshold: number): Readonly<{ delta: number; value: number; span: readonly [number, number] }> | null {
+  let best: Readonly<{ delta: number; value: number; span: readonly [number, number] }> | null = null;
+  for (const candidate of candidates) {
+    for (const point of candidate.match === "edge" ? [mine.lo, mine.hi] : [mine.mid]) {
+      const delta = candidate.value - point;
+      if (Math.abs(delta) >= threshold || (best && Math.abs(delta) >= Math.abs(best.delta))) continue;
+      best = { delta, value: candidate.value, span: candidate.span };
+    }
+  }
+  return best;
+}
+
+function guideSpan(first: readonly [number, number], second: readonly [number, number]): readonly [number, number] {
+  return [Math.min(first[0], second[0]) - 0.3, Math.max(first[1], second[1]) + 0.3];
+}
+
+/** Edge/centre snapping for plots, buildings, plants and props, matching the room editor's alignment language. */
+function alignFarmDecorBox(layout: FarmLayout, item: FarmDecorRow, definition: FarmDecorDefinition, wanted: RoomPlacement, snap: number): FarmDecorAligned<RoomPlacement> {
+  const mine = decorSpans(wanted, farmDecorFootprint(definition, item));
+  const limitX = FARM_BOUNDS.width / 2 - FARM_BOUNDS.wallInset;
+  const limitZ = FARM_BOUNDS.depth / 2 - FARM_BOUNDS.wallInset;
+  const fullX: readonly [number, number] = [-limitX, limitX];
+  const fullZ: readonly [number, number] = [-limitZ, limitZ];
+  const xCandidates: AxisCandidate[] = [
+    { value: -limitX, match: "edge", span: fullZ },
+    { value: limitX, match: "edge", span: fullZ },
+    { value: 0, match: "mid", span: fullZ },
+  ];
+  const zCandidates: AxisCandidate[] = [
+    { value: -limitZ, match: "edge", span: fullX },
+    { value: limitZ, match: "edge", span: fullX },
+    { value: 0, match: "mid", span: fullX },
+  ];
+  for (const row of layout.decor) {
+    if (row.instanceId === item.instanceId) continue;
+    const otherDefinition = definitionOf(row);
+    if (!otherDefinition) continue;
+    const other = decorSpans(row, farmDecorFootprint(otherDefinition, row));
+    xCandidates.push(...alignmentCandidates(other.x, [other.z.lo, other.z.hi]));
+    zCandidates.push(...alignmentCandidates(other.z, [other.x.lo, other.x.hi]));
+  }
+  const snapX = closestAxisSnap(mine.x, xCandidates, snap);
+  const snapZ = closestAxisSnap(mine.z, zCandidates, snap);
+  const x = snapX ? rounded(wanted.x + snapX.delta) : wanted.x;
+  const z = snapZ ? rounded(wanted.z + snapZ.delta) : wanted.z;
+  const guides: AlignGuide[] = [];
+  if (snapX) {
+    const span = guideSpan(snapX.span, [mine.z.lo + z - wanted.z, mine.z.hi + z - wanted.z]);
+    guides.push({ from: { x: snapX.value, y: 0.02, z: span[0] }, to: { x: snapX.value, y: 0.02, z: span[1] } });
+  }
+  if (snapZ) {
+    const span = guideSpan(snapZ.span, [mine.x.lo + x - wanted.x, mine.x.hi + x - wanted.x]);
+    guides.push({ from: { x: span[0], y: 0.02, z: snapZ.value }, to: { x: span[1], y: 0.02, z: snapZ.value } });
+  }
+  return { value: { x, z, rotationY: wanted.rotationY }, guides };
 }
 
 /** The end arrows on a selected stretchable item, lifted just off the ground. */

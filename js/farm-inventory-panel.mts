@@ -10,6 +10,7 @@ import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies, type TreeSpecies } from "./farm-catalog/trees.mjs";
 import { pantryLines, starsLabel } from "./farm-kitchen.mjs";
 import { PATTERN_CATALOG, PIECE_STARS, PLANK_SPECIES, pieceKey } from "./farm-catalog/carpentry.mjs";
+import { QUALITIES, gradedTitle, produceKey } from "./farm-quality.mjs";
 
 type Elements = Readonly<{
   root: HTMLElement;
@@ -176,7 +177,15 @@ export function createFarmInventoryPanel(elements: Elements, options: Options = 
       return button;
     }));
     elements.produceGrid.replaceChildren(
-      ...CROP_CATALOG.map((crop) => itemTile(`produce:${crop.id}`, crop.title, agriculture.inventory.produce[crop.id] ?? 0)),
+      // Each crop's Normal stack always shows (dimmed when empty); a Poor, Fine or Perfect one only while held.
+      ...CROP_CATALOG.flatMap((crop) => [...QUALITIES].reverse()
+        .map((quality) => ({ quality, key: produceKey(crop.id, quality) }))
+        .filter(({ quality, key }) => quality === "normal" || (agriculture.inventory.produce[key] ?? 0) > 0)
+        .map(({ quality, key }) => {
+          const tile = itemTile(`produce:${key}`, gradedTitle(crop.title, quality), agriculture.inventory.produce[key] ?? 0);
+          tile.dataset.quality = quality;
+          return tile;
+        })),
       ...FRUIT_TREES.map((species) => itemTile(`produce:${species.fruitId}`, species.fruitPlural, agriculture.inventory.produce[species.fruitId] ?? 0)),
     );
     const pantry = pantryLines(agriculture.inventory.dishes);
@@ -201,7 +210,10 @@ export function createFarmInventoryPanel(elements: Elements, options: Options = 
       empty.textContent = "Nothing made yet. Saw logs into planks at a Sawmill, then press E at the Carpenter's Workbench.";
       elements.furnitureGrid.replaceChildren(empty);
     }
-    elements.suppliesGrid.replaceChildren(...PET_CARE.map((care) => {
+    // Compost heads the supplies: made by digging out a dead crop, spent with E on a growing one.
+    const compost = itemTile("supply:compost", "Compost", agriculture.inventory.compost);
+    compost.title = "Dig out a dead crop to make compost; press E on a growing crop to work it in (one grade better at harvest).";
+    elements.suppliesGrid.replaceChildren(compost, ...PET_CARE.map((care) => {
       const held = agriculture.inventory.supplies[care.food.itemId] ?? 0;
       return itemTile(`supply:${care.food.itemId}`, care.food.title, held, buyButton(care.food.itemId, care.food.price, held));
     }));

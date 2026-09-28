@@ -27,6 +27,7 @@ import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { farmDishPrice, farmProducePrice } from "./farm-market-catalog.mjs";
 import { farmHarvestXp } from "./farm-skill-catalog.mjs";
 import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
+import { farmSeedFor as seedFor, farmSeededRandom as mulberry32 } from "./farm-seeded-random.mjs";
 
 export const FARM_ORDER_DAY_MS = 24 * 60 * 60 * 1000;
 /** An order's XP is this share of what growing its produce earned. */
@@ -100,27 +101,6 @@ export type FarmOrder = Readonly<{
 
 export function farmOrderDay(now: number): number {
   return Math.floor(now / FARM_ORDER_DAY_MS);
-}
-
-function seedFor(text: string): number {
-  // FNV-1a: a stable 32-bit seed from the day's name.
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function pick<T>(list: readonly T[], random: () => number, taken: Set<T>): T {

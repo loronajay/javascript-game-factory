@@ -249,6 +249,11 @@ camera.rotation.order = "YXZ";
 const world = createFarmWorld(THREE, scene);
 world.applyGround(layout.ground);
 world.sync(layout);
+// Match the arcade room's build tool: half-metre cells make plots and paths easy to line up.
+const grid = new THREE.GridHelper(FARM_BOUNDS.width, FARM_BOUNDS.width * 2, 0x7ba36b, 0x46664b);
+grid.position.y = 0.004;
+grid.visible = false;
+scene.add(grid);
 // `?time=<minute-of-day>` is a visual-QA seam for checking any light state without waiting through the cycle.
 const previewMinute = new URLSearchParams(location.search).get("time");
 let clockMinutes = previewMinute === null ? resumedClock.farmMinutes : advanceFarmTime(Number(previewMinute), 0, 0);
@@ -1262,6 +1267,7 @@ const farmEditor = createFarmEditor({
   onEditingChange: (editing) => {
     keys.clear();
     draggingLook = false;
+    grid.visible = editing;
     if (editing) dropCarried();
     if (editing) trees.cancelChop();
     // Come up for air first, so the underwater fog does not keep the overview's fog when it lets go.

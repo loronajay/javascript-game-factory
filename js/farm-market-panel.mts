@@ -27,6 +27,12 @@ type Options = Readonly<{
   sellable?: readonly Sellable[];
   /** What the counter says when the player holds nothing it buys. */
   emptyNote?: string;
+  /** Today's price for a line, when this counter pays by the day (the Produce Merchant). */
+  priceOf?: (id: string) => number;
+  /** A word beside a line's price (today's move). */
+  lineNote?: (id: string) => string;
+  /** Called after every draw (the page keeps the day's turnover beside it). */
+  onRender?: () => void;
   onClose?: () => void;
 }>;
 
@@ -34,6 +40,8 @@ export type MarketSalePanel = Readonly<{
   open: (produce: Readonly<Record<string, number>>, note?: string) => void;
   close: () => void;
   isOpen: () => boolean;
+  /** Draw the counter again (the day's prices arrived or turned over), keeping what was picked. */
+  repaint: () => void;
 }>;
 
 export function createMarketSalePanel(elements: Elements, options: Options): MarketSalePanel {
@@ -72,7 +80,8 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
     const title = document.createElement("strong");
     title.textContent = line.title;
     const held = document.createElement("small");
-    held.textContent = `You have ${line.held} · ${line.price} tickets each`;
+    const move = options.lineNote?.(line.cropId) ?? "";
+    held.textContent = `You have ${line.held} · ${line.price} tickets each${move ? ` · ${move}` : ""}`;
     label.replaceChildren(title, held);
     const stepper = document.createElement("div");
     stepper.className = "sale-row__stepper";
@@ -111,7 +120,7 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
   }
 
   function render(): void {
-    const lines = saleLines(produce, picked, sellable);
+    const lines = saleLines(produce, picked, sellable, options.priceOf);
     if (!lines.length) {
       const empty = document.createElement("li");
       empty.className = "sale-empty";
@@ -125,10 +134,11 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
     elements.sellButton.disabled = busy || total <= 0;
     elements.sellButton.textContent = busy ? "Selling…" : total > 0 ? `Sell for ${total.toLocaleString()} tickets` : "Pick something to sell";
     elements.pickAllButton.disabled = busy || !lines.length;
+    options.onRender?.();
   }
 
   async function sell(): Promise<void> {
-    const items = saleItems(saleLines(produce, picked, sellable));
+    const items = saleItems(saleLines(produce, picked, sellable, options.priceOf));
     if (busy || !Object.keys(items).length) return;
     busy = true;
     render();
@@ -153,9 +163,9 @@ export function createMarketSalePanel(elements: Elements, options: Options): Mar
   elements.closeButton.addEventListener("click", close);
   elements.sellButton.addEventListener("click", () => void sell());
   elements.pickAllButton.addEventListener("click", () => {
-    picked = Object.fromEntries(saleLines(produce, {}, sellable).map((line) => [line.cropId, line.held]));
+    picked = Object.fromEntries(saleLines(produce, {}, sellable, options.priceOf).map((line) => [line.cropId, line.held]));
     render();
   });
   elements.root.hidden = true;
-  return Object.freeze({ open, close, isOpen });
+  return Object.freeze({ open, close, isOpen, repaint: () => { if (isOpen()) render(); } });
 }

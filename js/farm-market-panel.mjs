@@ -39,7 +39,8 @@ export function createMarketSalePanel(elements, options) {
         const title = document.createElement("strong");
         title.textContent = line.title;
         const held = document.createElement("small");
-        held.textContent = `You have ${line.held} · ${line.price} tickets each`;
+        const move = options.lineNote?.(line.cropId) ?? "";
+        held.textContent = `You have ${line.held} · ${line.price} tickets each${move ? ` · ${move}` : ""}`;
         label.replaceChildren(title, held);
         const stepper = document.createElement("div");
         stepper.className = "sale-row__stepper";
@@ -77,7 +78,7 @@ export function createMarketSalePanel(elements, options) {
         return item;
     }
     function render() {
-        const lines = saleLines(produce, picked, sellable);
+        const lines = saleLines(produce, picked, sellable, options.priceOf);
         if (!lines.length) {
             const empty = document.createElement("li");
             empty.className = "sale-empty";
@@ -92,9 +93,10 @@ export function createMarketSalePanel(elements, options) {
         elements.sellButton.disabled = busy || total <= 0;
         elements.sellButton.textContent = busy ? "Selling…" : total > 0 ? `Sell for ${total.toLocaleString()} tickets` : "Pick something to sell";
         elements.pickAllButton.disabled = busy || !lines.length;
+        options.onRender?.();
     }
     async function sell() {
-        const items = saleItems(saleLines(produce, picked, sellable));
+        const items = saleItems(saleLines(produce, picked, sellable, options.priceOf));
         if (busy || !Object.keys(items).length)
             return;
         busy = true;
@@ -120,9 +122,10 @@ export function createMarketSalePanel(elements, options) {
     elements.closeButton.addEventListener("click", close);
     elements.sellButton.addEventListener("click", () => void sell());
     elements.pickAllButton.addEventListener("click", () => {
-        picked = Object.fromEntries(saleLines(produce, {}, sellable).map((line) => [line.cropId, line.held]));
+        picked = Object.fromEntries(saleLines(produce, {}, sellable, options.priceOf).map((line) => [line.cropId, line.held]));
         render();
     });
     elements.root.hidden = true;
-    return Object.freeze({ open, close, isOpen });
+    return Object.freeze({ open, close, isOpen, repaint: () => { if (isOpen())
+            render(); } });
 }

@@ -14,6 +14,7 @@ import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey, type DishStars } from "./farm-recipe-catalog.mjs";
 import { farmPiecePrice, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
+import { QUALITY_PRICE, parseFarmProduceKey } from "./farm-quality-catalog.mjs";
 
 const DAY = 24 * 60;
 
@@ -79,17 +80,25 @@ export const FARM_DISH_PRICES: Readonly<Record<string, number>> = Object.freeze(
   Object.keys(FARM_RECIPE_RULES).flatMap((recipeId) => ([1, 2, 3] as const).map((stars) => [`${recipeId}@${stars}`, farmDishPrice(recipeId, stars)])),
 ));
 
-/** Whatever a sale line names — a crop, a fruit, a dish or a piece of furniture — at the server's price, or 0 for anything the market does not buy. */
+/**
+ * Whatever a sale line names — a crop or fruit of some grade, a dish or a piece
+ * of furniture — at the server's STANDING price, or 0 for anything the market
+ * does not buy. Produce sold at the merchant is paid at the day's price
+ * instead (services/farm-market-day `farmMarketProducePrice`); this is its
+ * Normal-day value, which is what an offer is weighed against.
+ */
 export function farmSalePrice(itemId: unknown): number {
   const dish = parseFarmDishKey(itemId);
   if (dish) return farmDishPrice(dish.recipeId, dish.stars);
   const piece = parseFarmPieceKey(itemId);
   if (piece) return farmPiecePrice(piece.itemId, piece.stars);
-  return farmProducePrice(itemId);
+  const produce = parseFarmProduceKey(itemId);
+  if (!produce) return 0;
+  return Math.max(1, Math.round(farmProducePrice(produce.itemId) * QUALITY_PRICE[produce.quality]));
 }
 
 /**
- * A sale request made safe: known crops, fruit, dishes and furniture only, whole positive
+ * A sale request made safe: known crops (any grade), fruit, dishes and furniture only, whole positive
  * counts, at most MAX_SALE_QUANTITY each, at least one line. `null` for anything else.
  */
 export function normalizeSaleLines(value: unknown): Readonly<Record<string, number>> | null {

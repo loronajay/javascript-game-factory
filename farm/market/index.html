@@ -54,7 +54,8 @@
         <button id="closeSale" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
       <div class="inventory-panel__body">
-        <p class="sale-note">Prices are the merchant's: what the seed cost you, plus a fair day's margin for every day it grew. The Order Board across the square pays better for what it asks for.</p>
+        <p class="sale-note">Prices are the merchant's: what the seed cost you, plus a fair day's margin for every day it grew, moved a little by the day — up to a fifth either way — and by the grade. Perfect pays two fifths more than Normal, Poor a quarter less. The Order Board across the square pays better for what it asks for.</p>
+        <p id="saleTurnover" class="sale-turnover"></p>
         <ol id="saleList" class="sale-list"></ol>
       </div>
       <footer class="sale-footer">
@@ -64,6 +65,21 @@
           <button id="sellProduce" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Pick something to sell</button>
         </div>
         <p id="saleStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <aside id="seedPanel" class="inventory-panel sale-panel seed-panel" aria-label="Seed Merchant" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">SEED MERCHANT · JUNIPER</span><strong>Buy seeds</strong></div>
+        <button id="closeSeeds" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Every seed your farm's shop sells, at the same price — and three on special each day for a quarter less, only here. Seeds go straight to your farm's Inventory.</p>
+        <p id="seedTurnover" class="sale-turnover"></p>
+        <ol id="seedList" class="sale-list"></ol>
+      </div>
+      <footer class="sale-footer">
+        <p id="seedStatus" class="pets-status" aria-live="polite"></p>
       </footer>
     </aside>
 
@@ -153,6 +169,25 @@
           <button id="confirmTrade" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Confirm trade</button>
         </div>
         <p class="trade-footer__rule">Both lock, then both confirm. Any change unlocks both sides. No tickets change hands.</p>
+      </footer>
+    </aside>
+
+    <aside id="exchangePanel" class="inventory-panel sale-panel exchange-panel" aria-label="Exchange Board" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">EXCHANGE BOARD</span><strong>Buy and sell with other farmers</strong></div>
+        <button id="closeExchange" class="farm-button" type="button" title="Step back from the board (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="exchange-tabs" role="tablist">
+        <button id="exchangeBuyTab" type="button" role="tab" aria-selected="true">Buy</button>
+        <button id="exchangeSellTab" type="button" role="tab" aria-selected="false">Sell</button>
+      </div>
+      <div class="inventory-panel__body">
+        <ol id="exchangeBuyList" class="sale-list"></ol>
+        <div id="exchangeSellView" hidden></div>
+      </div>
+      <footer class="sale-footer">
+        <p id="exchangeLimits" class="exchange-limits"></p>
+        <p id="exchangeStatus" class="pets-status" aria-live="polite"></p>
       </footer>
     </aside>
 

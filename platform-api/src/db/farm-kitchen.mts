@@ -15,6 +15,7 @@
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, recordFarmCook } from "../services/farm-skill-catalog.mjs";
 import { COOK_ID, farmDishKey, farmDishStars, farmRecipeRule, normalizeCookScores } from "../services/farm-recipe-catalog.mjs";
+import { farmProduceHeld, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
 import { saveFarm, transaction, verifiedSubmittedFarm } from "./farm-economy.mjs";
 
@@ -53,11 +54,12 @@ export async function cookFarmDish(pool: any, input: any, now: number = Date.now
     const level = farmingLevelForXp(before.xp);
     if (level < rule.minLevel) return answer({ ok: false, error: "level_too_low", minLevel: rule.minLevel, level, layout: verified });
     const inventory = verified.agriculture.inventory;
-    const produce: Record<string, number> = { ...(inventory.produce ?? {}) };
+    // A recipe asks for the crop, not its grade: the plainest goes in the pot first.
+    let produce: Record<string, number> = { ...(inventory.produce ?? {}) };
     for (const [itemId, need] of Object.entries(rule.ingredients)) {
-      const held = Number(produce[itemId]) || 0;
-      if (held < need) return answer({ ok: false, error: "not_enough_produce", itemId, held, layout: verified });
-      produce[itemId] = held - need;
+      const taken = takeFarmProduce(produce, itemId, need);
+      if (!taken) return answer({ ok: false, error: "not_enough_produce", itemId, held: farmProduceHeld(produce, itemId), layout: verified });
+      produce = taken;
     }
     const stars = farmDishStars(scores);
     const key = farmDishKey(recipeId, stars);

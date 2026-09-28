@@ -90,11 +90,14 @@ export const PRODUCE_STALL_ID = "produce";
 export const ORDER_BOARD_ID = "orders";
 export const KITCHEN_STALL_ID = "kitchen";
 export const SAWMILL_STALL_ID = "sawmill";
+export const SEED_STALL_ID = "seeds";
+export const EXCHANGE_BOARD_ID = "exchange";
 /**
- * The square's stalls. The Produce Merchant (v1), the Order Board (Phase 4),
- * the Kitchen (Phase 6, buying cooked dishes) and the Sawmill (Phase 7: saws
- * logs into planks for a fee, and buys furniture) are open; the Seed Merchant
- * stands where it will trade, shuttered, and says so.
+ * The square's stalls. The Produce Merchant (v1, paying the day's prices), the
+ * Order Board (Phase 4), the Kitchen (Phase 6, buying cooked dishes), the
+ * Sawmill (Phase 7: saws logs into planks for a fee, and buys furniture) and
+ * the Seed Merchant (every seed, with three on special each day) are open,
+ * and the Exchange Board, where players list goods for each other's tickets.
  */
 export const MARKET_STALLS = Object.freeze([
     stall({
@@ -104,9 +107,10 @@ export const MARKET_STALLS = Object.freeze([
         closedNote: "",
     }),
     stall({
-        id: "seeds", kind: "stall", title: "Seed Merchant", open: false,
-        x: -7.4, z: -9.4, rotationY: 0, colors: ["#d2a032", "#f4ecd6"], keeper: null,
-        closedNote: "The Seed Merchant's shutters are down. Seeds are still sold from your farm's Inventory.",
+        id: SEED_STALL_ID, kind: "stall", title: "Seed Merchant", open: true,
+        x: -7.4, z: -9.4, rotationY: 0, colors: ["#d2a032", "#f4ecd6"],
+        keeper: Object.freeze({ name: "Juniper", avatarId: "avatar.hero-f", greeting: "Three packets on special today — nowhere else sells them cheaper." }),
+        closedNote: "",
     }),
     stall({
         id: KITCHEN_STALL_ID, kind: "stall", title: "Kitchen", open: true,
@@ -125,6 +129,13 @@ export const MARKET_STALLS = Object.freeze([
         x: 11.2, z: 1.2, rotationY: -QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
         colors: ["#6b4b2c", "#f4ecd6"], keeper: null,
         closedNote: "",
+    }),
+    stall({
+        id: EXCHANGE_BOARD_ID, kind: "board", title: "Exchange Board", open: true,
+        x: 11.2, z: -4.4, rotationY: -QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
+        colors: ["#2f5f8a", "#f4ecd6"], keeper: null,
+        closedNote: "",
+        notices: Object.freeze(["For sale", "For sale", "Bargain", "For sale", "Tickets"]),
     }),
 ]);
 export function findMarketStall(id) {
@@ -183,10 +194,14 @@ export function findStallInReach(pose, stalls = MARKET_STALLS) {
 export function stallPrompt(entry, signedIn) {
     if (!entry.open)
         return `${entry.title} · closed for now · Press E to read the notice`;
+    if (entry.id === EXCHANGE_BOARD_ID)
+        return signedIn ? `Press E to buy and sell at the ${entry.title}` : `${entry.title} · sign in to buy and sell`;
     if (entry.kind === "board")
         return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;
     if (entry.id === SAWMILL_STALL_ID)
         return signedIn ? `Press E to saw logs and sell furniture to ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to saw logs and sell furniture`;
+    if (entry.id === SEED_STALL_ID)
+        return signedIn ? `Press E to buy seeds from ${entry.keeper?.name ?? entry.title} · today's specials` : `${entry.title} · sign in to buy seeds`;
     const goods = entry.id === KITCHEN_STALL_ID ? "cooking" : "produce";
     if (!signedIn)
         return `${entry.title} · sign in to sell your ${goods}`;

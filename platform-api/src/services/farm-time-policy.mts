@@ -90,6 +90,9 @@ export function boundCropGrowth(crops: any[], storedCrops: any[], storedClockMin
       lastFarmMinute: stamp,
       growthMinutes: Math.max(0, growth),
       carePenalty: Math.max(finite(row.carePenalty, 0), previous ? finite(previous.carePenalty, 0) : 0),
+      // A crop's stress only ever accrues, and compost once worked in stays: both decide its grade.
+      stressMinutes: Math.max(finite(row.stressMinutes, 0), previous ? finite(previous.stressMinutes, 0) : 0),
+      fertilized: row.fertilized === true || previous?.fertilized === true,
       diedOf: previous?.diedOf || row.diedOf || "",
     };
   });

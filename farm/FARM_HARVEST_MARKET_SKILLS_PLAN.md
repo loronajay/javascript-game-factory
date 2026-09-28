@@ -1268,6 +1268,20 @@ Only after server-authoritative inventory is stable:
 
 ---
 
+## After the plan — shipped 2026-09-27
+
+The items this plan left for "later" (see `planning-docs/CHANGELOG.md`):
+
+1. **Market price variation (§18.1)** — day prices, ±20%, produce only; a sale names its day.
+2. **Seed Merchant** — the shuttered stall opened; three seeds on special a day, market only.
+3. **Crop quality (§10.8)** — Poor/Normal/Fine/Perfect from care (`stressMinutes`, `carePenalty`); price by grade; orders and recipes take the plainest first. Cooking's star ceiling is deliberately NOT tied to ingredient grade.
+4. **Composting (§10.5)** — a dead crop dug out makes compost; compost lifts a growing crop one grade.
+5. **Ticket-based player market (§7.1)** — the Exchange Board: listings in escrow, a ½–1½× price band, a 10% burned fee, daily caps.
+
+Offline growth stays at 10% and non-lethal by decision (§11 describes 20% and lethal).
+
+---
+
 # 21. Acceptance Criteria
 
 The system is not complete unless all of the following are true.

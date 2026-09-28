@@ -14,6 +14,7 @@ import { findCrop } from "./farm-crops.mjs";
 import { findFruit } from "./farm-catalog/trees.mjs";
 import { DISH_KEYS, findRecipe } from "./farm-catalog/recipes.mjs";
 import { basketItemTitle, pantryCount } from "./farm-kitchen.mjs";
+import { parseProduceKey, produceHeld } from "./farm-quality.mjs";
 function whole(value) {
     const number = Number(value);
     return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
@@ -21,7 +22,12 @@ function whole(value) {
 function text(value, limit) {
     return typeof value === "string" ? value.slice(0, limit) : "";
 }
-function counts(value, known = (id) => Boolean(findCrop(id) || findFruit(id))) {
+/** A basket key: a crop at any grade, or fruit (which has none). */
+function isBasketKey(key) {
+    const parsed = parseProduceKey(key);
+    return Boolean(parsed && (findCrop(parsed.itemId) || (parsed.quality === "normal" && findFruit(parsed.itemId))));
+}
+function counts(value, known = isBasketKey) {
     const source = value && typeof value === "object" ? value : {};
     const result = {};
     for (const [id, raw] of Object.entries(source))
@@ -64,7 +70,8 @@ export function normalizeOrderBoard(value) {
 export function orderView(order, stock) {
     const dish = order.kind === "dish";
     const lines = Object.entries(order.lines).map(([id, need]) => {
-        const held = dish ? pantryCount(stock.dishes, id) : whole(stock.produce[id]);
+        // An order asks for the crop, not its grade; the server takes the plainest first.
+        const held = dish ? pantryCount(stock.dishes, id) : whole(produceHeld(stock.produce, id));
         const title = dish ? findRecipe(id)?.title ?? id : basketItemTitle(id);
         return Object.freeze({ cropId: id, title, need, held, short: Math.max(0, need - held), itemKey: dish ? `dish:${id}@2` : `produce:${id}` });
     });

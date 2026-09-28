@@ -89,7 +89,7 @@ function normalizeRotation(value: any): number | null {
 
 export function defaultFarmGarage(): any {
   // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {} }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, skills: emptyFarmSkillRecords() };
+  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, skills: emptyFarmSkillRecords() };
 }
 
 function normalizeCropCounts(value: any): any {
@@ -100,6 +100,24 @@ function normalizeCropCounts(value: any): any {
     output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
   }
   return output;
+}
+
+/** The harvest basket: a crop or fruit id, a crop with a grade suffix (services/farm-quality-catalog; Normal is the bare id). */
+const PRODUCE_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:@(?:poor|fine|perfect))?$/;
+
+function normalizeProduceCounts(value: any): any {
+  const input = value && typeof value === "object" ? value : {};
+  const output: any = {};
+  for (const [id, raw] of Object.entries(input).slice(0, 160)) {
+    if (!PRODUCE_KEY_PATTERN.test(id) || typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
+  }
+  return output;
+}
+
+/** A whole bounded count, like one stack's. */
+function stackCount(value: any): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.min(99, Math.max(0, Math.floor(value))) : 0;
 }
 
 function normalizeSupplyCounts(value: any): any {
@@ -175,11 +193,16 @@ function normalizeAgriculture(value: any, decorIds: ReadonlySet<string>): any {
       untendedMinutes: Math.max(0, boundedNumber(row.untendedMinutes, 100000) ?? 0),
       carePenalty: Math.max(0, boundedNumber(row.carePenalty, 1) ?? 0),
       diedOf: row.diedOf === "thirst" || row.diedOf === "neglect" ? row.diedOf : "",
+      // Its produce grade (services/farm-quality-catalog): lifetime stress, and compost worked in.
+      stressMinutes: Math.max(0, boundedNumber(row.stressMinutes, 1000000) ?? 0),
+      fertilized: row.fertilized === true,
     });
   }
   return {
     inventory: {
-      seeds: normalizeCropCounts(inventory.seeds), produce: normalizeCropCounts(inventory.produce), supplies: normalizeSupplyCounts(inventory.supplies),
+      seeds: normalizeCropCounts(inventory.seeds), produce: normalizeProduceCounts(inventory.produce), supplies: normalizeSupplyCounts(inventory.supplies),
+      // Compost: one made each time a dead crop is dug out, spent to lift a growing crop a grade.
+      compost: stackCount(inventory.compost),
       // Productive-tree saplings (bought) and felled logs (server-minted), by species (services/farm-tree-catalog).
       saplings: normalizeCropCounts(inventory.saplings), logs: normalizeCropCounts(inventory.logs),
       // Cooked dishes (server-minted at the Kitchen Range, services/farm-recipe-catalog).
@@ -231,7 +254,10 @@ function capNewCrops(crops: any[], storedCrops: any[], capacity: number): any[] 
  *     the others;
  *   - PLANKS and FURNITURE are the server's too: only the Sawmill makes a
  *     plank and only the Workbench a piece (the Carpentry record is pinned),
- *     and a save may place no more of a piece than the stored count owns.
+ *     and a save may place no more of a piece than the stored count owns;
+ *   - COMPOST rises by at most one for each stored dead crop the save dug
+ *     out, and a crop newly marked fertilized must have been paid for by
+ *     compost that went (guardCompost).
  */
 function guardFarmSave(garage: any, current: any, context: any): void {
   const inventory = garage.agriculture.inventory;
@@ -265,6 +291,7 @@ function guardFarmSave(garage: any, current: any, context: any): void {
   const bounded = boundCropGrowth(garage.agriculture.crops, storedCrops, storedClockMinutes, verified, (cropId) => farmCropRule(cropId)?.growMinutes ?? 0);
   const level = farmingLevelForXp(garage.skills.farming.xp);
   garage.agriculture.crops = capNewCrops(bounded, storedCrops, farmCropCapacity(garage.decor ?? [], level));
+  guardCompost(garage.agriculture, current ? storedInventory.compost ?? 0 : 0, storedCrops);
 
   const storedTrees = Array.isArray(current?.trees) ? current.trees : [];
   garage.trees = admitNewTrees(boundTreeGrowth(garage.trees, storedTrees, storedClockMinutes, verified), storedTrees, {
@@ -273,6 +300,34 @@ function guardFarmSave(garage: any, current: any, context: any): void {
     farmingLevel: level,
     woodcuttingLevel: farmingLevelForXp(garage.skills.woodcutting.xp),
   });
+}
+
+/**
+ * Compost is made by digging out a dead crop and spent by working it into a
+ * growing one, both on the client — so a save is held to what it could have
+ * done. It may keep at most the stored heap plus one for every stored DEAD
+ * crop that is no longer in the ground, and every crop newly marked
+ * fertilized (not fertilized in the stored row) must be covered by compost
+ * that left the heap; any beyond that are saved unfertilized. A stored
+ * fertilized crop stays fertilized (boundCropGrowth).
+ */
+function guardCompost(agriculture: any, storedCompost: number, storedCrops: any[]): void {
+  const key = (row: any) => `${row.plotId}:${row.cellId}:${row.cropId}`;
+  const standing = new Set(agriculture.crops.map(key));
+  const dugOut = storedCrops.filter((row) => row?.diedOf && !standing.has(key(row))).length;
+  const ceiling = Math.min(99, storedCompost + dugOut);
+  const compost = Math.min(stackCount(agriculture.inventory.compost), ceiling);
+  let paid = ceiling - compost;
+  const stored = new Map(storedCrops.map((row) => [key(row), row]));
+  agriculture.crops = agriculture.crops.map((row: any) => {
+    if (!row.fertilized || stored.get(key(row))?.fertilized) return row;
+    if (paid > 0) {
+      paid -= 1;
+      return row;
+    }
+    return { ...row, fertilized: false };
+  });
+  agriculture.inventory.compost = compost;
 }
 
 function normalizePetProfile(value: any): any | null {

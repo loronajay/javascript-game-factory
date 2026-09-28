@@ -100,7 +100,7 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     onboarding: { status: "needs_name", introSeen: false },
     ground: "",
     pets: [],
-    agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {} }, crops: [] },
+    agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] },
     trees: [],
     clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 },
     skills: {
@@ -144,6 +144,7 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     dishes: {},
     planks: {},
     furniture: {},
+    compost: 0,
   });
   assert.deepEqual(garage.agriculture.crops, [{
     plotId: "plot-1",
@@ -157,6 +158,8 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     untendedMinutes: 0,
     carePenalty: 0,
     diedOf: "",
+    stressMinutes: 0,
+    fertilized: false,
   }, {
     plotId: "plot-1",
     cellId: "cell-1",
@@ -169,6 +172,8 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     untendedMinutes: 12,
     carePenalty: 1,
     diedOf: "thirst",
+    stressMinutes: 0,
+    fertilized: false,
   }]);
   assert.deepEqual(garage.clock, { farmMinutes: 612.5, updatedAt: 1_800_000_000_000, checkpointAt: 1_799_999_000_000, napBank: 1440 });
 });

@@ -8,6 +8,7 @@ import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { DISH_STARS, RECIPE_CATALOG, dishKey, parseDishKey } from "./farm-catalog/recipes.mjs";
 import { starsLabel } from "./farm-kitchen.mjs";
 import { PATTERN_CATALOG, PIECE_STARS, PLANKS_PER_LOG, parsePieceKey, pieceKey } from "./farm-catalog/carpentry.mjs";
+import { QUALITIES, QUALITY_PRICE, gradedTitle, parseProduceKey, produceKey } from "./farm-quality.mjs";
 /** Ticket margin one productive cell earns per farm day of growth when its crop is sold raw. */
 export const MARKET_MARGIN_PER_CELL_DAY = 12;
 export const MAX_SALE_QUANTITY = 99;
@@ -23,13 +24,28 @@ export const PRODUCE_PRICES = Object.freeze(Object.fromEntries([
     ...CROP_CATALOG.map((crop) => [crop.id, derivedProducePrice(crop)]),
     ...FRUIT_TREES.map((species) => [species.fruitId, derivedFruitPrice(species)]),
 ]));
-/** Everything the Produce Merchant buys, in the order the counter lists it: the crops, then the fruit. */
+/**
+ * Everything the Produce Merchant buys, in the order the counter lists it: each
+ * crop at every grade, finest first (farm-quality.mts), then the fruit.
+ */
 export const SELLABLE_PRODUCE = Object.freeze([
-    ...CROP_CATALOG.map((crop) => Object.freeze({ id: crop.id, title: crop.title, itemKey: `produce:${crop.id}` })),
+    ...CROP_CATALOG.flatMap((crop) => [...QUALITIES].reverse().map((quality) => {
+        const id = produceKey(crop.id, quality);
+        return Object.freeze({ id, title: gradedTitle(crop.title, quality), itemKey: `produce:${id}` });
+    })),
     ...FRUIT_TREES.map((species) => Object.freeze({ id: species.fruitId, title: species.fruitTitle, itemKey: `produce:${species.fruitId}` })),
 ]);
-export function producePrice(cropId) {
-    return Object.prototype.hasOwnProperty.call(PRODUCE_PRICES, cropId) ? PRODUCE_PRICES[cropId] : 0;
+/**
+ * A basket key's STANDING price: its crop's Normal price by its grade. The
+ * merchant pays the day's price instead (the server's `/games/farm/market/prices`);
+ * this is what an order, a recipe and a Market listing are weighed against.
+ */
+export function producePrice(key) {
+    const parsed = parseProduceKey(key);
+    if (!parsed || !Object.prototype.hasOwnProperty.call(PRODUCE_PRICES, parsed.itemId))
+        return 0;
+    const base = PRODUCE_PRICES[parsed.itemId];
+    return parsed.quality === "normal" ? base : Math.max(1, Math.round(base * QUALITY_PRICE[parsed.quality]));
 }
 // ---------------------------------------------------------------- cooked dishes
 /** The Kitchen's premium on the ingredients' raw price, by stars (platform-api's farm-market-catalog is the payer). */
@@ -93,12 +109,14 @@ export function salePrice(id) {
  * order, with the quantity they have picked to sell (clamped to what they hold).
  * The Produce Merchant's by default; the Kitchen passes SELLABLE_DISHES and the pantry.
  */
-export function saleLines(stock, picked, sellable = SELLABLE_PRODUCE) {
+export function saleLines(stock, picked, sellable = SELLABLE_PRODUCE, 
+/** Today's price for a line, when the counter pays by the day (the Produce Merchant); the standing price otherwise. */
+priceOf = salePrice) {
     return sellable
         .map((item) => {
         const held = Math.max(0, Math.floor(Number(stock[item.id]) || 0));
         const quantity = Math.min(held, MAX_SALE_QUANTITY, Math.max(0, Math.floor(Number(picked[item.id]) || 0)));
-        return { cropId: item.id, title: item.title, held, quantity, price: salePrice(item.id), itemKey: item.itemKey };
+        return { cropId: item.id, title: item.title, held, quantity, price: priceOf(item.id), itemKey: item.itemKey };
     })
         .filter((line) => line.held > 0);
 }

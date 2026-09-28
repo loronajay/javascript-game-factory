@@ -3,6 +3,8 @@ import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply } from "../services/farm-economy-catalog.mjs";
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
+import { farmMarketDay, farmMarketProducePrice, farmMarketSeedPrice } from "../services/farm-market-day.mjs";
+import { farmCropQuality, farmProduceKey, parseFarmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { parseFarmDishKey } from "../services/farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "../services/farm-carpentry-catalog.mjs";
 import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder } from "../services/farm-skill-catalog.mjs";
@@ -110,7 +112,14 @@ export async function adoptFarmPet(pool, input, random = Math.random) {
         return { ok: true, duplicate: false, price: FARM_ADOPTION_PRICE, balance: spend.balance, pet, layout: next };
     });
 }
-export async function purchaseFarmSupply(pool, input) {
+/**
+ * Buy seeds, saplings or feed. `venue: "market"` is a purchase at the Market
+ * Square's Seed Merchant, which charges the day's special price for a seed on
+ * special (services/farm-market-day) — and names the `day` it was priced on,
+ * so a special that ended while the player stood at the counter is refused
+ * (`prices_changed`) rather than charged at a price they were not shown.
+ */
+export async function purchaseFarmSupply(pool, input, now = Date.now()) {
     const playerId = required(input?.playerId, "playerId");
     const purchaseId = required(input?.purchaseId, "purchaseId");
     if (!PURCHASE_ID.test(purchaseId))
@@ -121,6 +130,11 @@ export async function purchaseFarmSupply(pool, input) {
     const quantity = Number(input?.quantity);
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20)
         return { ok: false, error: "invalid_quantity" };
+    const atMarket = input?.venue === "market";
+    const day = farmMarketDay(now);
+    if (atMarket && Number(input?.day) !== day)
+        return { ok: false, error: "prices_changed", day };
+    const unitPrice = atMarket && supply.kind === "seed" ? farmMarketSeedPrice(supply.cropId, day) : supply.price;
     const transactionKey = `farm:supply:${purchaseId}`;
     return transaction(pool, async (client) => {
         const farm = await lockedFarm(client, playerId);
@@ -145,10 +159,10 @@ export async function purchaseFarmSupply(pool, input) {
         const current = Number(stack?.[stackId]) || 0;
         if (current + quantity > MAX_STACK)
             return { ok: false, error: "inventory_full" };
-        const total = supply.price * quantity;
+        const total = unitPrice * quantity;
         const spend = await spendTicketsInTransaction(client, {
             playerId, transactionKey, amount: total, reason: "farm_supply_purchase",
-            metadata: { itemId: supply.id, quantity, kind: supply.kind },
+            metadata: { itemId: supply.id, quantity, kind: supply.kind, unitPrice, ...(atMarket ? { venue: "market", day } : {}) },
         });
         if (!spend.ok)
             return { ok: false, error: spend.error, balance: spend.balance, price: total, quantity };
@@ -223,8 +237,11 @@ export async function harvestFarmCrop(pool, input, now = Date.now()) {
         const amount = farmHarvestYield(crop);
         if (amount <= 0)
             return answer({ ok: false, error: "not_ready", layout: verified });
+        // The grade is the verified row's care (stress only accrues, compost only stays), never the client's say.
+        const quality = farmCropQuality(crop);
+        const produceKey = farmProduceKey(crop.cropId, quality);
         const produce = { ...verified.agriculture.inventory.produce };
-        produce[crop.cropId] = Math.min(MAX_STACK, (Number(produce[crop.cropId]) || 0) + amount);
+        produce[produceKey] = Math.min(MAX_STACK, (Number(produce[produceKey]) || 0) + amount);
         // The Farming XP is the verified row's: the stored care penalty, not the client's.
         const before = normalizeFarmingRecord(verified.skills?.farming);
         const xp = farmHarvestXp(crop.cropId, crop.carePenalty);
@@ -241,7 +258,7 @@ export async function harvestFarmCrop(pool, input, now = Date.now()) {
         const achievements = await awardServerAchievementsInTransaction(client, {
             playerId, gameSlug: "farm", facts: { farming, woodcutting: verified.skills?.woodcutting }, sourceId: `harvest:${plotId}:${cellId}:${farming.harvests}`,
         });
-        return answer({ ok: true, cropId: crop.cropId, quantity: amount, xp, farming: farmingSummary(farming, before.xp), achievements, layout });
+        return answer({ ok: true, cropId: crop.cropId, quality, quantity: amount, xp, farming: farmingSummary(farming, before.xp), achievements, layout });
     });
 }
 /**
@@ -317,8 +334,13 @@ const SALE_ID = PURCHASE_ID;
  * harvest or a cook can raise), the price is this server's, the goods come off
  * and the tickets go on together, and the ledger row is keyed by the client's
  * sale id so a retry of a sale that already landed changes nothing and says so.
+ *
+ * Produce is paid at the DAY's price for its grade (services/farm-market-day),
+ * and the sale names the `day` the player was shown: a day that has turned
+ * over is refused (`prices_changed`), never paid at a price they did not see.
+ * Dishes and furniture keep their standing prices.
  */
-export async function sellFarmProduce(pool, input) {
+export async function sellFarmProduce(pool, input, now = Date.now()) {
     const playerId = required(input?.playerId, "playerId");
     const saleId = required(input?.saleId, "saleId");
     if (!SALE_ID.test(saleId))
@@ -326,6 +348,11 @@ export async function sellFarmProduce(pool, input) {
     const lines = normalizeSaleLines(input?.items);
     if (!lines)
         return { ok: false, error: "invalid_sale" };
+    const day = farmMarketDay(now);
+    const hasProduce = Object.keys(lines).some((itemId) => parseFarmProduceKey(itemId));
+    if (hasProduce && Number(input?.day) !== day)
+        return { ok: false, error: "prices_changed", day };
+    const priceOf = (itemId) => parseFarmProduceKey(itemId) ? farmMarketProducePrice(itemId, day) : farmSalePrice(itemId);
     const transactionKey = `farm:sale:${saleId}`;
     return transaction(pool, async (client) => {
         const farm = await lockedFarm(client, playerId);
@@ -350,13 +377,13 @@ export async function sellFarmProduce(pool, input) {
             if (held < quantity)
                 return { ok: false, error: dish ? "not_enough_dishes" : piece ? "not_enough_furniture" : "not_enough_produce", cropId: itemId, held, layout: farm.layout };
             stack[itemId] = (Number(stack[itemId]) || 0) - quantity;
-            earned += farmSalePrice(itemId) * quantity;
+            earned += priceOf(itemId) * quantity;
         }
         const cooked = Object.keys(lines).some((itemId) => parseFarmDishKey(itemId));
         const crafted = Object.keys(lines).some((itemId) => parseFarmPieceKey(itemId));
         const award = await awardTicketsInTransaction(client, {
             playerId, transactionKey, amount: earned, reason: crafted ? "farm_furniture_sale" : cooked ? "farm_dish_sale" : "farm_produce_sale",
-            metadata: { items: lines, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, farmSalePrice(id)])) },
+            metadata: { items: lines, day, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, priceOf(id)])) },
         });
         const next = normalizeFarmGarage({
             ...farm.layout,
@@ -435,12 +462,13 @@ export async function fillFarmOrder(pool, input, now = Date.now()) {
         if (summary.level < order.minLevel)
             return { ok: false, error: "level_too_low", minLevel: order.minLevel, level: summary.level, layout: farm.layout };
         const agriculture = farm.layout.agriculture;
-        const produce = { ...(agriculture?.inventory?.produce ?? {}) };
+        // An order asks for the crop, not its grade: the plainest goes first.
+        let produce = { ...(agriculture?.inventory?.produce ?? {}) };
         for (const [cropId, quantity] of Object.entries(order.lines)) {
-            const held = Number(produce[cropId]) || 0;
-            if (held < quantity)
-                return { ok: false, error: "not_enough_produce", cropId, held, layout: farm.layout };
-            produce[cropId] = held - quantity;
+            const taken = takeFarmProduce(produce, cropId, quantity);
+            if (!taken)
+                return { ok: false, error: "not_enough_produce", cropId, layout: farm.layout };
+            produce = taken;
         }
         const award = await awardTicketsInTransaction(client, {
             playerId, transactionKey, amount: order.tickets, reason: "farm_order",

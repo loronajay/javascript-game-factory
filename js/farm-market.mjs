@@ -11,9 +11,17 @@
 // Trading between players is the same (farm-market-trading.mts): T on a person
 // in reach invites them, and the table the two of them build is the server's
 // (`/games/farm/trades`), which moves the goods between the farms only when
-// both have locked the same offers and both have confirmed.
+// both have locked the same offers and both have confirmed. The Exchange
+// Board is the other way goods change hands: listings for tickets, held in
+// escrow by the server (`/games/farm/market/listings`), priced inside a band
+// round the goods' worth, with the Market keeping a tenth of every sale.
 //
-// Money is never decided here. The Produce Merchant's panel names crops and
+// Money is never decided here. The day's prices are the server's
+// (`GET /games/farm/market/prices`, farm-market-day.mts): the Produce Merchant
+// pays them and the Seed Merchant marks three seeds down, and a sale or a
+// special-price purchase names the day it was shown, so a day that turned over
+// at the counter is refused and re-read rather than paid at a surprise price.
+// The Produce Merchant's panel names crops (by grade) and
 // counts, the Kitchen's names dishes, the Sawmill's logs to saw and furniture
 // to sell (farm-market-sawmill.mts); the server prices the sale, takes the
 // goods and pays the tickets in one transaction (`POST /games/farm/market/sales`),
@@ -35,9 +43,16 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, findMarketStall, findStallInReach, keeperPose, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
+import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
+import { dayPrice, normalizeMarketDay, trendNote, turnoverNote } from "./farm-market-day.mjs";
+import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
+import { createExchangePanel } from "./farm-exchange-panel.mjs";
+import { LISTING_MESSAGES, normalizeListingBoard } from "./farm-listings.mjs";
+import { stockEntries } from "./farm-trade.mjs";
+import { findCrop } from "./farm-crops.mjs";
 import { createOrderBoardPanel } from "./farm-orders-panel.mjs";
 import { createMarketSawmill } from "./farm-market-sawmill.mjs";
 import { createMarketTrading } from "./farm-market-trading.mjs";
@@ -82,6 +97,7 @@ const farmLoad = await farmStore.load();
 const canSell = farmStore.accountBacked && farmLoad.source === "account";
 let produce = farmLoad.layout.agriculture.inventory.produce;
 let dishes = farmLoad.layout.agriculture.inventory.dishes;
+let seeds = farmLoad.layout.agriculture.inventory.seeds;
 /** The whole farm as the server last answered: the Sawmill reads its logs, planks and furniture shelf from it. */
 let farm = farmLoad.layout;
 /** Take the basket and pantry from a farm the server answered with. */
@@ -92,9 +108,26 @@ function takeStock(layoutValue) {
     farm = next;
     produce = next.agriculture.inventory.produce;
     dishes = next.agriculture.inventory.dishes;
+    seeds = next.agriculture.inventory.seeds;
     return next;
 }
 const ticketClient = createTicketWalletClient();
+// ---------------------------------------------------------------- the market's day
+/** Today's prices and specials, as the server last said. Until they arrive the counters show standing prices. */
+let market = null;
+async function loadMarketDay() {
+    const next = normalizeMarketDay(await ticketClient.getFarmMarketPrices().catch(() => null));
+    if (next)
+        market = next;
+    salePanel.repaint();
+    seedPanel.repaint();
+    return market;
+}
+/** The day turns over at UTC midnight for everyone at once: read it again just after. */
+function scheduleTurnover() {
+    const wait = market ? Math.max(1_000, market.endsAt - Date.now() + 2_000) : 60_000;
+    setTimeout(() => { void loadMarketDay().finally(scheduleTurnover); }, Math.min(wait, 2 ** 31 - 1));
+}
 let balance = null;
 function renderTickets() {
     ticketChip.hidden = balance === null;
@@ -167,6 +200,12 @@ function keeperSays(stall, text, now = performance.now()) {
     keepers.say(`keeper-${stall.id}`, text, now);
 }
 const player = { x: MARKET_SPAWN.x, z: MARKET_SPAWN.z, yaw: MARKET_SPAWN.yaw, pitch: -0.03 };
+// `?at=<stall id>` stands the player at that counter, facing it — a QA seam like `?time=`.
+const startStall = findMarketStall(new URLSearchParams(location.search).get("at") ?? "");
+if (startStall) {
+    const spot = stallLocalToWorld(startStall, { x: 0, z: startStall.footprint.depth / 2 + 1 });
+    Object.assign(player, { x: spot.x, z: spot.z, yaw: Math.atan2(-(startStall.x - spot.x), -(startStall.z - spot.z)) });
+}
 let body = createFarmBody();
 const walkerBounds = { halfWidth: MARKET_BOUNDS.width / 2, halfDepth: MARKET_BOUNDS.depth / 2, margin: MARKET_BOUNDS.wallInset };
 const openDoors = new Set();
@@ -246,7 +285,7 @@ function publishPresence() {
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking",
-        activity: trading.activity() || (salePanel.isOpen() ? "selling produce" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
+        activity: trading.activity() || (salePanel.isOpen() ? "selling produce" : seedPanel.isOpen() ? "buying seeds" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
     });
 }
 // ---------------------------------------------------------------- the Produce Merchant and the Kitchen
@@ -261,9 +300,13 @@ const saleMessages = Object.freeze({
 /** One counter's sale: the server prices it, takes the goods and pays; the counter shows what it answered. */
 async function sellAt(stallId, items) {
     const saleId = `sale-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-    const result = await ticketClient.sellFarmProduce(items, saleId);
+    const result = await ticketClient.sellFarmProduce(items, saleId, market?.day);
     takeStock(result?.layout);
     const stock = stallId === KITCHEN_STALL_ID ? dishes : produce;
+    if (result?.error === "prices_changed") {
+        await loadMarketDay();
+        return { ok: false, message: "The day turned over while you were at the counter, and the prices with it. Check the new prices — nothing was sold.", produce: stock };
+    }
     if (!result?.ok) {
         return { ok: false, message: saleMessages[result?.error] ?? "The sale did not go through. Nothing was sold — try again in a moment.", produce: stock };
     }
@@ -272,6 +315,7 @@ async function sellAt(stallId, items) {
     const earned = Number(result.earned) || 0;
     return { ok: true, message: `Sold for ${earned.toLocaleString()} tickets. Your balance is ${formatTicketBalance(balance)}.`, produce: stock };
 }
+const saleTurnover = requiredElement("#saleTurnover");
 const salePanel = createMarketSalePanel({
     root: requiredElement("#salePanel"),
     closeButton: requiredElement("#closeSale"),
@@ -283,6 +327,47 @@ const salePanel = createMarketSalePanel({
 }, {
     sell: (items) => sellAt(PRODUCE_STALL_ID, items),
     thumbnail: itemThumbnails.get,
+    priceOf: (key) => dayPrice(market, key),
+    lineNote: (key) => trendNote(market, key),
+    onRender: () => { saleTurnover.textContent = turnoverNote(market, Date.now()); },
+    onClose: () => canvas.focus(),
+});
+// ---------------------------------------------------------------- the Seed Merchant
+const cropThumbnails = createCropThumbnails(THREE);
+const seedMessages = Object.freeze({
+    insufficient_tickets: "Not enough tickets for that.",
+    inventory_full: "Your seed stack for that crop is full (99).",
+    farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
+});
+async function buySeeds(cropId, quantity) {
+    if (!market)
+        await loadMarketDay();
+    if (!market)
+        return { ok: false, message: "Juniper is still chalking up today's prices. Try again in a moment.", seeds };
+    const purchaseId = `seed-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+    const result = await ticketClient.purchaseFarmSupply(`seed.${cropId}`, quantity, purchaseId, { venue: "market", day: market.day });
+    takeStock(result?.layout);
+    if (result?.error === "prices_changed") {
+        await loadMarketDay();
+        return { ok: false, message: "The specials just changed with the day. Check the new board — nothing was bought.", seeds };
+    }
+    if (!result?.ok)
+        return { ok: false, message: seedMessages[result?.error] ?? "The purchase did not go through. Nothing was bought — try again in a moment.", seeds };
+    takeBalance(result.balance);
+    keeperSays(findMarketStall(SEED_STALL_ID), quantity > 1 ? "A good handful. Plant them soon!" : "One packet. Grow it well.");
+    const title = findCrop(cropId)?.title ?? cropId;
+    return { ok: true, message: `Bought ${quantity} ${title} seed${quantity === 1 ? "" : "s"} for ${Number(result.price).toLocaleString()} tickets. They are in your farm's Inventory.`, seeds };
+}
+const seedPanel = createSeedMerchantPanel({
+    root: requiredElement("#seedPanel"),
+    closeButton: requiredElement("#closeSeeds"),
+    list: requiredElement("#seedList"),
+    turnover: requiredElement("#seedTurnover"),
+    status: requiredElement("#seedStatus"),
+}, {
+    buy: buySeeds,
+    market: () => market,
+    thumbnail: cropThumbnails.get,
     onClose: () => canvas.focus(),
 });
 const kitchenPanel = createMarketSalePanel({
@@ -373,6 +458,44 @@ const sawmill = createMarketSawmill({
     thumbnail: itemThumbnails.get,
     onClose: () => canvas.focus(),
 });
+// ---------------------------------------------------------------- the Exchange Board
+const listingApi = createPlatformApiClient();
+const newId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`}`;
+/** Adopt the farm and balance a listing move answered with, and word the refusal if it was one. */
+function exchangeOutcome(result, success) {
+    takeStock(result?.layout);
+    takeBalance(result?.balance);
+    if (result?.ok)
+        return { ok: true, message: success };
+    return { ok: false, message: LISTING_MESSAGES[result?.error] ?? "That did not go through. Nothing moved — try again in a moment." };
+}
+const exchangePanel = createExchangePanel({
+    root: requiredElement("#exchangePanel"),
+    closeButton: requiredElement("#closeExchange"),
+    buyTab: requiredElement("#exchangeBuyTab"),
+    sellTab: requiredElement("#exchangeSellTab"),
+    buyView: requiredElement("#exchangeBuyList"),
+    sellView: requiredElement("#exchangeSellView"),
+    limits: requiredElement("#exchangeLimits"),
+    status: requiredElement("#exchangeStatus"),
+}, {
+    load: async () => normalizeListingBoard(await listingApi.fetchFarmListings()),
+    buy: async (listing, quantity) => {
+        const result = await listingApi.buyFarmListing({ listingId: listing.id, quantity, purchaseId: newId("buy") });
+        return exchangeOutcome(result, `Bought ${quantity} ${listing.title} from ${listing.sellerName} for ${(quantity * listing.unitPrice).toLocaleString()} tickets. They are on your farm.`);
+    },
+    list: async (draft) => {
+        const result = await listingApi.createFarmListing({ listingId: newId("listing"), ...draft });
+        return exchangeOutcome(result, `Listed ${draft.quantity} at ${draft.unitPrice} tickets each. They are held on the board until they sell or you take them down.`);
+    },
+    withdraw: async (listing) => {
+        const result = await listingApi.withdrawFarmListing({ listingId: listing.id });
+        return exchangeOutcome(result, `Took the ${listing.title} down. ${Number(result?.returned) || 0} went back to your farm.`);
+    },
+    stock: () => stockEntries(farm),
+    thumbnail: itemThumbnails.get,
+    onClose: () => canvas.focus(),
+});
 // Trading with the others in the square (farm-market-trading.mts): T on a person, Y/N on an invitation.
 const trading = createMarketTrading({
     api: createPlatformApiClient(),
@@ -387,7 +510,7 @@ window.addEventListener("pageshow", () => { if (entered)
     trading.start(); });
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 function panelOpen() {
-    return salePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
+    return salePanel.isOpen() || seedPanel.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
 }
 function workStall(stall) {
     if (!stall.open) {
@@ -397,13 +520,17 @@ function workStall(stall) {
     if (!canSell) {
         notice(farmStore.accountBacked
             ? "The market cannot see your farm's records right now. Try again in a moment."
-            : stall.kind === "board"
-                ? "Sign in to fill orders — only an account farm's harvest can be delivered for tickets."
-                : stall.id === KITCHEN_STALL_ID
-                    ? "Sign in to sell your cooking — only an account farm's dishes can be traded for tickets."
-                    : stall.id === SAWMILL_STALL_ID
-                        ? "Sign in to saw logs and sell furniture — only an account farm's timber and pieces count."
-                        : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
+            : stall.id === EXCHANGE_BOARD_ID
+                ? "Sign in to buy and sell at the Exchange Board — only account farms trade for tickets."
+                : stall.kind === "board"
+                    ? "Sign in to fill orders — only an account farm's harvest can be delivered for tickets."
+                    : stall.id === KITCHEN_STALL_ID
+                        ? "Sign in to sell your cooking — only an account farm's dishes can be traded for tickets."
+                        : stall.id === SAWMILL_STALL_ID
+                            ? "Sign in to saw logs and sell furniture — only an account farm's timber and pieces count."
+                            : stall.id === SEED_STALL_ID
+                                ? "Sign in to buy seeds — they go to your account farm's Inventory."
+                                : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
         return;
     }
     keys.clear();
@@ -411,12 +538,24 @@ function workStall(stall) {
         ordersPanel.open();
         return;
     }
+    if (stall.id === EXCHANGE_BOARD_ID) {
+        exchangePanel.open();
+        return;
+    }
     if (stall.id === KITCHEN_STALL_ID)
         kitchenPanel.open(dishes);
     else if (stall.id === SAWMILL_STALL_ID)
         sawmill.open();
-    else
+    else if (stall.id === SEED_STALL_ID) {
+        seedPanel.open(seeds);
+        if (!market)
+            void loadMarketDay();
+    }
+    else {
         salePanel.open(produce);
+        if (!market)
+            void loadMarketDay();
+    }
     if (stall.keeper)
         keeperSays(stall, stall.keeper.greeting);
 }
@@ -518,6 +657,8 @@ window.addEventListener("keydown", (event) => {
         }
         else if (event.code === "Escape") {
             salePanel.close();
+            seedPanel.close();
+            exchangePanel.close();
             kitchenPanel.close();
             ordersPanel.close();
             sawmill.close();
@@ -600,6 +741,7 @@ function resize() {
 }
 publishPresence();
 presence.connect();
+void loadMarketDay().finally(scheduleTurnover);
 const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;
@@ -631,6 +773,9 @@ globalThis.__market = Object.freeze({
     doorInReach: () => doorInReach?.doorId ?? "",
     openDoors: () => [...openDoors],
     saleOpen: () => salePanel.isOpen(),
+    seedsOpen: () => seedPanel.isOpen(),
+    exchangeOpen: () => exchangePanel.isOpen(),
+    market: () => market,
     ordersOpen: () => ordersPanel.isOpen(),
     kitchenOpen: () => kitchenPanel.isOpen(),
     produce: () => produce,

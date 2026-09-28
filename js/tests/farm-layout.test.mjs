@@ -24,7 +24,8 @@ import { completeFarmOnboarding, markFarmIntroSeen } from "../farm-onboarding.mj
 import { DEFAULT_GROUND_ID } from "../farm-catalog/ground.mjs";
 import { findFarmDecor } from "../farm-catalog/decor.mjs";
 import { CROP_CATALOG } from "../farm-crops.mjs";
-import { boxesOverlap, farmDecorBox, farmDecorCollides } from "../farm-decor-layout.mjs";
+import { alignFarmDecorPlacement, boxesOverlap, farmDecorBox, farmDecorCollides, placeFarmDecor } from "../farm-decor-layout.mjs";
+import { buildingDoor, buildingLocalToWorld } from "../farm-scene.mjs";
 
 test("a new farm waits for a named dog and receives one plot plus six persisted starter seeds", () => {
   const layout = createDefaultFarmLayout(() => 0);
@@ -53,23 +54,67 @@ test("the farm is a wide open field bounded by the perimeter fence inset", () =>
   assert.ok(FARM_BOUNDS.wallInset > 0 && FARM_BOUNDS.wallInset < 2);
 });
 
-test("the starter farmhouse replaces the old hay-bale spot without clipping the barn, trees, or other decor", () => {
+test("the starter farmhouse has its own gate-facing site with a clear front walk", () => {
   const layout = createDefaultFarmLayout(() => 0);
   const farmhouse = layout.decor.find((row) => row.instanceId === "cottage-1");
   const range = layout.decor.find((row) => row.instanceId === "kitchen-range-1");
+  const gate = layout.decor.find((row) => row.instanceId === "gate-1");
+  const farmhouseDefinition = findFarmDecor(farmhouse.itemId);
   assert.deepEqual(
     { x: farmhouse.x, z: farmhouse.z, rotationY: farmhouse.rotationY },
-    { x: 0.25, z: -8.6, rotationY: Math.PI / 2 },
+    { x: 4.2, z: -9.3, rotationY: 6.1021 },
   );
   assert.deepEqual(
     { x: range.x, z: range.z, rotationY: range.rotationY },
-    { x: -2.53, z: -7.4, rotationY: Math.PI / 2 },
+    { x: 3.5203, z: -12.2507, rotationY: 6.1021 },
     "the range keeps its original local pose against the farmhouse back wall",
   );
   assert.deepEqual(
     layout.decor.filter((row) => row.itemId === "decor.prop.hay-bale").map(({ x, z }) => ({ x, z })),
     [{ x: -8, z: -2.5 }, { x: -6.5, z: -2 }],
     "the hay remains starter dressing but vacates the farmhouse site",
+  );
+  assert.deepEqual(
+    layout.decor.filter((row) => row.itemId === "decor.plant.oak").map(({ x, z }) => ({ x, z })),
+    [{ x: 11.5, z: -10.5 }, { x: 11, z: 5.5 }, { x: -11, z: 4 }, { x: 9.5, z: 10.5 }],
+    "the mature trees stay around the perimeter instead of crowding the farmhouse",
+  );
+
+  const door = buildingDoor(farmhouseDefinition, farmhouse);
+  const toGate = { x: gate.x - door.x, z: gate.z - door.z };
+  const gateDistance = Math.hypot(toGate.x, toGate.z);
+  const facingDot = (door.forward.x * toGate.x + door.forward.z * toGate.z) / gateDistance;
+  assert.ok(facingDot > 0.9999, "the front door points directly toward the front gate");
+
+  const frontWalkLength = gateDistance - 1.5;
+  const walkStart = { x: door.x + door.forward.x * 0.5, z: door.z + door.forward.z * 0.5 };
+  const frontWalk = {
+    x: walkStart.x + door.forward.x * frontWalkLength / 2,
+    z: walkStart.z + door.forward.z * frontWalkLength / 2,
+    rotationY: farmhouse.rotationY,
+  };
+  for (const row of layout.decor) {
+    if (["cottage-1", "kitchen-range-1", "gate-1"].includes(row.instanceId)) continue;
+    const definition = findFarmDecor(row.itemId);
+    if (!definition.solid && !definition.keepOut) continue;
+    assert.equal(
+      boxesOverlap(frontWalk, { width: 2.2, depth: frontWalkLength }, farmDecorBox(row, definition), definition.footprint),
+      false,
+      `${row.instanceId} must not block the porch-to-gate walk`,
+    );
+  }
+
+  const barn = layout.decor.find((row) => row.instanceId === "barn-1");
+  const barnDefinition = findFarmDecor(barn.itemId);
+  assert.equal(
+    boxesOverlap(
+      farmDecorBox(farmhouse, farmhouseDefinition),
+      { width: farmhouseDefinition.footprint.width + 2, depth: farmhouseDefinition.footprint.depth + 2 },
+      farmDecorBox(barn, barnDefinition),
+      { width: barnDefinition.footprint.width + 2, depth: barnDefinition.footprint.depth + 2 },
+    ),
+    false,
+    "the farmhouse and barn need visible yard space between them",
   );
 
   for (let first = 0; first < layout.decor.length; first += 1) {
@@ -93,17 +138,91 @@ test("the starter farmhouse replaces the old hay-bale spot without clipping the 
 test("an untouched saved starter cluster migrates to the corrected farmhouse arrangement", () => {
   const legacy = createDefaultFarmLayout(() => 0);
   const oldDecor = legacy.decor.map((row) => {
-    if (row.instanceId === "cottage-1") return { ...row, x: -7.5, z: 1.5 };
-    if (row.instanceId === "kitchen-range-1") return { ...row, x: -10.28, z: 2.7 };
+    if (row.instanceId === "cottage-1") return { ...row, x: -7.5, z: 1.5, rotationY: Math.PI / 2 };
+    if (row.instanceId === "kitchen-range-1") return { ...row, x: -10.28, z: 2.7, rotationY: Math.PI / 2 };
     if (row.instanceId === "hay-bale-1") return { ...row, x: -1.2, z: -8.6 };
     if (row.instanceId === "hay-bale-2") return { ...row, x: 0.9, z: -8.9 };
+    if (row.instanceId === "trough-1") return { ...row, x: 5.5, z: -1.5 };
+    if (row.instanceId === "oak-1") return { ...row, x: 9.5, z: -9 };
+    if (row.instanceId === "oak-2") return { ...row, x: 11.2, z: -4.5 };
+    if (row.instanceId === "oak-3") return { ...row, x: -11.5, z: 4 };
+    if (row.instanceId === "oak-4") return { ...row, x: 7.8, z: 9.5 };
     return row;
   });
   const migrated = normalizeFarmLayout({ ...legacy, decor: oldDecor });
   assert.deepEqual(
-    migrated.decor.filter((row) => ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2"].includes(row.instanceId)).map(({ instanceId, itemId, x, z }) => ({ instanceId, itemId, x, z })),
-    STARTER_FARM_DECOR.filter((row) => ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2"].includes(row.instanceId)).map(({ instanceId, itemId, x, z }) => ({ instanceId, itemId, x, z })),
+    migrated.decor.filter((row) => ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2", "trough-1", "oak-1", "oak-2", "oak-3", "oak-4"].includes(row.instanceId)).map(({ instanceId, itemId, x, z, rotationY }) => ({ instanceId, itemId, x, z, rotationY })),
+    STARTER_FARM_DECOR.filter((row) => ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2", "trough-1", "oak-1", "oak-2", "oak-3", "oak-4"].includes(row.instanceId)).map(({ instanceId, itemId, x, z, rotationY }) => ({ instanceId, itemId, x, z, rotationY })),
   );
+});
+
+test("the previously shipped crowded farmhouse arrangement migrates without overwriting a player-adjusted homesite", () => {
+  const starter = createDefaultFarmLayout(() => 0);
+  const homesiteIds = ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2", "trough-1", "oak-1", "oak-2", "oak-3", "oak-4"];
+  const homesiteRows = (decor) => decor.filter((row) => homesiteIds.includes(row.instanceId));
+  const crowdedDecor = starter.decor.map((row) => {
+    if (row.instanceId === "cottage-1") return { ...row, x: 0.25, z: -8.6, rotationY: Math.PI / 2 };
+    if (row.instanceId === "kitchen-range-1") return { ...row, x: -2.53, z: -7.4, rotationY: Math.PI / 2 };
+    if (row.instanceId === "trough-1") return { ...row, x: 5.5, z: -1.5 };
+    if (row.instanceId === "oak-1") return { ...row, x: 9.5, z: -9 };
+    if (row.instanceId === "oak-2") return { ...row, x: 11.2, z: -4.5 };
+    if (row.instanceId === "oak-3") return { ...row, x: -11.5, z: 4 };
+    if (row.instanceId === "oak-4") return { ...row, x: 7.8, z: 9.5 };
+    return row;
+  });
+  assert.deepEqual(homesiteRows(normalizeFarmLayout({ ...starter, decor: crowdedDecor }).decor), homesiteRows(STARTER_FARM_DECOR));
+
+  const adjusted = crowdedDecor.map((row) => row.instanceId === "cottage-1" ? { ...row, x: 1 } : row);
+  const normalizedAdjusted = normalizeFarmLayout({ ...starter, decor: adjusted });
+  assert.equal(normalizedAdjusted.decor.find((row) => row.instanceId === "cottage-1").x, 1);
+  assert.equal(normalizedAdjusted.decor.find((row) => row.instanceId === "oak-1").x, 9.5);
+});
+
+test("the interim forward farmhouse arrangement migrates back to the rear fence", () => {
+  const starter = createDefaultFarmLayout(() => 0);
+  const interim = starter.decor.map((row) => {
+    if (row.instanceId === "cottage-1") return { ...row, x: 4.2, z: -2, rotationY: Math.PI * 2 - Math.PI / 12 };
+    if (row.instanceId === "kitchen-range-1") return { ...row, x: 3.7604, z: -4.9959, rotationY: Math.PI * 2 - Math.PI / 12 };
+    return row;
+  });
+  const migrated = normalizeFarmLayout({ ...starter, decor: interim });
+  assert.deepEqual(
+    migrated.decor.filter((row) => ["cottage-1", "kitchen-range-1"].includes(row.instanceId)),
+    STARTER_FARM_DECOR.filter((row) => ["cottage-1", "kitchen-range-1"].includes(row.instanceId)),
+  );
+});
+
+test("moving or turning a farmhouse carries placed furniture and leaves yard props behind", () => {
+  const cottage = findFarmDecor("decor.building.cottage");
+  const building = { instanceId: "cottage-1", itemId: cottage.id, x: 0, z: 0, rotationY: 0, length: 0 };
+  const range = { instanceId: "range-1", itemId: "decor.prop.kitchen-range", x: -1.2, z: -2.7, rotationY: 0, length: 0 };
+  const bed = { instanceId: "bed-1", itemId: "decor.prop.bed", x: 2, z: 0.5, rotationY: Math.PI / 2, length: 0 };
+  const bale = { instanceId: "bale-1", itemId: "decor.prop.hay-bale", x: 8, z: 8, rotationY: 0.4, length: 0 };
+  const layout = { ...createDefaultFarmLayout(), decor: [building, range, bed, bale] };
+  const nextBuilding = { x: 3, z: -2, rotationY: Math.PI / 2 };
+  const moved = placeFarmDecor(layout, building.instanceId, nextBuilding);
+  assert.ok(moved.valid, moved.reason);
+  for (const original of [range, bed]) {
+    const after = moved.layout.decor.find((row) => row.instanceId === original.instanceId);
+    const expected = buildingLocalToWorld(nextBuilding, { x: original.x, z: original.z });
+    assert.ok(Math.abs(after.x - expected.x) < 1e-4 && Math.abs(after.z - expected.z) < 1e-4);
+    assert.ok(Math.abs(after.rotationY - (original.rotationY + Math.PI / 2)) < 1e-4);
+  }
+  assert.deepEqual(moved.layout.decor.find((row) => row.instanceId === bale.instanceId), bale);
+});
+
+test("plots snap edge-to-edge and align their centres with visible guides", () => {
+  const soil = findFarmDecor("decor.plant.soil-patch");
+  const layout = { ...createDefaultFarmLayout(), decor: [
+    { instanceId: "soil-1", itemId: soil.id, x: 0, z: 0, rotationY: 0, length: 0 },
+    { instanceId: "soil-2", itemId: soil.id, x: 5, z: 0, rotationY: 0, length: 0 },
+  ] };
+  const aligned = alignFarmDecorPlacement(layout, "soil-2", { x: 3.18, z: 0.14, rotationY: 0 }, 0.25);
+  assert.deepEqual(aligned.value, { x: 3, z: 0, rotationY: 0 });
+  assert.equal(aligned.guides.length, 2);
+  assert.deepEqual(alignFarmDecorPlacement(layout, "soil-2", { x: 3.18, z: 0.14, rotationY: 0 }, 0), {
+    value: { x: 3.18, z: 0.14, rotationY: 0 }, guides: [],
+  });
 });
 
 test("normalize keeps a valid document, treats old documents as established, and repairs garbage", () => {

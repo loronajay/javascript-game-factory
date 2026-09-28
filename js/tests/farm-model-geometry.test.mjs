@@ -44,6 +44,11 @@ test("the farmhouse hip roof has metre-scaled texture coordinates instead of one
     const area = Math.abs((uv[2] - uv[0]) * (uv[5] - uv[1]) - (uv[4] - uv[0]) * (uv[3] - uv[1]));
     assert.ok(area > 0.1, `roof triangle ${triangle + 1} has a non-degenerate tile map`);
   }
+  const uvAt = (triangle, vertex) => roof.uvs.slice((triangle * 3 + vertex) * 2, (triangle * 3 + vertex + 1) * 2);
+  assert.deepEqual(uvAt(0, 0), uvAt(1, 0), "the front slope keeps one texture origin across its diagonal");
+  assert.deepEqual(uvAt(0, 2), uvAt(1, 1), "the front slope does not break the tiles at its internal seam");
+  assert.deepEqual(uvAt(2, 0), uvAt(3, 0), "the back slope keeps one texture origin across its diagonal");
+  assert.deepEqual(uvAt(2, 2), uvAt(3, 1), "the back slope does not break the tiles at its internal seam");
 });
 
 test("farm trees have species-specific silhouettes instead of sharing one lollipop canopy", () => {

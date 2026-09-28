@@ -6,11 +6,14 @@
 // does the prompt say, what does E do.
 //
 // E at a cell does the one thing its state calls for: plant the selected
-// seed, water, tend, harvest, or clear a dead crop. An account farm's harvest
+// seed, water, tend, harvest, or clear a dead crop (which makes compost) —
+// and on a crop with nothing else to do, work compost in so it harvests a
+// grade higher (farm-quality.mts). The prompt says the grade it is on course for. An account farm's harvest
 // is the server's (the page injects `submitHarvest`); a signed-out farm
 // harvests here.
 
-import { clearDeadFarmCrop, cropStatus, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type CropPlayerPose, type SoilCellTarget } from "./farm-crops.mjs";
+import { canFertilizeCrop, clearDeadFarmCrop, cropStatus, fertilizeFarmCrop, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type CropPlayerPose, type SoilCellTarget } from "./farm-crops.mjs";
+import { QUALITY_TITLES, gradedTitle, type Quality } from "./farm-quality.mjs";
 import { cropCapacity, cropCapacityUse } from "./farm-capacity.mjs";
 import { withFarmAgriculture, withFarmClock, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 
@@ -59,11 +62,14 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     const definition = findCrop(planted.cropId)!;
     const crop = cropStatus(planted, deps.clockMinutes());
     const wilting = crop.wilted ? "wilting " : "";
-    if (crop.dead) return `The ${definition.title} died ${planted.diedOf === "thirst" ? "of thirst" : "untended"} · Press E to clear it`;
-    if (crop.mature) return `Press E to harvest ${definition.title} · ${crop.harvestYield} to collect`;
+    if (crop.dead) return `The ${definition.title} died ${planted.diedOf === "thirst" ? "of thirst" : "untended"} · Press E to clear it onto the compost heap`;
+    if (crop.mature) return `Press E to harvest ${definition.title} · ${crop.harvestYield} ${QUALITY_TITLES[crop.quality]} to collect`;
     if (crop.needsCare) return `Press E to tend the ${wilting}${definition.title}`;
     if (crop.thirsty) return `Press E to water the ${wilting}${definition.title}`;
-    return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist`;
+    const course = `on course for ${QUALITY_TITLES[crop.quality]}${planted.fertilized ? " · composted" : ""}`;
+    const compost = layout.agriculture.inventory.compost;
+    if (canFertilizeCrop(layout.agriculture, planted, deps.clockMinutes())) return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · ${course} · Press E to work in compost (${compost})`;
+    return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist · ${course}`;
   }
 
   /** What a harvest's answer says about the skill: the XP, and a level (and any new field room) if one was reached. */
@@ -83,7 +89,7 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     try {
       const result = await deps.submitHarvest(plotId, cellId);
       if (Array.isArray(result?.achievements) && result.achievements.length) deps.onAchievements(result.achievements);
-      if (result?.ok) deps.setStatus(`Harvested ${result.quantity} ${title}.${result?.layout ? harvestSkillNote(result, deps.layout()) : ""} Saved to your account.`);
+      if (result?.ok) deps.setStatus(`Harvested ${result.quantity} ${gradedTitle(title, gradeOf(result.quality))}.${result?.layout ? harvestSkillNote(result, deps.layout()) : ""} Saved to your account.`);
       else if (result?.error === "not_ready") deps.setStatus(`The ${title} is not ripe yet by the farm's records — it needs a little longer.`);
       else deps.setStatus("That harvest did not go through. Try again in a moment.");
     } catch {
@@ -92,6 +98,8 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
       harvestInFlight = false;
     }
   }
+
+  const gradeOf = (value: unknown): Quality => value === "poor" || value === "fine" || value === "perfect" ? value : "normal";
 
   /** E at a growing plot performs the one action its current state calls for. */
   function interact(): boolean {
@@ -116,6 +124,7 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
       }
       else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, cellId, now);
       else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, cellId, now);
+      else if (canFertilizeCrop(layout.agriculture, planted, now)) action = fertilizeFarmCrop(layout.agriculture, plotId, cellId, now);
       else return true;
     }
     if (!action.ok) return true;

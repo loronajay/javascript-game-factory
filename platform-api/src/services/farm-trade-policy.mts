@@ -23,8 +23,8 @@
 // confirmations, so nobody can be held to a deal they did not see. A lock and a
 // confirm name the revision the player was looking at; a stale one is refused.
 
-import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
-import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
+import { TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
+import { parseFarmProduceKey } from "./farm-quality-catalog.mjs";
 import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "./farm-carpentry-catalog.mjs";
 
@@ -53,13 +53,13 @@ export const MAX_TRADE_EVENTS = 80;
 export const TRADE_ID = /^trade-[A-Za-z0-9-]{8,64}$/;
 export const TRADE_PLAYER_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
-const CROP_IDS = new Set<string>([...Object.keys(FARM_CROP_RULES), ...FRUIT_TREE_IDS]);
 const TIMBER_IDS = new Set<string>(TIMBER_TREE_IDS);
 
 /** Whether `id` names something of `stack` a farm can hold. */
 export function tradeableItem(stack: TradeStack, id: string): boolean {
   switch (stack) {
-    case "produce": return CROP_IDS.has(id);
+    // A crop of any grade (a Perfect tomato is its own line), or fruit.
+    case "produce": return Boolean(parseFarmProduceKey(id));
     case "dishes": return Boolean(parseFarmDishKey(id));
     case "logs":
     case "planks": return TIMBER_IDS.has(id);

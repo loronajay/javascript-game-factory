@@ -13,6 +13,7 @@ import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { farmPiecePrice, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
+import { QUALITY_PRICE, parseFarmProduceKey } from "./farm-quality-catalog.mjs";
 const DAY = 24 * 60;
 /** Ticket margin one productive cell earns per farm day of growth when its crop is sold raw. */
 export const MARKET_MARGIN_PER_CELL_DAY = 12;
@@ -65,7 +66,13 @@ export function farmDishPrice(recipeId, stars) {
     return raw > 0 ? Math.ceil(raw * DISH_PREMIUM[stars]) : 0;
 }
 export const FARM_DISH_PRICES = Object.freeze(Object.fromEntries(Object.keys(FARM_RECIPE_RULES).flatMap((recipeId) => [1, 2, 3].map((stars) => [`${recipeId}@${stars}`, farmDishPrice(recipeId, stars)]))));
-/** Whatever a sale line names — a crop, a fruit, a dish or a piece of furniture — at the server's price, or 0 for anything the market does not buy. */
+/**
+ * Whatever a sale line names — a crop or fruit of some grade, a dish or a piece
+ * of furniture — at the server's STANDING price, or 0 for anything the market
+ * does not buy. Produce sold at the merchant is paid at the day's price
+ * instead (services/farm-market-day `farmMarketProducePrice`); this is its
+ * Normal-day value, which is what an offer is weighed against.
+ */
 export function farmSalePrice(itemId) {
     const dish = parseFarmDishKey(itemId);
     if (dish)
@@ -73,10 +80,13 @@ export function farmSalePrice(itemId) {
     const piece = parseFarmPieceKey(itemId);
     if (piece)
         return farmPiecePrice(piece.itemId, piece.stars);
-    return farmProducePrice(itemId);
+    const produce = parseFarmProduceKey(itemId);
+    if (!produce)
+        return 0;
+    return Math.max(1, Math.round(farmProducePrice(produce.itemId) * QUALITY_PRICE[produce.quality]));
 }
 /**
- * A sale request made safe: known crops, fruit, dishes and furniture only, whole positive
+ * A sale request made safe: known crops (any grade), fruit, dishes and furniture only, whole positive
  * counts, at most MAX_SALE_QUANTITY each, at least one line. `null` for anything else.
  */
 export function normalizeSaleLines(value) {

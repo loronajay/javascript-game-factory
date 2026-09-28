@@ -12,6 +12,7 @@
 import { CROP_CATALOG, type FarmInventory } from "./farm-crops.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
 import { DISH_STARS, KITCHEN_RANGE_ITEM_ID, RECIPE_CATALOG, dishKey, findRecipe, type DishStars, type Recipe } from "./farm-catalog/recipes.mjs";
+import { produceHeld, takeProduce } from "./farm-quality.mjs";
 
 const MAX_STACK = 99;
 
@@ -26,7 +27,8 @@ export type RecipeAvailability = Readonly<{ recipe: Recipe; state: RecipeState; 
 
 export function recipeAvailability(recipe: Recipe, produce: Readonly<Record<string, number>>, level: number): RecipeAvailability {
   const lines = Object.entries(recipe.ingredients).map(([id, need]) => {
-    const held = Math.max(0, Math.floor(Number(produce[id]) || 0));
+    // Any grade will do; the pot takes the plainest first.
+    const held = Math.max(0, Math.floor(produceHeld(produce, id)));
     return Object.freeze({ id, title: basketItemTitle(id), need, held, short: Math.max(0, need - held) });
   });
   const state: RecipeState = level < recipe.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
@@ -49,8 +51,8 @@ export function cookLocally(inventory: FarmInventory, recipeId: string, stars: D
   if (availability.state === "short") return Object.freeze({ ok: false, reason: "not_enough_produce", inventory });
   const key = dishKey(recipe.id, stars);
   if ((inventory.dishes[key] ?? 0) >= MAX_STACK) return Object.freeze({ ok: false, reason: "pantry_full", inventory });
-  const produce = { ...inventory.produce };
-  for (const [id, need] of Object.entries(recipe.ingredients)) produce[id] = (produce[id] ?? 0) - need;
+  let produce: Record<string, number> = { ...inventory.produce };
+  for (const [id, need] of Object.entries(recipe.ingredients)) produce = takeProduce(produce, id, need) ?? produce;
   return Object.freeze({
     ok: true,
     reason: "",

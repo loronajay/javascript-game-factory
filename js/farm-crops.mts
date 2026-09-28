@@ -5,6 +5,7 @@ import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
 import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
 import { PIECE_KEYS } from "./farm-catalog/carpentry.mjs";
+import { QUALITIES, cropQuality, produceKey, type Quality } from "./farm-quality.mjs";
 
 export const FARM_DAY_MINUTES = 24 * 60;
 export const MOISTURE_CAPACITY_MINUTES = 18 * 60;
@@ -103,10 +104,21 @@ export type FarmInventory = Readonly<{
    * (farm-workshop.mts `furnitureShelf`).
    */
   furniture: Readonly<Record<string, number>>;
+  /**
+   * Compost: one made each time a dead crop is dug out, spent (E on a growing
+   * crop) to lift it a grade (farm-quality.mts). The server holds a save to
+   * the dead crops it dug out and the crops it fertilized.
+   */
+  compost: number;
 }>;
 
 /** Everything the harvest basket holds: the crops, then the fruit. */
 export const PRODUCE_IDS: readonly string[] = Object.freeze([...CROP_CATALOG.map((entry) => entry.id), ...FRUIT_IDS]);
+/** Every basket stack: each crop at every grade (Normal is the bare id), then the fruit, which has no grades. */
+export const PRODUCE_KEYS: readonly string[] = Object.freeze([
+  ...CROP_CATALOG.flatMap((entry) => QUALITIES.map((quality) => produceKey(entry.id, quality))),
+  ...FRUIT_IDS,
+]);
 
 export type FarmCrop = Readonly<{
   plotId: string;
@@ -124,6 +136,10 @@ export type FarmCrop = Readonly<{
   carePenalty: number;
   /** "" while alive; what killed it once it is dead. A dead crop never changes again. */
   diedOf: CropDeathCause;
+  /** Minutes spent stressed (dry, or waiting at the care gate) over its whole life. Never resets; decides its grade. */
+  stressMinutes: number;
+  /** Compost was worked into its soil: it harvests a grade higher. */
+  fertilized: boolean;
 }>;
 
 export type CropDeathCause = "" | "thirst" | "neglect";
@@ -141,6 +157,8 @@ export type CropStatus = Readonly<{
   dead: boolean;
   /** What harvesting it now would put in the inventory (0 until ripe, 0 when dead). */
   harvestYield: number;
+  /** The grade it would harvest at now (farm-quality.mts). */
+  quality: Quality;
 }>;
 
 export function findCrop(id: unknown): CropDefinition | undefined {
@@ -209,7 +227,7 @@ const finite = (value: unknown, fallback = 0): number => typeof value === "numbe
 const STARTER_SAPLINGS: Readonly<Record<string, number>> = Object.freeze({ apple: 1, oak: 1 });
 
 function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, source?: unknown, defaultSaplings: Readonly<Record<string, number>> = {}): FarmInventory {
-  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown; saplings?: unknown; logs?: unknown; dishes?: unknown; planks?: unknown; furniture?: unknown } : {};
+  const input = source && typeof source === "object" ? source as { seeds?: unknown; produce?: unknown; supplies?: unknown; saplings?: unknown; logs?: unknown; dishes?: unknown; planks?: unknown; furniture?: unknown; compost?: unknown } : {};
   const storedSeeds = Boolean(input.seeds && typeof input.seeds === "object");
   const seeds = storedSeeds ? input.seeds as Record<string, unknown> : {};
   const produce = input.produce && typeof input.produce === "object" ? input.produce as Record<string, unknown> : {};
@@ -225,7 +243,7 @@ function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, 
     // would re-grant on every load). The number default is only for a legacy
     // document with no seed stack at all.
     seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? (storedSeeds ? 0 : defaultSeeds) : count(defaultSeeds[entry.id])]))),
-    produce: Object.freeze(Object.fromEntries(PRODUCE_IDS.map((id) => [id, count(produce[id])]))),
+    produce: Object.freeze(Object.fromEntries(PRODUCE_KEYS.map((id) => [id, count(produce[id])]))),
     supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
       care.food.itemId,
       care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
@@ -235,6 +253,7 @@ function inventoryWith(defaultSeeds: number | Readonly<Record<string, number>>, 
     dishes: Object.freeze(Object.fromEntries(DISH_KEYS.map((key) => [key, count(dishes[key])]))),
     planks: Object.freeze(Object.fromEntries(TIMBER_TREES.map((species) => [species.id, count(planks[species.id])]))),
     furniture: Object.freeze(Object.fromEntries(PIECE_KEYS.map((key) => [key, count(furniture[key])]))),
+    compost: count(input.compost),
   });
 }
 
@@ -282,6 +301,8 @@ export function normalizeAgriculture(value: unknown, validPlotIds: ReadonlySet<s
       untendedMinutes: Math.min(DEATH_UNTENDED_MINUTES, Math.max(0, finite(row.untendedMinutes))),
       carePenalty: Math.min(MAX_CARE_PENALTY, Math.max(0, finite(row.carePenalty))),
       diedOf,
+      stressMinutes: Math.max(0, finite(row.stressMinutes)),
+      fertilized: row.fertilized === true,
     });
   }
   return freezeAgriculture({ inventory: inventoryWith(5, source.inventory), crops });
@@ -309,7 +330,8 @@ function accrueStress(row: FarmCrop, span: number, clocks: readonly StressClock[
       if (untilDeath <= lived) { lived = Math.max(0, untilDeath); cause = clock.cause; }
     }
   }
-  let next: FarmCrop = row;
+  // However many clocks run, a minute stressed is one minute against its grade.
+  let next: FarmCrop = { ...row, stressMinutes: row.stressMinutes + lived };
   let penalty = row.carePenalty;
   for (const clock of clocks) {
     const before = row[clock.key];
@@ -390,6 +412,7 @@ export function cropStatus(row: FarmCrop, now: number): CropStatus {
     wilted,
     dead,
     harvestYield: mature ? cropHarvestYield(current) : 0,
+    quality: cropQuality(current),
   });
 }
 
@@ -409,7 +432,7 @@ export function plantFarmCrop(value: FarmAgriculture, plotId: string, cellId: So
   const seeds = { ...agriculture.inventory.seeds, [cropId]: agriculture.inventory.seeds[cropId] - 1 };
   const cropRow: FarmCrop = {
     plotId, cellId, cropId, growthMinutes: 0, moistureMinutes: 0, tended: false, lastFarmMinute: now,
-    dryMinutes: 0, untendedMinutes: 0, carePenalty: 0, diedOf: "",
+    dryMinutes: 0, untendedMinutes: 0, carePenalty: 0, diedOf: "", stressMinutes: 0, fertilized: false,
   };
   return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, seeds: Object.freeze(seeds) }), crops: [...agriculture.crops, cropRow] }), true);
 }
@@ -442,15 +465,39 @@ export function harvestFarmCrop(value: FarmAgriculture, plotId: string, cellId: 
   if (!row) return result(agriculture, false, "empty");
   if (row.diedOf) return result(agriculture, false, "dead");
   if (!cropStatus(row, now).mature) return result(agriculture, false, "not_ready");
-  const produce = { ...agriculture.inventory.produce, [row.cropId]: Math.min(MAX_STACK, agriculture.inventory.produce[row.cropId] + cropHarvestYield(row)) };
+  const key = produceKey(row.cropId, cropQuality(row));
+  const produce = { ...agriculture.inventory.produce, [key]: Math.min(MAX_STACK, (agriculture.inventory.produce[key] ?? 0) + cropHarvestYield(row)) };
   return result(freezeAgriculture({ inventory: Object.freeze({ ...agriculture.inventory, produce: Object.freeze(produce) }), crops: agriculture.crops.filter((entry) => entry.plotId !== plotId || entry.cellId !== cellId) }), true);
 }
 
-/** Dig out a dead crop. It yields nothing and its seed is gone; only then is the cell free again. */
+/**
+ * Dig out a dead crop. It yields nothing and its seed is gone, but it goes on
+ * the compost heap (one compost); only then is the cell free again.
+ */
 export function clearDeadFarmCrop(value: FarmAgriculture, plotId: string, cellId: SoilCellId, now: number): CropActionResult {
   const agriculture = advanceAgriculture(value, now);
   const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
   if (!row) return result(agriculture, false, "empty");
   if (!row.diedOf) return result(agriculture, false, "alive");
-  return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.filter((entry) => entry !== row) }), true);
+  const inventory = Object.freeze({ ...agriculture.inventory, compost: Math.min(MAX_STACK, agriculture.inventory.compost + 1) });
+  return result(freezeAgriculture({ inventory, crops: agriculture.crops.filter((entry) => entry !== row) }), true);
+}
+
+/** Whether E on this crop would work compost into it: alive, unripe, not yet fertilized, and compost on the heap. */
+export function canFertilizeCrop(agriculture: FarmAgriculture, row: FarmCrop, now: number): boolean {
+  const state = cropStatus(row, now);
+  return agriculture.inventory.compost > 0 && !row.fertilized && !state.dead && !state.mature;
+}
+
+/** Work one compost into a growing crop: it will harvest a grade higher. */
+export function fertilizeFarmCrop(value: FarmAgriculture, plotId: string, cellId: SoilCellId, now: number): CropActionResult {
+  const agriculture = advanceAgriculture(value, now);
+  const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
+  if (!row) return result(agriculture, false, "empty");
+  if (row.diedOf) return result(agriculture, false, "dead");
+  if (row.fertilized) return result(agriculture, false, "fertilized");
+  if (cropStatus(row, now).mature) return result(agriculture, false, "ripe");
+  if (agriculture.inventory.compost <= 0) return result(agriculture, false, "no_compost");
+  const inventory = Object.freeze({ ...agriculture.inventory, compost: agriculture.inventory.compost - 1 });
+  return result(updateCrop(freezeAgriculture({ inventory, crops: agriculture.crops }), plotId, cellId, (entry) => ({ ...entry, fertilized: true })), true);
 }

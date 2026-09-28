@@ -560,8 +560,9 @@ export function createPlatformApiClient(options = {}) {
         adoptFarmPet({ speciesId, name, purchaseId }) {
             return post("/games/farm/adoptions", { speciesId, name, purchaseId }, "purchase", {}, true);
         },
-        purchaseFarmSupply({ itemId, quantity, purchaseId }) {
-            return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId }, "purchase", {}, true);
+        /** Seeds, saplings and feed. `venue: "market"` buys at the Seed Merchant (the day's specials), naming the `day` it was priced on. */
+        purchaseFarmSupply({ itemId, quantity, purchaseId, venue, day }) {
+            return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId, ...(venue === "market" ? { venue, day } : {}) }, "purchase", {}, true);
         },
         /** The server decides ripeness and yield; the client sends its farm and names the cell. */
         harvestFarmCrop({ layout, plotId, cellId }) {
@@ -584,8 +585,28 @@ export function createPlatformApiClient(options = {}) {
             return post("/games/farm/workshop/crafts", { layout, itemId, scores, craftId }, "craft", {}, true);
         },
         /** The Market buys produce (the Produce Merchant) and dishes (the Kitchen): item ids and counts only — the server prices the sale and pays it. */
-        sellFarmProduce({ items, saleId }) {
-            return post("/games/farm/market/sales", { items, saleId }, "sale", {}, true);
+        sellFarmProduce({ items, saleId, day }) {
+            return post("/games/farm/market/sales", { items, saleId, ...(Number.isSafeInteger(day) ? { day } : {}) }, "sale", {}, true);
+        },
+        /** The Exchange Board: everyone else's open listings, this player's own, and what today's caps leave them. */
+        fetchFarmListings() {
+            return get("/games/farm/market/listings", "board");
+        },
+        /** Put goods up on the Exchange Board: they leave the farm into escrow. The server checks the price band. */
+        createFarmListing({ listingId, stack, itemId, quantity, unitPrice }) {
+            return post("/games/farm/market/listings", { listingId, stack, itemId, quantity, unitPrice }, "result", {}, true);
+        },
+        /** Buy some of a listing: the server moves the tickets and the goods together, once per purchase id. */
+        buyFarmListing({ listingId, quantity, purchaseId }) {
+            return post(`/games/farm/market/listings/${encodeURIComponent(listingId)}/purchases`, { quantity, purchaseId }, "result", {}, true);
+        },
+        /** Take a listing down (open or expired): what is left goes back to the farm. */
+        withdrawFarmListing({ listingId }) {
+            return post(`/games/farm/market/listings/${encodeURIComponent(listingId)}/withdrawal`, {}, "result", {}, true);
+        },
+        /** Today's Market prices (every produce grade), which way each moved, and the Seed Merchant's specials. Public. */
+        fetchFarmMarketPrices() {
+            return get("/games/farm/market/prices", "market");
         },
         /** Today's Order Board with this player's ticks, Farming level and basket (self only). */
         fetchFarmOrders() {
