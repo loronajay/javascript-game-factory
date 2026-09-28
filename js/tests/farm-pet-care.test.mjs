@@ -70,14 +70,16 @@ test("every species has its own sensible food and data-only dwelling", () => {
 test("every pet has a complete weighted visual palette set", () => {
   assert.equal(ANIMAL_CATALOG.length, 10);
   for (const species of ANIMAL_CATALOG) {
-    assert.equal(species.palettes.length, 4, `${species.id} has classic, uncommon, rare and super-rare looks`);
+    assert.equal(species.palettes.length, 6, `${species.id} has classic, three uncommon, rare and super-rare looks`);
     assert.equal(species.palettes[0].id, "standard", `${species.id} keeps the source art as its common look`);
     assert.deepEqual(species.palettes.map(({ tier, weight, statBoost }) => ({ tier, weight, statBoost })), [
-      { tier: "classic", weight: 69, statBoost: 0 },
-      { tier: "uncommon", weight: 24, statBoost: 0 },
+      { tier: "classic", weight: 51, statBoost: 0 },
+      { tier: "uncommon", weight: 14, statBoost: 0 },
+      { tier: "uncommon", weight: 14, statBoost: 0 },
+      { tier: "uncommon", weight: 14, statBoost: 0 },
       { tier: "rare", weight: 6, statBoost: 0.08 },
       { tier: "super-rare", weight: 1, statBoost: 0.15 },
-    ], `${species.id} uses the locked 69/24/6/1 distribution`);
+    ], `${species.id} keeps rare odds at 6/1 while classic remains the most common individual look`);
     assert.equal(new Set(species.palettes.map((palette) => palette.id)).size, species.palettes.length, `${species.id} palette ids are unique`);
     assert.equal(species.palettes.reduce((sum, palette) => sum + palette.weight, 0), 100, `${species.id} weights are readable percentages`);
     for (const palette of species.palettes) {
@@ -90,6 +92,12 @@ test("every pet has a complete weighted visual palette set", () => {
       }
     }
     assert.equal(pickAnimalPalette(species.id, () => 0)?.id, "standard");
+    assert.equal(pickAnimalPalette(species.id, () => 0.509999)?.id, "standard");
+    assert.equal(pickAnimalPalette(species.id, () => 0.51)?.id, species.palettes[1].id);
+    assert.equal(pickAnimalPalette(species.id, () => 0.65)?.id, species.palettes[2].id);
+    assert.equal(pickAnimalPalette(species.id, () => 0.79)?.id, species.palettes[3].id);
+    assert.equal(pickAnimalPalette(species.id, () => 0.929999)?.tier, "uncommon");
+    assert.equal(pickAnimalPalette(species.id, () => 0.93)?.tier, "rare");
     assert.equal(pickAnimalPalette(species.id, () => 0.989999)?.tier, "rare");
     assert.equal(pickAnimalPalette(species.id, () => 0.99)?.tier, "super-rare");
     assert.equal(pickAnimalPalette(species.id, () => 0.999999)?.id, species.palettes.at(-1).id);

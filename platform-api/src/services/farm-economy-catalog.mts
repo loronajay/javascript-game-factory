@@ -8,24 +8,26 @@ type Range = Readonly<{ min: number; max: number }>;
 type Species = Readonly<{
   id: string; title: string; habitat: "ground" | "air" | "water";
   foodItemId: string; speed: Range; strength: Range;
-  palettes: readonly Readonly<{ id: string; weight: number; statBoost: number }>[];
+  palettes: readonly Readonly<{ id: string; tier: "classic" | "uncommon" | "rare" | "super-rare"; weight: number; statBoost: number }>[];
 }>;
 
-const paletteIds: Readonly<Record<string, readonly [string, string, string]>> = Object.freeze({
-  "pet.corgi": ["sable", "midnight", "cosmic"], "pet.duck": ["mallard", "lavender", "prism"],
-  "pet.red-panda": ["golden", "silver", "celestial"], "pet.platypus": ["copper", "moonstone", "opaline"],
-  "pet.hippo": ["rosy", "slate", "nebula"], "pet.rhino": ["ochre", "frost", "crystal"],
-  "pet.bat": ["ember", "ghost", "eclipse"], "pet.shark": ["tiger", "albino", "voidfin"],
-  "pet.anglerfish": ["ember", "abyss", "biolume"], "pet.jellyfish": ["sunset", "aurora", "starborn"],
+const paletteIds: Readonly<Record<string, readonly [string, string, string, string, string]>> = Object.freeze({
+  "pet.corgi": ["sable", "cream", "tricolor", "midnight", "cosmic"], "pet.duck": ["mallard", "pekin", "bluewing", "lavender", "prism"],
+  "pet.red-panda": ["golden", "cinnamon", "snowcap", "silver", "celestial"], "pet.platypus": ["copper", "riverstone", "moss", "moonstone", "opaline"],
+  "pet.hippo": ["rosy", "mauve", "river", "slate", "nebula"], "pet.rhino": ["ochre", "sand", "mossback", "frost", "crystal"],
+  "pet.bat": ["ember", "cocoa", "dusky", "ghost", "eclipse"], "pet.shark": ["tiger", "blue", "reef", "albino", "voidfin"],
+  "pet.anglerfish": ["ember", "scarlet", "deepsea", "abyss", "biolume"], "pet.jellyfish": ["sunset", "lagoon", "peach", "aurora", "starborn"],
 });
 
 function palettes(id: string) {
-  const [uncommon, rare, superRare] = paletteIds[id]!;
+  const [uncommon, uncommonTwo, uncommonThree, rare, superRare] = paletteIds[id]!;
   return Object.freeze([
-    Object.freeze({ id: "standard", weight: 69, statBoost: 0 }),
-    Object.freeze({ id: uncommon, weight: 24, statBoost: 0 }),
-    Object.freeze({ id: rare, weight: 6, statBoost: 0.08 }),
-    Object.freeze({ id: superRare, weight: 1, statBoost: 0.15 }),
+    Object.freeze({ id: "standard", tier: "classic" as const, weight: 51, statBoost: 0 }),
+    Object.freeze({ id: uncommon, tier: "uncommon" as const, weight: 14, statBoost: 0 }),
+    Object.freeze({ id: uncommonTwo, tier: "uncommon" as const, weight: 14, statBoost: 0 }),
+    Object.freeze({ id: uncommonThree, tier: "uncommon" as const, weight: 14, statBoost: 0 }),
+    Object.freeze({ id: rare, tier: "rare" as const, weight: 6, statBoost: 0.08 }),
+    Object.freeze({ id: superRare, tier: "super-rare" as const, weight: 1, statBoost: 0.15 }),
   ]);
 }
 

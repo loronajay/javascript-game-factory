@@ -25,7 +25,6 @@ const GROWTH_BUDGET_SHARE = 0.9;
 const RATE_JITTER = Object.freeze({ min: 0.85, max: 1.15 });
 const MAX_CARE_MULTIPLIER = 1.3 * 1.3;
 const STAT_CEILING = 100;
-const TIERS = Object.freeze(["classic", "uncommon", "rare", "super-rare"]);
 /** Species lifespans, mirrored from the client care catalog (`maxLifeDays`). */
 export const FARM_PET_LIFESPANS = Object.freeze({
     "pet.corgi": 100, "pet.duck": 80, "pet.red-panda": 90, "pet.platypus": 100, "pet.hippo": 140,
@@ -60,8 +59,7 @@ export function maxGainedByAge(rate, ageDays, maxLifeDays) {
     return rate * growthStageDays(0, ageDays, maxLifeDays, true) * MAX_CARE_MULTIPLIER;
 }
 export function paletteTier(species, paletteId) {
-    const index = species?.palettes.findIndex((palette) => palette.id === paletteId) ?? -1;
-    return TIERS[index] ?? "classic";
+    return species?.palettes.find((palette) => palette.id === paletteId)?.tier ?? "classic";
 }
 /** Adoption roll, consuming random values in the client's order: grade, speed jitter, strength jitter. */
 export function rollFarmPetGrowth(species, base, tier, random) {

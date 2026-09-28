@@ -3,19 +3,21 @@ import { farmTreeRule } from "./farm-tree-catalog.mjs";
 import { farmRecipeRule } from "./farm-recipe-catalog.mjs";
 export const FARM_ADOPTION_PRICE = 1200;
 const paletteIds = Object.freeze({
-    "pet.corgi": ["sable", "midnight", "cosmic"], "pet.duck": ["mallard", "lavender", "prism"],
-    "pet.red-panda": ["golden", "silver", "celestial"], "pet.platypus": ["copper", "moonstone", "opaline"],
-    "pet.hippo": ["rosy", "slate", "nebula"], "pet.rhino": ["ochre", "frost", "crystal"],
-    "pet.bat": ["ember", "ghost", "eclipse"], "pet.shark": ["tiger", "albino", "voidfin"],
-    "pet.anglerfish": ["ember", "abyss", "biolume"], "pet.jellyfish": ["sunset", "aurora", "starborn"],
+    "pet.corgi": ["sable", "cream", "tricolor", "midnight", "cosmic"], "pet.duck": ["mallard", "pekin", "bluewing", "lavender", "prism"],
+    "pet.red-panda": ["golden", "cinnamon", "snowcap", "silver", "celestial"], "pet.platypus": ["copper", "riverstone", "moss", "moonstone", "opaline"],
+    "pet.hippo": ["rosy", "mauve", "river", "slate", "nebula"], "pet.rhino": ["ochre", "sand", "mossback", "frost", "crystal"],
+    "pet.bat": ["ember", "cocoa", "dusky", "ghost", "eclipse"], "pet.shark": ["tiger", "blue", "reef", "albino", "voidfin"],
+    "pet.anglerfish": ["ember", "scarlet", "deepsea", "abyss", "biolume"], "pet.jellyfish": ["sunset", "lagoon", "peach", "aurora", "starborn"],
 });
 function palettes(id) {
-    const [uncommon, rare, superRare] = paletteIds[id];
+    const [uncommon, uncommonTwo, uncommonThree, rare, superRare] = paletteIds[id];
     return Object.freeze([
-        Object.freeze({ id: "standard", weight: 69, statBoost: 0 }),
-        Object.freeze({ id: uncommon, weight: 24, statBoost: 0 }),
-        Object.freeze({ id: rare, weight: 6, statBoost: 0.08 }),
-        Object.freeze({ id: superRare, weight: 1, statBoost: 0.15 }),
+        Object.freeze({ id: "standard", tier: "classic", weight: 51, statBoost: 0 }),
+        Object.freeze({ id: uncommon, tier: "uncommon", weight: 14, statBoost: 0 }),
+        Object.freeze({ id: uncommonTwo, tier: "uncommon", weight: 14, statBoost: 0 }),
+        Object.freeze({ id: uncommonThree, tier: "uncommon", weight: 14, statBoost: 0 }),
+        Object.freeze({ id: rare, tier: "rare", weight: 6, statBoost: 0.08 }),
+        Object.freeze({ id: superRare, tier: "super-rare", weight: 1, statBoost: 0.15 }),
     ]);
 }
 function species(id, title, habitat, food, speed, strength) {

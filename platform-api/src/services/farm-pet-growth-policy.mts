@@ -13,9 +13,9 @@
 
 type Range = Readonly<{ min: number; max: number }>;
 /** The slice of a `FARM_SPECIES` row this policy reads; passed in so the catalogs import this file, not the reverse. */
-export type GrowthSpeciesRow = Readonly<{ id: string; speed: Range; strength: Range; palettes: readonly Readonly<{ id: string }>[] }>;
 type StatPair = { speed: number; strength: number };
 type Tier = "classic" | "uncommon" | "rare" | "super-rare";
+export type GrowthSpeciesRow = Readonly<{ id: string; speed: Range; strength: Range; palettes: readonly Readonly<{ id: string; tier: Tier }>[] }>;
 
 const GRADES = Object.freeze([
   Object.freeze({ id: "steady", multiplier: 1 }),
@@ -32,7 +32,6 @@ const GROWTH_BUDGET_SHARE = 0.9;
 const RATE_JITTER = Object.freeze({ min: 0.85, max: 1.15 });
 const MAX_CARE_MULTIPLIER = 1.3 * 1.3;
 const STAT_CEILING = 100;
-const TIERS: readonly Tier[] = Object.freeze(["classic", "uncommon", "rare", "super-rare"]);
 
 /** Species lifespans, mirrored from the client care catalog (`maxLifeDays`). */
 export const FARM_PET_LIFESPANS: Readonly<Record<string, number>> = Object.freeze({
@@ -72,8 +71,7 @@ export function maxGainedByAge(rate: number, ageDays: number, maxLifeDays: numbe
 }
 
 export function paletteTier(species: GrowthSpeciesRow | null, paletteId: unknown): Tier {
-  const index = species?.palettes.findIndex((palette) => palette.id === paletteId) ?? -1;
-  return TIERS[index] ?? "classic";
+  return species?.palettes.find((palette) => palette.id === paletteId)?.tier ?? "classic";
 }
 
 /** Adoption roll, consuming random values in the client's order: grade, speed jitter, strength jitter. */
