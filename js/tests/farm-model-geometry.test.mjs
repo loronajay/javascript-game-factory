@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt } from "../farm-building-geometry.mjs";
+import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt, hipRoofMesh } from "../farm-building-geometry.mjs";
 import { SCENERY } from "../farm-scenery.mjs";
 import { FARM_BOUNDS } from "../farm-layout.mjs";
 import { TREE_ARCHETYPES } from "../farm-props-plants.mjs";
@@ -32,6 +32,18 @@ test("the gazebo canopy base and its support header meet at the same height", ()
   assert.equal(canopy.roofBaseY, 2.6);
   assert.equal(canopy.roofCentreY, 3.3);
   assert.equal(canopy.headerCentreY + canopy.headerHeight / 2, canopy.roofBaseY);
+});
+
+test("the farmhouse hip roof has metre-scaled texture coordinates instead of one collapsed roof pixel", () => {
+  const roof = hipRoofMesh({ width: 9, depth: 7, wallHeight: 3, rise: 2.2, overhang: 0.55 });
+  assert.equal(roof.positions.length, 54, "six triangles describe the four roof slopes");
+  assert.equal(roof.uvs.length, 36);
+  assert.ok(new Set(roof.uvs).size > 4, "the tiled material receives varied coordinates across every slope");
+  for (let triangle = 0; triangle < 6; triangle += 1) {
+    const uv = roof.uvs.slice(triangle * 6, triangle * 6 + 6);
+    const area = Math.abs((uv[2] - uv[0]) * (uv[5] - uv[1]) - (uv[4] - uv[0]) * (uv[3] - uv[1]));
+    assert.ok(area > 0.1, `roof triangle ${triangle + 1} has a non-degenerate tile map`);
+  }
 });
 
 test("farm trees have species-specific silhouettes instead of sharing one lollipop canopy", () => {

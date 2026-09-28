@@ -30,7 +30,7 @@
         <h2>Market day.</h2>
         <p>The road from the farm ends in a walled square. Marigold at the Produce Merchant buys your harvest for tickets, and the Order Board pays better — plus Farming XP — for what the town needs today. The other stalls open as the farm grows. Whoever else is here, you'll see them.</p>
         <button id="enterMarket" type="button">Walk in</button>
-        <small id="marketStatus">WASD to move · E to use · Enter to chat · out the south gate to go home</small>
+        <small id="marketStatus">WASD to move · E to use · T to trade with someone · Enter to chat · out the south gate to go home</small>
       </div>
     </section>
 
@@ -45,7 +45,7 @@
 
     <div id="marketPrompt" class="farm-prompt" aria-live="polite"></div>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>T</b> Trade</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
     </div>
 
     <aside id="salePanel" class="inventory-panel sale-panel" aria-label="Produce Merchant" hidden>
@@ -119,6 +119,40 @@
           <button id="sellFurniture" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Pick something to sell</button>
         </div>
         <p id="furnitureStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <section id="tradeInvite" class="trade-invite" aria-live="assertive" hidden>
+      <span class="eyebrow">TRADE REQUEST</span>
+      <strong id="tradeInviteText">Someone wants to trade with you.</strong>
+      <div class="trade-invite__actions">
+        <button id="acceptTrade" class="farm-button farm-button--accent" type="button">Trade <kbd>Y</kbd></button>
+        <button id="declineTrade" class="farm-button" type="button">No thanks <kbd>N</kbd></button>
+      </div>
+    </section>
+
+    <aside id="tradePanel" class="inventory-panel trade-panel" aria-label="Trading table" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">TRADE · GOODS FOR GOODS</span><strong id="tradeTitle">Trading</strong></div>
+        <button id="closeTrade" class="farm-button" type="button" title="Leave the table (Esc)">Walk away <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body trade-panel__body">
+        <section class="trade-side" aria-label="Your offer">
+          <h3 class="trade-side__head"><span id="tradeYourTitle">You offer</span><em id="tradeYourState" class="trade-chip" data-state="editing">EDITING</em></h3>
+          <ol id="tradeStock" class="sale-list trade-list"></ol>
+        </section>
+        <section class="trade-side trade-side--theirs" aria-label="Their offer">
+          <h3 class="trade-side__head"><span id="tradeTheirTitle">They offer</span><em id="tradeTheirState" class="trade-chip" data-state="editing">EDITING</em></h3>
+          <ol id="tradeTheirs" class="sale-list trade-list"></ol>
+        </section>
+      </div>
+      <footer class="sale-footer trade-footer">
+        <p id="tradeStatus" class="pets-status" aria-live="polite"></p>
+        <div class="sale-footer__actions">
+          <button id="lockTrade" class="farm-button" type="button" aria-pressed="false">Lock my offer</button>
+          <button id="confirmTrade" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Confirm trade</button>
+        </div>
+        <p class="trade-footer__rule">Both lock, then both confirm. Any change unlocks both sides. No tickets change hands.</p>
       </footer>
     </aside>
 

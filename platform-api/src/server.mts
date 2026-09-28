@@ -33,6 +33,7 @@ import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tic
 import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
+import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import {
   getAccountSuspension,
   isAdminPlayer,
@@ -440,6 +441,10 @@ async function bootstrap(): Promise<void> {
     sellFarmProduce: (params: any) => sellFarmProduce(pool, params),
     getFarmOrderBoard: (params: any) => getFarmOrderBoard(pool, params),
     fillFarmOrder: (params: any) => fillFarmOrder(pool, params),
+    inviteFarmTrade: (params: any) => inviteFarmTrade(pool, params),
+    getCurrentFarmTrade: (params: any) => getCurrentFarmTrade(pool, params),
+    getFarmTrade: (params: any) => getFarmTrade(pool, params),
+    actOnFarmTrade: (params: any) => actOnFarmTrade(pool, params),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     spendValor: (params: any) => spendValorForEntitlement(pool, params),
     resetCampaign: (params: any) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

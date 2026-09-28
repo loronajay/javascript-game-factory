@@ -24,6 +24,7 @@ import { completeFarmOnboarding, markFarmIntroSeen } from "../farm-onboarding.mj
 import { DEFAULT_GROUND_ID } from "../farm-catalog/ground.mjs";
 import { findFarmDecor } from "../farm-catalog/decor.mjs";
 import { CROP_CATALOG } from "../farm-crops.mjs";
+import { boxesOverlap, farmDecorBox, farmDecorCollides } from "../farm-decor-layout.mjs";
 
 test("a new farm waits for a named dog and receives one plot plus six persisted starter seeds", () => {
   const layout = createDefaultFarmLayout(() => 0);
@@ -50,6 +51,59 @@ test("the farm is a wide open field bounded by the perimeter fence inset", () =>
   assert.equal(FARM_BOUNDS.width, 28);
   assert.equal(FARM_BOUNDS.depth, 28);
   assert.ok(FARM_BOUNDS.wallInset > 0 && FARM_BOUNDS.wallInset < 2);
+});
+
+test("the starter farmhouse replaces the old hay-bale spot without clipping the barn, trees, or other decor", () => {
+  const layout = createDefaultFarmLayout(() => 0);
+  const farmhouse = layout.decor.find((row) => row.instanceId === "cottage-1");
+  const range = layout.decor.find((row) => row.instanceId === "kitchen-range-1");
+  assert.deepEqual(
+    { x: farmhouse.x, z: farmhouse.z, rotationY: farmhouse.rotationY },
+    { x: 0.25, z: -8.6, rotationY: Math.PI / 2 },
+  );
+  assert.deepEqual(
+    { x: range.x, z: range.z, rotationY: range.rotationY },
+    { x: -2.53, z: -7.4, rotationY: Math.PI / 2 },
+    "the range keeps its original local pose against the farmhouse back wall",
+  );
+  assert.deepEqual(
+    layout.decor.filter((row) => row.itemId === "decor.prop.hay-bale").map(({ x, z }) => ({ x, z })),
+    [{ x: -8, z: -2.5 }, { x: -6.5, z: -2 }],
+    "the hay remains starter dressing but vacates the farmhouse site",
+  );
+
+  for (let first = 0; first < layout.decor.length; first += 1) {
+    for (let second = first + 1; second < layout.decor.length; second += 1) {
+      const a = layout.decor[first];
+      const b = layout.decor[second];
+      const aDefinition = findFarmDecor(a.itemId);
+      const bDefinition = findFarmDecor(b.itemId);
+      if (!farmDecorCollides(aDefinition, bDefinition)) continue;
+      const permittedInterior = b.instanceId === "kitchen-range-1" && a.instanceId === "cottage-1";
+      if (permittedInterior) continue;
+      assert.equal(
+        boxesOverlap(farmDecorBox(a, aDefinition), aDefinition.footprint, farmDecorBox(b, bDefinition), bDefinition.footprint),
+        false,
+        `${a.instanceId} must not overlap ${b.instanceId}`,
+      );
+    }
+  }
+});
+
+test("an untouched saved starter cluster migrates to the corrected farmhouse arrangement", () => {
+  const legacy = createDefaultFarmLayout(() => 0);
+  const oldDecor = legacy.decor.map((row) => {
+    if (row.instanceId === "cottage-1") return { ...row, x: -7.5, z: 1.5 };
+    if (row.instanceId === "kitchen-range-1") return { ...row, x: -10.28, z: 2.7 };
+    if (row.instanceId === "hay-bale-1") return { ...row, x: -1.2, z: -8.6 };
+    if (row.instanceId === "hay-bale-2") return { ...row, x: 0.9, z: -8.9 };
+    return row;
+  });
+  const migrated = normalizeFarmLayout({ ...legacy, decor: oldDecor });
+  assert.deepEqual(
+    migrated.decor.filter((row) => ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2"].includes(row.instanceId)).map(({ instanceId, itemId, x, z }) => ({ instanceId, itemId, x, z })),
+    STARTER_FARM_DECOR.filter((row) => ["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2"].includes(row.instanceId)).map(({ instanceId, itemId, x, z }) => ({ instanceId, itemId, x, z })),
+  );
 });
 
 test("normalize keeps a valid document, treats old documents as established, and repairs garbage", () => {

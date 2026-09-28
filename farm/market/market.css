@@ -62,8 +62,37 @@
 .orders-footer { padding-top: 10px; padding-bottom: 12px; }
 .orders-footer .pets-status:empty::before { content: "Deliver from your basket or pantry: the goods come off, the tickets and XP go on."; color: #9fb294; }
 
+/* Trading: an invitation toast, and a two-sided table. */
+.trade-invite { position: fixed; z-index: 8; top: 92px; left: 50%; translate: -50% 0; display: grid; gap: 8px; width: min(380px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--farm-accent); border-radius: 14px; background: var(--farm-ink); color: #f8fbf4; box-shadow: 0 24px 70px rgba(0,0,0,.55); backdrop-filter: blur(16px); }
+.trade-invite[hidden] { display: none; }
+.trade-invite strong { font-size: 15px; }
+.trade-invite__actions { display: flex; gap: 8px; }
+.trade-invite__actions button { flex: 1; }
+.trade-invite__actions button:disabled { opacity: .5; cursor: wait; }
+.trade-panel { left: 50%; right: auto; translate: -50% 0; width: min(860px, calc(100vw - 36px)); }
+.trade-panel__body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-content: start; }
+.trade-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.trade-side--theirs { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.1); }
+.trade-side__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+.trade-chip { padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); color: #d6e3c8; font: 800 9.5px ui-monospace, monospace; font-style: normal; letter-spacing: .12em; }
+.trade-chip[data-state="locked"] { border-color: var(--farm-accent); color: var(--farm-accent); }
+.trade-chip[data-state="confirmed"] { border-color: var(--farm-leaf); background: rgba(158,226,122,.18); color: var(--farm-leaf); }
+.trade-row { grid-template-columns: 46px minmax(0, 1fr) auto; }
+.trade-row .seed-card__image { width: 46px; height: 42px; }
+.trade-row[data-offered="true"] { border-color: rgba(255, 211, 61, .55); background: rgba(255, 211, 61, .09); }
+.trade-row__count { min-width: 26px; color: #fff6cf; font: 900 14px ui-monospace, monospace; text-align: center; }
+.trade-row--theirs .trade-row__count { color: var(--farm-accent); text-align: right; }
+.trade-panel[data-status="completed"] .trade-side--theirs .trade-row { border-color: rgba(158,226,122,.5); background: rgba(158,226,122,.1); }
+.trade-footer .pets-status { color: #fff6cf; font-weight: 700; }
+.trade-footer__rule { margin: 0; color: #9fb294; font-size: 11.5px; }
+#lockTrade[aria-pressed="true"] { border-color: var(--farm-accent); color: var(--farm-accent); }
+#confirmTrade:disabled, #lockTrade:disabled { opacity: .45; cursor: not-allowed; }
+
 @media (max-width: 720px) {
   .sale-row { grid-template-columns: 36px minmax(0, 1fr) 48px; }
   .sale-row__stepper { grid-column: 2 / 4; }
   .order-card__foot { flex-direction: column; align-items: stretch; }
+  .trade-panel__body { grid-template-columns: 1fr; }
+  .trade-side--theirs { padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.1); }
+  .trade-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
 }

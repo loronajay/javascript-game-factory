@@ -1,0 +1,93 @@
+// Trading in the Market Square, on the page: the session that follows the
+// table (farm-trade-session.mts) and the panel that draws it
+// (farm-trade-panel.mts), assembled against the square's markup. Kept out of
+// the market's composition root (farm-market.mts) like the Sawmill is, so the
+// square only asks: is a table up, what does E/T/Y/N/Esc do, and what is the
+// player doing for the presence line.
+//
+// Only an account farm can trade — the goods are the server's — so a
+// signed-out visitor never polls and T on a person says why.
+
+import { createTradeSession, type TradeApi } from "./farm-trade-session.mjs";
+import { createTradePanel } from "./farm-trade-panel.mjs";
+import { isLive } from "./farm-trade.mjs";
+import type { FarmLayout } from "./farm-layout.mjs";
+
+type Thumbnail = (key: string, onReady: (url: string) => void) => string | null;
+
+export type MarketTradingDeps = Readonly<{
+  api: TradeApi;
+  /** Whether this player's farm is an account farm the server can trade from. */
+  canTrade: boolean;
+  farm: () => FarmLayout;
+  takeStock: (layout: unknown) => unknown;
+  thumbnail?: Thumbnail;
+  onClose: () => void;
+}>;
+
+export type MarketTrading = Readonly<{
+  start: () => void;
+  stop: () => void;
+  /** Ask a person in the square to trade. Returns a line for the prompt when it cannot. */
+  invite: (member: Readonly<{ playerId: string; displayName: string }>) => string;
+  /** A table (live or just ended) is on screen and has the keyboard. */
+  isOpen: () => boolean;
+  escape: () => void;
+  /** Y / N on a waiting invitation; false when there is none. */
+  answer: (yes: boolean) => boolean;
+  /** What the player is doing, for the presence line. */
+  activity: () => string;
+}>;
+
+function required<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Market Square is missing ${selector}`);
+  return element;
+}
+
+export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
+  let panel: ReturnType<typeof createTradePanel> | null = null;
+  const session = createTradeSession({
+    api: deps.api,
+    timers: { set: (run, ms) => setTimeout(run, ms), clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>) },
+    farm: deps.farm,
+    onLayout: deps.takeStock,
+    onChange: () => panel?.render(),
+  });
+  panel = createTradePanel({
+    invite: required<HTMLElement>("#tradeInvite"),
+    inviteText: required<HTMLElement>("#tradeInviteText"),
+    acceptButton: required<HTMLButtonElement>("#acceptTrade"),
+    declineButton: required<HTMLButtonElement>("#declineTrade"),
+    root: required<HTMLElement>("#tradePanel"),
+    title: required<HTMLElement>("#tradeTitle"),
+    closeButton: required<HTMLButtonElement>("#closeTrade"),
+    yourState: required<HTMLElement>("#tradeYourState"),
+    theirState: required<HTMLElement>("#tradeTheirState"),
+    yourTitle: required<HTMLElement>("#tradeYourTitle"),
+    theirTitle: required<HTMLElement>("#tradeTheirTitle"),
+    stock: required<HTMLElement>("#tradeStock"),
+    theirs: required<HTMLElement>("#tradeTheirs"),
+    status: required<HTMLElement>("#tradeStatus"),
+    lockButton: required<HTMLButtonElement>("#lockTrade"),
+    confirmButton: required<HTMLButtonElement>("#confirmTrade"),
+  }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose });
+
+  return Object.freeze({
+    start: () => { if (deps.canTrade) session.start(); },
+    stop: () => session.stop(),
+    invite(member): string {
+      if (!deps.canTrade) return "Sign in to trade — only an account farm's goods can change hands.";
+      if (!member.playerId) return `${member.displayName} can't trade — they aren't signed in.`;
+      void session.invite(member.playerId, member.displayName);
+      return "";
+    },
+    isOpen: () => panel!.isOpen(),
+    escape: () => panel!.escape(),
+    answer: (yes) => panel!.answer(yes),
+    activity(): string {
+      const view = session.snapshot().view;
+      return view && isLive(view) ? "trading" : "";
+    },
+  });
+}

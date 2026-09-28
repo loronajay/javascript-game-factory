@@ -52,7 +52,7 @@ const GATE_WIDTH = 2.4;
 const SOUTH_RUN = EDGE - GATE_WIDTH / 2 + 0.07;
 /**
  * The starter field: the perimeter fence (four runs and the south gate), the
- * barn, four trees, two hay bales and the trough — the slice-1 dressing as
+ * barn, farmhouse, four trees, two hay bales and the trough — the starter dressing as
  * rows the player may now move. `normalizeFarmLayout` seeds it for a document
  * that has never had decor.
  */
@@ -68,17 +68,38 @@ export const STARTER_FARM_DECOR = Object.freeze([
     row("oak-2", "decor.plant.oak", 11.2, -4.5),
     row("oak-3", "decor.plant.oak", -11.5, 4),
     row("oak-4", "decor.plant.oak", 7.8, 9.5),
-    row("hay-bale-1", "decor.prop.hay-bale", -1.2, -8.6, 0.4),
-    row("hay-bale-2", "decor.prop.hay-bale", 0.9, -8.9, -0.2),
+    // Keep the hay beside the outbuildings and leave its former site open for the farmhouse.
+    row("hay-bale-1", "decor.prop.hay-bale", -8, -2.5, 0.4),
+    row("hay-bale-2", "decor.prop.hay-bale", -6.5, -2, -0.2),
     row("trough-1", "decor.prop.trough", 5.5, -1.5, Math.PI / 2),
     row("soil-1", "decor.plant.soil-patch", 4.5, 6.5),
-    // The farmhouse, door to the east across the field, with a Kitchen Range already against its back wall.
-    row("cottage-1", "decor.building.cottage", -7.5, 1.5, Math.PI / 2),
-    row("kitchen-range-1", "decor.prop.kitchen-range", -10.28, 2.7, Math.PI / 2),
+    // The farmhouse occupies the old hay-bale clearing, with its door facing east and its range against the back wall.
+    // The slight east offset clears the barn's rotated footprint while preserving a comfortable gap between them.
+    row("cottage-1", "decor.building.cottage", 0.25, -8.6, Math.PI / 2),
+    row("kitchen-range-1", "decor.prop.kitchen-range", -2.53, -7.4, Math.PI / 2),
     // Two Tree Plots for the new farm's first sapling of each kind.
     row("tree-plot-1", "decor.plant.tree-plot", -9.5, 10.5),
     row("tree-plot-2", "decor.plant.tree-plot", -6.2, 11.2),
 ]);
+const STARTER_FARMHOUSE_CLUSTER_IDS = Object.freeze(["cottage-1", "kitchen-range-1", "hay-bale-1", "hay-bale-2"]);
+const LEGACY_STARTER_FARMHOUSE_CLUSTER = Object.freeze({
+    "cottage-1": Object.freeze({ itemId: "decor.building.cottage", x: -7.5, z: 1.5 }),
+    "kitchen-range-1": Object.freeze({ itemId: "decor.prop.kitchen-range", x: -10.28, z: 2.7 }),
+    "hay-bale-1": Object.freeze({ itemId: "decor.prop.hay-bale", x: -1.2, z: -8.6 }),
+    "hay-bale-2": Object.freeze({ itemId: "decor.prop.hay-bale", x: 0.9, z: -8.9 }),
+});
+/** Repair only the exact shipped cluster; any player-moved piece makes the saved arrangement authoritative. */
+function migrateStarterFarmhouseCluster(decor) {
+    const untouched = STARTER_FARMHOUSE_CLUSTER_IDS.every((instanceId) => {
+        const row = decor.find((candidate) => candidate.instanceId === instanceId);
+        const legacy = LEGACY_STARTER_FARMHOUSE_CLUSTER[instanceId];
+        return row?.itemId === legacy.itemId && row.x === legacy.x && row.z === legacy.z;
+    });
+    if (!untouched)
+        return [...decor];
+    const replacements = new Map(STARTER_FARM_DECOR.filter((row) => STARTER_FARMHOUSE_CLUSTER_IDS.includes(row.instanceId)).map((row) => [row.instanceId, row]));
+    return decor.map((row) => replacements.get(row.instanceId) ?? row);
+}
 /** The decor rows crops may grow in, and the ones a tree may. */
 const cropPlotIds = (decor) => new Set(decor.filter((row) => row.itemId === "decor.plant.soil-patch" || row.itemId === "decor.building.greenhouse").map((row) => row.instanceId));
 const treePlotIds = (decor) => new Set(decor.filter((row) => row.itemId === TREE_PLOT_ITEM_ID).map((row) => row.instanceId));
@@ -236,6 +257,7 @@ export function normalizeFarmLayout(value) {
             if (decor.length >= MAX_PERSISTED_DECOR)
                 break;
         }
+        decor = migrateStarterFarmhouseCluster(decor);
     }
     const habitats = farmHabitats({ decor });
     const pets = [];

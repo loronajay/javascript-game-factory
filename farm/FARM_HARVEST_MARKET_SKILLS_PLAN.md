@@ -1264,6 +1264,8 @@ Only after server-authoritative inventory is stable:
 6. trade audit records;
 7. exploit/rate-limit protection.
 
+**Shipped 2026-09-27** (see `planning-docs/CHANGELOG.md`): barter in the Market Square (T on a person), tradeable goods = the server-minted stacks only (produce, dishes, logs, planks, furniture off the shelf), one-sided gifts allowed (never an empty table), polling transport, `farm_trades` rows as the audit record, limits of one live table per player, 10 invites / 10 min, 20 trades / UTC day.
+
 ---
 
 # 21. Acceptance Criteria

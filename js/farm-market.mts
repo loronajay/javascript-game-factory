@@ -8,6 +8,11 @@
 // through the room's visitor bodies). Everyone here shares one presence room on
 // the arcade-room bridge, with its chat, so the square is a place people meet.
 //
+// Trading between players is the same (farm-market-trading.mts): T on a person
+// in reach invites them, and the table the two of them build is the server's
+// (`/games/farm/trades`), which moves the goods between the farms only when
+// both have locked the same offers and both have confirmed.
+//
 // Money is never decided here. The Produce Merchant's panel names crops and
 // counts, the Kitchen's names dishes, the Sawmill's logs to saw and furniture
 // to sell (farm-market-sawmill.mts); the server prices the sale, takes the
@@ -54,6 +59,8 @@ import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel, type SaleOutcome } from "./farm-market-panel.mjs";
 import { createOrderBoardPanel, type OrderFillOutcome } from "./farm-orders-panel.mjs";
 import { createMarketSawmill } from "./farm-market-sawmill.mjs";
+import { createMarketTrading } from "./farm-market-trading.mjs";
+import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { normalizeOrderBoard, type FarmOrderBoard } from "./farm-orders.mjs";
 import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
@@ -271,7 +278,7 @@ function publishPresence(): void {
     z: player.z,
     yaw: player.yaw,
     moving: keys.size > 0 && body.mode === "walking",
-    activity: salePanel.isOpen() ? "selling produce" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity(),
+    activity: trading.activity() || (salePanel.isOpen() ? "selling produce" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
   });
 }
 
@@ -408,9 +415,21 @@ const sawmill = createMarketSawmill({
   onClose: () => canvas.focus(),
 });
 
-/** A counter or the board has the player's attention: no walking, no looking round. */
+// Trading with the others in the square (farm-market-trading.mts): T on a person, Y/N on an invitation.
+const trading = createMarketTrading({
+  api: createPlatformApiClient(),
+  canTrade: canSell,
+  farm: () => farm,
+  takeStock,
+  thumbnail: itemThumbnails.get,
+  onClose: () => canvas.focus(),
+});
+window.addEventListener("pagehide", () => trading.stop());
+window.addEventListener("pageshow", () => { if (entered) trading.start(); });
+
+/** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 function panelOpen(): boolean {
-  return salePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen();
+  return salePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
 }
 
 function workStall(stall: MarketStall): void {
@@ -466,7 +485,7 @@ function updateInteraction(): void {
   }
   if (stallInReach) return setPrompt(stallPrompt(stallInReach, canSell));
   if (seatInReach) return setPrompt(SEAT_PROMPT);
-  if (nearbyVisitor) return setPrompt(`Press E to wave at ${nearbyVisitor.displayName}`);
+  if (nearbyVisitor) return setPrompt(`Press E to wave at ${nearbyVisitor.displayName} · T to trade`);
   setPrompt("");
 }
 
@@ -525,7 +544,9 @@ function checkGateway(): void {
 
 window.addEventListener("keydown", (event) => {
   if (panelOpen()) {
-    if (event.code === "Escape") {
+    if (event.code === "Escape" && trading.isOpen()) {
+      trading.escape();
+    } else if (event.code === "Escape") {
       salePanel.close();
       kitchenPanel.close();
       ordersPanel.close();
@@ -536,6 +557,16 @@ window.addEventListener("keydown", (event) => {
   }
   if (entered && chatView.handleKey(event)) {
     keys.clear();
+    return;
+  }
+  if (entered && !event.repeat && (event.code === "KeyY" || event.code === "KeyN") && trading.answer(event.code === "KeyY")) {
+    event.preventDefault();
+    return;
+  }
+  if (entered && !event.repeat && event.code === "KeyT" && nearbyVisitor) {
+    event.preventDefault();
+    const note = trading.invite(nearbyVisitor);
+    if (note) notice(note);
     return;
   }
   if (body.mode === "seated" && isMoveKey(event.code)) {
@@ -565,6 +596,7 @@ canvas.addEventListener("click", () => {
 enterButton.addEventListener("click", () => {
   if (!entered) player.x += spawnOffsetForCompany({ x: player.x, z: player.z }, presence.members());
   entered = true;
+  trading.start();
   music.start();
   startGate.classList.add("is-hidden");
   canvas.focus();
@@ -634,6 +666,8 @@ function frame(now: number): void {
   produce: () => produce,
   dishes: () => dishes,
   canSell: () => canSell,
+  tradeOpen: () => trading.isOpen(),
+  nearbyVisitor: () => nearbyVisitor?.displayName ?? "",
   presence: () => presence.status(),
 });
 

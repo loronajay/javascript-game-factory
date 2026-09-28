@@ -595,6 +595,24 @@ export function createPlatformApiClient(options = {}) {
         fillFarmOrder({ orderId }) {
             return post("/games/farm/market/orders/fulfillments", { orderId }, "fill", {}, true);
         },
+        /** Invite another farmer to a trading table (self only; the server checks both farms and both trade slots). */
+        inviteFarmTrade({ partnerId }) {
+            return post("/games/farm/trades", { partnerId }, "result", {}, true);
+        },
+        /** The table this player is at, an invitation to them included: `{ trade }` with `trade` null when there is none. */
+        fetchCurrentFarmTrade() {
+            return get("/games/farm/trades/current");
+        },
+        /** One table followed to its end; a completed one brings this player's farm as it now stands. */
+        fetchFarmTrade(tradeId) {
+            const encoded = encodePathSegment(tradeId);
+            return encoded ? get(`/games/farm/trades/${encoded}`, "result") : Promise.resolve(null);
+        },
+        /** One move on a table: accept, decline, cancel, offer, lock, unlock or confirm. The server decides whether it is allowed. */
+        actOnFarmTrade(tradeId, action) {
+            const encoded = encodePathSegment(tradeId);
+            return encoded ? post(`/games/farm/trades/${encoded}/actions`, action, "result", {}, true) : Promise.resolve(null);
+        },
         recordGameProgressClaim(gameSlug, claim = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);

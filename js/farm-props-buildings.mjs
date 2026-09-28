@@ -31,7 +31,7 @@ import { box, cylinder, sphere, standard } from "./arcade-room-decor-primitives.
 import { farmMaterial, metricUvs, tbox, tcylinder, tmesh, tsphere } from "./farm-materials.mjs";
 import { roundFace, shellWalls } from "./farm-shell.mjs";
 import { farmFixtures, fixtureDoorHinge, fixtureNamed } from "./farm-fixtures.mjs";
-import { gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt, hangingLightChain } from "./farm-building-geometry.mjs";
+import { gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt, hangingLightChain, hipRoofMesh } from "./farm-building-geometry.mjs";
 const WOOD = "#8a5a34";
 const WOOD_DARK = "#5d3a1f";
 const TRIM = "#f1e6d2";
@@ -560,29 +560,19 @@ function hipRoof(THREE, group, definition, rise, overhang, materials) {
     const wallHeight = definition.shell.wallHeight;
     const hw = width / 2 + overhang;
     const hd = depth / 2 + overhang;
-    const y0 = wallHeight;
     const y1 = wallHeight + rise;
     const ridge = Math.max(0, hw - hd);
-    // Corners clockwise from the front-left, then the two ridge ends.
-    const c = [[-hw, y0, hd], [hw, y0, hd], [hw, y0, -hd], [-hw, y0, -hd]];
-    const r0 = [-ridge, y1, 0];
-    const r1 = [ridge, y1, 0];
-    const triangles = [
-        [c[0], c[1], r1], [c[0], r1, r0], // front slope
-        [c[2], c[3], r0], [c[2], r0, r1], // back slope
-        [c[1], c[2], r1], // east hip
-        [c[3], c[0], r0], // west hip
-    ];
-    const positions = new Float32Array(triangles.flatMap((triangle) => triangle.flatMap((vertex) => [...vertex])));
+    const mesh = hipRoofMesh({ width, depth, wallHeight, rise, overhang });
+    const positions = new Float32Array(mesh.positions);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(triangles.length * 6), 2));
+    geometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(mesh.uvs), 2));
     geometry.computeVertexNormals();
     tmesh(THREE, group, geometry, materials.roof);
     // The same roof again a hair lower and inset, so the slab has a visible thickness at the eaves.
     const under = new THREE.BufferGeometry();
     under.setAttribute("position", new THREE.BufferAttribute(positions.map((value, index) => (index % 3 === 1 ? value - 0.14 : value)), 3));
-    under.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(triangles.length * 6), 2));
+    under.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(mesh.uvs), 2));
     under.computeVertexNormals();
     tmesh(THREE, group, under, materials.roof);
     // Fascia round the eaves and rafter tails under it.

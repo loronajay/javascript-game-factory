@@ -20,6 +20,7 @@ import { handleProgressionRoute } from "./routes/progression-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handleTicketRoute } from "./routes/ticket-routes.mjs";
 import { handleFarmEconomyRoute } from "./routes/farm-economy-routes.mjs";
+import { handleFarmTradeRoute } from "./routes/farm-trade-routes.mjs";
 import { handleGameResultRoute } from "./routes/game-result-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
@@ -339,6 +340,10 @@ export function createApp(options: any = {}) {
   const cookFarmDish = typeof options?.cookFarmDish === "function" ? options.cookFarmDish : null;
   const millFarmLogs = typeof options?.millFarmLogs === "function" ? options.millFarmLogs : null;
   const craftFarmPiece = typeof options?.craftFarmPiece === "function" ? options.craftFarmPiece : null;
+  const inviteFarmTrade = typeof options?.inviteFarmTrade === "function" ? options.inviteFarmTrade : null;
+  const getCurrentFarmTrade = typeof options?.getCurrentFarmTrade === "function" ? options.getCurrentFarmTrade : null;
+  const getFarmTrade = typeof options?.getFarmTrade === "function" ? options.getFarmTrade : null;
+  const actOnFarmTrade = typeof options?.actOnFarmTrade === "function" ? options.actOnFarmTrade : null;
   // Earned advancement, read-only. Null for the leaderboards' reason: an
   // unconfigured backend must answer 503 rather than report a level-1 document a
   // client would cache as the truth. There is no write service — XP is awarded
@@ -673,6 +678,7 @@ export function createApp(options: any = {}) {
   };
   const ticketServices = { getTicketWallet, getTicketShop, purchaseTicketShopItem };
   const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder, cookFarmDish, millFarmLogs, craftFarmPiece };
+  const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
   const gameResultServices = { submitGameResult };
   const progressionServices = {
     getGameXpProgress,
@@ -786,6 +792,16 @@ export function createApp(options: any = {}) {
       bucket: "game-results",
       limit: 120,
       windowMs: 60 * MINUTE_MS,
+    },
+    {
+      // Farm trading. A table polls with GETs (not limited); these are the moves.
+      // A real trade is a handful of offers, two locks and two confirms, and the
+      // server's own per-player limits (invites per window, trades per day,
+      // revisions per table) bound what the moves can do, so this only stops hammering.
+      match: (p: string) => /^\/games\/farm\/trades(\/[^/]+\/actions)?$/.test(p),
+      bucket: "farm-trades",
+      limit: 300,
+      windowMs: 10 * MINUTE_MS,
     },
   ];
   let rateLimitSweepCounter = 0;
@@ -1108,6 +1124,11 @@ export function createApp(options: any = {}) {
     if (await handleFarmEconomyRoute({
       req, res, method, pathname, authClaims, requestOrigin, timestamp,
       services: farmEconomyServices,
+    })) return;
+
+    if (await handleFarmTradeRoute({
+      req, res, method, pathname, authClaims, requestOrigin, timestamp,
+      services: farmTradeServices,
     })) return;
 
     if (await handleGameSocialRoute({
