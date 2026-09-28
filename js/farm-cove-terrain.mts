@@ -9,6 +9,8 @@
 // models (farm/assets/fishing/); the rest is procedural.
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
+import { createSurfaceMaterial } from "./arcade-room-surfaces.mjs";
+import { COVE_GROUND_STYLES, coveGroundSurfaceAt, type CoveGroundSurface } from "./farm-cove-ground.mjs";
 import {
   COVE_DOCKS,
   COVE_WATER_LEVEL,
@@ -58,52 +60,45 @@ function smoothNoise(x: number, z: number): number {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-const GRASS = [0.42, 0.66, 0.3];
-const GRASS_DARK = [0.33, 0.55, 0.24];
-const SAND = [0.86, 0.79, 0.6];
-const WET_SAND = [0.72, 0.64, 0.46];
-const BED_LAGOON = [0.44, 0.47, 0.3];
-const BED_REEF = [0.8, 0.74, 0.56];
-const BED_DEEP = [0.12, 0.2, 0.26];
-
-function mix(a: readonly number[], b: readonly number[], t: number): number[] {
-  const k = Math.min(1, Math.max(0, t));
-  return [a[0]! + (b[0]! - a[0]!) * k, a[1]! + (b[1]! - a[1]!) * k, a[2]! + (b[2]! - a[2]!) * k];
-}
-
-/** The colour of the ground at a point: grass, a sandy beach at the water, then each water's bed. */
-function groundColour(x: number, z: number, height: number): number[] {
-  const point = { x, z };
-  const water = coveWaterAt(point);
-  const grain = smoothNoise(x * 0.35, z * 0.35) * 0.7 + smoothNoise(x * 1.7, z * 1.7) * 0.3;
-  if (!water) {
-    const nearWater = coveWaterDistance(point);
-    const beach = nearWater > -2.2 ? 1 - Math.max(0, -nearWater - 1) / 1.2 : 0;
-    return mix(mix(GRASS, GRASS_DARK, grain), SAND, beach);
-  }
-  if (height > COVE_WATER_LEVEL + 0.05) return mix(SAND, WET_SAND, grain * 0.6);
-  if (water.water === "lagoon") return mix(mix(WET_SAND, BED_LAGOON, (COVE_WATER_LEVEL - height) / 0.8), GRASS_DARK, grain * 0.25);
-  const depth = COVE_WATER_LEVEL - height;
-  return mix(mix(BED_REEF, WET_SAND, grain * 0.4), BED_DEEP, (depth - 1.5) / 4);
-}
+const GROUND_SURFACES: readonly CoveGroundSurface[] = Object.freeze(["turf", "shore", "lagoon", "reef", "deep"]);
 
 function heightfield(THREE: ThreeNamespace, size: number, segments: number, centre: Readonly<{ x: number; z: number }>, drop: number): any {
   const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
   geometry.rotateX(-Math.PI / 2);
   const position = geometry.attributes.position;
-  const colours = new Float32Array(position.count * 3);
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index) + centre.x;
     const z = position.getZ(index) + centre.z;
     const bump = coveWaterAt({ x, z }) ? 0 : (smoothNoise(x * 0.2, z * 0.2) - 0.5) * 0.06 * Math.min(1, Math.max(0, -coveWaterDistance({ x, z }) - 3) / 3);
     const height = coveGroundAt({ x, z }) + bump - drop;
     position.setXYZ(index, x, height, z);
-    const colour = groundColour(x, z, height);
-    colours.set(colour, index * 3);
   }
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+
+  // Sort triangles into a handful of material groups. This keeps the detailed
+  // farm meadow on dry land and the same renderer's sediment on the shore and
+  // beds without making grass blades show through the water.
+  const source = geometry.index;
+  if (!source) throw new Error("The Cove heightfield requires indexed plane geometry");
+  const triangles: number[][] = GROUND_SURFACES.map(() => []);
+  for (let offset = 0; offset < source.count; offset += 3) {
+    const a = source.getX(offset);
+    const b = source.getX(offset + 1);
+    const c = source.getX(offset + 2);
+    const x = (position.getX(a) + position.getX(b) + position.getX(c)) / 3;
+    const z = (position.getZ(a) + position.getZ(b) + position.getZ(c)) / 3;
+    const material = GROUND_SURFACES.indexOf(coveGroundSurfaceAt({ x, z }));
+    triangles[material]!.push(a, b, c);
+  }
+  geometry.setIndex(triangles.flat());
+  geometry.clearGroups();
+  let start = 0;
+  triangles.forEach((indices, materialIndex) => {
+    if (indices.length) geometry.addGroup(start, indices.length, materialIndex);
+    start += indices.length;
+  });
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }));
+  const materials = GROUND_SURFACES.map((surface) => createSurfaceMaterial(THREE, COVE_GROUND_STYLES[surface], { u: size, v: size }));
+  const mesh = new THREE.Mesh(geometry, materials);
   mesh.receiveShadow = true;
   return mesh;
 }

@@ -5,11 +5,25 @@ import { resolve } from "node:path";
 import { createLayoutStore } from "../arcade-room-store.mjs";
 import { PET_INTERACTIONS, getPetInteraction, getPetInteractionPrompt } from "../farm-interaction.mjs";
 import { buildFarmStats } from "../farm-stats.mjs";
+import { DEFAULT_GROUND_ID, findGround } from "../farm-catalog/ground.mjs";
+import { COVE_GROUND_STYLES, coveGroundSurfaceAt } from "../farm-cove-ground.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..");
 const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
 const source = readFileSync(resolve(repoRoot, "js", "farm.mts"), "utf8");
 const worldSource = readFileSync(resolve(repoRoot, "js", "farm-world.mts"), "utf8");
+
+test("the Cove reuses the farm's detailed ground renderer with distinct shore and seabed finishes", () => {
+  assert.equal(COVE_GROUND_STYLES.turf, findGround(DEFAULT_GROUND_ID)?.style, "dry turf is the farm's meadow texture");
+  for (const surface of ["shore", "lagoon", "reef", "deep"]) {
+    assert.equal(COVE_GROUND_STYLES[surface].pattern, "dirt", `${surface} uses the farm's clod-and-pebble renderer`);
+  }
+  assert.equal(coveGroundSurfaceAt({ x: 0, z: 14 }), "turf");
+  assert.equal(coveGroundSurfaceAt({ x: 5, z: 7 }), "shore");
+  assert.equal(coveGroundSurfaceAt({ x: -10, z: 0 }), "lagoon");
+  assert.equal(coveGroundSurfaceAt({ x: 10, z: 0 }), "reef");
+  assert.equal(coveGroundSurfaceAt({ x: 10, z: -20 }), "deep");
+});
 
 test("the player stats view includes every farm skill and its lifetime records", () => {
   const view = buildFarmStats({
