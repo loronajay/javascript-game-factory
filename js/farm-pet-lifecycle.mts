@@ -3,7 +3,7 @@
 // never owns age or size. Natural lifespan is a deterministic species cap.
 
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare, type PetProfile } from "./farm-pet-care.mjs";
+import { findPetCare, petMaxLifeDays, type PetProfile } from "./farm-pet-care.mjs";
 
 export const FAST_GROWTH_MULTIPLIER = 1.5;
 
@@ -14,9 +14,11 @@ const tidy = (value: number): number => Number(value.toFixed(10));
 export function advancePetLifecycle(profile: PetProfile, speciesId: string, elapsedFarmMinutes: number): PetProfile {
   const care = findPetCare(speciesId);
   const elapsedDays = cleanElapsed(elapsedFarmMinutes) / FARM_DAY_MINUTES;
-  if (!care || elapsedDays <= 0 || profile.ageDays >= care.maxLifeDays) return profile;
+  if (!care || elapsedDays <= 0) return profile;
+  const maxLifeDays = petMaxLifeDays(care, profile);
+  if (profile.ageDays >= maxLifeDays) return profile;
 
-  const livingDays = Math.min(elapsedDays, care.maxLifeDays - profile.ageDays);
+  const livingDays = Math.min(elapsedDays, maxLifeDays - profile.ageDays);
   const growthMultiplier = profile.traits.includes("growth.fast") ? FAST_GROWTH_MULTIPLIER : 1;
   const ageDays = tidy(profile.ageDays + livingDays);
   const current = tidy(Math.min(profile.size.max, profile.size.current + profile.size.growthPerDay * growthMultiplier * livingDays));

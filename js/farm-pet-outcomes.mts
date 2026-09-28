@@ -3,7 +3,7 @@
 // per pet/day, so reloading the same save cannot reroll an outcome.
 
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare, type PetProfile } from "./farm-pet-care.mjs";
+import { findPetCare, petMaxLifeDays, type PetProfile } from "./farm-pet-care.mjs";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { withFarmDecor, withFarmPets, withPetHistory, type FarmLayout, type FarmPet, type PetDepartureOutcome, type PetMemorial } from "./farm-layout.mjs";
 
@@ -23,7 +23,7 @@ export function petOutcomeWarning(profile: PetProfile, speciesId: string): PetOu
   const care = findPetCare(speciesId);
   const status = petNeedStatus(profile);
   if (status.starvationDue) return Object.freeze({ stage: "critical", label: "Life at risk", message: "This pet may die without food immediately." });
-  if (care && profile.ageDays >= care.maxLifeDays) return Object.freeze({ stage: "critical", label: "At life's end", message: "This pet has reached its natural lifespan." });
+  if (care && profile.ageDays >= petMaxLifeDays(care, profile)) return Object.freeze({ stage: "critical", label: "At life's end", message: "This pet has reached its natural lifespan." });
   if (profile.hunger <= 0 || profile.affection <= URGENT_AFFECTION || profile.happiness <= URGENT_HAPPINESS) return Object.freeze({ stage: "urgent", label: "Distressed", message: "This pet may refuse care, run away, or become gravely ill." });
   if (profile.hunger <= 40 || profile.affection <= WATCH_AFFECTION || profile.happiness <= WATCH_HAPPINESS) return Object.freeze({ stage: "watch", label: "Needs care", message: "Food, shelter, play, and gentle attention can prevent distress." });
   return Object.freeze({ stage: "safe", label: "Doing well", message: "This pet feels safe and cared for." });
@@ -83,7 +83,7 @@ export function resolvePetOutcomes(layout: FarmLayout, previousFarmMinute: numbe
     if (!pet?.profile) continue;
     const care = findPetCare(pet.speciesId);
     if (petNeedStatus(pet.profile).starvationDue) { next = remember(next, pet, "starvation", targetFarmMinute); continue; }
-    if (care && pet.profile.ageDays >= care.maxLifeDays) { next = remember(next, pet, "old_age", targetFarmMinute); continue; }
+    if (care && pet.profile.ageDays >= petMaxLifeDays(care, pet.profile)) { next = remember(next, pet, "old_age", targetFarmMinute); continue; }
     for (let day = firstDay; day <= lastDay && next.pets.some((row) => row.instanceId === pet.instanceId); day += 1) {
       const roll = (kind: string): number => random ? random() : stableRandom(`${pet.instanceId}:${day}:${kind}`);
       const runawayChance = (pet.profile.happiness <= URGENT_HAPPINESS ? RUNAWAY_CHANCE_PER_DAY : 0)

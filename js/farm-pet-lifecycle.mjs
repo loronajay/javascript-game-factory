@@ -2,7 +2,7 @@
 // farm minutes, through the same checkpoint as hunger and happiness; rendering
 // never owns age or size. Natural lifespan is a deterministic species cap.
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare } from "./farm-pet-care.mjs";
+import { findPetCare, petMaxLifeDays } from "./farm-pet-care.mjs";
 export const FAST_GROWTH_MULTIPLIER = 1.5;
 const cleanElapsed = (value) => Number.isFinite(value) ? Math.max(0, value) : 0;
 const tidy = (value) => Number(value.toFixed(10));
@@ -10,9 +10,12 @@ const tidy = (value) => Number(value.toFixed(10));
 export function advancePetLifecycle(profile, speciesId, elapsedFarmMinutes) {
     const care = findPetCare(speciesId);
     const elapsedDays = cleanElapsed(elapsedFarmMinutes) / FARM_DAY_MINUTES;
-    if (!care || elapsedDays <= 0 || profile.ageDays >= care.maxLifeDays)
+    if (!care || elapsedDays <= 0)
         return profile;
-    const livingDays = Math.min(elapsedDays, care.maxLifeDays - profile.ageDays);
+    const maxLifeDays = petMaxLifeDays(care, profile);
+    if (profile.ageDays >= maxLifeDays)
+        return profile;
+    const livingDays = Math.min(elapsedDays, maxLifeDays - profile.ageDays);
     const growthMultiplier = profile.traits.includes("growth.fast") ? FAST_GROWTH_MULTIPLIER : 1;
     const ageDays = tidy(profile.ageDays + livingDays);
     const current = tidy(Math.min(profile.size.max, profile.size.current + profile.size.growthPerDay * growthMultiplier * livingDays));

@@ -78,11 +78,38 @@ export function findFarmSupply(value: unknown): FarmSupply | null {
   return seedPrice ? Object.freeze({ id, price: seedPrice, kind: "seed" as const, cropId }) : null;
 }
 
-const TRAITS = Object.freeze(["held.dislikes", "held.loves", "movement.fast", "appetite.frequent", "appetite.rare", "growth.fast"]);
-const conflicts = (first: string, second: string): boolean => (first === "held.dislikes" && second === "held.loves")
-  || (first === "held.loves" && second === "held.dislikes")
-  || (first === "appetite.frequent" && second === "appetite.rare")
-  || (first === "appetite.rare" && second === "appetite.frequent");
+// Mirror of the client pet trait pool (js/farm-pet-care.mts `PET_TRAITS`): id,
+// adoption weight by rarity (common 6 / uncommon 3 / rare 1), mutual conflicts
+// and the adult-size bias. Order is the draw order; a parity test holds the two together.
+type FarmPetTraitRow = Readonly<{ id: string; weight: number; size?: "large" | "small" }>;
+export const FARM_PET_TRAITS: readonly FarmPetTraitRow[] = Object.freeze([
+  { id: "held.dislikes", weight: 6 }, { id: "held.loves", weight: 6 }, { id: "movement.fast", weight: 3 },
+  { id: "appetite.frequent", weight: 6 }, { id: "appetite.rare", weight: 6 }, { id: "growth.fast", weight: 3 },
+  { id: "temper.gentle", weight: 1 }, { id: "temper.grumpy", weight: 6 }, { id: "social.shy", weight: 6 },
+  { id: "social.friendly", weight: 6 }, { id: "social.loner", weight: 6 }, { id: "play.eager", weight: 6 },
+  { id: "home.loves", weight: 6 }, { id: "toys.collector", weight: 3 }, { id: "movement.lazy", weight: 6 },
+  { id: "movement.roams", weight: 6 }, { id: "follows.player", weight: 1 }, { id: "appetite.picky", weight: 6 },
+  { id: "body.hardy", weight: 1 }, { id: "size.large", weight: 1, size: "large" }, { id: "size.small", weight: 1, size: "small" },
+  { id: "life.long", weight: 1 },
+].map((row) => Object.freeze(row as FarmPetTraitRow)));
+export const FARM_PET_TRAIT_CONFLICTS: readonly (readonly [string, string])[] = Object.freeze([
+  ["held.dislikes", "held.loves"], ["appetite.frequent", "appetite.rare"], ["appetite.frequent", "appetite.picky"],
+  ["temper.gentle", "temper.grumpy"], ["social.shy", "social.friendly"], ["social.friendly", "social.loner"],
+  ["social.loner", "follows.player"], ["play.eager", "movement.lazy"], ["home.loves", "movement.roams"],
+  ["movement.lazy", "movement.fast"], ["movement.lazy", "movement.roams"], ["size.large", "size.small"],
+].map((pair) => Object.freeze(pair as [string, string])));
+const conflicts = (first: string, second: string): boolean =>
+  FARM_PET_TRAIT_CONFLICTS.some(([a, b]) => (a === first && b === second) || (a === second && b === first));
+const ADULT_SIZE = Object.freeze({ adultMin: 0.9, max: 1.12 });
+const SIZE_TRAIT_BAND = 0.3;
+function biasAdultSize(rolled: number, traits: readonly string[]): number {
+  const bias = traits.map((id) => FARM_PET_TRAITS.find((row) => row.id === id)?.size).find((value) => value);
+  const span = ADULT_SIZE.max - ADULT_SIZE.adultMin;
+  const within = (rolled - ADULT_SIZE.adultMin) / span;
+  if (bias === "large") return ADULT_SIZE.max - span * SIZE_TRAIT_BAND * (1 - within);
+  if (bias === "small") return ADULT_SIZE.adultMin + span * SIZE_TRAIT_BAND * within;
+  return rolled;
+}
 const unit = (value: number): number => Number.isFinite(value) ? Math.min(0.999999, Math.max(0, value)) : 0;
 const inRange = (range: Range, random: () => number): number => range.min + (range.max - range.min) * unit(random());
 const round = (value: number, places = 2): number => Number(value.toFixed(places));
@@ -90,19 +117,20 @@ const round = (value: number, places = 2): number => Number(value.toFixed(places
 export function createFarmPetProfile(speciesId: unknown, random: () => number = Math.random): any | null {
   const row = findFarmSpecies(speciesId);
   if (!row) return null;
-  const maxSize = round(inRange({ min: 0.9, max: 1.12 }, random));
-  const current = round(inRange({ min: 0.62, max: Math.min(0.9, maxSize) }, random));
+  const rolledMax = inRange({ min: ADULT_SIZE.adultMin, max: ADULT_SIZE.max }, random);
+  const current = round(inRange({ min: 0.62, max: Math.min(ADULT_SIZE.adultMin, round(rolledMax)) }, random));
   const gender = unit(random()) < 0.5 ? "female" : "male";
   const speed = inRange(row.speed, random);
   const strength = inRange(row.strength, random);
   const target = 1 + Math.floor(unit(random()) * 3);
-  const ordered = TRAITS.map((id) => ({ id, order: unit(random()) })).sort((a, b) => a.order - b.order);
+  const ordered = FARM_PET_TRAITS.map((row) => ({ id: row.id, key: Math.pow(unit(random()), 1 / row.weight) })).sort((a, b) => b.key - a.key);
   const traits: string[] = [];
   for (const candidate of ordered) {
     if (traits.some((id) => conflicts(id, candidate.id))) continue;
     traits.push(candidate.id);
     if (traits.length >= target) break;
   }
+  const maxSize = round(biasAdultSize(rolledMax, traits));
   const roll = unit(random()) * 100;
   let cursor = 0;
   const palette = row.palettes.find((entry) => (cursor += entry.weight) > roll) ?? row.palettes.at(-1)!;

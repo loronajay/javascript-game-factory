@@ -35,7 +35,7 @@
 // through a wall, which is what makes a stall with its door shut a pen: the
 // pet strolls the stall and never picks the field beyond the door.
 import { findAnimal } from "./farm-catalog/animals.mjs";
-import { petPace } from "./farm-pet-care.mjs";
+import { petPace, petTemperament } from "./farm-pet-care.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 import { WATER_LEVEL, groundHeightAt, insidePondWater, pondAt } from "./farm-pond.mjs";
 export const ATTENTION_SECONDS = 3;
@@ -47,6 +47,10 @@ export const CARRY_HEIGHT = 0.62;
 const IDLE_SECONDS = Object.freeze({ min: 1.5, max: 5 });
 const ARRIVE_DISTANCE = 0.3;
 const WANDER_RANGE = Object.freeze({ min: 1, max: 9 });
+/** A Shadow picks its strolls this close to the player, when the player is within SHADOW_REACH. */
+const SHADOW_DISTANCE = Object.freeze({ min: 1.8, max: 4 });
+const SHADOW_REACH = 14;
+const SHADOW_TRIES = 6;
 /** How finely a line of sight is sampled for walls, in metres. */
 const SIGHT_STEP = 0.25;
 const TARGET_TRIES = 12;
@@ -199,12 +203,37 @@ export function createPetSim(options) {
     function indoors(pet) {
         return pet.species.habitat !== "water" && blockedByKeepOut(pet.x, pet.z, 0);
     }
-    function pickTarget(pet) {
+    /** A Shadow's stroll: somewhere open a few steps from the player, if the player is near and the pet is out in the field. */
+    function pickShadowTarget(pet, player) {
+        if (!pet.temperament.follows || !player || pet.species.habitat === "water" || indoors(pet))
+            return false;
+        if (Math.hypot(player.x - pet.x, player.z - pet.z) > SHADOW_REACH)
+            return false;
+        for (let attempt = 0; attempt < SHADOW_TRIES; attempt += 1) {
+            const range = SHADOW_DISTANCE.min + random() * (SHADOW_DISTANCE.max - SHADOW_DISTANCE.min);
+            const angle = random() * Math.PI * 2;
+            const x = player.x + Math.cos(angle) * range;
+            const z = player.z + Math.sin(angle) * range;
+            if (!inField(x, z, pet.radius) || blockedBySolid(x, z, pet.radius) || blockedByPet(x, z, pet, pet.radius))
+                continue;
+            if (blockedByKeepOut(x, z, pet.radius) || blockedByPlayer(x, z, player, pet.radius))
+                continue;
+            if (!canSee(pet, { x, z }))
+                continue;
+            pet.targetX = x;
+            pet.targetZ = z;
+            return true;
+        }
+        return false;
+    }
+    function pickTarget(pet, player = null) {
+        if (pickShadowTarget(pet, player))
+            return true;
         const inside = indoors(pet);
         for (let attempt = 0; attempt < TARGET_TRIES; attempt += 1) {
-            // An indoor pet strolls short distances: its room is small.
+            // An indoor pet strolls short distances: its room is small. Its traits stretch or shorten a stroll.
             const min = inside ? 0.4 : WANDER_RANGE.min;
-            const max = inside ? 3 : WANDER_RANGE.max;
+            const max = inside ? 3 : WANDER_RANGE.max * pet.temperament.wanderRange;
             const range = min + random() * (max - min);
             const angle = random() * Math.PI * 2;
             const x = pet.x + Math.cos(angle) * range;
@@ -239,7 +268,7 @@ export function createPetSim(options) {
     }
     function startIdle(pet) {
         pet.state = "idle";
-        pet.timer = IDLE_SECONDS.min + random() * (IDLE_SECONDS.max - IDLE_SECONDS.min);
+        pet.timer = (IDLE_SECONDS.min + random() * (IDLE_SECONDS.max - IDLE_SECONDS.min)) * pet.temperament.idle;
     }
     /** One step along the heading if the ground there is free, else along the first free feeler; false if nowhere to go. */
     function stepAlong(pet, heading, distance, player) {
@@ -301,7 +330,7 @@ export function createPetSim(options) {
         else if (pet.state === "idle") {
             pet.timer -= dt;
             if (pet.timer <= 0) {
-                if (pickTarget(pet)) {
+                if (pickTarget(pet, player)) {
                     pet.state = "wander";
                     pet.timer = 0;
                 }
@@ -385,7 +414,8 @@ export function createPetSim(options) {
                     pets[index].name = row.name;
                     pets[index].sizeMultiplier = row.profile?.size.current ?? 1;
                     pets[index].paletteId = row.profile?.paletteId ?? "standard";
-                    pets[index].pace = petPace(row.profile);
+                    pets[index].temperament = petTemperament(row.profile);
+                    pets[index].pace = pets[index].temperament.pace;
                     pets[index].radius = pets[index].species.radius * pets[index].sizeMultiplier;
                 }
             }
@@ -425,6 +455,7 @@ export function createPetSim(options) {
                     state: "idle",
                     moving: false,
                     pace: petPace(row.profile),
+                    temperament: petTemperament(row.profile),
                     timer: 0,
                     targetX: spot.x,
                     targetZ: spot.z,

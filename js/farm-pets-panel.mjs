@@ -12,7 +12,7 @@
 import { adoptableAnimals, findAnimal, findAnimalPalette } from "./farm-catalog/animals.mjs";
 import { animalPaletteDisplayName } from "./farm-pet-palettes.mjs";
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats } from "./farm-layout.mjs";
-import { PET_TRAITS, findPetCare, petGrowthView, visiblePetStats } from "./farm-pet-care.mjs";
+import { findPetCare, findPetTrait, petGrowthView, visiblePetStats } from "./farm-pet-care.mjs";
 const gainedMarkup = (gained) => gained && gained >= 0.1 ? ` <span class="pet-row__gained" title="Earned by growing up">+${gained.toFixed(1)}</span>` : "";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { petOutcomeWarning } from "./farm-pet-outcomes.mjs";
@@ -104,8 +104,9 @@ export function createPetsPanel(elements, actions, options = {}) {
                 + `<span><strong>Home</strong> ${have(care.home.placed, care.home.title)}</span>`
                 + `<span><strong>Toys</strong> ${care.toys.map((toy) => have(toy.placed, toy.title)).join(" ")}</span></p>` : "";
             const traitMarkup = profile?.traits.length ? `<ul class="pet-row__traits">${profile.traits.map((id) => {
-                const trait = PET_TRAITS.find((entry) => entry.id === id);
-                return trait ? `<li title="${escapeHtml(trait.description)}">${escapeHtml(trait.title)}</li>` : "";
+                const trait = findPetTrait(id);
+                const rarity = trait && trait.rarity !== "common" ? ` · ${trait.rarity === "rare" ? "Rare" : "Uncommon"} trait` : "";
+                return trait ? `<li class="pet-row__trait pet-row__trait--${trait.rarity}" title="${escapeHtml(trait.description + rarity)}">${escapeHtml(trait.title)}</li>` : "";
             }).join("")}</ul>` : "";
             row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}${palette && palette.id !== "standard" ? ` · ${escapeHtml(animalPaletteDisplayName(palette))}` : ""}</span>`
                 + `<input class="pet-row__name" type="text" maxlength="${PET_NAME_MAX_LENGTH}" value="${escapeHtml(pet.name)}" aria-label="Name of ${escapeHtml(pet.name)}">`

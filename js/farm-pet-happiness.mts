@@ -4,7 +4,7 @@
 // the farm composition root.
 
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare, treatPet, type PetProfile } from "./farm-pet-care.mjs";
+import { findPetCare, petSnapThreshold, petTraitMultiplier, treatPet, type PetProfile } from "./farm-pet-care.mjs";
 import { withFarmPets, type FarmDecorRow, type FarmLayout, type FarmPet } from "./farm-layout.mjs";
 
 export const HAPPINESS_DRAIN_PER_DAY = 8;
@@ -66,11 +66,12 @@ export function advancePetWellbeing(profile: PetProfile, speciesId: string, deco
   if (elapsed <= 0 || !findPetCare(speciesId)) return profile;
   const days = elapsed / FARM_DAY_MINUTES;
   const environment = petCareEnvironment(speciesId, decor);
-  const happinessRate = -HAPPINESS_DRAIN_PER_DAY
-    + (environment.hasDwelling ? DWELLING_HAPPINESS_PER_DAY : 0)
-    + environment.toyCount * TOY_HAPPINESS_PER_DAY;
-  const affectionRate = (environment.hasDwelling ? DWELLING_AFFECTION_PER_DAY : 0)
-    + environment.toyCount * TOY_AFFECTION_PER_DAY;
+  const trait = (key: Parameters<typeof petTraitMultiplier>[1]) => petTraitMultiplier(profile, key);
+  const happinessRate = -HAPPINESS_DRAIN_PER_DAY * trait("happinessDrain") * (environment.hasDwelling ? 1 : trait("missingDwellingDrain"))
+    + (environment.hasDwelling ? DWELLING_HAPPINESS_PER_DAY * trait("dwellingHappiness") : 0)
+    + environment.toyCount * TOY_HAPPINESS_PER_DAY * trait("toyHappiness");
+  const affectionRate = (environment.hasDwelling ? DWELLING_AFFECTION_PER_DAY * trait("dwellingAffection") : 0)
+    + environment.toyCount * TOY_AFFECTION_PER_DAY * trait("toyAffection");
   return Object.freeze({
     ...profile,
     happiness: bounded(profile.happiness + happinessRate * days),
@@ -91,7 +92,7 @@ export function applyPetCareMilestones(layout: FarmLayout): FarmLayout {
       ...pet,
       profile: Object.freeze({
         ...pet.profile,
-        affection: bounded(pet.profile.affection + FIRST_DWELLING_AFFECTION),
+        affection: bounded(pet.profile.affection + FIRST_DWELLING_AFFECTION * petTraitMultiplier(pet.profile, "dwellingAffection")),
         milestones: Object.freeze([...pet.profile.milestones, milestone]),
       }),
     };
@@ -121,15 +122,17 @@ function reactWithoutTreatment(profile: PetProfile, speciesId: string, kind: Pet
   if (!care) return result(profile, false, "no_profile", "refuse", "This pet cannot be handled right now.");
   const cuddly = profile.traits.includes("held.loves");
   const independent = profile.traits.includes("held.dislikes");
+  const handlingAffection = petTraitMultiplier(profile, "handlingAffection");
+  const snapAt = petSnapThreshold(profile);
 
   if (kind === "play") {
     const environment = petCareEnvironment(speciesId, decor);
     const toy = environment.toyTitles[0];
     if (!toy) return result(profile, false, "no_toy", "refuse", "Place a compatible toy before asking this pet to play.");
-    return result(Object.freeze({ ...profile, happiness: bounded(profile.happiness + 12), affection: bounded(profile.affection + 3) }), true, "", "accept", `Played with the ${toy}.`);
+    return result(Object.freeze({ ...profile, happiness: bounded(profile.happiness + 12), affection: bounded(profile.affection + 3 * handlingAffection) }), true, "", "accept", `Played with the ${toy}.`);
   }
 
-  if (profile.happiness <= 10 || profile.affection <= 10) {
+  if (profile.happiness <= snapAt || profile.affection <= snapAt) {
     return result(profile, false, "refused", "bite", "Warning: this pet is distressed and snaps. Give it space, food, a dwelling, and toys.");
   }
   if (independent && profile.affection < (kind === "carry" ? 70 : 60)) {
@@ -140,7 +143,7 @@ function reactWithoutTreatment(profile: PetProfile, speciesId: string, kind: Pet
     const message = seconds ? `Picked up carefully · it may wriggle free in ${seconds} seconds.` : "Picked up gently.";
     return result(profile, true, "", "accept", message, seconds);
   }
-  const affection = cuddly ? 4 : independent ? 1 : 2;
-  const happiness = cuddly ? 4 : 2;
-  return result(Object.freeze({ ...profile, affection: bounded(profile.affection + affection), happiness: bounded(profile.happiness + happiness) }), true, "", "accept", cuddly ? "Loved the extra cuddle." : "Enjoyed being petted.");
+  const affection = (cuddly ? 4 : independent ? 1 : 2) * handlingAffection;
+  const happiness = (cuddly ? 4 : 2) * petTraitMultiplier(profile, "handlingHappiness");
+  return result(Object.freeze({ ...profile, affection: bounded(profile.affection + affection), happiness: bounded(profile.happiness + happiness) }), true, "", "accept", cuddly ? "Loved the extra cuddle." : profile.traits.includes("temper.grumpy") ? "Put up with being petted." : "Enjoyed being petted.");
 }

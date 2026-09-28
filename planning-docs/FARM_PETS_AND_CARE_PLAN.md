@@ -107,15 +107,36 @@ These are balancing rows, not claims about real-world animal biology. Food price
 
 ### Shared trait pool
 
-- [x] **Independent** — dislikes being held; conflicts with Cuddly.
-- [x] **Cuddly** — likes being held often; conflicts with Independent.
-- [x] **Zoomies** — moves unusually fast around the farm.
-- [x] **Big Appetite** — hunger drains faster; conflicts with Light Eater.
-- [x] **Light Eater** — hunger drains slower; conflicts with Big Appetite.
-- [x] **Fast Grower** — reaches adult size sooner.
-- [x] Every trait has its live effect: appetite traits change hunger drain; Cuddly/Independent change handling; Fast Grower changes growth; **Zoomies** multiplies wander pace by 1.35 (`petPace`, which also applies a narrow 0.9–1.1× band from Speed — the same curve the pet games use — and speeds the walk clip to match).
-- [x] Every trait also declares how it wants to be treated (rapport deltas per pet/carry/play/feed/early-feed), which drives stat growth.
-- [ ] Add rarity/weight data after the first behavior tuning pass; current selection is uniform.
+22 traits, shared by every species (expanded 2026-09-27 from the original six). Each is a row in `PET_TRAITS` (`js/farm-pet-care.mts`) carrying a **rarity**, **mutual conflicts**, a **treatment** (rapport deltas) and its **effect as data**: `multipliers` (hunger drain, happiness drain, home/toy happiness and trust, handling, pace, rest, stroll length, starvation grace, lifespan — composed by `petTraitMultiplier`), `snapAt`, `follows` or `size`. A pet's traits multiply together. The API mirrors the pool in `FARM_PET_TRAITS` / `FARM_PET_TRAIT_CONFLICTS` (`services/farm-economy-catalog.mts`) because it rolls adoption; a parity test holds order, weights, conflicts and whole adoptions together.
+
+| Trait | Rarity | Effect | Conflicts |
+| --- | --- | --- | --- |
+| Independent | common | refuses handling below 60/70 trust; hates being carried | Cuddly |
+| Cuddly | common | extra trust/happiness from petting | Independent |
+| Zoomies | uncommon | walks 1.35× | Lazy |
+| Big Appetite | common | hunger ×1.5 | Light Eater, Picky Eater |
+| Light Eater | common | hunger ×0.65, dislikes early meals | Big Appetite |
+| Fast Grower | uncommon | size ×1.5, stats ×1.25 in youth | — |
+| Gentle | rare | snaps only at ≤5 (default ≤10) | Grumpy |
+| Grumpy | common | snaps at ≤20, half the happiness from petting | Gentle |
+| Shy | common | half the trust from handling, double from its home (daily + first-home award) | Social |
+| Social | common | happiness drains ×1.25, loves petting | Shy, Loner |
+| Loner | common | happiness drains ×0.75, lukewarm about petting | Social, Shadow |
+| Playful | common | toy happiness ×2 | Lazy |
+| Homebody | common | home happiness ×2, drain ×1.3 while homeless | Wanderer |
+| Collector | uncommon | toy trust ×2 | — |
+| Lazy | common | walks 0.75×, rests 2× | Zoomies, Playful, Wanderer |
+| Wanderer | common | strolls 1.5× farther, rests 0.6× | Homebody, Lazy |
+| Shadow | rare | strolls to within 1.8–4 m of the player when the player is within 14 m (land/air only, not indoors) | Loner |
+| Picky Eater | common | meals barely register; early meals disliked | Big Appetite |
+| Hardy | rare | starvation grace ×2, hunger trust loss ×0.5 | — |
+| Big-Boned | rare | adult size remapped into the top 30% of the range (no extra draw) | Runt |
+| Runt | rare | adult size remapped into the bottom 30% | Big-Boned |
+| Long-Lived | rare | natural lifespan ×1.2 (`petMaxLifeDays`); growth stages stay on the species' life, so it is a longer elderhood at peak, and the server growth pin is unchanged | — |
+
+- [x] **Rarity weights**: common 6 / uncommon 3 / rare 1 (`PET_TRAIT_RARITY_WEIGHTS`), a weighted shuffle with one draw per trait (key `u^(1/w)`, highest first). The Pets panel tints uncommon (blue) and rare (gold) chips.
+- [x] Existing pets keep their stored traits (the server pins them on save); only new adoptions roll from the larger pool.
+- [ ] Species-specific pools (`care.traitIds` is the seam) and a 2–4 trait count are open questions.
 
 ## Stat progression (shipped 2026-09-25)
 

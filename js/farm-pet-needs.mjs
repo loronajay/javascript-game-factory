@@ -3,7 +3,7 @@
 // while the player is away (see resumeFarmClock), so time away never drains needs.
 // This module owns no timer, DOM, storage or rendering state.
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { EARLY_FEED_HUNGER, PET_TRAITS, findPetCare, treatPet } from "./farm-pet-care.mjs";
+import { EARLY_FEED_HUNGER, findPetCare, petTraitMultiplier, treatPet } from "./farm-pet-care.mjs";
 import { HUNGRY_GROWTH_WEIGHT, advancePetGrowth, statsFromGrowth } from "./farm-pet-growth.mjs";
 import { withFarmAgriculture, withFarmClock, withFarmPets } from "./farm-layout.mjs";
 import { advancePetWellbeing } from "./farm-pet-happiness.mjs";
@@ -14,11 +14,9 @@ export const STARVATION_GRACE_MINUTES = FARM_DAY_MINUTES;
 export const HUNGRY_AFFECTION_LOSS_PER_DAY = 2;
 export const STARVING_AFFECTION_LOSS_PER_DAY = 6;
 const roundedNeed = (value) => Number(value.toFixed(4));
-function appetiteMultiplier(profile) {
-    return profile.traits.reduce((product, id) => {
-        const modifier = PET_TRAITS.find((trait) => trait.id === id)?.hungerDrainMultiplier ?? 1;
-        return product * modifier;
-    }, 1);
+/** How long this pet survives at zero hunger (Hardy stretches it). */
+export function starvationGraceMinutes(profile) {
+    return STARVATION_GRACE_MINUTES * petTraitMultiplier(profile, "starvationGrace");
 }
 /** A concise public state; affection remains deliberately absent. */
 export function petNeedStatus(profile) {
@@ -32,7 +30,7 @@ export function petNeedStatus(profile) {
     return Object.freeze({
         level,
         label: level === "full" ? "Full" : level === "content" ? "Content" : level === "hungry" ? "Hungry" : "Starving",
-        starvationDue: profile.starvingMinutes >= STARVATION_GRACE_MINUTES,
+        starvationDue: profile.starvingMinutes >= starvationGraceMinutes(profile),
     });
 }
 /**
@@ -55,7 +53,7 @@ function advancePetProfileStep(profile, speciesId, elapsed, decor) {
     const care = findPetCare(speciesId);
     if (!care || elapsed <= 0)
         return profile;
-    const drainPerMinute = care.needs.hungerPerDay * appetiteMultiplier(profile) / FARM_DAY_MINUTES;
+    const drainPerMinute = care.needs.hungerPerDay * petTraitMultiplier(profile, "hungerDrain") / FARM_DAY_MINUTES;
     const minutesToHungry = profile.hunger > HUNGRY_THRESHOLD ? (profile.hunger - HUNGRY_THRESHOLD) / drainPerMinute : 0;
     const minutesToEmpty = profile.hunger > 0 ? profile.hunger / drainPerMinute : 0;
     const hungryMinutes = Math.max(0, Math.min(elapsed, minutesToEmpty) - Math.min(elapsed, minutesToHungry));
@@ -64,8 +62,8 @@ function advancePetProfileStep(profile, speciesId, elapsed, decor) {
     const starvingMinutes = hunger <= 0
         ? Math.floor(profile.starvingMinutes + starvingMinutesAdded)
         : 0;
-    const affectionLoss = (hungryMinutes / FARM_DAY_MINUTES) * HUNGRY_AFFECTION_LOSS_PER_DAY
-        + (starvingMinutesAdded / FARM_DAY_MINUTES) * STARVING_AFFECTION_LOSS_PER_DAY;
+    const affectionLoss = ((hungryMinutes / FARM_DAY_MINUTES) * HUNGRY_AFFECTION_LOSS_PER_DAY
+        + (starvingMinutesAdded / FARM_DAY_MINUTES) * STARVING_AFFECTION_LOSS_PER_DAY) * petTraitMultiplier(profile, "hungryAffectionLoss");
     const hungryProfile = Object.freeze({
         ...profile,
         hunger,

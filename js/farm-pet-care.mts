@@ -21,22 +21,71 @@ import {
 } from "./farm-pet-growth.mjs";
 
 export type PetGender = "female" | "male";
+export type PetTraitRarity = "common" | "uncommon" | "rare";
+
+/**
+ * Every multiplier a trait can apply. A trait names only the ones it changes;
+ * the rest stay 1, and a pet's traits multiply together (`petTraitMultiplier`).
+ * Each key is read by exactly one rule module, named beside it.
+ */
+export type PetTraitMultipliers = Readonly<{
+  hungerDrain: number;          // needs: hunger lost per farm day
+  hungryAffectionLoss: number;  // needs: trust lost while hungry or starving
+  starvationGrace: number;      // needs: how long at zero hunger before death
+  happinessDrain: number;       // wellbeing: happiness lost per farm day
+  missingDwellingDrain: number; // wellbeing: extra drain while its home is not placed
+  dwellingHappiness: number;    // wellbeing: happiness its home adds per day
+  dwellingAffection: number;    // wellbeing: trust its home adds per day, and the first-home award
+  toyHappiness: number;         // wellbeing: happiness each toy adds per day
+  toyAffection: number;         // wellbeing: trust each toy adds per day
+  handlingAffection: number;    // handling: trust gained from petting and play
+  handlingHappiness: number;    // handling: happiness gained from petting
+  pace: number;                 // farm sim: walk speed
+  idle: number;                 // farm sim: rest between strolls
+  wanderRange: number;          // farm sim: how far one stroll goes
+  lifespan: number;             // lifecycle: natural lifespan (growth stages stay on the species' life)
+}>;
+export type PetTraitMultiplier = keyof PetTraitMultipliers;
+
 export type PetTrait = Readonly<{
   id: string;
   title: string;
   description: string;
+  rarity: PetTraitRarity;
   conflicts: readonly string[];
-  hungerDrainMultiplier: number;
+  multipliers: Readonly<Partial<PetTraitMultipliers>>;
+  /** Happiness/trust at or below which a handling attempt is snapped at; the default is DEFAULT_SNAP_AT. */
+  snapAt: number | null;
+  /** Picks its strolls near the player (farm sim). */
+  follows: boolean;
+  /** Where in the species' adult size range it lands, applied once at adoption. */
+  size: "large" | "small" | null;
   /** How this trait wants to be treated: rapport added on top of BASE_TREATMENT per interaction. */
   treatment: Readonly<Partial<Record<PetTreatmentKind, number>>>;
 }>;
 
-type TraitSpec = Readonly<{ conflicts?: readonly string[]; hungerDrainMultiplier?: number; treatment?: Partial<Record<PetTreatmentKind, number>> }>;
-const trait = (id: string, title: string, description: string, spec: TraitSpec = {}): PetTrait =>
+/** Adoption draw weight per rarity: a common trait is six times as likely as a rare one. */
+export const PET_TRAIT_RARITY_WEIGHTS: Readonly<Record<PetTraitRarity, number>> = Object.freeze({ common: 6, uncommon: 3, rare: 1 });
+export const DEFAULT_SNAP_AT = 10;
+
+type TraitSpec = Readonly<{
+  rarity?: PetTraitRarity;
+  conflicts?: readonly string[];
+  multipliers?: Partial<PetTraitMultipliers>;
+  snapAt?: number;
+  follows?: boolean;
+  size?: "large" | "small";
+  treatment?: Partial<Record<PetTreatmentKind, number>>;
+}>;
+const trait = (id: string, title: string, description: string, spec: TraitSpec = {}): Omit<PetTrait, "conflicts"> & { declared: readonly string[] } =>
   Object.freeze({
     id, title, description,
-    conflicts: Object.freeze([...(spec.conflicts ?? [])]),
-    hungerDrainMultiplier: spec.hungerDrainMultiplier ?? 1,
+    rarity: spec.rarity ?? "common",
+    declared: Object.freeze([...(spec.conflicts ?? [])]),
+    multipliers: Object.freeze({ ...(spec.multipliers ?? {}) }),
+    snapAt: spec.snapAt ?? null,
+    follows: spec.follows ?? false,
+    size: spec.size ?? null,
     treatment: Object.freeze({ ...(spec.treatment ?? {}) }),
   });
 
@@ -44,15 +93,72 @@ const trait = (id: string, title: string, description: string, spec: TraitSpec =
 export const BASE_TREATMENT: Readonly<Record<PetTreatmentKind, number>> = Object.freeze({ pet: 2, carry: 1, play: 3, feed: 1, "feed-early": 0 });
 /** Feeding a pet above this hunger counts as `feed-early`, which Light Eaters dislike. */
 export const EARLY_FEED_HUNGER = 60;
+/** Zoomies wander this much faster than their species. */
+export const ZOOMIES_PACE = 1.35;
+/** Long-Lived pets live this much longer than their species (as elders: growth stages stay on the species' life). */
+export const LONG_LIVED_LIFESPAN = 1.2;
 
-export const PET_TRAITS: readonly PetTrait[] = Object.freeze([
+// The pool is shared by every species. Conflicts are declared on one side and
+// made mutual below. Order matters: it is the adoption draw order, mirrored by
+// the API's `FARM_PET_TRAITS` (a parity test holds the two together).
+const DECLARED_TRAITS = [
   trait("held.dislikes", "Independent", "Does not like to be held. Grows best when given space and toys.", { conflicts: ["held.loves"], treatment: { pet: -1, carry: -8, play: 3 } }),
-  trait("held.loves", "Cuddly", "Likes to be held often. Grows best with cuddles and carrying.", { conflicts: ["held.dislikes"], treatment: { pet: 4, carry: 6 } }),
-  trait("movement.fast", "Zoomies", "Moves unusually fast. Grows best with play, and would rather run than be carried.", { treatment: { play: 6, carry: -2 } }),
-  trait("appetite.frequent", "Big Appetite", "Gets hungry more often, and loves every meal.", { conflicts: ["appetite.rare"], hungerDrainMultiplier: 1.5, treatment: { feed: 4, "feed-early": 3 } }),
-  trait("appetite.rare", "Light Eater", "Gets hungry less often, and dislikes being fed when it is not hungry.", { conflicts: ["appetite.frequent"], hungerDrainMultiplier: 0.65, treatment: { feed: 1, "feed-early": -5 } }),
-  trait("growth.fast", "Fast Grower", "Reaches adult size sooner and grows fastest while young.", { treatment: { feed: 2 } }),
-]);
+  trait("held.loves", "Cuddly", "Likes to be held often. Grows best with cuddles and carrying.", { treatment: { pet: 4, carry: 6 } }),
+  trait("movement.fast", "Zoomies", "Moves unusually fast. Grows best with play, and would rather run than be carried.", { rarity: "uncommon", multipliers: { pace: ZOOMIES_PACE }, treatment: { play: 6, carry: -2 } }),
+  trait("appetite.frequent", "Big Appetite", "Gets hungry more often, and loves every meal.", { conflicts: ["appetite.rare", "appetite.picky"], multipliers: { hungerDrain: 1.5 }, treatment: { feed: 4, "feed-early": 3 } }),
+  trait("appetite.rare", "Light Eater", "Gets hungry less often, and dislikes being fed when it is not hungry.", { multipliers: { hungerDrain: 0.65 }, treatment: { feed: 1, "feed-early": -5 } }),
+  trait("growth.fast", "Fast Grower", "Reaches adult size sooner and grows fastest while young.", { rarity: "uncommon", treatment: { feed: 2 } }),
+  trait("temper.gentle", "Gentle", "Almost never snaps, even when it is unhappy, and loves a soft pat.", { rarity: "rare", conflicts: ["temper.grumpy"], snapAt: 5, treatment: { pet: 2 } }),
+  trait("temper.grumpy", "Grumpy", "Snaps sooner when unhappy and gets little out of being petted. Would rather have its toys.", { snapAt: 20, multipliers: { handlingHappiness: 0.5 }, treatment: { pet: -2, carry: -3, play: 2 } }),
+  trait("social.shy", "Shy", "Slow to trust people: handling earns half the trust, but a home of its own earns twice as much.", { conflicts: ["social.friendly"], multipliers: { handlingAffection: 0.5, dwellingAffection: 2 }, treatment: { pet: -1, carry: -4, play: 1 } }),
+  trait("social.friendly", "Social", "Loves attention and company, and gets lonely faster when it is ignored.", { conflicts: ["social.loner"], multipliers: { happinessDrain: 1.25 }, treatment: { pet: 3, play: 2 } }),
+  trait("social.loner", "Loner", "Content on its own: its happiness fades slowly, but it is lukewarm about being petted.", { conflicts: ["follows.player"], multipliers: { happinessDrain: 0.75 }, treatment: { pet: -1, carry: -2 } }),
+  trait("play.eager", "Playful", "Its toys cheer it up twice as much, and play is its favourite thing.", { conflicts: ["movement.lazy"], multipliers: { toyHappiness: 2 }, treatment: { play: 4 } }),
+  trait("home.loves", "Homebody", "Its home cheers it up twice as much, but it pines faster without one.", { conflicts: ["movement.roams"], multipliers: { dwellingHappiness: 2, missingDwellingDrain: 1.3 }, treatment: { pet: 1 } }),
+  trait("toys.collector", "Collector", "Every one of its toys on the farm earns twice the trust.", { rarity: "uncommon", multipliers: { toyAffection: 2 }, treatment: { play: 2 } }),
+  trait("movement.lazy", "Lazy", "Ambles slowly and naps between strolls. Would rather eat than play.", { conflicts: ["movement.fast", "movement.roams"], multipliers: { pace: 0.75, idle: 2 }, treatment: { play: -2, feed: 2, carry: 1 } }),
+  trait("movement.roams", "Wanderer", "Roams far and rests little. Would rather walk than be carried.", { multipliers: { wanderRange: 1.5, idle: 0.6 }, treatment: { carry: -2, play: 2 } }),
+  trait("follows.player", "Shadow", "Follows you around the farm, and loves being close to you.", { rarity: "rare", follows: true, treatment: { pet: 2, carry: 2 } }),
+  trait("appetite.picky", "Picky Eater", "Unimpressed by meals, and dislikes being fed before it is hungry.", { treatment: { feed: -1, "feed-early": -3 } }),
+  trait("body.hardy", "Hardy", "Survives twice as long without food, and loses less trust when it goes hungry.", { rarity: "rare", multipliers: { starvationGrace: 2, hungryAffectionLoss: 0.5 }, treatment: { feed: 1 } }),
+  trait("size.large", "Big-Boned", "Grows up near the top of its species' size range.", { rarity: "rare", conflicts: ["size.small"], size: "large", treatment: { feed: 2 } }),
+  trait("size.small", "Runt", "Stays near the bottom of its species' size range. Easy to carry, and likes it.", { rarity: "rare", size: "small", treatment: { pet: 1, carry: 1 } }),
+  trait("life.long", "Long-Lived", "Lives a fifth longer than its species usually does, keeping its peak into old age.", { rarity: "rare", multipliers: { lifespan: LONG_LIVED_LIFESPAN }, treatment: { pet: 1 } }),
+];
+
+export const PET_TRAITS: readonly PetTrait[] = Object.freeze(DECLARED_TRAITS.map(({ declared, ...entry }) => Object.freeze({
+  ...entry,
+  conflicts: Object.freeze(DECLARED_TRAITS
+    .filter((other) => declared.includes(other.id) || other.declared.includes(entry.id))
+    .map((other) => other.id)),
+})));
+
+export function findPetTrait(id: unknown): PetTrait | undefined {
+  return typeof id === "string" ? PET_TRAITS.find((entry) => entry.id === id) : undefined;
+}
+
+/** The product of one multiplier across a pet's traits (1 when none of them changes it). */
+export function petTraitMultiplier(profile: Readonly<{ traits: readonly string[] }> | null | undefined, key: PetTraitMultiplier): number {
+  return (profile?.traits ?? []).reduce((product, id) => product * (findPetTrait(id)?.multipliers[key] ?? 1), 1);
+}
+
+export function petHasTrait(profile: Readonly<{ traits: readonly string[] }> | null | undefined, predicate: (trait: PetTrait) => boolean): boolean {
+  return (profile?.traits ?? []).some((id) => { const entry = findPetTrait(id); return entry ? predicate(entry) : false; });
+}
+
+/** Happiness/trust at or below which this pet snaps at handling. */
+export function petSnapThreshold(profile: Readonly<{ traits: readonly string[] }>): number {
+  for (const id of profile.traits) {
+    const snapAt = findPetTrait(id)?.snapAt;
+    if (snapAt !== null && snapAt !== undefined) return snapAt;
+  }
+  return DEFAULT_SNAP_AT;
+}
+
+/** This individual's natural lifespan in farm days: the species' cap, stretched by Long-Lived. */
+export function petMaxLifeDays(care: Readonly<{ maxLifeDays: number }>, profile: Readonly<{ traits: readonly string[] }> | null | undefined): number {
+  return Math.round(care.maxLifeDays * petTraitMultiplier(profile, "lifespan"));
+}
 
 type Range = Readonly<{ min: number; max: number }>;
 export type PetCareDefinition = Readonly<{
@@ -178,18 +284,27 @@ export function petCareForItem(itemId: unknown): Readonly<{ care: PetCareDefinit
   return null;
 }
 
-/** Zoomies wander this much faster than their species. */
-export const ZOOMIES_PACE = 1.35;
-
 /**
  * How fast this individual moves around the farm relative to its species'
  * walk: a narrow band from Speed (0.9–1.1×, the same curve the pet games use)
- * and the Zoomies trait on top. Movement only; it never touches care maths.
+ * and its movement traits (Zoomies, Lazy) on top. Movement only; it never touches care maths.
  */
 export function petPace(profile: PetProfile | null | undefined): number {
   if (!profile) return 1;
   const fromSpeed = 0.9 + Math.min(100, Math.max(0, profile.stats.speed)) / 500;
-  return round(fromSpeed * (profile.traits.includes("movement.fast") ? ZOOMIES_PACE : 1), 3);
+  return round(fromSpeed * petTraitMultiplier(profile, "pace"), 3);
+}
+
+export type PetTemperament = Readonly<{ pace: number; idle: number; wanderRange: number; follows: boolean }>;
+
+/** Everything the farm sim reads off a pet's traits: its walk, its rests, its stroll length, and whether it shadows the player. */
+export function petTemperament(profile: PetProfile | null | undefined): PetTemperament {
+  return Object.freeze({
+    pace: petPace(profile),
+    idle: petTraitMultiplier(profile, "idle"),
+    wanderRange: petTraitMultiplier(profile, "wanderRange"),
+    follows: petHasTrait(profile, (entry) => entry.follows),
+  });
 }
 
 const unit = (value: number): number => Number.isFinite(value) ? Math.min(0.999999, Math.max(0, value)) : 0;
@@ -198,12 +313,29 @@ const round = (value: number, places = 2): number => Number(value.toFixed(places
 const clamp = (value: unknown, min: number, max: number, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 
+/** Share of the adult size range a Big-Boned or Runt pet is squeezed into, at its top or bottom. */
+export const SIZE_TRAIT_BAND = 0.3;
+
+/** Big-Boned and Runt remap the rolled adult size into the top or bottom band of the range; no extra draw. */
+export function biasAdultSize(rolled: number, size: Readonly<{ adultMin: number; max: number }>, traits: readonly string[]): number {
+  const bias = traits.map((id) => findPetTrait(id)?.size).find((value) => value);
+  const span = size.max - size.adultMin;
+  const within = span > 0 ? (rolled - size.adultMin) / span : 0;
+  if (bias === "large") return size.max - span * SIZE_TRAIT_BAND * (1 - within);
+  if (bias === "small") return size.adultMin + span * SIZE_TRAIT_BAND * within;
+  return rolled;
+}
+
 function chooseTraits(care: PetCareDefinition, random: () => number): string[] {
   const target = care.traitCount.min + Math.floor(unit(random()) * (care.traitCount.max - care.traitCount.min + 1));
-  const pool = care.traitIds.map((id) => ({ id, order: unit(random()) })).sort((a, b) => a.order - b.order);
+  // A weighted shuffle, one draw per trait: key = u^(1/weight), highest first,
+  // so a common trait comes out ahead of a rare one six times as often.
+  const pool = care.traitIds
+    .map((id) => ({ id, key: Math.pow(unit(random()), 1 / PET_TRAIT_RARITY_WEIGHTS[findPetTrait(id)?.rarity ?? "common"]) }))
+    .sort((a, b) => b.key - a.key);
   const selected: string[] = [];
   for (const candidate of pool) {
-    const definition = PET_TRAITS.find((entry) => entry.id === candidate.id);
+    const definition = findPetTrait(candidate.id);
     if (!definition || selected.some((id) => definition.conflicts.includes(id))) continue;
     selected.push(candidate.id);
     if (selected.length >= Math.min(5, target)) break;
@@ -214,12 +346,13 @@ function chooseTraits(care: PetCareDefinition, random: () => number): string[] {
 export function createPetProfile(speciesId: string, random: () => number): PetProfile | null {
   const care = findPetCare(speciesId);
   if (!care) return null;
-  const maxSize = round(randomIn({ min: care.size.adultMin, max: care.size.max }, random));
-  const currentSize = round(randomIn({ min: care.size.min, max: Math.min(care.size.adultMin, maxSize) }, random));
+  const rolledMax = randomIn({ min: care.size.adultMin, max: care.size.max }, random);
+  const currentSize = round(randomIn({ min: care.size.min, max: Math.min(care.size.adultMin, round(rolledMax)) }, random));
   const gender = unit(random()) < 0.5 ? "female" : "male";
   const baseSpeed = randomIn(care.stats.speed, random);
   const baseStrength = randomIn(care.stats.strength, random);
   const traits = chooseTraits(care, random);
+  const maxSize = round(biasAdultSize(rolledMax, care.size, traits));
   const palette = pickAnimalPalette(speciesId, random);
   const paletteBonus = palette?.statBoost ?? 0;
   // Rolled last so every earlier draw (and every existing seeded test) is unchanged.
@@ -255,11 +388,11 @@ export function normalizePetProfile(speciesId: string, value: unknown): PetProfi
   const currentSize = round(clamp(size.current, care.size.min, maxSize, care.size.min));
   const selected: string[] = [];
   for (const id of Array.isArray(source.traits) ? source.traits : []) {
-    const definition = PET_TRAITS.find((entry) => entry.id === id);
+    const definition = findPetTrait(id);
     if (!definition || selected.includes(id) || selected.some((other) => definition.conflicts.includes(other)) || selected.length >= 5) continue;
     selected.push(id);
   }
-  const ageDays = round(clamp(source.ageDays, 0, care.maxLifeDays, 0), 4);
+  const ageDays = round(clamp(source.ageDays, 0, petMaxLifeDays(care, { traits: selected }), 0), 4);
   const gender = source.gender === "male" ? "male" : "female";
   // A profile saved before progression: its stored stats (bonus included) become
   // the base, a stable seeded roll supplies potential, and the days it already

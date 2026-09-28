@@ -2,7 +2,7 @@
 // farm-time checkpoints. Chance is injectable for tests and otherwise stable
 // per pet/day, so reloading the same save cannot reroll an outcome.
 import { FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { findPetCare } from "./farm-pet-care.mjs";
+import { findPetCare, petMaxLifeDays } from "./farm-pet-care.mjs";
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { withFarmDecor, withFarmPets, withPetHistory } from "./farm-layout.mjs";
 export const AFFECTION_CALL_THRESHOLD = 70;
@@ -18,7 +18,7 @@ export function petOutcomeWarning(profile, speciesId) {
     const status = petNeedStatus(profile);
     if (status.starvationDue)
         return Object.freeze({ stage: "critical", label: "Life at risk", message: "This pet may die without food immediately." });
-    if (care && profile.ageDays >= care.maxLifeDays)
+    if (care && profile.ageDays >= petMaxLifeDays(care, profile))
         return Object.freeze({ stage: "critical", label: "At life's end", message: "This pet has reached its natural lifespan." });
     if (profile.hunger <= 0 || profile.affection <= URGENT_AFFECTION || profile.happiness <= URGENT_HAPPINESS)
         return Object.freeze({ stage: "urgent", label: "Distressed", message: "This pet may refuse care, run away, or become gravely ill." });
@@ -86,7 +86,7 @@ export function resolvePetOutcomes(layout, previousFarmMinute, targetFarmMinute,
             next = remember(next, pet, "starvation", targetFarmMinute);
             continue;
         }
-        if (care && pet.profile.ageDays >= care.maxLifeDays) {
+        if (care && pet.profile.ageDays >= petMaxLifeDays(care, pet.profile)) {
             next = remember(next, pet, "old_age", targetFarmMinute);
             continue;
         }
