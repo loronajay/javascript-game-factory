@@ -86,6 +86,42 @@
       </footer>
     </aside>
 
+    <aside id="millPanel" class="inventory-panel mill-panel" aria-label="The Sawmill" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE SAWMILL · BRAM</span><strong>Saw logs into planks</strong></div>
+        <button id="closeMill" class="farm-button" type="button" title="Step back from the saw (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Every log saws into three planks of its own wood, for a ticket a log. A Sawmill of your own (Build mode · Props) saws for nothing.</p>
+        <ol id="millList" class="sale-list"></ol>
+      </div>
+      <footer class="sale-footer">
+        <p id="millStatus" class="pets-status" aria-live="polite"></p>
+        <div class="sale-footer__actions">
+          <button id="openFurnitureSale" class="farm-button farm-button--accent" type="button">Sell furniture to Bram →</button>
+        </div>
+      </footer>
+    </aside>
+
+    <aside id="furniturePanel" class="inventory-panel sale-panel" aria-label="Sell furniture" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE SAWMILL · BRAM</span><strong>Sell your furniture</strong></div>
+        <button id="closeFurniture" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Bram pays twice what a piece's planks are worth for a rough one, over three times for a varnished one. Only pieces on your shelf can be sold — anything standing on your farm stays there.</p>
+        <ol id="furnitureList" class="sale-list"></ol>
+      </div>
+      <footer class="sale-footer">
+        <div class="sale-footer__total"><span>Total</span><strong id="furnitureTotal">0</strong><small>tickets</small></div>
+        <div class="sale-footer__actions">
+          <button id="pickAllFurniture" class="farm-button" type="button">Pick everything</button>
+          <button id="sellFurniture" class="farm-button farm-button--accent sale-footer__sell" type="button" disabled>Pick something to sell</button>
+        </div>
+        <p id="furnitureStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
     <aside id="ordersPanel" class="inventory-panel orders-panel" aria-label="Order Board" hidden>
       <header class="pets-panel__head">
         <div><span class="eyebrow">ORDER BOARD · <span id="ordersLevel"></span></span><strong>Today's orders</strong></div>

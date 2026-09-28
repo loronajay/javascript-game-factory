@@ -317,7 +317,8 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any, options: Farm
   let seedCounter = 0;
 
   function needsRebuild(entry: PlacedModel, row: FarmDecorRow): boolean {
-    return entry.row.itemId !== row.itemId || entry.row.length !== row.length;
+    // A piece's stars are its finish, drawn into its model.
+    return entry.row.itemId !== row.itemId || entry.row.length !== row.length || entry.row.stars !== row.stars;
   }
 
   function build(row: FarmDecorRow): PlacedModel | null {

@@ -19,6 +19,7 @@ import type { FarmInventory } from "./farm-catalog/inventory.mjs";
 import { addFarmDecor, alignFarmDecorPlacement, duplicateFarmDecor, farmDecorHandles, placeFarmDecor, removeFarmDecor, rotateFarmDecor, setFarmDecorLength, stretchFarmDecorEnd, type FarmDecorResult } from "./farm-decor-layout.mjs";
 import { FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { farmObstacles, type FarmObstacleState } from "./farm-scene.mjs";
+import { bestOnShelf, shelfHas } from "./farm-workshop.mjs";
 import { createFarmEditorPanel, type FarmEditorTab, type FarmPanelElements } from "./farm-editor-panel.mjs";
 import type { EditPhase } from "./arcade-room-editor-panel.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
@@ -352,12 +353,14 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
 
   function addDecor(itemId: string): void {
     const definition = findFarmDecor(itemId);
-    if (!definition || !inventory.owns(itemId)) {
-      setStatus("You do not own that item yet.", "error");
+    // A crafted piece is not owned but counted: it comes off the shelf, the finest first.
+    const stars = definition?.unlock.type === "crafted" ? bestOnShelf(layout.agriculture.inventory.furniture, layout.decor, itemId) : null;
+    if (!definition || (definition.unlock.type === "crafted" ? !stars : !inventory.owns(itemId))) {
+      setStatus(definition?.unlock.type === "crafted" ? "None of those on the shelf · make one at the Carpenter's Workbench." : "You do not own that item yet.", "error");
       return;
     }
     const target = view.view().target;
-    const result = addFarmDecor(layout, definition, { x: target.x, z: target.z, rotationY: 0 });
+    const result = addFarmDecor(layout, definition, { x: target.x, z: target.z, rotationY: 0, ...(stars ? { stars } : {}) });
     if (!result.valid) {
       setStatus(result.reason === "full" ? "The field is full." : `No room for ${definition.title} near here · move the view and try again.`, "error");
       return;
@@ -382,8 +385,13 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
   }
 
   function duplicate(instanceId: string): void {
-    if (layout.decor.find((row) => row.instanceId === instanceId)?.memorialId) {
+    const original = layout.decor.find((row) => row.instanceId === instanceId);
+    if (original?.memorialId) {
       setStatus("A pet memorial is unique and cannot be copied.", "error");
+      return;
+    }
+    if (original?.stars && !shelfHas(layout.agriculture.inventory.furniture, layout.decor, original.itemId, original.stars)) {
+      setStatus("No more of those on the shelf · make another at the Carpenter's Workbench.", "error");
       return;
     }
     const result = duplicateFarmDecor(layout, instanceId);

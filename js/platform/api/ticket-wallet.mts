@@ -46,6 +46,12 @@ export function createTicketWalletClient(options: any = {}) {
     cookFarmDish(layout: unknown, recipeId: string, scores: readonly number[], cookId: string) {
       return api.cookFarmDish({ layout, recipeId, scores, cookId });
     },
+    millFarmLogs(layout: unknown, speciesId: string, logs: number, at: "market" | "farm", millId: string) {
+      return api.millFarmLogs({ layout, speciesId, logs, at, millId });
+    },
+    craftFarmPiece(layout: unknown, itemId: string, scores: readonly number[], craftId: string) {
+      return api.craftFarmPiece({ layout, itemId, scores, craftId });
+    },
     sellFarmProduce(items: Record<string, number>, saleId: string) {
       return api.sellFarmProduce({ items, saleId });
     },

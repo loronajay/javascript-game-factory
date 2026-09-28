@@ -46,6 +46,11 @@ import { createKitchenView } from "./farm-kitchen-view.mjs";
 import { createKitchenPanel } from "./farm-kitchen-panel.mjs";
 import { createCookingHud } from "./farm-cooking-view.mjs";
 import { createFarmKitchenController } from "./farm-kitchen-controller.mjs";
+import { createWorkshopView } from "./farm-workshop-view.mjs";
+import { createWorkshopPanel } from "./farm-workshop-panel.mjs";
+import { createMillPanel } from "./farm-mill-panel.mjs";
+import { createCraftingHud } from "./farm-carpentry-view.mjs";
+import { createFarmWorkshopController, millOutcome } from "./farm-workshop-controller.mjs";
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { applyOfflineProduction, offlineSpan } from "./farm-offline.mjs";
@@ -89,6 +94,7 @@ const skillsHud = createFarmSkillsHud({
     farming: { root: requiredElement("#farmingSkill"), label: requiredElement("#farmingSkillLabel"), bar: requiredElement("#farmingSkillBar") },
     woodcutting: { root: requiredElement("#woodcuttingSkill"), label: requiredElement("#woodcuttingSkillLabel"), bar: requiredElement("#woodcuttingSkillBar") },
     cooking: { root: requiredElement("#cookingSkill"), label: requiredElement("#cookingSkillLabel"), bar: requiredElement("#cookingSkillBar") },
+    carpentry: { root: requiredElement("#carpentrySkill"), label: requiredElement("#carpentrySkillLabel"), bar: requiredElement("#carpentrySkillBar") },
 });
 const farmClockPhase = requiredElement("#farmClockPhase");
 const napDialog = requiredElement("#napDialog");
@@ -250,6 +256,9 @@ treesView.sync(layout, clockMinutes);
 const kitchenView = createKitchenView(THREE, scene, world);
 /** Set once the kitchen controller exists: a layout change moves or clears what is on a range. */
 let kitchenSync = () => undefined;
+// Carpentry, in the world: the board on the Workbench and the finished piece (farm-workshop-view.mts).
+const workshopView = createWorkshopView(THREE, scene, world);
+let workshopSync = () => undefined;
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
 let body = createFarmBody();
@@ -384,7 +393,8 @@ function updateInteraction() {
     crops.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach);
     trees.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach());
     kitchen.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach() && !trees.inReach());
-    const producing = crops.inReach() || trees.inReach() || kitchen.inReach();
+    workshop.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach() && !trees.inReach() && !kitchen.inReach());
+    const producing = crops.inReach() || trees.inReach() || kitchen.inReach() || workshop.inReach();
     seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing ? findSeatInReach(seats, pose) : null;
     nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
     const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
@@ -406,7 +416,7 @@ function updateInteraction() {
     // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
     if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId))
         doorInReach = null;
-    if (petsPanel.isOpen() || kitchenPanel.isOpen() || farmEditor.isEditing() || !farmEntered) {
+    if (petsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
         setPrompt("");
         return;
     }
@@ -416,6 +426,10 @@ function updateInteraction() {
     }
     if (kitchen.cooking()) {
         setPrompt(kitchen.prompt());
+        return;
+    }
+    if (workshop.crafting()) {
+        setPrompt(workshop.prompt());
         return;
     }
     if (body.mode === "climbing") {
@@ -449,6 +463,10 @@ function updateInteraction() {
     }
     if (kitchen.inReach()) {
         setPrompt(kitchen.prompt());
+        return;
+    }
+    if (workshop.inReach()) {
+        setPrompt(workshop.prompt());
         return;
     }
     if (seatInReach) {
@@ -508,6 +526,8 @@ function interact() {
         return trees.interact();
     if (kitchen.inReach())
         return kitchen.interact();
+    if (workshop.inReach())
+        return workshop.interact();
     if (seatInReach) {
         applyBodyStep(sitOn(player, body, seatInReach.seat, seatInReach.point));
         keys.clear();
@@ -719,6 +739,7 @@ function applyLayout(next) {
     petsPanel.render(layout);
     inventoryPanel.render(layout.agriculture, skillLevels());
     kitchenSync();
+    workshopSync();
     renderFieldCapacity();
 }
 /** The levels that decide which saplings are on sale. A local farm stays at 1. */
@@ -772,9 +793,18 @@ window.addEventListener("keydown", (event) => {
         keys.clear();
         return;
     }
-    if (kitchenPanel.isOpen()) {
-        if (event.code === "Escape")
+    // A piece on the bench owns the keyboard the same way: E marks and hammers, A/D saw, Escape stops.
+    if (workshop.crafting()) {
+        if (!event.repeat && workshop.keyDown(event.code))
+            event.preventDefault();
+        keys.clear();
+        return;
+    }
+    if (stationPanelOpen()) {
+        if (event.code === "Escape") {
             kitchenPanel.close();
+            workshop.closePanels();
+        }
         keys.clear();
         return;
     }
@@ -850,13 +880,15 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => {
     keys.delete(event.code);
     kitchen.keyUp(event.code);
+    workshop.keyUp(event.code);
 });
 window.addEventListener("blur", () => {
     keys.clear();
     kitchen.keyUp("KeyE");
+    workshop.keyUp("KeyE");
 });
 canvas.addEventListener("click", () => {
-    if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !kitchenPanel.isOpen() && !farmEditor.isEditing())
+    if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !stationPanelOpen() && !farmEditor.isEditing())
         canvas.requestPointerLock?.().catch(() => undefined);
 });
 starterDogForm.addEventListener("submit", async (event) => {
@@ -939,7 +971,7 @@ document.addEventListener("pointerlockchange", () => {
 canvas.addEventListener("pointerdown", () => { draggingLook = !farmEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-    if (petsPanel.isOpen() || inventoryPanel.isOpen() || kitchenPanel.isOpen() || kitchen.cooking() || farmEditor.isEditing())
+    if (petsPanel.isOpen() || inventoryPanel.isOpen() || stationPanelOpen() || stationBusy() || farmEditor.isEditing())
         return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;
@@ -948,7 +980,7 @@ document.addEventListener("mousemove", (event) => {
     player.pitch = looked.pitch;
 });
 function updatePlayer(dt) {
-    if (!farmEntered || leavingForMarket || trees.chopping() || kitchen.cooking() || petsPanel.isOpen() || inventoryPanel.isOpen() || kitchenPanel.isOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
+    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || petsPanel.isOpen() || inventoryPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
         return;
     const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
     if (!step.moved)
@@ -1076,6 +1108,8 @@ const inventoryPanel = createFarmInventoryPanel({
     suppliesGrid: requiredElement("#suppliesGrid"),
     saplingGrid: requiredElement("#saplingGrid"),
     logsGrid: requiredElement("#logsGrid"),
+    planksGrid: requiredElement("#planksGrid"),
+    furnitureGrid: requiredElement("#furnitureGrid"),
     pantryGrid: requiredElement("#pantryGrid"),
     selected: requiredElement("#selectedSeed"),
 }, {
@@ -1146,6 +1180,57 @@ const kitchen = createFarmKitchenController({
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
 });
 kitchenSync = () => kitchen.sync();
+// The workshop (farm-workshop-controller.mts): E at the Carpenter's Workbench opens the pattern book and
+// Make plays the carpentry games; E at the farm's own Sawmill saws logs for free. Every plank and piece is the server's.
+const workshop = createFarmWorkshopController({
+    panel: createWorkshopPanel({
+        root: requiredElement("#workshopPanel"),
+        closeButton: requiredElement("#closeWorkshop"),
+        level: requiredElement("#workshopLevel"),
+        list: requiredElement("#patternList"),
+        detail: requiredElement("#patternDetail"),
+        status: requiredElement("#workshopStatus"),
+    }, {
+        thumbnail: itemThumbnails.get,
+        make: (itemId) => workshop.begin(itemId),
+        canMake: () => serverHarvests,
+        onClose: () => canvas.focus(),
+    }),
+    millPanel: createMillPanel({
+        root: requiredElement("#millPanel"),
+        closeButton: requiredElement("#closeMill"),
+        list: requiredElement("#millList"),
+        status: requiredElement("#millStatus"),
+    }, {
+        feePerLog: 0,
+        thumbnail: itemThumbnails.get,
+        emptyNote: "No logs to saw. Fell a grown timber tree in a Tree Plot first.",
+        mill: async (speciesId, logs) => {
+            if (!serverHarvests)
+                return { ok: false, message: "Sign in to saw logs into planks." };
+            const result = await submitServerHarvest((sent) => ticketClient.millFarmLogs(sent, speciesId, logs, "farm", farmPurchaseId("mill")));
+            if (Array.isArray(result?.achievements) && result.achievements.length)
+                achievementToaster.show("farm", "The Farm", result.achievements);
+            return millOutcome(result, () => layout);
+        },
+        onClose: () => canvas.focus(),
+    }),
+    hud: createCraftingHud(requiredElement("#craftingHud"), { thumbnail: itemThumbnails.get }),
+    view: workshopView,
+    layout: () => layout,
+    submitCraft: serverHarvests ? (itemId, scores, craftId) => submitServerHarvest((sent) => ticketClient.craftFarmPiece(sent, itemId, scores, craftId)) : null,
+    setStatus: (text) => { status.textContent = text; },
+    onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
+});
+workshopSync = () => workshop.sync();
+/** A dish on the stove or a piece on the bench: the station owns the player. */
+function stationBusy() {
+    return kitchen.cooking() || workshop.crafting();
+}
+/** The cookbook, the pattern book or the Sawmill's counter is open. */
+function stationPanelOpen() {
+    return kitchenPanel.isOpen() || workshop.panelOpen();
+}
 // Build mode: the shared editor frame over the farm's own placement rules. The
 // editor owns the layout while it is open; every change comes back through `applyLayout`.
 const decorThumbnails = createFarmDecorThumbnails(THREE);
@@ -1207,7 +1292,7 @@ const farmEditor = createFarmEditor({
         inspector: requiredElement("#farmInspector"),
     },
     // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-    canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !kitchenPanel.isOpen() && !kitchen.cooking() && !napDialog.open && napRemainingMinutes <= 0,
+    canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !stationPanelOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
     onEditingChange: (editing) => {
         keys.clear();
         draggingLook = false;
@@ -1267,7 +1352,8 @@ const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;
 function frame(now) {
-    const frameSeconds = Math.min((now - previous) / 1000, 0.1);
+    // Clamped both ways: a frame stamped before the last one (a stale first frame) must not drive the accumulator negative.
+    const frameSeconds = Math.min(Math.max(0, (now - previous) / 1000), 0.1);
     accumulator += frameSeconds;
     previous = now;
     while (accumulator >= TICK_SECONDS) {
@@ -1280,6 +1366,7 @@ function frame(now) {
         updateInteraction();
         trees.tick();
         kitchen.tick();
+        workshop.tick();
         updateCarryPatience(TICK_SECONDS);
         accumulator -= TICK_SECONDS;
     }
@@ -1311,6 +1398,9 @@ globalThis.__farm = Object.freeze({
     kitchenInReach: () => kitchen.inReach(),
     cooking: () => kitchen.cooking(),
     cookbookOpen: () => kitchenPanel.isOpen(),
+    workshopInReach: () => workshop.inReach(),
+    crafting: () => workshop.crafting(),
+    workshopPanelOpen: () => workshop.panelOpen(),
     editing: () => farmEditor.isEditing(),
     time: () => clockMinutes,
     napping: () => napRemainingMinutes > 0,

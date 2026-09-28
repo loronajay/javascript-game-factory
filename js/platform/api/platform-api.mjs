@@ -575,6 +575,14 @@ export function createPlatformApiClient(options = {}) {
         cookFarmDish({ layout, recipeId, scores, cookId }) {
             return post("/games/farm/kitchen/cooks", { layout, recipeId, scores, cookId }, "cook", {}, true);
         },
+        /** Saw logs into planks: at the Market Square's Sawmill (`at: "market"`, a fee per log) or the farm's own (`at: "farm"`, free, with the farm as it stands). */
+        millFarmLogs({ layout, speciesId, logs, at, millId }) {
+            return post("/games/farm/workshop/mills", { layout, speciesId, logs, at, millId }, "mill", {}, true);
+        },
+        /** Make a piece at the Workbench: the client sends its farm, the pattern and its step scores; the server takes the planks and decides the stars. */
+        craftFarmPiece({ layout, itemId, scores, craftId }) {
+            return post("/games/farm/workshop/crafts", { layout, itemId, scores, craftId }, "craft", {}, true);
+        },
         /** The Market buys produce (the Produce Merchant) and dishes (the Kitchen): item ids and counts only — the server prices the sale and pays it. */
         sellFarmProduce({ items, saleId }) {
             return post("/games/farm/market/sales", { items, saleId }, "sale", {}, true);

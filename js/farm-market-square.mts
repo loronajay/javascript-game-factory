@@ -123,12 +123,13 @@ const stall = (spec: Omit<MarketStall, "footprint"> & Partial<Pick<MarketStall, 
 export const PRODUCE_STALL_ID = "produce";
 export const ORDER_BOARD_ID = "orders";
 export const KITCHEN_STALL_ID = "kitchen";
+export const SAWMILL_STALL_ID = "sawmill";
 
 /**
- * The square's stalls. The Produce Merchant (v1), the Order Board (Phase 4)
- * and the Kitchen (Phase 6, buying cooked dishes) are open; the others stand
- * where they will trade, shuttered, and say so — the plan's Seed Merchant and
- * Sawmill, in the order it brings them online.
+ * The square's stalls. The Produce Merchant (v1), the Order Board (Phase 4),
+ * the Kitchen (Phase 6, buying cooked dishes) and the Sawmill (Phase 7: saws
+ * logs into planks for a fee, and buys furniture) are open; the Seed Merchant
+ * stands where it will trade, shuttered, and says so.
  */
 export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
@@ -149,9 +150,10 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
     closedNote: "",
   }),
   stall({
-    id: "sawmill", kind: "stall", title: "Sawmill", open: false,
-    x: -11, z: 1.2, rotationY: QUARTER, colors: ["#7a5534", "#e9d9bb"], keeper: null,
-    closedNote: "The Sawmill is quiet. Keep the logs you fell — when it opens they will be sawn into planks.",
+    id: SAWMILL_STALL_ID, kind: "stall", title: "Sawmill", open: true,
+    x: -11, z: 1.2, rotationY: QUARTER, colors: ["#7a5534", "#e9d9bb"],
+    keeper: Object.freeze({ name: "Bram", avatarId: "avatar.ogre", greeting: "Logs to saw? A ticket a log. Or have you made something?" }),
+    closedNote: "",
   }),
   stall({
     id: ORDER_BOARD_ID, kind: "board", title: "Order Board", open: true,
@@ -223,6 +225,7 @@ export function findStallInReach(
 export function stallPrompt(entry: MarketStall, signedIn: boolean): string {
   if (!entry.open) return `${entry.title} · closed for now · Press E to read the notice`;
   if (entry.kind === "board") return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;
+  if (entry.id === SAWMILL_STALL_ID) return signedIn ? `Press E to saw logs and sell furniture to ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to saw logs and sell furniture`;
   const goods = entry.id === KITCHEN_STALL_ID ? "cooking" : "produce";
   if (!signedIn) return `${entry.title} · sign in to sell your ${goods}`;
   return `Press E to sell ${goods} to ${entry.keeper?.name ?? entry.title}`;

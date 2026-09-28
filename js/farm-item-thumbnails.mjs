@@ -10,8 +10,10 @@ export function itemThumbnailView(key) {
     const kind = parseItemKey(key)?.kind;
     if (kind === "dish")
         return { azimuth: 0.6, elevation: 0.62 };
-    if (kind === "log")
+    if (kind === "log" || kind === "plank")
         return { azimuth: 0.5, elevation: 0.42 };
+    if (kind === "piece")
+        return { azimuth: 0.55, elevation: 0.3 };
     return { azimuth: 0.7, elevation: 0.38 };
 }
 export function createFarmItemThumbnails(THREE) {

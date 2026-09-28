@@ -9,7 +9,8 @@
 // the arcade-room bridge, with its chat, so the square is a place people meet.
 //
 // Money is never decided here. The Produce Merchant's panel names crops and
-// counts, the Kitchen's names dishes; the server prices the sale, takes the
+// counts, the Kitchen's names dishes, the Sawmill's logs to saw and furniture
+// to sell (farm-market-sawmill.mts); the server prices the sale, takes the
 // goods and pays the tickets in one transaction (`POST /games/farm/market/sales`),
 // and the page shows what it answers. The Order Board is the same: the server writes the day's orders
 // (`GET /games/farm/market/orders`), the panel names one to fill, and the
@@ -29,10 +30,11 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, findMarketStall, findStallInReach, keeperPose, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, findMarketStall, findStallInReach, keeperPose, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createOrderBoardPanel } from "./farm-orders-panel.mjs";
+import { createMarketSawmill } from "./farm-market-sawmill.mjs";
 import { normalizeOrderBoard } from "./farm-orders.mjs";
 import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
@@ -73,11 +75,14 @@ const farmLoad = await farmStore.load();
 const canSell = farmStore.accountBacked && farmLoad.source === "account";
 let produce = farmLoad.layout.agriculture.inventory.produce;
 let dishes = farmLoad.layout.agriculture.inventory.dishes;
+/** The whole farm as the server last answered: the Sawmill reads its logs, planks and furniture shelf from it. */
+let farm = farmLoad.layout;
 /** Take the basket and pantry from a farm the server answered with. */
 function takeStock(layoutValue) {
     if (!layoutValue)
         return null;
     const next = normalizeFarmLayout(layoutValue);
+    farm = next;
     produce = next.agriculture.inventory.produce;
     dishes = next.agriculture.inventory.dishes;
     return next;
@@ -234,7 +239,7 @@ function publishPresence() {
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking",
-        activity: salePanel.isOpen() ? "selling produce" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : "",
+        activity: salePanel.isOpen() ? "selling produce" : kitchenPanel.isOpen() ? "selling cooking" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity(),
     });
 }
 // ---------------------------------------------------------------- the Produce Merchant and the Kitchen
@@ -350,9 +355,20 @@ const ordersPanel = createOrderBoardPanel({
     thumbnail: itemThumbnails.get,
     onClose: () => canvas.focus(),
 });
+// The Sawmill (farm-market-sawmill.mts): Bram saws logs for a ticket a log and buys furniture off the shelf.
+const sawmill = createMarketSawmill({
+    ticketClient,
+    farm: () => farm,
+    takeStock,
+    takeBalance,
+    keeperSays: (text) => keeperSays(findMarketStall(SAWMILL_STALL_ID), text),
+    onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
+    thumbnail: itemThumbnails.get,
+    onClose: () => canvas.focus(),
+});
 /** A counter or the board has the player's attention: no walking, no looking round. */
 function panelOpen() {
-    return salePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen();
+    return salePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen();
 }
 function workStall(stall) {
     if (!stall.open) {
@@ -366,7 +382,9 @@ function workStall(stall) {
                 ? "Sign in to fill orders — only an account farm's harvest can be delivered for tickets."
                 : stall.id === KITCHEN_STALL_ID
                     ? "Sign in to sell your cooking — only an account farm's dishes can be traded for tickets."
-                    : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
+                    : stall.id === SAWMILL_STALL_ID
+                        ? "Sign in to saw logs and sell furniture — only an account farm's timber and pieces count."
+                        : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
         return;
     }
     keys.clear();
@@ -376,6 +394,8 @@ function workStall(stall) {
     }
     if (stall.id === KITCHEN_STALL_ID)
         kitchenPanel.open(dishes);
+    else if (stall.id === SAWMILL_STALL_ID)
+        sawmill.open();
     else
         salePanel.open(produce);
     if (stall.keeper)
@@ -478,6 +498,7 @@ window.addEventListener("keydown", (event) => {
             salePanel.close();
             kitchenPanel.close();
             ordersPanel.close();
+            sawmill.close();
         }
         keys.clear();
         return;
@@ -549,7 +570,8 @@ const TICK_SECONDS = 1 / 60;
 let previous = performance.now();
 let accumulator = 0;
 function frame(now) {
-    const frameSeconds = Math.min((now - previous) / 1000, 0.1);
+    // Clamped both ways: a frame stamped before the last one (a stale first frame) must not drive the accumulator negative.
+    const frameSeconds = Math.min(Math.max(0, (now - previous) / 1000), 0.1);
     accumulator += frameSeconds;
     previous = now;
     while (accumulator >= TICK_SECONDS) {

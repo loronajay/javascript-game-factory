@@ -4,9 +4,10 @@
 // the same derivation off the client's crop catalog so the merchant's board can
 // show them, and platform-api/tests/farm-market.test.mjs holds the two equal.
 import { CROP_CATALOG, FARM_DAY_MINUTES } from "./farm-crops.mjs";
-import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
+import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { DISH_STARS, RECIPE_CATALOG, dishKey, parseDishKey } from "./farm-catalog/recipes.mjs";
 import { starsLabel } from "./farm-kitchen.mjs";
+import { PATTERN_CATALOG, PIECE_STARS, PLANKS_PER_LOG, parsePieceKey, pieceKey } from "./farm-catalog/carpentry.mjs";
 /** Ticket margin one productive cell earns per farm day of growth when its crop is sold raw. */
 export const MARKET_MARGIN_PER_CELL_DAY = 12;
 export const MAX_SALE_QUANTITY = 99;
@@ -49,10 +50,43 @@ export const SELLABLE_DISHES = Object.freeze(RECIPE_CATALOG.flatMap((recipe) => 
     title: `${recipe.title} ${starsLabel(stars)}`,
     itemKey: `dish:${dishKey(recipe.id, stars)}`,
 }))));
-/** The price of whatever a sale line names: a crop, a fruit or a dish. */
+// ---------------------------------------------------------------- furniture
+/**
+ * What the Sawmill pays for a piece: its planks' worth times a premium by
+ * stars, and half back of any tickets a fine piece asked for. A log is worth a
+ * timber tree's regrowth days at the market's margin over the logs a felling
+ * yields; a plank is a third of a log (platform-api's farm-carpentry-catalog pays).
+ */
+export const PIECE_PREMIUM = Object.freeze({ 1: 2, 2: 2.5, 3: 3.2 });
+export const PIECE_TICKET_RESALE = 0.5;
+export function plankValue(speciesId) {
+    const species = TIMBER_TREES.find((entry) => entry.id === speciesId);
+    return species ? (MARKET_MARGIN_PER_CELL_DAY * (species.regrowMinutes / FARM_DAY_MINUTES)) / species.yield / PLANKS_PER_LOG : 0;
+}
+export function pieceRawValue(itemId) {
+    const pattern = PATTERN_CATALOG.find((entry) => entry.id === itemId);
+    return pattern ? Object.entries(pattern.planks).reduce((sum, [speciesId, count]) => sum + plankValue(speciesId) * count, 0) : 0;
+}
+export function piecePrice(itemId, stars) {
+    const pattern = PATTERN_CATALOG.find((entry) => entry.id === itemId);
+    return pattern ? Math.ceil(pieceRawValue(itemId) * PIECE_PREMIUM[stars] + pattern.tickets * PIECE_TICKET_RESALE) : 0;
+}
+export const PIECE_PRICES = Object.freeze(Object.fromEntries(PATTERN_CATALOG.flatMap((pattern) => PIECE_STARS.map((stars) => [pieceKey(pattern.id, stars), piecePrice(pattern.id, stars)]))));
+/** Everything the Sawmill buys: every piece, finest first within a pattern. */
+export const SELLABLE_FURNITURE = Object.freeze(PATTERN_CATALOG.flatMap((pattern) => [...PIECE_STARS].reverse().map((stars) => Object.freeze({
+    id: pieceKey(pattern.id, stars),
+    title: `${pattern.title} ${starsLabel(stars)}`,
+    itemKey: `piece:${pieceKey(pattern.id, stars)}`,
+}))));
+/** The price of whatever a sale line names: a crop, a fruit, a dish or a piece of furniture. */
 export function salePrice(id) {
     const dish = parseDishKey(id);
-    return dish ? dishPrice(dish.recipe.id, dish.stars) : producePrice(id);
+    if (dish)
+        return dishPrice(dish.recipe.id, dish.stars);
+    const piece = parsePieceKey(id);
+    if (piece)
+        return piecePrice(piece.pattern.id, piece.stars);
+    return producePrice(id);
 }
 /**
  * A stall's board: everything it buys that the player holds any of, in its

@@ -127,7 +127,9 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| kitchen\.cooking\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| kitchenPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel, at the stove or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel, at the stove or bench, or while napping");
+  assert.match(source, /return kitchen\.cooking\(\) \|\| workshop\.crafting\(\);/, "a dish on the stove and a piece on the bench both hold the player");
+  assert.match(source, /return kitchenPanel\.isOpen\(\) \|\| workshop\.panelOpen\(\);/, "the cookbook, the pattern book and the Sawmill counter are all station panels");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
   assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay \}\)/);
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
@@ -187,7 +189,7 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
     assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
     assert.match(source, new RegExp(`#${id}"`), `farm.mts reads #${id}`);
   }
-  for (const tab of ["ground", "fence", "building", "plant", "seeds", "water", "prop"]) assert.match(html, new RegExp(`data-tab="${tab}"`));
+  for (const tab of ["ground", "fence", "building", "plant", "seeds", "water", "prop", "furniture"]) assert.match(html, new RegExp(`data-tab="${tab}"`));
   assert.match(html, /id="farmSeedCatalog"/);
   assert.match(source, /purchaseFarmSupply\(`seed\.\$\{cropId\}`/);
   // The editor is built on the shared camera controller, history and gizmos; the farm supplies only its rules and panel.
@@ -207,9 +209,9 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.doesNotMatch(panelSource, /^import[^;]*three|new THREE\./im);
   assert.match(panelSource, /data-clear-selection/);
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
-  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !kitchenPanel\.isOpen\(\) && !kitchen\.cooking\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
+  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !stationPanelOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| kitchen\.cooking\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| kitchenPanel\.isOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);
@@ -223,7 +225,9 @@ test("farm build mode uses the shared ticket shop and permanent Farm inventory",
   assert.match(source, /createFarmInventory\(\{ ownedIds: shop\?\.ownedIds \}\)/);
   assert.match(source, /purchaseShopItem\("farm", itemId\)/);
   assert.match(editorSource, /if \(!inventory\.owns\(id\)\)/);
-  assert.match(editorSource, /if \(!definition \|\| !inventory\.owns\(itemId\)\)/);
+  // An unlock is owned; a crafted piece is counted off the shelf instead (farm-workshop.mts).
+  assert.match(editorSource, /if \(!definition \|\| \(definition\.unlock\.type === "crafted" \? !stars : !inventory\.owns\(itemId\)\)\)/);
+  assert.match(editorSource, /bestOnShelf\(layout\.agriculture\.inventory\.furniture, layout\.decor, itemId\)/, "a placement takes the finest piece on the shelf");
   assert.match(panelSource, /dataset\.buyItem/);
   assert.match(panelSource, /tickets available/);
 });

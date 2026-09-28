@@ -13,6 +13,7 @@ import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey, type DishStars } from "./farm-recipe-catalog.mjs";
+import { farmPiecePrice, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
 
 const DAY = 24 * 60;
 
@@ -78,14 +79,17 @@ export const FARM_DISH_PRICES: Readonly<Record<string, number>> = Object.freeze(
   Object.keys(FARM_RECIPE_RULES).flatMap((recipeId) => ([1, 2, 3] as const).map((stars) => [`${recipeId}@${stars}`, farmDishPrice(recipeId, stars)])),
 ));
 
-/** Whatever a sale line names — a crop, a fruit or a dish — at the server's price, or 0 for anything the market does not buy. */
+/** Whatever a sale line names — a crop, a fruit, a dish or a piece of furniture — at the server's price, or 0 for anything the market does not buy. */
 export function farmSalePrice(itemId: unknown): number {
   const dish = parseFarmDishKey(itemId);
-  return dish ? farmDishPrice(dish.recipeId, dish.stars) : farmProducePrice(itemId);
+  if (dish) return farmDishPrice(dish.recipeId, dish.stars);
+  const piece = parseFarmPieceKey(itemId);
+  if (piece) return farmPiecePrice(piece.itemId, piece.stars);
+  return farmProducePrice(itemId);
 }
 
 /**
- * A sale request made safe: known crops, fruit and dishes only, whole positive
+ * A sale request made safe: known crops, fruit, dishes and furniture only, whole positive
  * counts, at most MAX_SALE_QUANTITY each, at least one line. `null` for anything else.
  */
 export function normalizeSaleLines(value: unknown): Readonly<Record<string, number>> | null {

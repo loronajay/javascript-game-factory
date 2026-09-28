@@ -382,11 +382,11 @@ export function farmDecorHandles(layout: FarmLayout, instanceId: string): readon
 }
 
 /** Add a catalog item near a point: the point itself, then rings of spots around it until one is free. */
-export function addFarmDecor(layout: FarmLayout, definition: FarmDecorDefinition, near: Readonly<{ x: number; z: number; rotationY?: number }>, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
+export function addFarmDecor(layout: FarmLayout, definition: FarmDecorDefinition, near: Readonly<{ x: number; z: number; rotationY?: number; stars?: 1 | 2 | 3 }>, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
   if (layout.decor.length >= MAX_DECOR) return { valid: false, layout, instanceId: "", reason: "full" };
   if (definition.pond && pondRegions(layout).length >= MAX_PONDS) return { valid: false, layout, instanceId: "", reason: "ponds" };
   const instanceId = nextFarmDecorInstanceId(layout, definition);
-  const item: FarmDecorRow = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0 };
+  const item: FarmDecorRow = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0, ...(near.stars ? { stars: near.stars } : {}) };
   const candidate = withFarmDecor(layout, [...layout.decor, item]);
   const attempt = (x: number, z: number, rotationY = item.rotationY): FarmDecorResult => tryPlace(candidate, item, definition, { x, z, rotationY }, bounds);
   const first = attempt(near.x, near.z);
@@ -468,7 +468,7 @@ export function duplicateFarmDecor(layout: FarmLayout, instanceId: string, bound
     const result = tryPlace(candidate, copy, definition, { x: item.x + across.x * gap * sign, z: item.z + across.z * gap * sign, rotationY: item.rotationY }, bounds);
     if (result.valid) return result;
   }
-  const spread = addFarmDecor(layout, definition, { x: item.x, z: item.z, rotationY: item.rotationY }, bounds);
+  const spread = addFarmDecor(layout, definition, { x: item.x, z: item.z, rotationY: item.rotationY, ...(item.stars ? { stars: item.stars } : {}) }, bounds);
   if (!spread.valid) return spread;
   // Keep the copy's length: addFarmDecor placed a default-length row.
   const placed = spread.layout.decor.find((row) => row.instanceId === spread.instanceId)!;

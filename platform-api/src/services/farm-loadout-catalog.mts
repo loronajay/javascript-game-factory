@@ -38,6 +38,7 @@ import { farmCropRule } from "./farm-crop-catalog.mjs";
 import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, verifyFarmClock } from "./farm-time-policy.mjs";
 import { emptyFarmSkillRecords, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
 import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
+import { farmPieceKey, farmPieceRule, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
 import { TREE_PLOT_ITEM_ID, admitNewTrees, boundTreeGrowth, normalizeFarmTreeRows } from "./farm-tree-catalog.mjs";
 
 export const FARM_GAME_SLUG = "farm";
@@ -88,7 +89,7 @@ function normalizeRotation(value: any): number | null {
 
 export function defaultFarmGarage(): any {
   // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {} }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, skills: emptyFarmSkillRecords() };
+  return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {} }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, skills: emptyFarmSkillRecords() };
 }
 
 function normalizeCropCounts(value: any): any {
@@ -120,6 +121,32 @@ function normalizeDishCounts(value: any): any {
     output[key] = Math.min(99, Math.max(0, Math.floor(raw)));
   }
   return output;
+}
+
+/** Furniture the farm owns, placed or not, by "decor.furniture.<piece>@stars" (services/farm-carpentry-catalog). */
+function normalizePieceCounts(value: any): any {
+  const input = value && typeof value === "object" ? value : {};
+  const output: any = {};
+  for (const [key, raw] of Object.entries(input).slice(0, 96)) {
+    if (!parseFarmPieceKey(key) || typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    output[key] = Math.min(99, Math.max(0, Math.floor(raw)));
+  }
+  return output;
+}
+
+/**
+ * A crafted piece stands on the field only while the farm owns one more of
+ * its "item@stars" than already stand: rows past what is owned are dropped,
+ * first placed first kept. Crafted pieces are counted, never unlocked.
+ */
+function boundCraftedRows(decor: any[], furniture: any): any[] {
+  const standing: Record<string, number> = {};
+  return decor.filter((row) => {
+    if (!farmPieceRule(row.itemId)) return true;
+    const key = farmPieceKey(row.itemId, row.stars);
+    standing[key] = (standing[key] ?? 0) + 1;
+    return standing[key]! <= (Number(furniture?.[key]) || 0);
+  });
 }
 
 function normalizeAgriculture(value: any, decorIds: ReadonlySet<string>): any {
@@ -157,6 +184,8 @@ function normalizeAgriculture(value: any, decorIds: ReadonlySet<string>): any {
       saplings: normalizeCropCounts(inventory.saplings), logs: normalizeCropCounts(inventory.logs),
       // Cooked dishes (server-minted at the Kitchen Range, services/farm-recipe-catalog).
       dishes: normalizeDishCounts(inventory.dishes),
+      // Sawn planks by species, and furniture owned by "item@stars" (server-minted at the Sawmill and the Workbench).
+      planks: normalizeCropCounts(inventory.planks), furniture: normalizePieceCounts(inventory.furniture),
     },
     crops,
   };
@@ -199,11 +228,14 @@ function capNewCrops(crops: any[], storedCrops: any[], capacity: number): any[] 
  *   - each tree grows no further than its own stamp moved, like a crop;
  *   - DISHES are the server's like produce: only a cook makes one, only a
  *     sale or a dish order takes one, and the Cooking record is pinned with
- *     the others.
+ *     the others;
+ *   - PLANKS and FURNITURE are the server's too: only the Sawmill makes a
+ *     plank and only the Workbench a piece (the Carpentry record is pinned),
+ *     and a save may place no more of a piece than the stored count owns.
  */
 function guardFarmSave(garage: any, current: any, context: any): void {
   const inventory = garage.agriculture.inventory;
-  const storedInventory = current?.agriculture?.inventory ?? { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {} };
+  const storedInventory = current?.agriculture?.inventory ?? { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {} };
   const atMost = (submitted: any, stored: any) => Object.fromEntries(Object.entries(stored ?? {})
     .map(([id, count]) => [id, Math.min(Number(count) || 0, Number(submitted?.[id]) || 0)]));
   if (current) {
@@ -216,6 +248,8 @@ function guardFarmSave(garage: any, current: any, context: any): void {
   inventory.produce = { ...(storedInventory.produce ?? {}) };
   inventory.logs = { ...(storedInventory.logs ?? {}) };
   inventory.dishes = { ...(storedInventory.dishes ?? {}) };
+  inventory.planks = { ...(storedInventory.planks ?? {}) };
+  inventory.furniture = { ...(storedInventory.furniture ?? {}) };
   // So are the skill records: XP is minted by harvests, fellings, cooks and orders, never a save.
   garage.skills = current?.skills ? normalizeFarmSkillRecords(current.skills) : emptyFarmSkillRecords();
 
@@ -316,6 +350,8 @@ function ownership(context: any): { enforce: boolean; owned: Set<string> } {
 function mayUseCatalogId(id: string, context: any): boolean {
   if (!FARM_CATALOG_IDS.has(id)) return false;
   if (id === "decor.prop.pet-tombstone") return true;
+  // A crafted piece is not an unlock: it is admitted by count against the furniture the farm owns (boundCraftedRows).
+  if (farmPieceRule(id)) return true;
   const state = ownership(context);
   return !state.enforce || FARM_STARTER_IDS.has(id) || state.owned.has(id);
 }
@@ -339,6 +375,12 @@ function normalizeDecorRow(raw: any): any | null {
   if (HEX_COLOR.test(color)) row.color = color;
   const memorialId = cleanText(source.memorialId, 40);
   if (itemId === "decor.prop.pet-tombstone" && INSTANCE_ID_PATTERN.test(memorialId)) row.memorialId = memorialId;
+  // A crafted piece carries the stars it was made with; a piece without them is not a piece.
+  if (farmPieceRule(itemId)) {
+    const stars = Number(source.stars);
+    if (stars !== 1 && stars !== 2 && stars !== 3) return null;
+    row.stars = stars;
+  }
   return row;
 }
 
@@ -450,6 +492,11 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
     // writes normalize stored documents and are not re-checked.
     const saving = Boolean(context) && Object.prototype.hasOwnProperty.call(context, "currentGarage");
     if (saving) guardFarmSave(garage, current, context);
+    // After the guard, so on a save the count is the stored one.
+    if (garage.decor) garage.decor = boundCraftedRows(garage.decor, garage.agriculture.inventory.furniture);
+  } else if (garage.decor) {
+    // Before version 3 a farm had no furniture to place.
+    garage.decor = garage.decor.filter((row: any) => !farmPieceRule(row.itemId));
   }
   return garage;
 }

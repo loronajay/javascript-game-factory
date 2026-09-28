@@ -16,6 +16,9 @@
 import { GROUND_CATALOG } from "./farm-catalog/ground.mjs";
 import { FARM_DECOR_CATEGORIES, FARM_DECOR_CATEGORY_TITLES, farmDecorByCategory, farmDecorFootprint, farmDecorTab, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { CROP_CATALOG } from "./farm-crops.mjs";
+import { PIECE_FINISH_TITLES } from "./farm-catalog/carpentry.mjs";
+import { shelfEntries } from "./farm-workshop.mjs";
+import { starsLabel } from "./farm-kitchen.mjs";
 export const FARM_EDITOR_TABS = Object.freeze(["ground", ...FARM_DECOR_CATEGORIES, "seeds"]);
 const CATEGORY_HINTS = Object.freeze({
     fence: "Click a fence to place a run, then pull its end arrows to stretch it. Runs cross and meet freely, so pens are easy.",
@@ -23,6 +26,7 @@ const CATEGORY_HINTS = Object.freeze({
     plant: "Trees are solid at the trunk; beds and flowers are walked over.",
     water: "Ponds are dug into the field: walk down the bank and wade in. The shark, the anglerfish and the jellyfish live in them, and their homes sit on the pond bed.",
     prop: "Bits and pieces for the yard.",
+    furniture: "Pieces you have made at the Carpenter's Workbench. Placing one takes the finest on the shelf; removing one puts it back.",
 });
 function element(tag, className = "", text = "") {
     const node = document.createElement(tag);
@@ -136,10 +140,37 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             swatch.setAttribute("aria-pressed", String(swatch.dataset.groundId === state.layout.ground));
         }
     }
+    /** The Furniture tab: made, not bought. Each card is a pattern with what is on the shelf. */
+    function renderFurniture(state) {
+        const entries = shelfEntries(state.layout.agriculture.inventory.furniture, state.layout.decor);
+        const made = entries.some((entry) => entry.onShelf + entry.placed > 0);
+        const lead = element("small", "ticket-shop-balance", made
+            ? "Your workshop's shelf"
+            : "Nothing made yet · saw logs into planks at a Sawmill, then make furniture at the Carpenter's Workbench (Props tab)");
+        elements.catalog.replaceChildren(lead, ...entries.filter((entry) => entry.onShelf + entry.placed > 0).map((entry) => {
+            const definition = findFarmDecor(entry.pattern.id);
+            const card = element("button", "decor-card");
+            card.type = "button";
+            if (entry.best)
+                card.dataset.addDecor = definition.id;
+            card.disabled = !entry.best;
+            card.title = entry.best ? `Place a ${PIECE_FINISH_TITLES[entry.best].toLowerCase()} ${definition.title}` : `Every ${definition.title} you have made is on the field`;
+            card.append(decorIcon(definition, options.thumbnail), element("span", "decor-card__title", definition.title));
+            const stock = [3, 2, 1].filter((stars) => entry.byStars[stars] > 0).map((stars) => `${starsLabel(stars)}×${entry.byStars[stars]}`).join(" ");
+            card.append(element("small", "decor-card__meta", entry.onShelf ? `${stock} on the shelf` : `all ${entry.placed} placed`));
+            return card;
+        }));
+    }
     function renderCatalog(state) {
         if (state.tab === "ground" || state.tab === "seeds")
             return;
         const category = state.tab;
+        if (category === "furniture") {
+            elements.catalogTitle.textContent = FARM_DECOR_CATEGORY_TITLES[category];
+            elements.catalogHint.textContent = CATEGORY_HINTS[category];
+            renderFurniture(state);
+            return;
+        }
         elements.catalogTitle.textContent = FARM_DECOR_CATEGORY_TITLES[category];
         elements.catalogHint.textContent = CATEGORY_HINTS[category];
         const balance = element("small", "ticket-shop-balance", state.ticketBalance === null
@@ -186,7 +217,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
             const dot = element("span", "placed-list__dot");
             dot.style.setProperty("--tint", definition.swatch[0]);
             const text = element("div");
-            text.append(element("strong", "", definition.title), element("small", "", placementLabel(row, definition)));
+            text.append(element("strong", "", row.stars ? `${definition.title} ${starsLabel(row.stars)}` : definition.title), element("small", "", placementLabel(row, definition)));
             item.append(dot, text);
             const remove = element("button", "placed-list__remove", "×");
             remove.type = "button";
@@ -221,7 +252,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         close.dataset.clearSelection = "true";
         close.title = "Deselect (Esc)";
         close.setAttribute("aria-label", "Deselect");
-        heading.append(element("span", "eyebrow", "SELECTED"), element("strong", "", definition.title), where, close);
+        heading.append(element("span", "eyebrow", row.stars ? `${PIECE_FINISH_TITLES[row.stars].toUpperCase()} · ${starsLabel(row.stars)}` : "SELECTED"), element("strong", "", definition.title), where, close);
         const nodes = [heading];
         let lengthInput = null;
         if (definition.length.enabled) {
@@ -239,9 +270,13 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         const duplicate = element("button", "inspector__tool", "Copy");
         duplicate.type = "button";
         duplicate.dataset.duplicateDecor = row.instanceId;
-        duplicate.disabled = Boolean(row.memorialId);
+        // A copy of a piece takes another of the same stars off the shelf.
+        const shelved = row.stars ? shelfEntries(state.layout.agriculture.inventory.furniture, state.layout.decor).find((entry) => entry.pattern.id === row.itemId)?.byStars[row.stars] ?? 0 : Infinity;
+        duplicate.disabled = Boolean(row.memorialId) || shelved <= 0;
         if (row.memorialId)
             duplicate.title = "Pet memorials cannot be copied";
+        else if (shelved <= 0)
+            duplicate.title = "No more of these on the shelf · make another at the Workbench";
         tools.append(left, right, duplicate);
         const remove = element("button", "inspector__tool inspector__tool--danger", "Remove");
         remove.type = "button";
@@ -265,7 +300,9 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
                             ? "Fences pass through other fences, so corners and crossings are fine."
                             : row.memorialId
                                 ? "Drag or rotate this memorial like any prop. Removing it is permanent, though its history remains in farm records."
-                                : "Drag it in the field, arrows to nudge, Q/R to turn.");
+                                : row.stars
+                                    ? "You made this at the Workbench. Removing it puts it back on the shelf, to place again or sell at the Market Square's Sawmill."
+                                    : "Drag it in the field, arrows to nudge, Q/R to turn.");
         nodes.push(tools, removeRow, removeHint, hint);
         elements.inspector.replaceChildren(...nodes);
         return { instanceId: row.instanceId, where, lengthInput, remove, removeHint };

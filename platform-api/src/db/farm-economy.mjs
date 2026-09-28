@@ -4,6 +4,7 @@ import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSup
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
 import { parseFarmDishKey } from "../services/farm-recipe-catalog.mjs";
+import { parseFarmPieceKey, unplacedFarmPieces } from "../services/farm-carpentry-catalog.mjs";
 import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder } from "../services/farm-skill-catalog.mjs";
 import { farmTreeReady, farmTreeRule } from "../services/farm-tree-catalog.mjs";
 import { normalizeCookingRecord, recordFarmDishOrder } from "../services/farm-skill-catalog.mjs";
@@ -337,24 +338,29 @@ export async function sellFarmProduce(pool, input) {
         const agriculture = farm.layout.agriculture;
         const produce = { ...(agriculture?.inventory?.produce ?? {}) };
         const dishes = { ...(agriculture?.inventory?.dishes ?? {}) };
+        const furniture = { ...(agriculture?.inventory?.furniture ?? {}) };
+        // Only what is on the shelf can be sold: a piece standing on the field stays there.
+        const shelf = unplacedFarmPieces(furniture, farm.layout.decor ?? []);
         let earned = 0;
         for (const [itemId, quantity] of Object.entries(lines)) {
             const dish = Boolean(parseFarmDishKey(itemId));
-            const stack = dish ? dishes : produce;
-            const held = Number(stack[itemId]) || 0;
+            const piece = Boolean(parseFarmPieceKey(itemId));
+            const stack = dish ? dishes : piece ? furniture : produce;
+            const held = piece ? shelf[itemId] ?? 0 : Number(stack[itemId]) || 0;
             if (held < quantity)
-                return { ok: false, error: dish ? "not_enough_dishes" : "not_enough_produce", cropId: itemId, held, layout: farm.layout };
-            stack[itemId] = held - quantity;
+                return { ok: false, error: dish ? "not_enough_dishes" : piece ? "not_enough_furniture" : "not_enough_produce", cropId: itemId, held, layout: farm.layout };
+            stack[itemId] = (Number(stack[itemId]) || 0) - quantity;
             earned += farmSalePrice(itemId) * quantity;
         }
         const cooked = Object.keys(lines).some((itemId) => parseFarmDishKey(itemId));
+        const crafted = Object.keys(lines).some((itemId) => parseFarmPieceKey(itemId));
         const award = await awardTicketsInTransaction(client, {
-            playerId, transactionKey, amount: earned, reason: cooked ? "farm_dish_sale" : "farm_produce_sale",
+            playerId, transactionKey, amount: earned, reason: crafted ? "farm_furniture_sale" : cooked ? "farm_dish_sale" : "farm_produce_sale",
             metadata: { items: lines, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, farmSalePrice(id)])) },
         });
         const next = normalizeFarmGarage({
             ...farm.layout,
-            agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce, dishes } },
+            agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce, dishes, furniture } },
         }, { ownedEntitlementIds: farm.owned });
         await saveFarm(client, playerId, next);
         return { ok: true, duplicate: false, earned, sold: lines, balance: award.balance, layout: next };

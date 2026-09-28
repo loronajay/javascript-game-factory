@@ -1,9 +1,9 @@
-// The farm's skills, for display: Farming, Woodcutting and Cooking. PURE — no DOM, no
+// The farm's skills, for display: Farming, Woodcutting, Cooking and Carpentry. PURE — no DOM, no
 // THREE, no storage.
 //
 // The server owns the records (platform-api/src/services/farm-skill-catalog.mts):
-// only a server harvest, a picked fruit tree, a felled tree, a cooked dish or a
-// filled Market order raises them, and a save can never change them. The page reads `layout.skills.farming` as the server last
+// only a server harvest, a picked fruit tree, a felled tree, a cooked dish, a
+// sawn log, a made piece of furniture or a filled Market order raises them, and a save can never change them. The page reads `layout.skills.farming` as the server last
 // returned it and derives the level and progress bar from it with this same
 // curve; platform-api/tests/farm-skills.test.mjs holds the two copies equal.
 //
@@ -13,6 +13,7 @@
 import { CROP_CATALOG, FARM_DAY_MINUTES, findCrop } from "./farm-crops.mjs";
 import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { RECIPE_CATALOG } from "./farm-catalog/recipes.mjs";
+import { PATTERN_CATALOG } from "./farm-catalog/carpentry.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
 export const FARMING_MAX_XP = 200_000_000;
@@ -77,12 +78,23 @@ export type CookingRecord = Readonly<{
   recipes: Readonly<Record<string, number>>;
 }>;
 
-export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord }>;
+export type CarpentryRecord = Readonly<{
+  xp: number;
+  /** Lifetime logs sawn, pieces made, and three-star pieces among them. */
+  milled: number;
+  pieces: number;
+  masterwork: number;
+  /** Lifetime pieces per pattern. */
+  patterns: Readonly<Record<string, number>>;
+}>;
+
+export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord }>;
 
 export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
   woodcutting: Object.freeze({ xp: 0, fellings: 0, trees: Object.freeze({}) }),
   cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}) }),
+  carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
 });
 
 function count(value: unknown, limit = 100_000_000): number {
@@ -105,7 +117,8 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
   const farming: any = source.farming && typeof source.farming === "object" ? source.farming : null;
   const woodcutting: any = source.woodcutting && typeof source.woodcutting === "object" ? source.woodcutting : null;
   const cooking: any = source.cooking && typeof source.cooking === "object" ? source.cooking : null;
-  if (!farming && !woodcutting && !cooking) return EMPTY_FARM_SKILLS;
+  const carpentry: any = source.carpentry && typeof source.carpentry === "object" ? source.carpentry : null;
+  if (!farming && !woodcutting && !cooking && !carpentry) return EMPTY_FARM_SKILLS;
   return Object.freeze({
     farming: farming ? Object.freeze({
       xp: count(farming.xp, FARMING_MAX_XP),
@@ -126,6 +139,13 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
       orders: count(cooking.orders),
       recipes: counts(cooking.recipes, RECIPE_CATALOG.map((entry) => entry.id)),
     }) : EMPTY_FARM_SKILLS.cooking,
+    carpentry: carpentry ? Object.freeze({
+      xp: count(carpentry.xp, FARMING_MAX_XP),
+      milled: count(carpentry.milled),
+      pieces: count(carpentry.pieces),
+      masterwork: count(carpentry.masterwork),
+      patterns: counts(carpentry.patterns, PATTERN_CATALOG.map((entry) => entry.id)),
+    }) : EMPTY_FARM_SKILLS.carpentry,
   });
 }
 

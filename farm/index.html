@@ -60,7 +60,7 @@
       <span id="farmClockPhase">Morning</span>
       <strong id="farmClock">8:00 AM</strong>
     </div>
-    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small><div id="farmingSkill" class="farming-skill" hidden><small id="farmingSkillLabel">Farming 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="farmingSkillBar"></i></span></div><div id="woodcuttingSkill" class="farming-skill farming-skill--wood" hidden><small id="woodcuttingSkillLabel">Woodcutting 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="woodcuttingSkillBar"></i></span></div><div id="cookingSkill" class="farming-skill farming-skill--cook" hidden><small id="cookingSkillLabel">Cooking 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="cookingSkillBar"></i></span></div></div>
+    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small><div id="farmingSkill" class="farming-skill" hidden><small id="farmingSkillLabel">Farming 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="farmingSkillBar"></i></span></div><div id="woodcuttingSkill" class="farming-skill farming-skill--wood" hidden><small id="woodcuttingSkillLabel">Woodcutting 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="woodcuttingSkillBar"></i></span></div><div id="cookingSkill" class="farming-skill farming-skill--cook" hidden><small id="cookingSkillLabel">Cooking 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="cookingSkillBar"></i></span></div><div id="carpentrySkill" class="farming-skill farming-skill--carpentry" hidden><small id="carpentrySkillLabel">Carpentry 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="carpentrySkillBar"></i></span></div></div>
     <section id="chopMeter" class="chop-meter" aria-live="polite" hidden>
       <strong data-chop-title>Felling</strong>
       <div class="chop-meter__bar" aria-hidden="true"><span class="chop-meter__good" data-chop-good></span><span class="chop-meter__perfect" data-chop-perfect></span><i class="chop-meter__marker" data-chop-marker></i></div>
@@ -123,6 +123,14 @@
           <div id="logsGrid" class="item-grid"></div>
         </section>
         <section class="pets-section">
+          <h3 class="pets-section__title">Planks · for the Carpenter's Workbench</h3>
+          <div id="planksGrid" class="item-grid"></div>
+        </section>
+        <section class="pets-section">
+          <h3 class="pets-section__title">Furniture · made at the Workbench</h3>
+          <div id="furnitureGrid" class="item-grid"></div>
+        </section>
+        <section class="pets-section">
           <h3 class="pets-section__title">Pet supplies</h3>
           <div id="suppliesGrid" class="item-grid item-grid--wide"></div>
         </section>
@@ -142,6 +150,41 @@
         <p id="kitchenStatus" class="pets-status" aria-live="polite"></p>
       </footer>
     </aside>
+
+    <aside id="workshopPanel" class="inventory-panel kitchen-panel" aria-label="Pattern book" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">CARPENTER'S WORKBENCH · <span id="workshopLevel">Carpentry 1</span></span><strong>Pattern book</strong></div>
+        <button id="closeWorkshop" class="farm-button" type="button" title="Step back from the bench (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="kitchen-panel__body">
+        <div id="patternList" class="recipe-list" role="list"></div>
+        <div id="patternDetail" class="recipe-detail-pane"></div>
+      </div>
+      <footer class="sale-footer">
+        <p id="workshopStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <aside id="millPanel" class="inventory-panel mill-panel" aria-label="Sawmill" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">YOUR SAWMILL · NO FEE</span><strong>Saw logs into planks</strong></div>
+        <button id="closeMill" class="farm-button" type="button" title="Step back from the saw (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Every log saws into three planks of its own wood. Planks are what the Carpenter's Workbench makes furniture from.</p>
+        <ol id="millList" class="sale-list"></ol>
+      </div>
+      <footer class="sale-footer">
+        <p id="millStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <section id="craftingHud" class="cooking-hud crafting-hud" aria-live="polite" hidden>
+      <header class="cooking-hud__head"><strong data-cook-title>Carpentry</strong><small data-cook-step></small></header>
+      <div class="cooking-hud__stage" data-cook-stage></div>
+      <p class="cooking-hud__hint"><span data-cook-hint></span><span class="cooking-hud__word" data-cook-word></span></p>
+      <div class="cooking-hud__steps" data-cook-steps></div>
+    </section>
 
     <section id="cookingHud" class="cooking-hud" aria-live="polite" hidden>
       <header class="cooking-hud__head"><strong data-cook-title>Cooking</strong><small data-cook-step></small></header>
@@ -216,6 +259,10 @@
         <button type="button" role="tab" data-tab="prop" aria-selected="false" title="Yard props">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11M9 20v-5h6v5" /></svg>
           <span>Props</span>
+        </button>
+        <button type="button" role="tab" data-tab="furniture" aria-selected="false" title="Furniture you have made at the Workbench">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21v-8h12v8M6 13V5h12v8M4 13h16M8 17h8" /></svg>
+          <span>Furniture</span>
         </button>
       </nav>
 

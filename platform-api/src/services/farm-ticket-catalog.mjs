@@ -1,3 +1,4 @@
+import { FARM_PIECE_IDS } from "./farm-carpentry-catalog.mjs";
 // Server-authoritative permanent Farm unlocks. Placement/model metadata stays
 // in the browser catalog; this explicit roster owns prices and save admission.
 export const FARM_GAME_SLUG = "farm";
@@ -9,6 +10,8 @@ export const FARM_STARTER_IDS = new Set([
     "decor.prop.rope-toy", "decor.prop.bone",
     // Every farm has a home and can cook (services/farm-recipe-catalog).
     "decor.building.cottage", "decor.prop.kitchen-range",
+    // Every farm can make furniture (services/farm-carpentry-catalog).
+    "decor.prop.workbench",
 ]);
 const prices = Object.freeze({
     "ground.clover": 150, "ground.dry": 150, "ground.mud": 200, "ground.gravel": 250,
@@ -27,6 +30,8 @@ const prices = Object.freeze({
     "decor.prop.lamp-post": 125, "decor.prop.water-pump": 150, "decor.prop.well": 200,
     "decor.prop.campfire": 200, "decor.prop.bed": 250, "decor.prop.wagon": 250,
     "decor.prop.beehive": 250,
+    // Saw logs at home instead of at the Market Square's Sawmill, and never pay its fee.
+    "decor.prop.sawmill": 1200,
     "decor.prop.duck-coop": 200, "decor.prop.roosting-box": 250,
     "decor.prop.burrow-lodge": 300, "decor.prop.treetop-den": 350,
     "decor.prop.darkwater-cave": 400, "decor.prop.jellyfish-lagoon": 450,
@@ -34,7 +39,7 @@ const prices = Object.freeze({
     "decor.prop.rhino-shade": 600,
 });
 export const FARM_TICKET_ITEMS = Object.freeze(Object.entries(prices).map(([id, price]) => Object.freeze({ id, price })));
-export const FARM_CATALOG_IDS = new Set([...FARM_STARTER_IDS, ...Object.keys(prices), "decor.prop.pet-tombstone"]);
+export const FARM_CATALOG_IDS = new Set([...FARM_STARTER_IDS, ...Object.keys(prices), "decor.prop.pet-tombstone", ...FARM_PIECE_IDS]);
 export function findFarmTicketItem(itemId) {
     const id = typeof itemId === "string" ? itemId.trim() : "";
     const price = prices[id];

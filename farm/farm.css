@@ -149,6 +149,7 @@ button, a { font: inherit; }
 .farming-skill.is-levelled .farming-skill__bar i { background: var(--farm-accent); }
 .farming-skill--wood .farming-skill__bar i { background: #c98a4b; }
 .farming-skill--cook .farming-skill__bar i { background: #e0673a; }
+.farming-skill--carpentry .farming-skill__bar i { background: #c9a06a; }
 
 /* The felling meter: a marker sweeps the bar; E when it is in the green. */
 .chop-meter { position: fixed; left: 50%; bottom: 200px; z-index: 6; width: min(420px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: rgba(20, 26, 16, .86); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
@@ -392,6 +393,12 @@ button, a { font: inherit; }
 .cook-pip[data-state="perfect"] { background: #d8f07a; }
 .cook-pip[data-state="good"] { background: #6fae4a; }
 .cook-pip[data-state="poor"] { background: #c86a4a; }
+/* The carpentry games reuse the cooking HUD; only the bars and the saw's call are their own. */
+.craft-bar--ruler { background: repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0 1px, transparent 1px 10%), linear-gradient(90deg, #d9b77a, #ead2a0 50%, #d9b77a); }
+.craft-bar--beat { background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(201,160,106,.45)); }
+.craft-bar--hammer { background: linear-gradient(90deg, #3b444a, #6f7d86 55%, #b8452f 100%); }
+.cook-arrow.craft-call { font-size: 26px; min-height: 30px; letter-spacing: .04em; }
+.cook-arrow.craft-call[data-direction="pull"] { color: #9fd9ff; text-shadow: 0 3px 12px rgba(159,217,255,.35); }
 .cook-arrow { font: 900 52px/1 "Arial Black", sans-serif; color: var(--farm-accent); text-shadow: 0 3px 12px rgba(255,211,61,.4); min-height: 52px; }
 .cook-timer { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
 .cook-timer i { display: block; height: 100%; background: #e0673a; }
@@ -407,4 +414,26 @@ button, a { font: inherit; }
   .recipe-detail-pane { overflow: visible; }
   .recipe-detail__head { grid-template-columns: 110px minmax(0, 1fr); }
   .recipe-detail__dish { width: 110px; height: 96px; }
+}
+
+/* The Sawmill's counter (farm-mill-panel.mts): shared by the farm's own Sawmill and the Market Square's stall. */
+.mill-panel .sale-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mill-row { display: grid; grid-template-columns: 50px minmax(0, 1fr) 50px; align-items: center; gap: 8px 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
+.mill-row__controls { grid-row: 2; grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* Logs in, what they are, planks out: every cell placed, since a portrait otherwise spans two rows. */
+.mill-row .seed-card__image { grid-row: 1; grid-column: 1; width: 50px; height: 44px; }
+.mill-row .sale-row__label { grid-row: 1; grid-column: 2; }
+.mill-row .seed-card__image:nth-child(3) { grid-column: 3; }
+.mill-row .sale-row__label strong { display: block; font-size: 13.5px; }
+.mill-row .sale-row__label small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11px; }
+.mill-row .sale-row__stepper { display: flex; align-items: center; gap: 4px; }
+.mill-row .sale-row__stepper button { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.07); color: #fff; font-weight: 900; cursor: pointer; }
+.mill-row .sale-row__stepper button:disabled { opacity: .35; cursor: not-allowed; }
+.mill-row__count { min-width: 26px; text-align: center; font: 900 14px ui-monospace, monospace; }
+.mill-row__saw { white-space: nowrap; }
+.mill-panel .sale-empty { padding: 18px 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 11px; color: #c9d7bd; text-align: center; font-size: 13px; list-style: none; }
+.recipe-ingredients__tickets { display: grid; place-items: center; font-size: 22px; }
+@media (max-width: 720px) {
+  .mill-row { grid-template-columns: 40px minmax(0, 1fr) 40px; }
+  .mill-row .seed-card__image { width: 40px; height: 36px; }
 }

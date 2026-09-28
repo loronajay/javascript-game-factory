@@ -272,7 +272,8 @@ export function createFarmWorld(THREE, scene, options = {}) {
     const placed = new Map();
     let seedCounter = 0;
     function needsRebuild(entry, row) {
-        return entry.row.itemId !== row.itemId || entry.row.length !== row.length;
+        // A piece's stars are its finish, drawn into its model.
+        return entry.row.itemId !== row.itemId || entry.row.length !== row.length || entry.row.stars !== row.stars;
     }
     function build(row) {
         const definition = findFarmDecor(row.itemId);

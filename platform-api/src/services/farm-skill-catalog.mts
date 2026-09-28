@@ -11,6 +11,7 @@
 import { FARM_CROP_RULES, farmCropRule } from "./farm-crop-catalog.mjs";
 import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
 import { COOK_ID, FARM_RECIPE_RULES, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
+import { FARM_PIECE_IDS, RECENT_WORKSHOP_IDS, WORKSHOP_ID } from "./farm-carpentry-catalog.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
 /** A bound on stored XP, comfortably past level 99 (13,034,431). */
@@ -79,6 +80,12 @@ export type WoodcuttingRecord = { xp: number; fellings: number; trees: Record<st
  * cook ids, so a retried cook request makes its dish once.
  */
 export type CookingRecord = { xp: number; dishes: number; perfect: number; orders: number; recipes: Record<string, number>; recent: string[] };
+/**
+ * The Carpentry skill: same curve, earned only by logs the server sawed and
+ * pieces it made. `milled` counts logs, `pieces` furniture, `masterwork` the
+ * three-star pieces; `recent` is the latest mill and craft ids, for retries.
+ */
+export type CarpentryRecord = { xp: number; milled: number; pieces: number; masterwork: number; patterns: Record<string, number>; recent: string[] };
 
 const COUNT_LIMIT = 100_000_000;
 
@@ -97,6 +104,10 @@ export function emptyWoodcuttingRecord(): WoodcuttingRecord {
 
 export function emptyCookingRecord(): CookingRecord {
   return { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, recent: [] };
+}
+
+export function emptyCarpentryRecord(): CarpentryRecord {
+  return { xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: {}, recent: [] };
 }
 
 /** Positive counts for the known ids only. */
@@ -135,16 +146,29 @@ export function normalizeCookingRecord(value: unknown): CookingRecord {
   };
 }
 
-export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord };
+export function normalizeCarpentryRecord(value: unknown): CarpentryRecord {
+  const source: any = value && typeof value === "object" ? value : {};
+  const recent = Array.isArray(source.recent) ? source.recent.filter((id: unknown) => typeof id === "string" && WORKSHOP_ID.test(id)).slice(-RECENT_WORKSHOP_IDS) : [];
+  return {
+    xp: count(source.xp, FARMING_MAX_XP), milled: count(source.milled), pieces: count(source.pieces), masterwork: count(source.masterwork),
+    patterns: counts(source.patterns, FARM_PIECE_IDS),
+    recent,
+  };
+}
+
+export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord };
 
 /** Every server-owned skill record, shape-bounded. */
 export function normalizeFarmSkillRecords(value: unknown): FarmSkillRecords {
   const source: any = value && typeof value === "object" ? value : {};
-  return { farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting), cooking: normalizeCookingRecord(source.cooking) };
+  return {
+    farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting),
+    cooking: normalizeCookingRecord(source.cooking), carpentry: normalizeCarpentryRecord(source.carpentry),
+  };
 }
 
 export function emptyFarmSkillRecords(): FarmSkillRecords {
-  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord() };
+  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord() };
 }
 
 /** A harvest of `cropId` landed: its XP, one more harvest, one more of that crop. */
@@ -176,6 +200,23 @@ export function recordFarmCook(record: CookingRecord, recipeId: string, xp: numb
     perfect: record.perfect + (stars >= 3 ? 1 : 0),
     recipes: { ...record.recipes, [recipeId]: (record.recipes[recipeId] ?? 0) + 1 },
     recent: [...record.recent, cookId].slice(-RECENT_COOK_IDS),
+  };
+}
+
+/** Logs were sawn: their Carpentry XP, the count, and the mill's id remembered. */
+export function recordFarmMill(record: CarpentryRecord, logs: number, xp: number, millId: string): CarpentryRecord {
+  return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), milled: record.milled + logs, recent: [...record.recent, millId].slice(-RECENT_WORKSHOP_IDS) };
+}
+
+/** A piece was made: its XP, one more piece of that pattern, one more masterwork if it was, and the craft's id remembered. */
+export function recordFarmCraft(record: CarpentryRecord, itemId: string, xp: number, stars: number, craftId: string): CarpentryRecord {
+  return {
+    ...record,
+    xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)),
+    pieces: record.pieces + 1,
+    masterwork: record.masterwork + (stars >= 3 ? 1 : 0),
+    patterns: { ...record.patterns, [itemId]: (record.patterns[itemId] ?? 0) + 1 },
+    recent: [...record.recent, craftId].slice(-RECENT_WORKSHOP_IDS),
   };
 }
 

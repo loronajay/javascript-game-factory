@@ -400,7 +400,7 @@ export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
     if (definition.pond && pondRegions(layout).length >= MAX_PONDS)
         return { valid: false, layout, instanceId: "", reason: "ponds" };
     const instanceId = nextFarmDecorInstanceId(layout, definition);
-    const item = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0 };
+    const item = { instanceId, itemId: definition.id, x: near.x, z: near.z, rotationY: near.rotationY ?? 0, length: definition.length.enabled ? definition.length.default : 0, ...(near.stars ? { stars: near.stars } : {}) };
     const candidate = withFarmDecor(layout, [...layout.decor, item]);
     const attempt = (x, z, rotationY = item.rotationY) => tryPlace(candidate, item, definition, { x, z, rotationY }, bounds);
     const first = attempt(near.x, near.z);
@@ -492,7 +492,7 @@ export function duplicateFarmDecor(layout, instanceId, bounds = FARM_BOUNDS) {
         if (result.valid)
             return result;
     }
-    const spread = addFarmDecor(layout, definition, { x: item.x, z: item.z, rotationY: item.rotationY }, bounds);
+    const spread = addFarmDecor(layout, definition, { x: item.x, z: item.z, rotationY: item.rotationY, ...(item.stars ? { stars: item.stars } : {}) }, bounds);
     if (!spread.valid)
         return spread;
     // Keep the copy's length: addFarmDecor placed a default-length row.

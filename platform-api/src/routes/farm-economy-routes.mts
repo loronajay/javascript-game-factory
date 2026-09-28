@@ -10,7 +10,9 @@ export async function handleFarmEconomyRoute(context: any): Promise<boolean> {
   const readingOrders = pathname === "/games/farm/market/orders" && method === "GET";
   const fillingOrder = pathname === "/games/farm/market/orders/fulfillments" && method === "POST";
   const cooking = pathname === "/games/farm/kitchen/cooks" && method === "POST";
-  if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder && !cooking) return false;
+  const milling = pathname === "/games/farm/workshop/mills" && method === "POST";
+  const crafting = pathname === "/games/farm/workshop/crafts" && method === "POST";
+  if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder && !cooking && !milling && !crafting) return false;
   if (!authClaims?.playerId) {
     writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
     return true;
@@ -21,6 +23,8 @@ export async function handleFarmEconomyRoute(context: any): Promise<boolean> {
   if (readingOrders) return handleOrderBoard(context);
   if (fillingOrder) return handleOrderFill(context);
   if (cooking) return handleCook(context);
+  if (milling) return handleMill(context);
+  if (crafting) return handleCraft(context);
   const action = adopting ? services?.adoptFarmPet : services?.purchaseFarmSupply;
   if (typeof action !== "function") {
     writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
@@ -154,6 +158,82 @@ async function handleCook(context: any): Promise<boolean> {
 }
 
 /**
+ * POST /games/farm/workshop/mills — self only. Saw logs into planks: at the
+ * Market Square's Sawmill (`at: "market"`, a fee per log, the stored farm) or
+ * at the farm's own Sawmill (`at: "farm"`, free, the submitted farm verified
+ * like a harvest). What a log saws into, the fee and the XP are the server's
+ * (db/farm-workshop.mts `millFarmLogs`).
+ */
+async function handleMill(context: any): Promise<boolean> {
+  const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+  if (typeof services?.millFarmLogs !== "function") {
+    writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+    return true;
+  }
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+    return true;
+  }
+  try {
+    const mill = await services.millFarmLogs({
+      playerId: authClaims.playerId,
+      speciesId: body.value?.speciesId,
+      logs: body.value?.logs,
+      at: body.value?.at,
+      millId: body.value?.millId,
+      layout: body.value?.layout,
+    });
+    if (!mill?.ok) {
+      const conflict = new Set(["not_enough_logs", "planks_full", "insufficient_tickets", "no_sawmill"]);
+      writeJson(res, conflict.has(mill?.error) ? 409 : 400, { status: "error", ...mill, timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { mill }, requestOrigin);
+  } catch {
+    writeJson(res, 400, { status: "error", error: "invalid_farm_mill", timestamp }, requestOrigin);
+  }
+  return true;
+}
+
+/**
+ * POST /games/farm/workshop/crafts — self only. The client sends its farm, a
+ * pattern (the decor item it makes), the scores of its steps and a craft id;
+ * whether the pattern is taught, whether the planks and tickets cover it, the
+ * piece's stars and the XP are the server's (db/farm-workshop.mts `craftFarmPiece`).
+ */
+async function handleCraft(context: any): Promise<boolean> {
+  const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+  if (typeof services?.craftFarmPiece !== "function") {
+    writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+    return true;
+  }
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+    return true;
+  }
+  try {
+    const craft = await services.craftFarmPiece({
+      playerId: authClaims.playerId,
+      itemId: body.value?.itemId,
+      scores: body.value?.scores,
+      craftId: body.value?.craftId,
+      layout: body.value?.layout,
+    });
+    if (!craft?.ok) {
+      const conflict = new Set(["not_enough_planks", "level_too_low", "workshop_full", "insufficient_tickets", "no_workbench"]);
+      writeJson(res, conflict.has(craft?.error) ? 409 : 400, { status: "error", ...craft, timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { craft }, requestOrigin);
+  } catch {
+    writeJson(res, 400, { status: "error", error: "invalid_farm_craft", timestamp }, requestOrigin);
+  }
+  return true;
+}
+
+/**
  * POST /games/farm/market/sales — self only. The body names crops and counts
  * and an idempotency key; the price and the payout are the server's
  * (db/farm-economy.mts `sellFarmProduce`). Any price the client sends is ignored.
@@ -176,7 +256,7 @@ async function handleSale(context: any): Promise<boolean> {
       saleId: body.value?.saleId,
     });
     if (!sale?.ok) {
-      const conflict = new Set(["not_enough_produce"]);
+      const conflict = new Set(["not_enough_produce", "not_enough_dishes", "not_enough_furniture"]);
       writeJson(res, conflict.has(sale?.error) ? 409 : 400, { status: "error", ...sale, timestamp }, requestOrigin);
       return true;
     }

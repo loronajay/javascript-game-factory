@@ -22,6 +22,7 @@ import { farmDecorFootprint } from "./farm-catalog/decor.mjs";
 import { FARM_BUILDING_BUILDERS } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
 import { createKitchenRange } from "./farm-props-kitchen.mjs";
+import { createFurniturePiece, createSawmill, createWorkbench, furnitureModelNames } from "./farm-props-furniture.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
 import { createAppleTree, createBirch, createBush, createFlowerBed, createLavender, createPine, createPumpkinPatch, createSoilPatch, createStump, createSunflowers, createTree, createTreePlot, createVegRows, createWheat, createWillow } from "./farm-props-plants.mjs";
 export { createBarn } from "./farm-props-buildings.mjs";
@@ -1126,6 +1127,10 @@ export const FARM_PROP_BUILDERS = Object.freeze({
     "log-pile": (THREE) => still(createLogPile(THREE)),
     campfire: (THREE) => { const fire = createCampfire(THREE); return { group: fire.group, doors: null, fixtureDoors: {}, animate: fire.animate }; },
     "kitchen-range": (THREE) => { const range = createKitchenRange(THREE); return { group: range.group, doors: null, fixtureDoors: {}, animate: range.animate }; },
+    // The workshop (farm-props-furniture.mts): the bench, the farm's own Sawmill, and every piece in the finish of its stars.
+    workbench: (THREE) => still(createWorkbench(THREE)),
+    sawmill: (THREE) => { const mill = createSawmill(THREE); return { group: mill.group, doors: null, fixtureDoors: {}, animate: mill.animate }; },
+    ...Object.fromEntries(furnitureModelNames().map((name) => [name, (THREE, definition, row, seed) => still(createFurniturePiece(THREE, name, definition.id, row.stars ?? 1, seed))])),
     birdbath: (THREE) => still(createBirdbath(THREE)),
     signpost: (THREE) => still(createSignpost(THREE)),
     mailbox: (THREE) => still(createMailbox(THREE)),

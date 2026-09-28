@@ -246,6 +246,26 @@ function gazeboFixtures({ footprint, shell }) {
 function benchFixtures() {
     return [fixture("seat", { kind: "seat", x: 0, z: 0.02, rotationY: 0, width: 1.6, depth: 0.5, top: 0.47 })];
 }
+/** Furniture to sit on (farm-catalog/carpentry.mts): each seat faces local +z, like the bench's. */
+function chairFixtures() {
+    return [fixture("seat", { kind: "seat", x: 0, z: 0.03, rotationY: 0, width: 0.5, depth: 0.45, top: 0.46 })];
+}
+function stoolFixtures() {
+    return [fixture("seat", { kind: "seat", x: 0, z: 0, rotationY: 0, width: 0.46, depth: 0.46, top: 0.5 })];
+}
+function rockingChairFixtures() {
+    return [fixture("seat", { kind: "seat", x: 0, z: 0.08, rotationY: 0, width: 0.6, depth: 0.5, top: 0.44 })];
+}
+/** The picnic table's two built-in benches face each other across the top. */
+function picnicTableFixtures() {
+    return [
+        fixture("bench-front", { kind: "seat", x: 0, z: 0.6, rotationY: Math.PI, width: 1.8, depth: 0.3, top: 0.45 }),
+        fixture("bench-back", { kind: "seat", x: 0, z: -0.6, rotationY: 0, width: 1.8, depth: 0.3, top: 0.45 }),
+    ];
+}
+function porchSwingFixtures() {
+    return [fixture("seat", { kind: "seat", x: 0, z: 0.05, rotationY: 0, width: 1.5, depth: 0.5, top: 0.5 })];
+}
 const FIXTURES_BY_MODEL = Object.freeze({
     barn: barnFixtures,
     stable: stableFixtures,
@@ -257,6 +277,11 @@ const FIXTURES_BY_MODEL = Object.freeze({
     windmill: windmillFixtures,
     gazebo: gazeboFixtures,
     bench: benchFixtures,
+    "furniture-chair": chairFixtures,
+    "furniture-stool": stoolFixtures,
+    "furniture-rocking-chair": rockingChairFixtures,
+    "furniture-picnic-table": picnicTableFixtures,
+    "furniture-porch-swing": porchSwingFixtures,
 });
 const NONE = Object.freeze([]);
 const cache = new Map();

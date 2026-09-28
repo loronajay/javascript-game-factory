@@ -73,6 +73,8 @@ export type FarmDecorRow = Readonly<{
   length: number;
   /** Tombstones reference durable history; removing the prop never removes that record. */
   memorialId?: string;
+  /** A crafted piece's stars (farm-catalog/carpentry.mts): which of the farm's pieces this is, and its finish. */
+  stars?: 1 | 2 | 3;
 }>;
 
 export type FarmLayout = Readonly<{
@@ -240,6 +242,10 @@ export function normalizeFarmDecorRow(value: unknown): FarmDecorRow | null {
   const limitX = FARM_BOUNDS.width / 2;
   const limitZ = FARM_BOUNDS.depth / 2;
   const memorialId = definition.id === "decor.prop.pet-tombstone" && typeof source.memorialId === "string" && /^[a-z0-9-]{1,40}$/.test(source.memorialId) ? source.memorialId : undefined;
+  // A crafted piece is the piece it was made as: without its stars it is not one.
+  const crafted = definition.unlock.type === "crafted";
+  const stars = source.stars === 1 || source.stars === 2 || source.stars === 3 ? source.stars : undefined;
+  if (crafted && !stars) return null;
   return {
     instanceId: source.instanceId,
     itemId: definition.id,
@@ -248,6 +254,7 @@ export function normalizeFarmDecorRow(value: unknown): FarmDecorRow | null {
     rotationY: finiteNumber(source.rotationY) ? wrapRotation(source.rotationY) : 0,
     length: definition.length.enabled ? clampFarmDecorLength(definition, finiteNumber(source.length) && source.length > 0 ? source.length : definition.length.default) : 0,
     ...(memorialId ? { memorialId } : {}),
+    ...(crafted ? { stars } : {}),
   };
 }
 
@@ -472,7 +479,7 @@ export function withProductionCheckpoint(layout: FarmLayout, at: number): FarmLa
 export function farmDecorRowsEqual(first: FarmDecorRow, second: FarmDecorRow): boolean {
   return first.instanceId === second.instanceId && first.itemId === second.itemId
     && first.x === second.x && first.z === second.z && first.rotationY === second.rotationY && first.length === second.length
-    && first.memorialId === second.memorialId;
+    && first.memorialId === second.memorialId && first.stars === second.stars;
 }
 
 export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean {

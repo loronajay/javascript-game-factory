@@ -1,13 +1,15 @@
 // The farm's inventory, on screen (I). Every stack is shown as the thing it
 // is — the seed's grown plant, and for everything else its item model
 // (farm-item-models.mts): the harvest basket as a shelf of produce, the
-// pantry as the dishes themselves with their stars, logs, saplings in burlap
-// and sacks of feed.
+// pantry as the dishes themselves with their stars, logs and planks, the
+// furniture the Workbench has made in its finish, saplings in burlap and
+// sacks of feed.
 
 import { CROP_CATALOG, type FarmAgriculture } from "./farm-crops.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies, type TreeSpecies } from "./farm-catalog/trees.mjs";
 import { pantryLines, starsLabel } from "./farm-kitchen.mjs";
+import { PATTERN_CATALOG, PIECE_STARS, PLANK_SPECIES, pieceKey } from "./farm-catalog/carpentry.mjs";
 
 type Elements = Readonly<{
   root: HTMLElement;
@@ -18,6 +20,8 @@ type Elements = Readonly<{
   suppliesGrid: HTMLElement;
   saplingGrid: HTMLElement;
   logsGrid: HTMLElement;
+  planksGrid: HTMLElement;
+  furnitureGrid: HTMLElement;
   pantryGrid: HTMLElement;
   selected: HTMLElement;
 }>;
@@ -186,6 +190,17 @@ export function createFarmInventoryPanel(elements: Elements, options: Options = 
     }
     elements.saplingGrid.replaceChildren(...TREE_CATALOG.map(saplingCard));
     elements.logsGrid.replaceChildren(...TIMBER_TREES.map((species) => itemTile(`log:${species.id}`, `${species.title} logs`, agriculture.inventory.logs[species.id] ?? 0)));
+    elements.planksGrid.replaceChildren(...PLANK_SPECIES.map((species) => itemTile(`plank:${species.id}`, species.title, agriculture.inventory.planks[species.id] ?? 0)));
+    // Everything the farm has made, placed or not (build mode's Furniture tab places them).
+    const made = PATTERN_CATALOG.flatMap((pattern) => [...PIECE_STARS].reverse().map((stars) => ({ pattern, stars, count: agriculture.inventory.furniture[pieceKey(pattern.id, stars)] ?? 0 }))).filter((line) => line.count > 0);
+    if (made.length) {
+      elements.furnitureGrid.replaceChildren(...made.map((line) => itemTile(`piece:${pieceKey(line.pattern.id, line.stars)}`, `${line.pattern.title} ${starsLabel(line.stars)}`, line.count)));
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "item-empty";
+      empty.textContent = "Nothing made yet. Saw logs into planks at a Sawmill, then press E at the Carpenter's Workbench.";
+      elements.furnitureGrid.replaceChildren(empty);
+    }
     elements.suppliesGrid.replaceChildren(...PET_CARE.map((care) => {
       const held = agriculture.inventory.supplies[care.food.itemId] ?? 0;
       return itemTile(`supply:${care.food.itemId}`, care.food.title, held, buyButton(care.food.itemId, care.food.price, held));

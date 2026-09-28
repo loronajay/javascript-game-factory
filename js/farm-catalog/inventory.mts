@@ -11,7 +11,8 @@ export type FarmInventoryOptions = Readonly<{ ownedIds?: readonly string[] }>;
 
 export function createFarmInventory(options: FarmInventoryOptions = {}): FarmInventory {
   const definitions = [...GROUND_CATALOG, ...FARM_DECOR_CATALOG];
-  const known = new Set(definitions.filter((row) => row.unlock.type !== "achievement").map((row) => row.id));
+  // Achievement props and crafted furniture are never "owned": the one is placed by an outcome, the other is counted stock.
+  const known = new Set(definitions.filter((row) => row.unlock.type !== "achievement" && row.unlock.type !== "crafted").map((row) => row.id));
   const starter = new Set(definitions.filter((row) => row.unlock.type === "starter").map((row) => row.id));
   const granted = new Set((options.ownedIds ?? []).filter((id) => known.has(id)));
   const owns = (id: string): boolean => known.has(id) && (starter.has(id) || granted.has(id));

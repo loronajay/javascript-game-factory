@@ -32,6 +32,7 @@ import { submitGameResult } from "./db/game-results.mjs";
 import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tickets.mjs";
 import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import { cookFarmDish } from "./db/farm-kitchen.mjs";
+import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
 import {
   getAccountSuspension,
   isAdminPlayer,
@@ -434,6 +435,8 @@ async function bootstrap(): Promise<void> {
     harvestFarmCrop: (params: any) => harvestFarmCrop(pool, params),
     harvestFarmTree: (params: any) => harvestFarmTree(pool, params),
     cookFarmDish: (params: any) => cookFarmDish(pool, params),
+    millFarmLogs: (params: any) => millFarmLogs(pool, params),
+    craftFarmPiece: (params: any) => craftFarmPiece(pool, params),
     sellFarmProduce: (params: any) => sellFarmProduce(pool, params),
     getFarmOrderBoard: (params: any) => getFarmOrderBoard(pool, params),
     fillFarmOrder: (params: any) => fillFarmOrder(pool, params),

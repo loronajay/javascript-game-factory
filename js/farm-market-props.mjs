@@ -6,10 +6,13 @@
 //
 // An open stall's stock is the real goods (farm-item-models.mts): the Produce
 // Merchant's crates are heaped with the crops and fruit she buys, the
-// Kitchen's counter is set with the dishes Basil buys.
+// Kitchen's counter is set with the dishes Basil buys, and the Sawmill's with
+// stacked planks and the furniture Bram buys.
 import { canvasPlane } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
-import { KITCHEN_STALL_ID } from "./farm-market-square.mjs";
+import { KITCHEN_STALL_ID, SAWMILL_STALL_ID } from "./farm-market-square.mjs";
+import { createPlankModel } from "./farm-item-models.mjs";
+import { createFurniturePiece } from "./farm-props-furniture.mjs";
 import { createProduceModel } from "./farm-produce-models.mjs";
 import { createDishModel } from "./farm-dish-models.mjs";
 import { findRecipe } from "./farm-catalog/recipes.mjs";
@@ -106,6 +109,33 @@ function setDishes(THREE, group, front, back) {
         group.add(dish);
     }
 }
+/** The Sawmill's counter: planks of every wood, a saw on the wall and a few pieces Bram has bought. */
+function setSawmill(THREE, group, width, front, back) {
+    ["oak", "pine", "birch", "willow"].forEach((speciesId, index) => {
+        const stack = createPlankModel(THREE, speciesId);
+        stack.position.set(-1.1 + index * 0.55, COUNTER_HEIGHT + 0.06, front - 0.3);
+        stack.rotation.y = index % 2 ? 0.2 : -0.15;
+        stack.scale.setScalar(1.6);
+        group.add(stack);
+    });
+    const pieces = [
+        ["decor.furniture.chair", "furniture-chair", -0.95, 0.14],
+        ["decor.furniture.birdhouse", "furniture-birdhouse", 0.05, 0.1],
+        ["decor.furniture.stool", "furniture-stool", 0.85, 0.12],
+    ];
+    for (const [itemId, model, x, scale] of pieces) {
+        const piece = createFurniturePiece(THREE, model, itemId, 3);
+        piece.position.set(x, 1.3, back + 0.28);
+        piece.scale.setScalar(scale * 3.3);
+        group.add(piece);
+    }
+    // A two-man saw hung on the back wall.
+    const steel = new THREE.MeshStandardMaterial({ color: "#c3c9ce", roughness: 0.25, metalness: 0.85 });
+    tbox(THREE, group, [1.2, 0.14, 0.012], [0, 1.9, back + 0.1], steel, false);
+    for (const sx of [-1, 1])
+        tcylinder(THREE, group, 0.022, 0.022, 0.2, [sx * 0.66, 1.9, back + 0.12], farmMaterial(THREE, "wood"), 8, false);
+    void width;
+}
 function buildStall(THREE, group, stall) {
     const { width, depth } = stall.footprint;
     const wood = farmMaterial(THREE, "wood", { colors: ["#8a6440", "#5f4128"] });
@@ -142,6 +172,10 @@ function buildStall(THREE, group, stall) {
     const board = Math.min(width - 0.2, 2.6);
     tbox(THREE, group, [board + 0.12, 0.56, 0.05], [0, POST_HEIGHT - 0.02, front + 0.24], wood);
     canvasPlane(THREE, group, board, 0.48, [640, 118], (context, w, h) => drawSign(context, w, h, stall.title, stall.colors[0], ""), [0, POST_HEIGHT - 0.02, front + 0.27], false);
+    if (stall.open && stall.id === SAWMILL_STALL_ID) {
+        setSawmill(THREE, group, width, front, back);
+        return;
+    }
     if (stall.open && stall.id === KITCHEN_STALL_ID) {
         setDishes(THREE, group, front, back);
         // A copper pot and a ladle hang at the corner where the scale would be.

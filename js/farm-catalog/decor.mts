@@ -41,12 +41,19 @@
 // solid — nothing walks through a wall there — but it is keep-out, so ground
 // animals never pick the water as a place to stroll to.
 //
+// FURNITURE IS MADE, NOT BOUGHT. The `furniture` category is every piece the
+// Carpenter's Workbench makes (`farm-catalog/carpentry.mts`, one pattern per
+// row, the pattern's id IS the row's id). Its unlock is `crafted`: nothing
+// here owns one — the farm's `inventory.furniture` counts how many of each
+// piece, at each star level, the farm has made, and a placed row carries the
+// stars of the piece it is. The Furniture tab lists what is on the shelf.
+//
 // AN AQUATIC DWELLING LIVES IN A POND. `aquatic: true` says the item may only
 // stand wholly inside a pond's shore line, on the bed; it is the one thing
 // that may overlap a pond's box, and it travels with the pond when the pond
 // is moved. The Water tab lists them beside the ponds (`farmDecorTab`).
 
-export const FARM_DECOR_CATEGORIES = Object.freeze(["fence", "building", "plant", "water", "prop"] as const);
+export const FARM_DECOR_CATEGORIES = Object.freeze(["fence", "building", "plant", "water", "prop", "furniture"] as const);
 export type FarmDecorCategory = typeof FARM_DECOR_CATEGORIES[number];
 
 export const FARM_DECOR_CATEGORY_TITLES: Readonly<Record<FarmDecorCategory, string>> = Object.freeze({
@@ -55,6 +62,7 @@ export const FARM_DECOR_CATEGORY_TITLES: Readonly<Record<FarmDecorCategory, stri
   plant: "Plants",
   water: "Water",
   prop: "Props",
+  furniture: "Furniture",
 });
 
 export type FarmDecorLength = Readonly<{ enabled: boolean; min: number; max: number; default: number }>;
@@ -123,7 +131,8 @@ export type FarmDecorDefinition = Readonly<{
   swatch: readonly [string, string];
   /** The builder in `farm-props.mts` that draws it. */
   model: string;
-  unlock: Readonly<{ type: "starter" | "achievement" | "purchase"; source: string }>;
+  /** `crafted` pieces are counted, never owned outright: the farm's furniture stock decides how many may stand. */
+  unlock: Readonly<{ type: "starter" | "achievement" | "purchase" | "crafted"; source: string }>;
   /** Outcome-created props remain valid placed rows but do not appear in the add catalog. */
   catalogVisible: boolean;
 }>;
@@ -131,6 +140,7 @@ export type FarmDecorDefinition = Readonly<{
 const STARTER = Object.freeze({ type: "starter", source: "The Farm" } as const);
 const PURCHASE = Object.freeze({ type: "purchase", source: "Farm Shop" } as const);
 const PET_OUTCOME = Object.freeze({ type: "achievement", source: "Pet outcome" } as const);
+const CRAFTED = Object.freeze({ type: "crafted", source: "Carpenter's Workbench" } as const);
 const NO_LENGTH: FarmDecorLength = Object.freeze({ enabled: false, min: 0, max: 0, default: 0 });
 
 type Spec = Readonly<{
@@ -250,6 +260,10 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   // The Kitchen Range is where the Cooking skill is played (farm-kitchen.mts): free, so every farm can cook,
   // and happy out in the yard as a summer kitchen or inside the Farmhouse beside the hearth.
   item("kitchen-range", { title: "Kitchen Range", category: "prop", footprint: { width: 2.2, depth: 0.8 }, indoors: true, swatch: ["#2f3236", "#b8452f"], model: "kitchen-range", unlock: STARTER }),
+  // The Carpenter's Workbench is where the Carpentry skill is played (farm-workshop.mts): free like the range.
+  item("workbench", { title: "Carpenter's Workbench", category: "prop", footprint: { width: 2, depth: 0.8 }, indoors: true, swatch: ["#9a7248", "#3b444a"], model: "workbench", unlock: STARTER }),
+  // A farm's own Sawmill saws logs into planks for nothing; the Market Square's charges a fee per log.
+  item("sawmill", { title: "Sawmill", category: "prop", footprint: { width: 3.4, depth: 1.6 }, swatch: ["#7a5534", "#b9bec4"], model: "sawmill" }),
   item("bed", { title: "Farmhouse Bed", category: "prop", footprint: { width: 1.35, depth: 2.1 }, interior: true, swatch: ["#f2e5ca", "#7d9bb8"], model: "bed" }),
   item("lamp-post", { title: "Lamp Post", category: "prop", footprint: { width: 0.3, depth: 0.3 }, swatch: ["#2b2b2b", "#ffd9a0"], model: "lamp-post" }),
   // Pet dwellings are regular placeable props. `keepOut` keeps random wandering from
@@ -282,6 +296,21 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("mailbox", { title: "Mailbox", category: "prop", footprint: { width: 0.3, depth: 0.5 }, swatch: ["#2b4a8a", "#8a5a34"], model: "mailbox" }),
   item("water-pump", { title: "Water Pump", category: "prop", footprint: { width: 0.5, depth: 0.8 }, swatch: ["#2b2b2b", "#8e8b82"], model: "water-pump" }),
   item("beehive", { title: "Beehive", category: "prop", footprint: { width: 0.6, depth: 0.6 }, swatch: ["#f1e6d2", "#ffd33d"], model: "beehive" }),
+  // Furniture: made at the Workbench and counted, one row per pattern (farm-catalog/carpentry.mts). Happy indoors or out.
+  item("crate", { title: "Wooden Crate", category: "furniture", footprint: { width: 0.8, depth: 0.8 }, indoors: true, swatch: ["#b98a55", "#8a6238"], model: "furniture-crate", unlock: CRAFTED }),
+  item("planter-box", { title: "Planter Box", category: "furniture", footprint: { width: 1.4, depth: 0.5 }, indoors: true, swatch: ["#b98a55", "#ff6f91"], model: "furniture-planter-box", unlock: CRAFTED }),
+  item("stool", { title: "Stool", category: "furniture", footprint: { width: 0.5, depth: 0.5 }, indoors: true, snapDegrees: 45, swatch: ["#b98a55", "#8a6238"], model: "furniture-stool", unlock: CRAFTED }),
+  item("chair", { title: "Farmhouse Chair", category: "furniture", footprint: { width: 0.55, depth: 0.55 }, indoors: true, swatch: ["#b98a55", "#6f4a2d"], model: "furniture-chair", unlock: CRAFTED }),
+  item("table", { title: "Kitchen Table", category: "furniture", footprint: { width: 1.6, depth: 0.9 }, indoors: true, swatch: ["#b98a55", "#8a6238"], model: "furniture-table", unlock: CRAFTED }),
+  item("birdhouse", { title: "Birdhouse", category: "furniture", footprint: { width: 0.4, depth: 0.4 }, snapDegrees: 45, swatch: ["#dcb97c", "#a8312b"], model: "furniture-birdhouse", unlock: CRAFTED }),
+  item("bookshelf", { title: "Bookshelf", category: "furniture", footprint: { width: 1.2, depth: 0.4 }, indoors: true, swatch: ["#dcb97c", "#3f6f9a"], model: "furniture-bookshelf", unlock: CRAFTED }),
+  item("picnic-table", { title: "Picnic Table", category: "furniture", footprint: { width: 1.8, depth: 1.6 }, indoors: true, swatch: ["#dcb97c", "#b48a4e"], model: "furniture-picnic-table", unlock: CRAFTED }),
+  item("storage-chest", { title: "Storage Chest", category: "furniture", footprint: { width: 1.1, depth: 0.6 }, indoors: true, swatch: ["#ead9b2", "#3b3b3b"], model: "furniture-storage-chest", unlock: CRAFTED }),
+  item("rocking-chair", { title: "Rocking Chair", category: "furniture", footprint: { width: 0.7, depth: 1 }, indoors: true, swatch: ["#ead9b2", "#c7b287"], model: "furniture-rocking-chair", unlock: CRAFTED }),
+  // An arch is walked under: only its feet would stop you, so it does not collide.
+  item("garden-arch", { title: "Garden Arch", category: "furniture", footprint: { width: 1.6, depth: 0.6 }, solid: false, swatch: ["#ead9b2", "#d8405a"], model: "furniture-garden-arch", unlock: CRAFTED }),
+  item("porch-swing", { title: "Porch Swing", category: "furniture", footprint: { width: 2.2, depth: 1.2 }, swatch: ["#9d6c45", "#b98a55"], model: "furniture-porch-swing", unlock: CRAFTED }),
+  item("grandfather-clock", { title: "Grandfather Clock", category: "furniture", footprint: { width: 0.6, depth: 0.4 }, indoors: true, swatch: ["#9d6c45", "#d9b44a"], model: "furniture-grandfather-clock", unlock: CRAFTED }),
 ]);
 
 export function findFarmDecor(id: unknown): FarmDecorDefinition | undefined {

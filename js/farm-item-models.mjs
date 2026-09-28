@@ -6,6 +6,8 @@
 //   sapling:<species>   a young tree, root-balled in burlap
 //   supply:<itemId>     a sack of pet food
 //   dish:<recipe>@<n>   a cooked dish with n stars (dish:<recipe> is two)
+//   plank:<species>     a short stack of sawn planks
+//   piece:<item>@<n>    a made piece of furniture in the finish of n stars
 //
 // Produce is `farm-produce-models.mts` and dishes `farm-dish-models.mts`;
 // the goods that are not food live here. Models are built at true size, base
@@ -16,6 +18,9 @@ import { findRecipe, parseDishKey } from "./farm-catalog/recipes.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { createProduceModel } from "./farm-produce-models.mjs";
 import { createDishModel } from "./farm-dish-models.mjs";
+import { PLANK_SPECIES, parsePieceKey } from "./farm-catalog/carpentry.mjs";
+import { findFarmDecor } from "./farm-catalog/decor.mjs";
+import { createFurniturePiece } from "./farm-props-furniture.mjs";
 import { lathe, leaf, paintedSurface, paintedTexture, place, surface, tint } from "./farm-item-geometry.mjs";
 export const itemKey = Object.freeze({
     produce: (id) => `produce:${id}`,
@@ -23,9 +28,11 @@ export const itemKey = Object.freeze({
     sapling: (speciesId) => `sapling:${speciesId}`,
     supply: (itemId) => `supply:${itemId}`,
     dish: (recipeId, stars = 2) => `dish:${recipeId}@${stars}`,
+    plank: (speciesId) => `plank:${speciesId}`,
+    piece: (itemId, stars = 2) => `piece:${itemId}@${stars}`,
 });
 export function parseItemKey(key) {
-    const match = /^(produce|log|sapling|supply|dish):(.+)$/.exec(key);
+    const match = /^(produce|log|sapling|supply|dish|plank|piece):(.+)$/.exec(key);
     return match ? Object.freeze({ kind: match[1], id: match[2] }) : null;
 }
 // ---------------------------------------------------------------- logs
@@ -172,6 +179,19 @@ function createSackModel(THREE, itemId) {
     place(THREE, group, new THREE.BoxGeometry(0.112, 0.004, 0.024), surface(THREE, tint(color, -0.2)), [0, 0.19, 0]);
     return group;
 }
+// ---------------------------------------------------------------- planks
+/** A short, slightly skewed stack of sawn planks in the species' own wood. */
+export function createPlankModel(THREE, speciesId) {
+    const species = PLANK_SPECIES.find((entry) => entry.id === speciesId) ?? PLANK_SPECIES[0];
+    const group = new THREE.Group();
+    const wood = farmMaterial(THREE, "wood", { colors: [species.color, species.grain, tint(species.color, 0.15)], metresPerTile: 0.5 });
+    const layout = [[0, 0.02, 0, 0], [0.01, 0.06, 0.012, 0.05], [-0.015, 0.1, -0.01, -0.07]];
+    for (const [x, y, z, turn] of layout) {
+        const plank = place(THREE, group, new THREE.BoxGeometry(0.5, 0.036, 0.11), wood, [x, y, z]);
+        plank.rotation.y = turn;
+    }
+    return group;
+}
 // ---------------------------------------------------------------- the registry
 /** The model for an item key, or null for a key no item answers to. */
 export function createFarmItemModel(THREE, key) {
@@ -189,6 +209,12 @@ export function createFarmItemModel(THREE, key) {
                 return createDishModel(THREE, dish.recipe, dish.stars);
             const recipe = findRecipe(parsed.id);
             return recipe ? createDishModel(THREE, recipe) : null;
+        }
+        case "plank": return PLANK_SPECIES.some((species) => species.id === parsed.id) ? createPlankModel(THREE, parsed.id) : null;
+        case "piece": {
+            const piece = parsePieceKey(parsed.id);
+            const definition = piece ? findFarmDecor(piece.pattern.id) : undefined;
+            return piece && definition ? createFurniturePiece(THREE, definition.model, piece.pattern.id, piece.stars) : null;
         }
     }
 }
