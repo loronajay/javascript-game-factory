@@ -24,6 +24,9 @@ import {
   type StatRange,
 } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
+import { adultAgeDays, normalizeLivestockCare, type LivestockCare } from "./farm-livestock-care.mjs";
+
+export { adultAgeDays, GROWTH_SPREAD } from "./farm-livestock-care.mjs";
 
 export type LivestockGender = "female" | "male";
 export type LivestockStage = "young" | "adult";
@@ -39,14 +42,14 @@ export type LivestockAnimal = Readonly<{
   bornAt: number;
   /** The home it lives in (`farm-livestock-housing.mts`), or null while it waits for one. */
   homeId: string | null;
+  /** Hunger and the goods it is working up to, as of the server's last checkpoint (`farm-livestock-care.mts`). */
+  care: LivestockCare;
 }>;
 
 export const LIVESTOCK_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 /** Grades by the mean of the four stats: at least this much for each star. */
 export const GRADE_THRESHOLDS = Object.freeze([0, 25, 40, 55, 70] as const);
 export const MAX_GRADE = GRADE_THRESHOLDS.length;
-/** Growth 50 grows up in the species' `adultDays`; Growth 100 in 70% of it, Growth 1 in 130%. */
-export const GROWTH_SPREAD = 0.6;
 
 function clampStat(value: unknown): number {
   const number = Math.round(Number(value));
@@ -71,10 +74,6 @@ export function gradeStars(grade: number): string {
   return "★".repeat(whole) + "☆".repeat(MAX_GRADE - whole);
 }
 
-/** Farm days from birth to grown for this individual. */
-export function adultAgeDays(species: LivestockSpecies, stats: LivestockStats): number {
-  return species.adultDays * (1 + GROWTH_SPREAD * (0.5 - stats.growth / STAT_MAX));
-}
 
 /** Whole and part farm days since it was born, never negative (a clock behind the birth is a fresh animal). */
 export function livestockAgeDays(animal: Pick<LivestockAnimal, "bornAt">, clockMinutes: number): number {
@@ -135,6 +134,7 @@ export function normalizeLivestockAnimal(value: unknown): LivestockAnimal | null
     stats,
     bornAt: Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0,
     homeId: typeof source.homeId === "string" && source.homeId ? source.homeId : null,
+    care: normalizeLivestockCare(source.care, Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0),
   });
 }
 

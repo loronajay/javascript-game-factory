@@ -28,6 +28,8 @@ type Api = Readonly<{
 export type MountedFishDetail = AnglerFish & Readonly<{ playerId: string; state: string }>;
 
 export type AnglerLink = Readonly<{
+  /** Fishing's server-owned XP and lifetime dex, for the shared Stats screen. */
+  stats: () => Angler | null;
   /** The owner's creel (empty when signed out or visiting). */
   creel: () => readonly AnglerFish[];
   /** Fish mounted and ready to stand on a plaque, as build-mode cards. */
@@ -157,6 +159,7 @@ export function createAnglerLink(options: Readonly<{
   }
 
   return Object.freeze({
+    stats: () => angler,
     creel: () => angler?.creel ?? [],
     trophies: () => (angler?.mounted ?? []).map((fish) => Object.freeze({
       fishId: fish.id,

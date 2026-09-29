@@ -11,12 +11,12 @@
 // naps. Nothing grows while the farm is away (the farm's own rule).
 import { LIVESTOCK_NAME_MAX, LIVESTOCK_STATS, LIVESTOCK_STAT_TITLES, STAT_MAX, STAT_MIN, YOUNG_SIZE, findLivestockCoat, findLivestockSpecies, } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
+import { adultAgeDays, normalizeLivestockCare } from "./farm-livestock-care.mjs";
+export { adultAgeDays, GROWTH_SPREAD } from "./farm-livestock-care.mjs";
 export const LIVESTOCK_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 /** Grades by the mean of the four stats: at least this much for each star. */
 export const GRADE_THRESHOLDS = Object.freeze([0, 25, 40, 55, 70]);
 export const MAX_GRADE = GRADE_THRESHOLDS.length;
-/** Growth 50 grows up in the species' `adultDays`; Growth 100 in 70% of it, Growth 1 in 130%. */
-export const GROWTH_SPREAD = 0.6;
 function clampStat(value) {
     const number = Math.round(Number(value));
     return Number.isFinite(number) ? Math.min(STAT_MAX, Math.max(STAT_MIN, number)) : STAT_MIN;
@@ -36,10 +36,6 @@ export function livestockGrade(stats) {
 export function gradeStars(grade) {
     const whole = Math.min(MAX_GRADE, Math.max(1, Math.round(grade)));
     return "★".repeat(whole) + "☆".repeat(MAX_GRADE - whole);
-}
-/** Farm days from birth to grown for this individual. */
-export function adultAgeDays(species, stats) {
-    return species.adultDays * (1 + GROWTH_SPREAD * (0.5 - stats.growth / STAT_MAX));
 }
 /** Whole and part farm days since it was born, never negative (a clock behind the birth is a fresh animal). */
 export function livestockAgeDays(animal, clockMinutes) {
@@ -97,6 +93,7 @@ export function normalizeLivestockAnimal(value) {
         stats,
         bornAt: Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0,
         homeId: typeof source.homeId === "string" && source.homeId ? source.homeId : null,
+        care: normalizeLivestockCare(source.care, Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0),
     });
 }
 export function normalizeLivestockHerd(value) {

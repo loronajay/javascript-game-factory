@@ -9,6 +9,8 @@
 import { livestockSummary } from "./farm-livestock.mjs";
 import { homeOccupancy, totalLivestockSlots } from "./farm-livestock-housing.mjs";
 import { LIVESTOCK_NAME_MAX } from "./farm-catalog/livestock.mjs";
+import { goodsState, livestockNeed } from "./farm-livestock-care.mjs";
+import { QUALITY_TITLES } from "./farm-quality.mjs";
 function element(tag, className, text = "") {
     const node = document.createElement(tag);
     node.className = className;
@@ -85,6 +87,20 @@ export function createLivestockPanel(elements, actions, options = {}) {
         grade.title = `Grade ${summary.grade} of 5, from its four stats`;
         head.append(name, grade);
         const line = element("p", "livestock-row__line", `${summary.kind} ${summary.gender} · ${summary.coat}${summary.stage === "young" ? ` · ${summary.grownPercent}% grown` : ""}`);
+        // Care: how hungry, and each good it is working up to (only once grown).
+        const need = livestockNeed(animal, animal.care, current.clockMinutes);
+        const care = element("div", `livestock-care livestock-care--${need.stage}`);
+        const hunger = element("span", "livestock-care__bar");
+        const hungerFill = element("i", "livestock-care__fill");
+        hungerFill.style.width = `${Math.round(animal.care.hunger)}%`;
+        hunger.append(hungerFill);
+        care.append(element("span", "livestock-care__label", `${need.label} · ${Math.round(animal.care.hunger)}%`), hunger);
+        for (const good of goodsState(animal, animal.care)) {
+            const words = summary.stage === "young"
+                ? `${good.product.title} · once grown`
+                : good.ready ? `${good.product.title} ready · ${QUALITY_TITLES[good.quality]} · E to collect` : `${good.product.title} · ${Math.floor(good.fraction * 100)}%`;
+            care.append(element("span", `livestock-good${good.ready ? " is-ready" : ""}`, words));
+        }
         const stats = element("dl", "livestock-row__stats");
         for (const stat of summary.stats) {
             const cell = element("div", "livestock-stat");
@@ -95,7 +111,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
             cell.append(element("dt", "", stat.title), element("dd", "", String(stat.value)), bar);
             stats.append(cell);
         }
-        card.append(head, line, stats, homeSelect(animal, current.homes, occupancy, current.canManage));
+        card.append(head, line, care, stats, homeSelect(animal, current.homes, occupancy, current.canManage));
         return card;
     }
     function draw() {

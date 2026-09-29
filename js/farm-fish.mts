@@ -187,7 +187,15 @@ export const SHADOW_RARITY_WEIGHTS: Readonly<Record<FishRarity, number>> = Objec
 export type BiteOdds = readonly Readonly<{ speciesId: string; weight: number }>[];
 
 /** Every species that can bite in a zone, with its share, for a lure (or none) and a kind of cast. */
-export function biteOdds(zone: FishZone, lure: FishingLure | null, kind: "blind" | "shadow"): BiteOdds {
+export function fishingRarityMultiplier(rarity: FishRarity, level = 1): number {
+  const earned = Math.max(0, Math.min(98, Math.floor(Number(level) || 1) - 1));
+  if (rarity === "rare") return Math.min(1.75, 1 + earned * 0.01);
+  if (rarity === "epic") return Math.min(2.25, 1 + earned * 0.015);
+  if (rarity === "legendary") return Math.min(3, 1 + earned * 0.02);
+  return 1;
+}
+
+export function biteOdds(zone: FishZone, lure: FishingLure | null, kind: "blind" | "shadow", level = 1): BiteOdds {
   const table = kind === "shadow" ? SHADOW_RARITY_WEIGHTS : BLIND_RARITY_WEIGHTS;
   const pool = FISH_CATALOG.filter((entry) => entry.zones.includes(zone));
   const perRarity = new Map<FishRarity, number>();
@@ -195,7 +203,7 @@ export function biteOdds(zone: FishZone, lure: FishingLure | null, kind: "blind"
   return pool.map((entry) => {
     const share = table[entry.rarity] * (lure?.rarity[entry.rarity] ?? 1) / (perRarity.get(entry.rarity) ?? 1);
     const favored = lure?.favors.includes(entry.id) ? 2 : 1;
-    return Object.freeze({ speciesId: entry.id, weight: share * favored });
+    return Object.freeze({ speciesId: entry.id, weight: share * favored * fishingRarityMultiplier(entry.rarity, level) });
   });
 }
 
@@ -213,8 +221,8 @@ export function pickFromOdds(odds: BiteOdds, roll: number): string {
 export type BiteRoll = Readonly<{ speciesId: string; rank: number; variant: FishVariant }>;
 
 /** A whole bite: the species from the odds, a rank and a colour. Three draws from `random`, in that order. */
-export function rollBite(zone: FishZone, lure: FishingLure | null, kind: "blind" | "shadow", random: () => number): BiteRoll {
-  const speciesId = pickFromOdds(biteOdds(zone, lure, kind), random());
+export function rollBite(zone: FishZone, lure: FishingLure | null, kind: "blind" | "shadow", random: () => number, level = 1): BiteRoll {
+  const speciesId = pickFromOdds(biteOdds(zone, lure, kind, level), random());
   return Object.freeze({ speciesId, rank: clampUnit(random()), variant: variantForRoll(random()) });
 }
 

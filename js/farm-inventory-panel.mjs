@@ -6,6 +6,7 @@
 // sacks of feed.
 import { CROP_CATALOG } from "./farm-crops.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
+import { LIVESTOCK_FEEDS, LIVESTOCK_GOODS } from "./farm-catalog/livestock.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies } from "./farm-catalog/trees.mjs";
 import { pantryLines, starsLabel } from "./farm-kitchen.mjs";
 import { PATTERN_CATALOG, PIECE_STARS, PLANK_SPECIES, pieceKey } from "./farm-catalog/carpentry.mjs";
@@ -145,7 +146,16 @@ export function createFarmInventoryPanel(elements, options = {}) {
             const tile = itemTile(`produce:${key}`, gradedTitle(crop.title, quality), agriculture.inventory.produce[key] ?? 0);
             tile.dataset.quality = quality;
             return tile;
-        })), ...FRUIT_TREES.map((species) => itemTile(`produce:${species.fruitId}`, species.fruitPlural, agriculture.inventory.produce[species.fruitId] ?? 0)));
+        })), ...FRUIT_TREES.map((species) => itemTile(`produce:${species.fruitId}`, species.fruitPlural, agriculture.inventory.produce[species.fruitId] ?? 0)), 
+        // Livestock goods: graded like crops, and only shown while held (a farm without animals has none).
+        ...LIVESTOCK_GOODS.flatMap((good) => [...QUALITIES].reverse()
+            .map((quality) => ({ quality, key: produceKey(good.itemId, quality) }))
+            .filter(({ key }) => (agriculture.inventory.produce[key] ?? 0) > 0)
+            .map(({ quality, key }) => {
+            const tile = itemTile(`produce:${key}`, gradedTitle(good.title, quality), agriculture.inventory.produce[key] ?? 0);
+            tile.dataset.quality = quality;
+            return tile;
+        })));
         const pantry = pantryLines(agriculture.inventory.dishes);
         if (pantry.length) {
             elements.pantryGrid.replaceChildren(...pantry.map((line) => itemTile(`dish:${line.key}`, `${line.recipe.title} ${starsLabel(line.stars)}`, line.count)));
@@ -176,6 +186,9 @@ export function createFarmInventoryPanel(elements, options = {}) {
         elements.suppliesGrid.replaceChildren(compost, ...PET_CARE.map((care) => {
             const held = agriculture.inventory.supplies[care.food.itemId] ?? 0;
             return itemTile(`supply:${care.food.itemId}`, care.food.title, held, buyButton(care.food.itemId, care.food.price, held));
+        }), ...LIVESTOCK_FEEDS.map((feed) => {
+            const held = agriculture.inventory.supplies[feed.itemId] ?? 0;
+            return itemTile(`supply:${feed.itemId}`, feed.title, held, buyButton(feed.itemId, feed.price, held));
         }));
         const selected = CROP_CATALOG.find((entry) => entry.id === selectedCropId);
         if (!elements.selected.textContent?.includes("Purchased"))

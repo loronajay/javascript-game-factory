@@ -16,6 +16,7 @@ import { farmMaterial, tcylinder } from "./farm-materials.mjs";
 import { findTreeSpecies } from "./farm-catalog/trees.mjs";
 import { findRecipe, parseDishKey } from "./farm-catalog/recipes.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
+import { LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { createProduceModel } from "./farm-produce-models.mjs";
 import { createDishModel } from "./farm-dish-models.mjs";
 import { PLANK_SPECIES, parsePieceKey } from "./farm-catalog/carpentry.mjs";
@@ -149,10 +150,35 @@ const SACK_COLORS = Object.freeze({
     "food.shark-feed": "#3f5f7a",
     "food.deep-sea-feed": "#30263f",
     "food.plankton-blend": "#2f9a8f",
+    "food.pig-feed": "#c9748a",
 });
+/** A small bale of hay: a golden block with two twine bands. */
+function createHayModel(THREE) {
+    const group = new THREE.Group();
+    group.name = "supply-food.hay";
+    const texture = paintedTexture(THREE, 128, 128, (context, w, h) => {
+        context.fillStyle = "#d8b24a";
+        context.fillRect(0, 0, w, h);
+        for (let stroke = 0; stroke < 90; stroke += 1) {
+            const x = (stroke * 37) % w;
+            const y = (stroke * 53) % h;
+            context.strokeStyle = stroke % 3 ? "#b8902e" : "#f0d478";
+            context.beginPath();
+            context.moveTo(x, y);
+            context.lineTo(x + 14, y + ((stroke % 5) - 2) * 2);
+            context.stroke();
+        }
+    });
+    place(THREE, group, new THREE.BoxGeometry(0.2, 0.12, 0.13), paintedSurface(THREE, "#d8b24a", texture, { roughness: 1 }), [0, 0.06, 0]);
+    for (const x of [-0.05, 0.05])
+        place(THREE, group, new THREE.BoxGeometry(0.012, 0.124, 0.134), surface(THREE, "#8a5a2b", { roughness: 0.9 }), [x, 0.06, 0]);
+    return group;
+}
 function createSackModel(THREE, itemId) {
-    const care = PET_CARE.find((entry) => entry.food.itemId === itemId);
-    if (!care)
+    if (itemId === "food.hay")
+        return createHayModel(THREE);
+    const title = PET_CARE.find((entry) => entry.food.itemId === itemId)?.food.title ?? LIVESTOCK_FEEDS.find((feed) => feed.itemId === itemId)?.title;
+    if (!title)
         return null;
     const color = SACK_COLORS[itemId] ?? "#8a6a3a";
     const group = new THREE.Group();
@@ -168,7 +194,7 @@ function createSackModel(THREE, itemId) {
         context.fillStyle = "#fff8e6";
         context.textAlign = "center";
         context.textBaseline = "middle";
-        const words = care.food.title.toUpperCase().split(" ");
+        const words = title.toUpperCase().split(" ");
         const lines = words.length > 1 ? [words.slice(0, Math.ceil(words.length / 2)).join(" "), words.slice(Math.ceil(words.length / 2)).join(" ")] : words;
         context.font = "800 34px Georgia, serif";
         lines.forEach((line, index) => context.fillText(line, w * 0.12, h / 2 + (index - (lines.length - 1) / 2) * 38, w * 0.2));

@@ -19,6 +19,7 @@
         <h1>Market Square</h1>
       </div>
       <div class="farm-header__actions">
+        <button id="openInventory" class="farm-button" type="button" aria-pressed="false" title="See your farm inventory (I)">Inventory <kbd>I</kbd></button>
         <span id="marketTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
         <button id="toggleMarketMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
       </div>
@@ -45,8 +46,13 @@
 
     <div id="marketPrompt" class="farm-prompt" aria-live="polite"></div>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>T</b> Trade</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>I</b> Inventory</span><span><b>T</b> Trade</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
     </div>
+
+    <aside id="inventoryPanel" class="inventory-panel sale-panel" aria-label="Farm inventory" hidden>
+      <header class="pets-panel__head"><div><span class="eyebrow">YOUR FARM</span><strong>Inventory</strong></div><button id="closeInventory" class="farm-button" type="button">Done <kbd>Esc</kbd></button></header>
+      <div id="inventorySummary" class="inventory-panel__body"></div>
+    </aside>
 
     <aside id="salePanel" class="inventory-panel sale-panel" aria-label="Produce Merchant" hidden>
       <header class="pets-panel__head">

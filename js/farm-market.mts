@@ -91,6 +91,7 @@ import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { normalizeOrderBoard, type FarmOrderBoard } from "./farm-orders.mjs";
 import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
+import { barterPurchasePrice, barterSalePrice } from "./farm-bartering.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createFishPortraits } from "./farm-fish-portraits.mjs";
@@ -99,6 +100,7 @@ import { INGREDIENT_STOCK, RECIPE_STOCK, type IngredientStockLine, type RecipeSt
 import { createVendorShelf } from "./farm-vendor-shelf.mjs";
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
+import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -140,6 +142,13 @@ let dishes: Readonly<Record<string, number>> = farmLoad.layout.agriculture.inven
 let seeds: Readonly<Record<string, number>> = farmLoad.layout.agriculture.inventory.seeds;
 /** The whole farm as the server last answered: the Sawmill reads its logs, planks and furniture shelf from it. */
 let farm = farmLoad.layout;
+const inventorySummary = createFarmInventorySummary({
+  root: requiredElement<HTMLElement>("#inventoryPanel"),
+  openButton: requiredElement<HTMLButtonElement>("#openInventory"),
+  closeButton: requiredElement<HTMLButtonElement>("#closeInventory"),
+  body: requiredElement<HTMLElement>("#inventorySummary"),
+});
+inventorySummary.render(farm);
 /** Take the basket and pantry from a farm the server answered with. */
 function takeStock(layoutValue: unknown): ReturnType<typeof normalizeFarmLayout> | null {
   if (!layoutValue) return null;
@@ -148,8 +157,13 @@ function takeStock(layoutValue: unknown): ReturnType<typeof normalizeFarmLayout>
   produce = next.agriculture.inventory.produce;
   dishes = next.agriculture.inventory.dishes;
   seeds = next.agriculture.inventory.seeds;
+  inventorySummary.render(next);
+  salePanel?.repaint?.();
+  ingredientShelf?.render?.();
+  recipeShelf?.render?.();
   return next;
 }
+const barteringLevel = (): number => farmingLevelForXp(farm.skills.bartering.xp);
 const ticketClient = createTicketWalletClient();
 
 // ---------------------------------------------------------------- the market's day
@@ -383,7 +397,7 @@ const salePanel = createMarketSalePanel({
 }, {
   sell: (items) => sellAt(PRODUCE_STALL_ID, items),
   thumbnail: itemThumbnails.get,
-  priceOf: (key) => dayPrice(market, key),
+  priceOf: (key) => barterSalePrice(dayPrice(market, key), barteringLevel()),
   lineNote: (key) => trendNote(market, key),
   onRender: () => { saleTurnover.textContent = turnoverNote(market, Date.now()); },
   onClose: () => canvas.focus(),
@@ -416,6 +430,7 @@ const ingredientShelf = createVendorShelf({
   stock: INGREDIENT_STOCK,
   buy: (line, quantity) => buyIngredient(line as IngredientStockLine, quantity),
   held: (line) => Number(produce[(line as IngredientStockLine).id]) || 0,
+  price: (base) => barterPurchasePrice(base, barteringLevel()),
   thumbnail: itemThumbnails.get,
 });
 
@@ -454,6 +469,7 @@ const seedPanel = createSeedMerchantPanel({
 }, {
   buy: buySeeds,
   market: () => market,
+  price: (base) => barterPurchasePrice(base, barteringLevel()),
   thumbnail: cropThumbnails.get,
   onClose: () => canvas.focus(),
 });
@@ -547,6 +563,7 @@ const recipeShelf = createVendorShelf({
   stock: RECIPE_STOCK,
   buy: (line) => buyRecipe(line as RecipeStockLine),
   held: (line) => farm.skills.cooking.learned.includes((line as RecipeStockLine).recipeId) ? 1 : 0,
+  price: (base) => barterPurchasePrice(base, barteringLevel()),
   thumbnail: itemThumbnails.get,
 });
 
@@ -695,7 +712,7 @@ window.addEventListener("pageshow", () => { if (entered) trading.start(); });
 
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 function panelOpen(): boolean {
-  return salePanel.isOpen() || seedPanel.isOpen() || dealerPanel.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
+  return inventorySummary.isOpen() || salePanel.isOpen() || seedPanel.isOpen() || dealerPanel.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
 }
 
 function workStall(stall: MarketStall): void {
@@ -838,9 +855,12 @@ function checkGateway(): void {
 
 window.addEventListener("keydown", (event) => {
   if (panelOpen()) {
-    if (event.code === "Escape" && trading.isOpen()) {
+    if (event.code === "KeyI" && inventorySummary.isOpen()) {
+      inventorySummary.close();
+    } else if (event.code === "Escape" && trading.isOpen()) {
       trading.escape();
     } else if (event.code === "Escape") {
+      inventorySummary.close();
       salePanel.close();
       seedPanel.close();
       dealerPanel.close();
@@ -858,6 +878,12 @@ window.addEventListener("keydown", (event) => {
   }
   if (entered && !event.repeat && (event.code === "KeyY" || event.code === "KeyN") && trading.answer(event.code === "KeyY")) {
     event.preventDefault();
+    return;
+  }
+  if (entered && !event.repeat && event.code === "KeyI") {
+    event.preventDefault();
+    keys.clear();
+    inventorySummary.toggle();
     return;
   }
   if (entered && !event.repeat && event.code === "KeyT" && nearbyVisitor) {

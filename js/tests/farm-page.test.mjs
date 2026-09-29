@@ -31,10 +31,11 @@ test("the player stats view includes every farm skill and its lifetime records",
     woodcutting: { xp: 0, fellings: 0, trees: {} },
     cooking: { xp: 2_000, dishes: 5, perfect: 2, orders: 1, recipes: { "farm-stew": 5 }, learned: [] },
     carpentry: { xp: 500, milled: 7, pieces: 3, masterwork: 1, patterns: { "decor.furniture.crate": 3 } },
-  });
+    bartering: { xp: 750, deals: 8, bought: 200, sold: 500, saved: 14, bonus: 26 },
+  }, { fishing: { xp: 250, catches: 4, dex: { "fish.koi": { caught: 3, bestG: 4000 }, "fish.tetra": { caught: 1, bestG: 40 } } } });
 
-  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry"]);
-  assert.equal(view.totalXp, 3_500);
+  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry", "Fishing", "Bartering"]);
+  assert.equal(view.totalXp, 4_500);
   assert.equal(view.totalLevel, view.skills.reduce((total, skill) => total + skill.level, 0));
   assert.deepEqual(view.skills[0].stats, [
     { label: "Crop harvests", value: 12 },
@@ -51,9 +52,24 @@ test("the player stats view includes every farm skill and its lifetime records",
     { label: "Pieces made", value: 3 },
     { label: "Masterworks", value: 1 },
   ]);
+  assert.deepEqual(view.skills[4].stats, [{ label: "Fish landed", value: 4 }, { label: "Species caught", value: 2 }]);
+  assert.deepEqual(view.skills[5].stats, [{ label: "Deals made", value: 8 }, { label: "Tickets spent", value: 200 }, { label: "Tickets earned", value: 500 }, { label: "Tickets saved", value: 14 }, { label: "Bonus earned", value: 26 }]);
   assert.deepEqual(view.skills[0].breakdown.map((line) => line.label), ["Bean", "Carrot", "Apple Tree"]);
   assert.deepEqual(view.skills[2].breakdown, [{ label: "Farm Stew", value: 5 }]);
   assert.deepEqual(view.skills[3].breakdown, [{ label: "Wooden Crate", value: 3 }]);
+});
+
+test("inventory is reachable from both shared farm spaces with I", () => {
+  const marketHtml = readFileSync(resolve(repoRoot, "farm", "market", "index.html"), "utf8");
+  const coveHtml = readFileSync(resolve(repoRoot, "farm", "cove", "index.html"), "utf8");
+  const marketSource = readFileSync(resolve(repoRoot, "js", "farm-market.mts"), "utf8");
+  const coveSource = readFileSync(resolve(repoRoot, "js", "farm-cove-page.mts"), "utf8");
+  for (const page of [marketHtml, coveHtml]) {
+    assert.match(page, /id="openInventory"/);
+    assert.match(page, /id="inventoryPanel"/);
+  }
+  assert.match(marketSource, /event\.code === "KeyI"/);
+  assert.match(coveSource, /event\.code === "KeyI"/);
 });
 
 test("the farm page exposes an owner stats panel and keyboard shortcut", () => {
@@ -62,7 +78,7 @@ test("the farm page exposes an owner stats panel and keyboard shortcut", () => {
     assert.match(source, new RegExp(`#${id}"`), `farm.mts reads #${id}`);
   }
   assert.match(source, /event\.code === "KeyK"/);
-  assert.match(source, /statsPanel\.render\(layout\.skills\)/);
+  assert.match(source, /statsPanel\.render\(layout\.skills, anglerLink\.stats\(\)\)/);
   assert.match(source, /statsPanel\.isOpen\(\)/, "the stats screen pauses walking like the other farm panels");
 });
 

@@ -34,9 +34,10 @@ export function createSeedMerchantPanel(elements, options) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = quantity > 1 ? "farm-button farm-button--accent" : "farm-button";
-        button.textContent = `Buy ${quantity} · ${line.price * quantity}`;
+        const price = options.price?.(line.price * quantity) ?? line.price * quantity;
+        button.textContent = `Buy ${quantity} · ${price}`;
         button.disabled = busy || line.held + quantity > MAX_HELD;
-        button.setAttribute("aria-label", `Buy ${quantity} ${line.title} seed${quantity === 1 ? "" : "s"} for ${line.price * quantity} tickets`);
+        button.setAttribute("aria-label", `Buy ${quantity} ${line.title} seed${quantity === 1 ? "" : "s"} for ${price} tickets`);
         button.addEventListener("click", () => void buy(line.cropId, quantity));
         return button;
     }
@@ -65,9 +66,11 @@ export function createSeedMerchantPanel(elements, options) {
             title.append(" ", tag);
         }
         const detail = document.createElement("small");
+        const price = options.price?.(line.price) ?? line.price;
+        const standing = options.price?.(line.standing) ?? line.standing;
         detail.textContent = line.special
-            ? `You have ${line.held} · ${line.price} tickets each (usually ${line.standing})`
-            : `You have ${line.held} · ${line.price} tickets each`;
+            ? `You have ${line.held} · ${price} tickets each (usually ${standing})`
+            : `You have ${line.held} · ${price} tickets each`;
         label.replaceChildren(title, detail);
         const actions = document.createElement("div");
         actions.className = "seed-row__actions";

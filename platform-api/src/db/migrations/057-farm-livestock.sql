@@ -6,7 +6,8 @@
 -- what its goods, its meat and its young are worth, so they are never in the
 -- client-saved farm document. `born_minute` is the farm-clock minute it was
 -- born at (its age is farm time), `home_id` the stall, barn floor or pen it
--- lives in (null while it waits for one), and `state` where it is now: alive
+-- lives in (null while it waits for one), `care` its hunger and the goods it
+-- is working up to, and `state` where it is now: alive
 -- on the farm, or gone (sold to the butcher, dead, traded away) with the row
 -- kept as its record.
 
@@ -20,7 +21,13 @@ create table if not exists farm_livestock (
   stats        jsonb            not null,
   born_minute  double precision not null default 0,
   home_id      text,
+  -- Hunger and the goods it is working up to, as of the last checkpoint
+  -- (services/farm-livestock-catalog `advanceLivestockCare`).
+  care         jsonb            not null default '{}'::jsonb,
   state        text             not null default 'alive',
+  -- How and when (farm minute) a gone animal left: 'starvation' today.
+  end_cause    text,
+  ended_minute double precision,
   parents      jsonb,
   origin       text             not null default 'dealer',
   created_at   timestamptz      not null default now(),

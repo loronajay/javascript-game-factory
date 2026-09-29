@@ -7,7 +7,8 @@ import { farmMarketDay, farmMarketProducePrice, farmMarketSeedPrice } from "../s
 import { farmCropQuality, farmProduceKey, parseFarmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { parseFarmDishKey } from "../services/farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "../services/farm-carpentry-catalog.mjs";
-import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder, type FarmingRecord } from "../services/farm-skill-catalog.mjs";
+import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmBarter, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder, type FarmingRecord } from "../services/farm-skill-catalog.mjs";
+import { barterPurchasePrice, barterSalePrice } from "../services/farm-bartering.mjs";
 import { farmTreeReady, farmTreeRule, farmTreeYield } from "../services/farm-tree-catalog.mjs";
 import { normalizeCookingRecord, recordFarmDishOrder } from "../services/farm-skill-catalog.mjs";
 import { takeFarmDishes } from "../services/farm-recipe-catalog.mjs";
@@ -165,37 +166,38 @@ export async function purchaseFarmSupply(pool: any, input: any, now: number = Da
       return { ok: true, duplicate: true, price: 0, quantity, balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
     }
     const agriculture = farm.layout.agriculture;
+    const skills = normalizeFarmSkillRecords(farm.layout.skills);
     // A sapling is sold only to a farmer whose skill has reached its species (Farming for fruit, Woodcutting for timber).
     if (supply.kind === "sapling") {
       const rule = farmTreeRule(supply.speciesId)!;
-      const skills = normalizeFarmSkillRecords(farm.layout.skills);
       const level = farmingLevelForXp(rule.kind === "fruit" ? skills.farming.xp : skills.woodcutting.xp);
       if (level < rule.minLevel) return { ok: false, error: "level_too_low", minLevel: rule.minLevel, level };
     }
-    const skills = normalizeFarmSkillRecords(farm.layout.skills);
     if (supply.kind === "recipe" && skills.cooking.learned.includes(supply.recipeId!)) return { ok: false, error: "already_owned" };
     const stackKey = supply.kind === "seed" ? "seeds" : supply.kind === "sapling" ? "saplings" : supply.kind === "ingredient" ? "produce" : "supplies";
     const stack = agriculture?.inventory?.[stackKey];
     const stackId = supply.cropId ?? supply.speciesId ?? supply.id;
     const current = supply.kind === "recipe" ? 0 : Number(stack?.[stackId]) || 0;
     if (current + quantity > MAX_STACK) return { ok: false, error: "inventory_full" };
-    const total = unitPrice * quantity;
+    const baseTotal = unitPrice * quantity;
+    const total = barterPurchasePrice(baseTotal, farmingLevelForXp(skills.bartering.xp));
     const spend = await spendTicketsInTransaction(client, {
       playerId, transactionKey, amount: total, reason: "farm_supply_purchase",
       metadata: { itemId: supply.id, quantity, kind: supply.kind, unitPrice, ...(atMarket ? { venue: "market", day } : {}) },
     });
     if (!spend.ok) return { ok: false, error: spend.error, balance: spend.balance, price: total, quantity };
     const inventory = supply.kind === "recipe" ? agriculture.inventory : { ...agriculture.inventory, [stackKey]: { ...(agriculture.inventory?.[stackKey] ?? {}), [stackId]: current + quantity } };
+    const bartering = recordFarmBarter(skills.bartering, "purchase", baseTotal, total);
     const nextSkills = supply.kind === "recipe"
-      ? { ...skills, cooking: { ...skills.cooking, learned: [...skills.cooking.learned, supply.recipeId!] } }
-      : farm.layout.skills;
+      ? { ...skills, cooking: { ...skills.cooking, learned: [...skills.cooking.learned, supply.recipeId!] }, bartering }
+      : { ...skills, bartering };
     const next = normalizeFarmGarage({
       ...farm.layout,
       agriculture: { ...agriculture, inventory },
       skills: nextSkills,
     }, { ownedEntitlementIds: farm.owned });
     await saveFarm(client, playerId, next);
-    return { ok: true, duplicate: false, price: total, quantity, balance: spend.balance, layout: next };
+    return { ok: true, duplicate: false, price: total, basePrice: baseTotal, quantity, balance: spend.balance, bartering: farmingSummary(bartering, skills.bartering.xp), layout: next };
   });
 }
 
@@ -375,7 +377,7 @@ export async function sellFarmProduce(pool: any, input: any, now: number = Date.
   const day = farmMarketDay(now);
   const hasProduce = Object.keys(lines).some((itemId) => parseFarmProduceKey(itemId));
   if (hasProduce && Number(input?.day) !== day) return { ok: false, error: "prices_changed", day };
-  const priceOf = (itemId: string): number => parseFarmProduceKey(itemId) ? farmMarketProducePrice(itemId, day) : farmSalePrice(itemId);
+  const basePriceOf = (itemId: string): number => parseFarmProduceKey(itemId) ? farmMarketProducePrice(itemId, day) : farmSalePrice(itemId);
   const transactionKey = `farm:sale:${saleId}`;
   return transaction(pool, async (client) => {
     const farm = await lockedFarm(client, playerId);
@@ -385,12 +387,16 @@ export async function sellFarmProduce(pool: any, input: any, now: number = Date.
       return { ok: true, duplicate: true, earned: 0, sold: {}, balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
     }
     const agriculture = farm.layout.agriculture;
+    const skills = normalizeFarmSkillRecords(farm.layout.skills);
+    const barterLevel = farmingLevelForXp(skills.bartering.xp);
+    const priceOf = (itemId: string): number => barterSalePrice(basePriceOf(itemId), barterLevel);
     const produce: Record<string, number> = { ...(agriculture?.inventory?.produce ?? {}) };
     const dishes: Record<string, number> = { ...(agriculture?.inventory?.dishes ?? {}) };
     const furniture: Record<string, number> = { ...(agriculture?.inventory?.furniture ?? {}) };
     // Only what is on the shelf can be sold: a piece standing on the field stays there.
     const shelf = unplacedFarmPieces(furniture, farm.layout.decor ?? []);
     let earned = 0;
+    let baseEarned = 0;
     for (const [itemId, quantity] of Object.entries(lines)) {
       const dish = Boolean(parseFarmDishKey(itemId));
       const piece = Boolean(parseFarmPieceKey(itemId));
@@ -399,6 +405,7 @@ export async function sellFarmProduce(pool: any, input: any, now: number = Date.
       if (held < quantity) return { ok: false, error: dish ? "not_enough_dishes" : piece ? "not_enough_furniture" : "not_enough_produce", cropId: itemId, held, layout: farm.layout };
       stack[itemId] = (Number(stack[itemId]) || 0) - quantity;
       earned += priceOf(itemId) * quantity;
+      baseEarned += basePriceOf(itemId) * quantity;
     }
     const cooked = Object.keys(lines).some((itemId) => parseFarmDishKey(itemId));
     const crafted = Object.keys(lines).some((itemId) => parseFarmPieceKey(itemId));
@@ -406,12 +413,14 @@ export async function sellFarmProduce(pool: any, input: any, now: number = Date.
       playerId, transactionKey, amount: earned, reason: crafted ? "farm_furniture_sale" : cooked ? "farm_dish_sale" : "farm_produce_sale",
       metadata: { items: lines, day, prices: Object.fromEntries(Object.keys(lines).map((id) => [id, priceOf(id)])) },
     });
+    const bartering = recordFarmBarter(skills.bartering, "sale", baseEarned, earned);
     const next = normalizeFarmGarage({
       ...farm.layout,
       agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce, dishes, furniture } },
+      skills: { ...skills, bartering },
     }, { ownedEntitlementIds: farm.owned });
     await saveFarm(client, playerId, next);
-    return { ok: true, duplicate: false, earned, sold: lines, balance: award.balance, layout: next };
+    return { ok: true, duplicate: false, earned, baseEarned, sold: lines, balance: award.balance, bartering: farmingSummary(bartering, skills.bartering.xp), layout: next };
   });
 }
 

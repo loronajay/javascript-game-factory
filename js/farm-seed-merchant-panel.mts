@@ -21,6 +21,7 @@ export type SeedPurchaseOutcome = Readonly<{ ok: boolean; message: string; seeds
 type Options = Readonly<{
   buy: (cropId: string, quantity: number) => Promise<SeedPurchaseOutcome>;
   market: () => MarketDay | null;
+  price?: (basePrice: number) => number;
   /** A crop's portrait (farm-crop-thumbnails.mts): the plant it grows into. */
   thumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
   onClose?: () => void;
@@ -63,9 +64,10 @@ export function createSeedMerchantPanel(elements: Elements, options: Options): S
     const button = document.createElement("button");
     button.type = "button";
     button.className = quantity > 1 ? "farm-button farm-button--accent" : "farm-button";
-    button.textContent = `Buy ${quantity} · ${line.price * quantity}`;
+    const price = options.price?.(line.price * quantity) ?? line.price * quantity;
+    button.textContent = `Buy ${quantity} · ${price}`;
     button.disabled = busy || line.held + quantity > MAX_HELD;
-    button.setAttribute("aria-label", `Buy ${quantity} ${line.title} seed${quantity === 1 ? "" : "s"} for ${line.price * quantity} tickets`);
+    button.setAttribute("aria-label", `Buy ${quantity} ${line.title} seed${quantity === 1 ? "" : "s"} for ${price} tickets`);
     button.addEventListener("click", () => void buy(line.cropId, quantity));
     return button;
   }
@@ -94,9 +96,11 @@ export function createSeedMerchantPanel(elements: Elements, options: Options): S
       title.append(" ", tag);
     }
     const detail = document.createElement("small");
+    const price = options.price?.(line.price) ?? line.price;
+    const standing = options.price?.(line.standing) ?? line.standing;
     detail.textContent = line.special
-      ? `You have ${line.held} · ${line.price} tickets each (usually ${line.standing})`
-      : `You have ${line.held} · ${line.price} tickets each`;
+      ? `You have ${line.held} · ${price} tickets each (usually ${standing})`
+      : `You have ${line.held} · ${price} tickets each`;
     label.replaceChildren(title, detail);
     const actions = document.createElement("div");
     actions.className = "seed-row__actions";

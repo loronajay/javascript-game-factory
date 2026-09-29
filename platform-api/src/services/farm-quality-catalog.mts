@@ -17,6 +17,7 @@
 // WHERE IT MATTERS. The Produce Merchant pays by grade (QUALITY_PRICE). An
 // order and a recipe ask for the crop, and take the plainest first.
 
+import { FARM_LIVESTOCK_GOODS } from "./farm-livestock-catalog.mjs";
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 
@@ -47,6 +48,8 @@ export function farmCropQuality(row: any): FarmQuality {
   return row?.fertilized === true ? bump[cared] : cared;
 }
 
+// Livestock goods (services/farm-livestock-catalog): milk and wool, graded by the animal's care like a crop.
+const LIVESTOCK_GOOD_IDS: ReadonlySet<string> = new Set(FARM_LIVESTOCK_GOODS.map((good) => good.itemId));
 const FRUIT_IDS: ReadonlySet<string> = new Set(Object.entries(FARM_TREE_RULES).filter(([, rule]) => rule.kind === "fruit").map(([id]) => id));
 const has = (table: object, id: string): boolean => Object.prototype.hasOwnProperty.call(table, id);
 
@@ -62,7 +65,7 @@ export function parseFarmProduceKey(key: unknown): Readonly<{ itemId: string; qu
   if (extra !== undefined || suffix === "normal") return null;
   const quality = suffix ?? "normal";
   if (!(FARM_QUALITIES as readonly string[]).includes(quality)) return null;
-  if (has(FARM_CROP_RULES, itemId)) return Object.freeze({ itemId, quality: quality as FarmQuality });
+  if (has(FARM_CROP_RULES, itemId) || LIVESTOCK_GOOD_IDS.has(itemId)) return Object.freeze({ itemId, quality: quality as FarmQuality });
   // Fruit is only ever Normal: a tree has no care to grade.
   if (FRUIT_IDS.has(itemId) && quality === "normal") return Object.freeze({ itemId, quality: "normal" as const });
   return null;
@@ -72,6 +75,7 @@ export function parseFarmProduceKey(key: unknown): Readonly<{ itemId: string; qu
 export const FARM_PRODUCE_KEYS: readonly string[] = Object.freeze([
   ...Object.keys(FARM_CROP_RULES).flatMap((cropId) => FARM_QUALITIES.map((quality) => farmProduceKey(cropId, quality))),
   ...FRUIT_IDS,
+  ...[...LIVESTOCK_GOOD_IDS].flatMap((itemId) => FARM_QUALITIES.map((quality) => farmProduceKey(itemId, quality))),
 ]);
 
 /** How much of a crop or fruit the basket holds, every grade together. */

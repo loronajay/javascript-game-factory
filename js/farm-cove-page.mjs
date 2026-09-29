@@ -17,7 +17,7 @@
 // answered. Signed out, the Cove is practice: the minigame is the same, the
 // bite is rolled here, and nothing is kept.
 import * as THREE_VENDOR from "./vendor/three.module.js";
-import { createRoomLayoutStore } from "./arcade-room-store.mjs";
+import { createLayoutStore, createRoomLayoutStore } from "./arcade-room-store.mjs";
 import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
 import { spawnOffsetForCompany } from "./arcade-room-interaction.mjs";
 import { createRoomPresence } from "./arcade-room-presence.mjs";
@@ -49,6 +49,8 @@ import { createAchievementToaster } from "./platform/achievements/achievements.m
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
+import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
+import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -72,6 +74,14 @@ const tackleBar = requiredElement("#tackleBar");
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const marketUrl = `../market/index.html?from=cove${fromFarm ? `&farm=${encodeURIComponent(fromFarm)}` : ""}`;
 backLink.href = marketUrl;
+const inventoryFarm = await createLayoutStore(FARM_LAYOUT_SPEC).load();
+const inventorySummary = createFarmInventorySummary({
+    root: requiredElement("#inventoryPanel"),
+    openButton: requiredElement("#openInventory"),
+    closeButton: requiredElement("#closeInventory"),
+    body: requiredElement("#inventorySummary"),
+});
+inventorySummary.render(inventoryFarm.layout);
 // ---------------------------------------------------------------- the angler
 const api = createPlatformApiClient();
 const signedIn = readFactoryAccountSession().authenticated && api.isConfigured !== false;
@@ -451,9 +461,10 @@ function repaintPanels() {
     renderTackleBar();
 }
 function panelOpen() {
-    return creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
+    return inventorySummary.isOpen() || creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
 }
 function closePanels() {
+    inventorySummary.close();
     creelPanel.close();
     fishmongerPanel.close();
     tacklePanel.close();
@@ -595,7 +606,7 @@ function steerFromKeys() {
 }
 window.addEventListener("keydown", (event) => {
     if (panelOpen()) {
-        if (event.code === "Escape")
+        if (event.code === "Escape" || (event.code === "KeyI" && inventorySummary.isOpen()))
             closePanels();
         keys.clear();
         return;
@@ -606,6 +617,12 @@ window.addEventListener("keydown", (event) => {
     }
     if (!entered)
         return;
+    if (event.code === "KeyI" && !event.repeat && !fishing.busy()) {
+        event.preventDefault();
+        keys.clear();
+        inventorySummary.toggle();
+        return;
+    }
     if (event.code === "Space") {
         event.preventDefault();
         if (event.repeat)

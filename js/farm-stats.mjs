@@ -5,6 +5,8 @@ import { CROP_CATALOG } from "./farm-crops.mjs";
 import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { RECIPE_CATALOG } from "./farm-catalog/recipes.mjs";
 import { PATTERN_CATALOG } from "./farm-catalog/carpentry.mjs";
+import { FISH_CATALOG } from "./farm-catalog/fish.mjs";
+import { barteringBenefits } from "./farm-bartering.mjs";
 import { farmingProgress } from "./farm-skills.mjs";
 function sumCounts(values) {
     return Object.values(values).reduce((total, value) => total + value, 0);
@@ -29,7 +31,7 @@ function skill(id, title, description, xp, stats, breakdownTitle, detail) {
         breakdown: Object.freeze([...detail]),
     });
 }
-export function buildFarmStats(skills) {
+export function buildFarmStats(skills, extras = {}) {
     const rows = [
         skill("farming", "Farming", "Grow crops, pick orchard fruit and fill produce orders.", skills.farming.xp, [
             { label: "Crop harvests", value: skills.farming.harvests },
@@ -51,6 +53,20 @@ export function buildFarmStats(skills) {
             { label: "Masterworks", value: skills.carpentry.masterwork },
         ], "Patterns made", breakdown(PATTERN_CATALOG, skills.carpentry.patterns)),
     ];
+    if (extras.fishing) {
+        rows.push(skill("fishing", "Fishing", "Land rarer fish with a wider strike window and a more forgiving fight.", extras.fishing.xp, [
+            { label: "Fish landed", value: extras.fishing.catches },
+            { label: "Species caught", value: Object.values(extras.fishing.dex).filter((entry) => entry.caught > 0).length },
+        ], "Fish landed", breakdown(FISH_CATALOG, Object.fromEntries(Object.entries(extras.fishing.dex).map(([id, entry]) => [id, entry.caught])))));
+    }
+    const benefits = barteringBenefits(farmingProgress(skills.bartering.xp).level);
+    rows.push(skill("bartering", "Bartering", `Negotiate NPC prices: ${Math.round(benefits.purchaseDiscount * 1000) / 10}% off purchases and ${Math.round(benefits.saleBonus * 1000) / 10}% extra on sales.`, skills.bartering.xp, [
+        { label: "Deals made", value: skills.bartering.deals },
+        { label: "Tickets spent", value: skills.bartering.bought },
+        { label: "Tickets earned", value: skills.bartering.sold },
+        { label: "Tickets saved", value: skills.bartering.saved },
+        { label: "Bonus earned", value: skills.bartering.bonus },
+    ], "Trade record", []));
     return Object.freeze({
         totalLevel: rows.reduce((total, row) => total + row.level, 0),
         totalXp: rows.reduce((total, row) => total + row.xp, 0),

@@ -36,7 +36,7 @@ import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
-import { buyFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
+import { buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
 import { buyFarmTackle, castFarmLine, getFarmFishDetails, getFarmFishRecords, getFarmFishShadows, getFarmFishing, landFarmCast, lockFarmFish, mountFarmFish, releaseFarmFish, sellFarmFish } from "./db/farm-fishing.mjs";
 import {
   getAccountSuspension,
@@ -466,6 +466,7 @@ async function bootstrap(): Promise<void> {
     buyFarmLivestock: (params: any) => buyFarmLivestock(pool, params),
     moveFarmLivestock: (params: any) => moveFarmLivestock(pool, params),
     renameFarmLivestock: (params: any) => renameFarmLivestock(pool, params),
+    careFarmLivestock: (params: any) => careFarmLivestock(pool, params),
     getCurrentFarmTrade: (params: any) => getCurrentFarmTrade(pool, params),
     getFarmTrade: (params: any) => getFarmTrade(pool, params),
     actOnFarmTrade: (params: any) => actOnFarmTrade(pool, params),

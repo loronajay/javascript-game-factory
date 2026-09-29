@@ -282,7 +282,7 @@ export async function castFarmLine(pool, input, now = Date.now(), random = Math.
             }
         }
         if (!bite)
-            bite = rollFarmBite(zone, lure ?? null, "blind", random);
+            bite = rollFarmBite(zone, lure ?? null, "blind", random, level);
         const species = farmFishRule(bite.speciesId);
         const weightG = weightGramsAtRank(species, bite.rank);
         const strength = farmFishStrength(species.id, weightG);

@@ -6,6 +6,7 @@
 //   POST /games/farm/livestock/purchases  { purchaseId, speciesId, homeId?, name? }   the Livestock Dealer
 //   POST /games/farm/livestock/moves      { animalId, homeId | null }                  to another home
 //   POST /games/farm/livestock/names      { animalId, name }                           rename
+//   POST /games/farm/livestock/care       { layout, action, animalId?, itemId? }       checkup / feed / collect
 
 import { readJsonBody, writeJson } from "../http-utils.mjs";
 
@@ -14,10 +15,11 @@ const POSTS: Readonly<Record<string, string>> = Object.freeze({
   "/games/farm/livestock/purchases": "buyFarmLivestock",
   "/games/farm/livestock/moves": "moveFarmLivestock",
   "/games/farm/livestock/names": "renameFarmLivestock",
+  "/games/farm/livestock/care": "careFarmLivestock",
 });
 
 // A refusal about the state of the farm rather than a malformed request.
-const CONFLICTS = new Set(["no_room", "home_full", "herd_full", "insufficient_tickets", "farm_not_initialized", "unknown_home"]);
+const CONFLICTS = new Set(["no_room", "home_full", "herd_full", "insufficient_tickets", "farm_not_initialized", "unknown_home", "full", "no_feed", "not_ready", "basket_full", "died"]);
 
 export async function handleFarmLivestockRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
@@ -59,6 +61,8 @@ export async function handleFarmLivestockRoute(context: any): Promise<boolean> {
     const value = body.value ?? {};
     const outcome = postService === "buyFarmLivestock"
       ? await service({ playerId, purchaseId: value.purchaseId, speciesId: value.speciesId, homeId: value.homeId, name: value.name })
+      : postService === "careFarmLivestock"
+        ? await service({ playerId, layout: value.layout, action: value.action, animalId: value.animalId, itemId: value.itemId })
       : postService === "moveFarmLivestock"
         ? await service({ playerId, animalId: value.animalId, homeId: value.homeId })
         : await service({ playerId, animalId: value.animalId, name: value.name });

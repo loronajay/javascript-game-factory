@@ -89,7 +89,7 @@ export function createFishingController(deps) {
         const mine = token;
         if (!deps.api) {
             // Practice: roll the bite here. Nothing is kept.
-            const bite = rollBite(where, lure, nearby ? "shadow" : "blind", deps.random);
+            const bite = rollBite(where, lure, nearby ? "shadow" : "blind", deps.random, tackle.level);
             practiceBite = bite;
             const species = findFishSpecies(bite.speciesId);
             const range = nearby ? PRACTICE_BITE.shadow : PRACTICE_BITE.blind;

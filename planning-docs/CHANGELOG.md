@@ -1,5 +1,33 @@
 # Changelog
 
+## Livestock, second slice: hunger, feeding, milk and wool, and death from neglect (2026-09-28)
+
+Phase 2 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. The herd now eats, gives goods and can die.
+
+**Care is a checkpoint and a straight line.** Each `farm_livestock` row has a `care` record: hunger at a farm minute, plus per-good progress and stress. The column is in migration 057 for a fresh database, and migration 058 adds it where 057 already ran. Between checkpoints hunger falls in a straight line: 25 a farm day, scaled by Hardiness from ×0.7 to ×1.3. That makes three things exact, with no ticking:
+- how long the animal was **well fed** (above 40), the only time its goods fill, and only once it is grown;
+- how long it was **hungry** while grown, which counts as stress on the goods' grade;
+- the minute it **starved**.
+
+A whole farm day at empty and it dies, the same rule as pets. The rule lives in `js/farm-livestock-care.mts` and in the server's `services/farm-livestock-catalog.mts`, and a randomized test walks both through the same feed and advance steps and holds them equal.
+
+**One care route, shaped like a harvest.** `POST /games/farm/livestock/care` takes `{ layout, action: checkup | feed | collect, animalId }`. The page sends its farm, the server verifies the clock (real time plus the nap bank), carries every animal to that minute, and only then acts:
+- **Death:** any animal due to die is marked dead at the minute it died. Its row closes (`state = 'died'`, `end_cause`, `ended_minute`), and the farm gains a **pets-style memorial** in the same transaction: a history entry plus a `decor.prop.pet-tombstone` stone. `petHistory` now accepts `livestock.*` species on both sides.
+- **G feeds** one serving (+35): the animal's own feed first (**Hay** for cow, sheep and llama; **Pig Feed** for pigs; 8 tickets each in the Inventory's supply shop), otherwise a crop it likes from the basket, plainest grade first. A full animal uses nothing.
+- **E collects** a ready good: 1 + ⌊Yield/40⌋ of it, graded Poor/Normal/Fine/Perfect by the Quality stat minus 60 × the share of the cycle spent hungry.
+
+When the page's own sums say an animal is due to die, it asks for a checkup, so the server is always the one that marks the death. The farm clock never runs while you're away, so nothing starves offline.
+
+**Goods are basket produce.** Milk (cow, daily), Sheep's Milk (daily), Wool (sheep, every 3 days) and Llama Wool (every 3 days) join the harvest basket the way fruit did, keyed `item@grade`. That means the save guard, trading and the Exchange Board already handle them. The Produce Merchant buys them at a price derived from a per-day value, and the day-price swing applies. There are new item models for the milk bottles, fleeces, a hay bale and a pig-feed sack. The Herd panel shows each animal's hunger bar, need, and each good's progress or "ready · grade".
+
+**Verified:**
+- **API:** livestock tests grew to 15. They cover care parity on both sides, the hunger, grown and death timeline, goods as graded sellable basket keys, feed order (hay, then the plainest liked crop; a pig refuses cabbage; a full animal uses nothing), collection grade and quantity, no double pay and no minting through a save, and death at checkup writing the row, the memorial stone and the history entry, which the page reads back.
+- **Frontend:** 770 tests pass. The only failure is the pond-walk test that predates this work.
+- **API suite:** 1188 tests pass.
+- **Visual:** a headless render of the six new item models and the Herd panel's care rows.
+
+**Not verified:** a signed-in feed or collection in a real browser, because the local harness has no account.
+
 ## Livestock, first slice: the herd, its homes, and the Livestock Dealer (2026-09-28)
 
 Farm animals that yield goods are now their own system beside pets (plan in `planning-docs/FARM_LIVESTOCK_PLAN.md`). This slice covers the plan's Phases 0 and 1: the animals exist, live somewhere, and can be bought. Products, feeding, the butcher and breeding come next.

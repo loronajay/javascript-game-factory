@@ -16,6 +16,7 @@
 //
 // WHERE IT MATTERS. The Produce Merchant pays by grade (QUALITY_PRICE). An
 // order and a recipe ask for the crop, and take the plainest first.
+import { FARM_LIVESTOCK_GOODS } from "./farm-livestock-catalog.mjs";
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 export const FARM_QUALITIES = Object.freeze(["poor", "normal", "fine", "perfect"]);
@@ -39,6 +40,8 @@ export function farmCropQuality(row) {
                     : "normal";
     return row?.fertilized === true ? bump[cared] : cared;
 }
+// Livestock goods (services/farm-livestock-catalog): milk and wool, graded by the animal's care like a crop.
+const LIVESTOCK_GOOD_IDS = new Set(FARM_LIVESTOCK_GOODS.map((good) => good.itemId));
 const FRUIT_IDS = new Set(Object.entries(FARM_TREE_RULES).filter(([, rule]) => rule.kind === "fruit").map(([id]) => id));
 const has = (table, id) => Object.prototype.hasOwnProperty.call(table, id);
 export function farmProduceKey(itemId, quality) {
@@ -55,7 +58,7 @@ export function parseFarmProduceKey(key) {
     const quality = suffix ?? "normal";
     if (!FARM_QUALITIES.includes(quality))
         return null;
-    if (has(FARM_CROP_RULES, itemId))
+    if (has(FARM_CROP_RULES, itemId) || LIVESTOCK_GOOD_IDS.has(itemId))
         return Object.freeze({ itemId, quality: quality });
     // Fruit is only ever Normal: a tree has no care to grade.
     if (FRUIT_IDS.has(itemId) && quality === "normal")
@@ -66,6 +69,7 @@ export function parseFarmProduceKey(key) {
 export const FARM_PRODUCE_KEYS = Object.freeze([
     ...Object.keys(FARM_CROP_RULES).flatMap((cropId) => FARM_QUALITIES.map((quality) => farmProduceKey(cropId, quality))),
     ...FRUIT_IDS,
+    ...[...LIVESTOCK_GOOD_IDS].flatMap((itemId) => FARM_QUALITIES.map((quality) => farmProduceKey(itemId, quality))),
 ]);
 /** How much of a crop or fruit the basket holds, every grade together. */
 export function farmProduceHeld(produce, itemId) {

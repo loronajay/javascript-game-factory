@@ -17,6 +17,7 @@
 // it did. In version 2 an ABSENT `decor` also means the starter field (the
 // server only sends the key when the client did), and an EMPTY list is a
 // deliberately cleared field.
+import { findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { DEFAULT_GROUND_ID, findGround, normalizeGroundId } from "./farm-catalog/ground.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { clampFarmDecorLength, findFarmDecor } from "./farm-catalog/decor.mjs";
@@ -247,7 +248,9 @@ function normalizePetMemorial(value) {
     const stats = source.finalStats && typeof source.finalStats === "object" ? source.finalStats : {};
     if (typeof source.id !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.id))
         return null;
-    if (typeof source.instanceId !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.instanceId) || !findAnimal(source.speciesId))
+    // A memorial remembers a pet or a head of livestock (the server settles a livestock death into this history).
+    const remembered = findAnimal(source.speciesId) ?? findLivestockSpecies(source.speciesId);
+    if (typeof source.instanceId !== "string" || !/^[a-z0-9-]{1,40}$/.test(source.instanceId) || !remembered)
         return null;
     if (!["runaway", "starvation", "old_age", "neglect"].includes(String(source.outcome)))
         return null;
@@ -256,7 +259,7 @@ function normalizePetMemorial(value) {
         id: source.id,
         instanceId: source.instanceId,
         speciesId: source.speciesId,
-        name: cleanPetName(source.name) || findAnimal(source.speciesId)?.title || "Pet",
+        name: cleanPetName(source.name) || remembered.title || "Pet",
         outcome: source.outcome,
         departedAtFarmMinute: number(source.departedAtFarmMinute, 0, 1_000_000_000),
         lifespanDays: number(source.lifespanDays, 0, 200),

@@ -673,6 +673,10 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     renameFarmLivestock({ animalId, name }: { animalId: string; name: string }) {
       return post("/games/farm/livestock/names", { animalId, name }, "result", {}, true);
     },
+    /** Livestock care at the farm's verified clock: a checkup, a feed or a collection. Sends the farm like a harvest. */
+    careFarmLivestock({ layout, action, animalId, itemId }: { layout: unknown; action: "checkup" | "feed" | "collect"; animalId?: string; itemId?: string }) {
+      return post("/games/farm/livestock/care", { layout, action, animalId, itemId }, "result", {}, true);
+    },
     /** Mount a fish from the creel (Old Pike's fee), or take one down back into the creel. */
     mountFarmFish({ fishId, mounted, purchaseId }: { fishId: string; mounted: boolean; purchaseId?: string }) {
       return post("/games/farm/fishing/mounts", { fishId, mounted, purchaseId }, "result", {}, true);

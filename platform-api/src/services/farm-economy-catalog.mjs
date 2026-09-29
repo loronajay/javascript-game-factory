@@ -41,6 +41,8 @@ const supplyPrices = Object.freeze({
     "food.river-grubs": 20, "food.bamboo-bites": 24, "food.plankton-blend": 28,
     "food.river-hay": 30, "food.browse-bundle": 35, "food.deep-sea-feed": 40,
     "food.shark-feed": 45,
+    // Livestock feed (services/farm-livestock-catalog FARM_LIVESTOCK_FEED_PRICES holds the same two).
+    "food.hay": 8, "food.pig-feed": 8,
 });
 const seedPrices = Object.freeze({
     bean: 10, beetroot: 7, cabbage: 12, carrot: 8,

@@ -326,6 +326,16 @@ button, a { font: inherit; }
 .livestock-stat__bar { grid-column: 1 / -1; display: block; height: 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
 .livestock-stat__fill { display: block; height: 100%; border-radius: inherit; background: var(--farm-leaf); }
 .livestock-row__home { width: 100%; padding: 6px 8px; border: 1px solid var(--farm-line); border-radius: 9px; color: #fff6cf; background: rgba(0,0,0,.3); font: 600 12.5px system-ui, sans-serif; }
+.livestock-care { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.livestock-care__label { color: #d6e3c8; font: 700 12px system-ui, sans-serif; }
+.livestock-care__bar { flex: 1 1 120px; display: block; height: 6px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
+.livestock-care__fill { display: block; height: 100%; border-radius: inherit; background: var(--farm-leaf); }
+.livestock-care--hungry .livestock-care__fill, .livestock-care--hungry .livestock-care__label { background-color: transparent; color: #f2c14e; }
+.livestock-care--hungry .livestock-care__fill { background: #f2c14e; }
+.livestock-care--starving .livestock-care__label { color: #ff7a6b; }
+.livestock-care--starving .livestock-care__fill { background: #ff7a6b; }
+.livestock-good { padding: 2px 8px; border-radius: 999px; color: #c9d7bd; background: rgba(255,255,255,.06); font: 700 11px ui-monospace, monospace; }
+.livestock-good.is-ready { color: #1d2a16; background: #9ee27a; }
 .livestock-panel__note { margin: 12px 0 0; color: #9fb294; font-size: 12px; line-height: 1.45; }
 @media (max-width: 560px) { .livestock-row__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stats-panel { width: min(820px, calc(100vw - 36px)); }

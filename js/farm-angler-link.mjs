@@ -136,6 +136,7 @@ export function createAnglerLink(options) {
         }
     }
     return Object.freeze({
+        stats: () => angler,
         creel: () => angler?.creel ?? [],
         trophies: () => (angler?.mounted ?? []).map((fish) => Object.freeze({
             fishId: fish.id,

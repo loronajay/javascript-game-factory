@@ -1,6 +1,6 @@
 # Farm Livestock Plan
 
-Status: **Phases 0–1 shipped** (2026-09-28): assets, the herd as server rows, homes (stalls, barn floor, pens), the Livestock Dealer, the herd sim and the Livestock panel. Next: Phase 2 (feed + products, and neglect). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
+Status: **Phases 0–2 shipped** (2026-09-28): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial. Next: Phase 3 (Husbandry skill, dairy recipes, orders). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
 and `FARM_HARVEST_MARKET_SKILLS_PLAN.md`.
 
 Livestock are farm animals that **yield goods** — milk, wool, and meat
@@ -158,8 +158,19 @@ land gets bigger, so it follows the livestock phases.
    (Hollis) in the Market, homes (stable stalls ×1, barn floor ×2, Small Pen
    ×2, Large Pen ×4), herd sim, Livestock panel (L / Herd). Homeless animals
    (their pen taken down) roam the field until re-homed.
-2. **Feed + products** — feed items, growth to adult, collect milk/wool
-   through a server route, graded inventory stacks, market sale.
+2. ✅ **Feed + products + neglect** — `js/farm-livestock-care.mts` ↔ the
+   server's copy: care is a checkpoint and a straight line (hunger at a farm
+   minute, 25/day scaled by Hardiness), so well-fed time, hungry (stress) time
+   and the minute it starved are exact between checkpoints. Goods fill only
+   while grown and well fed; a whole farm day at empty is death. One route,
+   `POST /games/farm/livestock/care` (checkup/feed/collect), sends the farm like
+   a harvest; the server settles the herd at the verified clock first, closing
+   a dead animal's row and writing a pets-style memorial stone + history entry.
+   G feeds (Hay / Pig Feed from the supply shop, else a liked crop, plainest
+   first); E collects a ready good. Milk, Sheep's Milk, Wool, Llama Wool live in
+   the harvest basket at Poor/Normal/Fine/Perfect (Quality stat − 60 × the
+   cycle's hungry share) and sell at the Produce Merchant (price derived from a
+   per-day value). Yield: 1 + ⌊Yield/40⌋ per collection.
 3. **Husbandry + kitchen** — skill, dairy recipes, Order Board notices,
    barter-table stacks.
 4. **Butcher** — Market Butcher, meat cuts, meat recipes (and fish/crop
@@ -175,5 +186,5 @@ Later, outside this plan: **Weaving** (wool → cloth/goods at a loom), pig
 ## Open questions
 
 - Can a butchered or sold animal's name/lineage be seen anywhere afterwards?
-- Does a dead animal leave a memorial prop like a pet, or only a record?
+- ~~Does a dead animal leave a memorial prop?~~ Yes, like a pet (owner, 2026-09-28).
 - Pet breeding's own plan (hidden compatibility) — when?

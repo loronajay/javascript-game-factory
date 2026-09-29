@@ -12,6 +12,7 @@ import { FARM_CROP_RULES, farmCropRule } from "./farm-crop-catalog.mjs";
 import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
 import { COOK_ID, FARM_RECIPE_RULES, FARM_VENDOR_RECIPE_IDS, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
 import { FARM_PIECE_IDS, RECENT_WORKSHOP_IDS, WORKSHOP_ID } from "./farm-carpentry-catalog.mjs";
+import { barteringXp } from "./farm-bartering.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
 /** A bound on stored XP, comfortably past level 99 (13,034,431). */
@@ -86,6 +87,7 @@ export type CookingRecord = { xp: number; dishes: number; perfect: number; order
  * three-star pieces; `recent` is the latest mill and craft ids, for retries.
  */
 export type CarpentryRecord = { xp: number; milled: number; pieces: number; masterwork: number; patterns: Record<string, number>; recent: string[] };
+export type BarteringRecord = { xp: number; deals: number; bought: number; sold: number; saved: number; bonus: number };
 
 const COUNT_LIMIT = 100_000_000;
 
@@ -108,6 +110,10 @@ export function emptyCookingRecord(): CookingRecord {
 
 export function emptyCarpentryRecord(): CarpentryRecord {
   return { xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: {}, recent: [] };
+}
+
+export function emptyBarteringRecord(): BarteringRecord {
+  return { xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 };
 }
 
 /** Positive counts for the known ids only. */
@@ -157,19 +163,40 @@ export function normalizeCarpentryRecord(value: unknown): CarpentryRecord {
   };
 }
 
-export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord };
+export function normalizeBarteringRecord(value: unknown): BarteringRecord {
+  const source: any = value && typeof value === "object" ? value : {};
+  return {
+    xp: count(source.xp, FARMING_MAX_XP), deals: count(source.deals), bought: count(source.bought), sold: count(source.sold),
+    saved: count(source.saved), bonus: count(source.bonus),
+  };
+}
+
+export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord };
 
 /** Every server-owned skill record, shape-bounded. */
 export function normalizeFarmSkillRecords(value: unknown): FarmSkillRecords {
   const source: any = value && typeof value === "object" ? value : {};
   return {
     farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting),
-    cooking: normalizeCookingRecord(source.cooking), carpentry: normalizeCarpentryRecord(source.carpentry),
+    cooking: normalizeCookingRecord(source.cooking), carpentry: normalizeCarpentryRecord(source.carpentry), bartering: normalizeBarteringRecord(source.bartering),
   };
 }
 
 export function emptyFarmSkillRecords(): FarmSkillRecords {
-  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord() };
+  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord(), bartering: emptyBarteringRecord() };
+}
+
+/** One completed NPC deal. Player-to-player trades never feed this record. */
+export function recordFarmBarter(record: BarteringRecord, side: "purchase" | "sale", baseTickets: number, actualTickets: number): BarteringRecord {
+  const base = Math.max(0, Math.floor(Number(baseTickets) || 0));
+  const actual = Math.max(0, Math.floor(Number(actualTickets) || 0));
+  return {
+    ...record,
+    xp: Math.min(FARMING_MAX_XP, record.xp + barteringXp(base)), deals: record.deals + 1,
+    bought: record.bought + (side === "purchase" ? actual : 0), sold: record.sold + (side === "sale" ? actual : 0),
+    saved: record.saved + (side === "purchase" ? Math.max(0, base - actual) : 0),
+    bonus: record.bonus + (side === "sale" ? Math.max(0, actual - base) : 0),
+  };
 }
 
 /** A harvest of `cropId` landed: its XP, one more harvest, one more of that crop. */

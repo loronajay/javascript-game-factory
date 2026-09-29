@@ -757,7 +757,7 @@ function applyLayout(next: FarmLayout): void {
   kitchenSync();
   workshopSync();
   livestockSync();
-  statsPanel.render(layout.skills);
+  statsPanel.render(layout.skills, anglerLink.stats());
   renderFieldCapacity();
 }
 
@@ -899,6 +899,11 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (petInteraction && nearbyPet && interactWithPet(petInteraction.id)) {
+    event.preventDefault();
+    return;
+  }
+  // G at a head of livestock: one serving of its feed (farm-livestock-controller.mts).
+  if (event.code === "KeyG" && !event.repeat && farmEntered && !nearbyPet && livestock.inReach() && livestock.feed()) {
     event.preventDefault();
     return;
   }
@@ -1122,6 +1127,7 @@ const anglerLink = createAnglerLink({
   ownerId: layoutStore.ownerPlayerId,
   isOwner: !visiting && layoutStore.accountBacked,
   modelFor: (instanceId) => world.modelFor(instanceId),
+  onChange: () => statsPanel.render(layout.skills, anglerLink.stats()),
 });
 void anglerLink.refresh();
 
@@ -1152,6 +1158,9 @@ const livestock = createFarmLivestockController({
   keepOut: () => keepOutBoxes(layout),
   water: () => waterRegions(layout),
   panel: livestockPanel,
+  // Care goes through the harvest seam: the farm is sent, the server settles the herd and answers with the farm.
+  submit: canManageFarm && serverHarvests ? submitServerHarvest : null,
+  setStatus: (text) => { status.textContent = text; livestockPanel.setStatus(text); },
 });
 livestockSync = () => livestock.sync();
 void livestock.refresh();
@@ -1196,7 +1205,7 @@ const statsPanel = createFarmStatsPanel({
 }, {
   beforeOpen: () => { inventoryPanel.close(); petsPanel.close(); },
 });
-statsPanel.render(layout.skills);
+statsPanel.render(layout.skills, anglerLink.stats());
 openInventoryButton.addEventListener("click", () => statsPanel.close());
 openPetsButton.addEventListener("click", () => statsPanel.close());
 if (visiting) openStatsButton.hidden = true;

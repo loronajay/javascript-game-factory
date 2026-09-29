@@ -90,13 +90,25 @@ export type CarpentryRecord = Readonly<{
   patterns: Readonly<Record<string, number>>;
 }>;
 
-export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord }>;
+export type BarteringRecord = Readonly<{
+  xp: number;
+  deals: number;
+  /** Actual tickets spent and earned after the skill adjustment. */
+  bought: number;
+  sold: number;
+  /** Lifetime discount and bonus tickets created by the skill. */
+  saved: number;
+  bonus: number;
+}>;
+
+export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord }>;
 
 export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
   woodcutting: Object.freeze({ xp: 0, fellings: 0, trees: Object.freeze({}) }),
   cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}), learned: Object.freeze([]) }),
   carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
+  bartering: Object.freeze({ xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 }),
 });
 
 function count(value: unknown, limit = 100_000_000): number {
@@ -125,7 +137,8 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
   const woodcutting: any = source.woodcutting && typeof source.woodcutting === "object" ? source.woodcutting : null;
   const cooking: any = source.cooking && typeof source.cooking === "object" ? source.cooking : null;
   const carpentry: any = source.carpentry && typeof source.carpentry === "object" ? source.carpentry : null;
-  if (!farming && !woodcutting && !cooking && !carpentry) return EMPTY_FARM_SKILLS;
+  const bartering: any = source.bartering && typeof source.bartering === "object" ? source.bartering : null;
+  if (!farming && !woodcutting && !cooking && !carpentry && !bartering) return EMPTY_FARM_SKILLS;
   return Object.freeze({
     farming: farming ? Object.freeze({
       xp: count(farming.xp, FARMING_MAX_XP),
@@ -154,6 +167,10 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
       masterwork: count(carpentry.masterwork),
       patterns: counts(carpentry.patterns, PATTERN_CATALOG.map((entry) => entry.id)),
     }) : EMPTY_FARM_SKILLS.carpentry,
+    bartering: bartering ? Object.freeze({
+      xp: count(bartering.xp, FARMING_MAX_XP), deals: count(bartering.deals),
+      bought: count(bartering.bought), sold: count(bartering.sold), saved: count(bartering.saved), bonus: count(bartering.bonus),
+    }) : EMPTY_FARM_SKILLS.bartering,
   });
 }
 

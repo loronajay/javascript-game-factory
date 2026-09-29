@@ -9,6 +9,7 @@
 // farm-catalog/trees.mts); a test asserts every basket id has one.
 import { calyx, lathe, leaf, place, stem, surface, tint } from "./farm-item-geometry.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
+import { paintedSurface, paintedTexture } from "./farm-item-geometry.mjs";
 const LEAF = "#4f9a3a";
 const STALK = "#6b8a3a";
 const WOOD_STEM = "#5d3a1f";
@@ -229,9 +230,40 @@ const orange = (THREE, group) => {
     place(THREE, group, new THREE.CylinderGeometry(0.004, 0.005, 0.004, 6), surface(THREE, "#4f6b2a"), [0, 0.079, 0]);
     leaf(THREE, group, "#2f7a36", 0.05, [0.02, 0.082, 0.004], [0.1, 0.4, 0.25]);
 };
+// ---------------------------------------------------------------- livestock goods
+/** A glass milk bottle, full, with a foil cap: the cap's colour says whose milk it is. */
+function milkBottle(cap, label) {
+    return (THREE, group) => {
+        const profile = [[0, 0], [0.034, 0], [0.036, 0.008], [0.036, 0.1], [0.03, 0.125], [0.02, 0.15], [0.019, 0.17], [0.021, 0.175]];
+        const texture = paintedTexture(THREE, 256, 128, (context, w, h) => {
+            context.fillStyle = "#f7f4ea";
+            context.fillRect(0, 0, w, h);
+            context.fillStyle = cap;
+            context.fillRect(0, h * 0.38, w, h * 0.26);
+            context.fillStyle = "#ffffff";
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.font = "800 22px Georgia, serif";
+            context.fillText(label, w * 0.12, h / 2, w * 0.22);
+        });
+        place(THREE, group, lathe(THREE, profile, 18), paintedSurface(THREE, "#f7f4ea", texture, { roughness: 0.25 }), [0, 0, 0]);
+        place(THREE, group, new THREE.CylinderGeometry(0.023, 0.023, 0.01, 16), surface(THREE, cap, { roughness: 0.3, metalness: 0.6, flat: false }), [0, 0.178, 0]);
+    };
+}
+/** A shorn fleece rolled up and tied: lumpy wool in the fleece's own colour. */
+function fleece(color) {
+    return (THREE, group) => {
+        const lumps = [[0, 0.05, 0, 0.06], [0.05, 0.045, 0.02, 0.048], [-0.05, 0.045, -0.015, 0.05], [0.015, 0.085, -0.02, 0.045], [-0.02, 0.08, 0.025, 0.042], [0.04, 0.035, -0.035, 0.038]];
+        for (const [x, y, z, radius] of lumps)
+            place(THREE, group, new THREE.IcosahedronGeometry(radius, 1), surface(THREE, tint(color, (x + z) * 2), { roughness: 1 }), [x, y, z]);
+        place(THREE, group, new THREE.TorusGeometry(0.066, 0.005, 6, 18), surface(THREE, "#8a5a2b", { roughness: 0.9 }), [0, 0.055, 0], [Math.PI / 2, 0, 0]);
+    };
+}
 export const PRODUCE_BUILDERS = Object.freeze({
     bean, beetroot, blueberry, cabbage, carrot, cauliflower, corn, eggplant, garlic, potato, pumpkin, radish, strawberry, sunflower, tomato, watermelon,
     apple, pear, cherry, peach, orange,
+    milk: milkBottle("#3a7fc2", "MILK"), "milk-sheep": milkBottle("#6aa84f", "EWE"),
+    wool: fleece("#f2ede2"), "wool-llama": fleece("#b98a5e"),
 });
 /** A harvest-basket item as a model, or null for an id the basket does not hold. */
 export function createProduceModel(THREE, id) {

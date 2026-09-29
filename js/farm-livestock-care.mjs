@@ -1,0 +1,188 @@
+// Livestock care: hunger, the goods an animal is working up to, and neglect.
+//
+// Pure — no THREE, no DOM, no clock of its own — and the same rule, line for
+// line, as `platform-api/src/services/farm-livestock-catalog.mts` (a test
+// holds them equal). The SERVER decides: it advances every animal to the
+// farm's verified clock before a feed, a collection or a checkup, and it is
+// the one that marks a death. This copy lets the page show the same numbers
+// between those moments without asking.
+//
+// CARE IS A CHECKPOINT AND A STRAIGHT LINE. A row stores its hunger at a
+// farm minute (`at`); between checkpoints hunger falls in a straight line at
+// the animal's own rate, so everything that happened in between can be
+// worked out exactly from the two ends:
+//
+//   · how long it was WELL FED (hunger above `HUNGRY_AT`) — the only time its
+//     goods come along, and only once it is grown;
+//   · how long it was HUNGRY while grown — stress, which costs its goods a grade;
+//   · the minute its hunger reached nothing — `starvedAt`. A whole farm day
+//     starving and it dies, the pets' rule.
+//
+// The farm clock only runs while the owner plays or naps, so nothing here
+// happens while the farm is away.
+import { STAT_MAX, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
+import { DAY_MINUTES } from "./farm-time.mjs";
+/** Hunger a Hardiness-50 animal loses in a farm day: the pets' rate. */
+export const HUNGER_PER_DAY = 25;
+/** Hardiness 100 gets hungry at 70% of that, Hardiness 1 at 130%. */
+export const HARDINESS_SPREAD = 0.6;
+/** One serving of feed or one crop. */
+export const SERVING = 35;
+export const FULL = 100;
+/** At or below this it is Hungry: its goods stop coming and stress starts. */
+export const HUNGRY_AT = 40;
+/** A whole farm day at nothing and it dies. */
+export const STARVE_GRACE_MINUTES = DAY_MINUTES;
+/** One more of a good for every this much Yield. */
+export const YIELD_STEP = 40;
+/** What stress costs a good's grade, at a whole cycle of it. */
+export const STRESS_WEIGHT = 60;
+/** The grade a good's score earns: at least this for each. */
+export const GOOD_GRADE_SCORES = Object.freeze({ perfect: 70, fine: 45, normal: 20 });
+/** A freshly arrived animal: fed, nothing owed, from the minute given. */
+export function newLivestockCare(at) {
+    return Object.freeze({ hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: Object.freeze({}), stress: Object.freeze({}) });
+}
+/** Hunger lost per farm minute for this individual. */
+export function hungerPerMinute(stats) {
+    return (HUNGER_PER_DAY * (1 + HARDINESS_SPREAD * (0.5 - stats.hardiness / STAT_MAX))) / DAY_MINUTES;
+}
+/** Growth 50 grows up in the species' `adultDays`; Growth 100 in 70% of it, Growth 1 in 130%. */
+export const GROWTH_SPREAD = 0.6;
+/** Farm days from birth to grown for this individual. */
+export function adultAgeDays(species, stats) {
+    return species.adultDays * (1 + GROWTH_SPREAD * (0.5 - stats.growth / STAT_MAX));
+}
+/** The farm minute it is grown (its goods only come once it is). */
+export function adultMinute(subject, species) {
+    return subject.bornAt + adultAgeDays(species, subject.stats) * DAY_MINUTES;
+}
+export function goodCycleMinutes(product) {
+    return product.everyDays * DAY_MINUTES;
+}
+function overlap(start, end, from) {
+    return Math.max(0, end - Math.max(start, from));
+}
+function finite(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
+/** A stored care record made safe; a missing one is a fed animal from `fallbackAt`. */
+export function normalizeLivestockCare(value, fallbackAt) {
+    if (!value || typeof value !== "object")
+        return newLivestockCare(fallbackAt);
+    const source = value;
+    const minutes = (table) => {
+        const out = {};
+        if (table && typeof table === "object") {
+            for (const [id, raw] of Object.entries(table).slice(0, 8)) {
+                if (/^[a-z0-9-]{1,40}$/.test(id))
+                    out[id] = Math.max(0, finite(raw));
+            }
+        }
+        return out;
+    };
+    const starved = source.starvedAt === null || source.starvedAt === undefined ? null : Math.max(0, finite(source.starvedAt));
+    return Object.freeze({
+        hunger: Math.min(FULL, Math.max(0, finite(source.hunger, FULL))),
+        at: Math.max(0, finite(source.at, fallbackAt)),
+        starvedAt: starved,
+        progress: Object.freeze(minutes(source.progress)),
+        stress: Object.freeze(minutes(source.stress)),
+    });
+}
+/**
+ * Care carried to farm minute `now`. A clock behind the checkpoint changes
+ * nothing (time never runs backwards on an animal). Goods fill only while it
+ * is grown and well fed, and stop at their cycle; stress counts grown hungry
+ * minutes toward a good not yet ready.
+ */
+export function advanceLivestockCare(subject, care, now) {
+    const species = findLivestockSpecies(subject.speciesId);
+    if (!species || !(now > care.at))
+        return care;
+    const start = care.at;
+    const end = now;
+    const rate = hungerPerMinute(subject.stats);
+    const wellUntil = Math.min(end, care.hunger > HUNGRY_AT ? start + (care.hunger - HUNGRY_AT) / rate : start);
+    const grownFrom = adultMinute(subject, species);
+    const well = overlap(start, wellUntil, grownFrom);
+    const hungry = overlap(Math.max(start, wellUntil), end, grownFrom);
+    const progress = { ...care.progress };
+    const stress = { ...care.stress };
+    for (const product of species.products) {
+        const cycle = goodCycleMinutes(product);
+        const before = progress[product.itemId] ?? 0;
+        if (before < cycle)
+            stress[product.itemId] = Math.min(cycle, (stress[product.itemId] ?? 0) + hungry);
+        progress[product.itemId] = Math.min(cycle, before + well);
+    }
+    const hunger = Math.max(0, care.hunger - rate * (end - start));
+    const emptyAt = start + care.hunger / rate;
+    const starvedAt = hunger > 0 ? null : care.starvedAt ?? Math.min(end, emptyAt);
+    return Object.freeze({ hunger, at: end, starvedAt, progress: Object.freeze(progress), stress: Object.freeze(stress) });
+}
+/** The farm minute it dies of neglect if nobody feeds it, or null while it has food in it. */
+export function livestockDeathMinute(subject, care) {
+    if (care.hunger > 0 && care.starvedAt === null) {
+        return care.at + care.hunger / hungerPerMinute(subject.stats) + STARVE_GRACE_MINUTES;
+    }
+    return (care.starvedAt ?? care.at) + STARVE_GRACE_MINUTES;
+}
+/** Due to die by `now`? (The server is the one that marks it.) */
+export function livestockDueToDie(subject, care, now) {
+    return (livestockDeathMinute(subject, care) ?? Infinity) <= now;
+}
+/** One serving: hunger up by `SERVING`, never past full, and a starving animal is no longer starving. */
+export function feedLivestockCare(care) {
+    const hunger = Math.min(FULL, care.hunger + SERVING);
+    return Object.freeze({ ...care, hunger, starvedAt: hunger > 0 ? null : care.starvedAt });
+}
+/** Whether a serving would do anything: a full animal is not fed (nothing is used). */
+export function wantsFood(care) {
+    return care.hunger < FULL - 0.5;
+}
+/** How many of a good one collection gives, from Yield. */
+export function goodsPerCollection(stats) {
+    return 1 + Math.floor(stats.yield / YIELD_STEP);
+}
+/** A good's grade: the Quality stat, less what hunger took out of this cycle. */
+export function goodQuality(stats, stressMinutes, cycleMinutes) {
+    const score = stats.quality - STRESS_WEIGHT * Math.min(1, Math.max(0, stressMinutes) / Math.max(1, cycleMinutes));
+    if (score >= GOOD_GRADE_SCORES.perfect)
+        return "perfect";
+    if (score >= GOOD_GRADE_SCORES.fine)
+        return "fine";
+    if (score >= GOOD_GRADE_SCORES.normal)
+        return "normal";
+    return "poor";
+}
+/** Each good's state: how far along (0–1) and whether it can be collected now. */
+export function goodsState(subject, care) {
+    const species = findLivestockSpecies(subject.speciesId);
+    if (!species)
+        return [];
+    return species.products.map((product) => {
+        const cycle = goodCycleMinutes(product);
+        const done = care.progress[product.itemId] ?? 0;
+        return Object.freeze({ product, fraction: Math.min(1, done / cycle), ready: done >= cycle, quality: goodQuality(subject.stats, care.stress[product.itemId] ?? 0, cycle) });
+    });
+}
+/** A good collected: its progress and stress start again. */
+export function collectedCare(care, itemId) {
+    return Object.freeze({
+        ...care,
+        progress: Object.freeze({ ...care.progress, [itemId]: 0 }),
+        stress: Object.freeze({ ...care.stress, [itemId]: 0 }),
+    });
+}
+/** The words the panel and the prompt use. */
+export function livestockNeed(subject, care, now) {
+    if (care.hunger > HUNGRY_AT)
+        return Object.freeze({ stage: "fed", label: "Well fed" });
+    if (care.hunger > 0)
+        return Object.freeze({ stage: "hungry", label: "Hungry" });
+    const dies = livestockDeathMinute(subject, care) ?? now;
+    const hours = Math.max(0, Math.ceil((dies - now) / 60));
+    return Object.freeze({ stage: "starving", label: `Starving · life at risk (${hours} h)` });
+}

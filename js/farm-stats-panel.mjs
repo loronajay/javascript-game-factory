@@ -61,8 +61,8 @@ export function createFarmStatsPanel(elements, options = {}) {
         document.exitPointerLock?.();
     }
     function toggle() { isOpen() ? close() : open(); }
-    function render(skills) {
-        const view = buildFarmStats(skills);
+    function render(skills, fishing) {
+        const view = buildFarmStats(skills, { fishing });
         elements.summary.textContent = `Total level ${view.totalLevel} · ${view.totalXp.toLocaleString()} lifetime XP`;
         elements.grid.replaceChildren(...view.skills.map(statCard));
     }

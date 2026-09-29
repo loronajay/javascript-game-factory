@@ -58,6 +58,8 @@ const NAME_LIMIT = 20;
 const INSTANCE_ID_PATTERN = /^[a-z0-9-]{1,40}$/;
 const GROUND_ID_PATTERN = /^ground\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SPECIES_ID_PATTERN = /^pet\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** A memorial remembers a pet or a head of livestock (db/farm-livestock settles a livestock death into petHistory). */
+const MEMORIAL_SPECIES_PATTERN = /^(?:pet|livestock)\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DECOR_ID_PATTERN = /^decor\.[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX_COLOR = /^#[0-9a-f]{6}$/;
 const CROP_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -386,7 +388,7 @@ function normalizePetHistoryRow(raw: any): any | null {
   const id = cleanText(source.id, 40);
   const instanceId = cleanText(source.instanceId, 40);
   const speciesId = cleanText(source.speciesId, 80);
-  if (!INSTANCE_ID_PATTERN.test(id) || !INSTANCE_ID_PATTERN.test(instanceId) || !SPECIES_ID_PATTERN.test(speciesId) || !OUTCOMES.has(source.outcome)) return null;
+  if (!INSTANCE_ID_PATTERN.test(id) || !INSTANCE_ID_PATTERN.test(instanceId) || !MEMORIAL_SPECIES_PATTERN.test(speciesId) || !OUTCOMES.has(source.outcome)) return null;
   return {
     id, instanceId, speciesId, name: cleanName(source.name, NAME_LIMIT), outcome: source.outcome,
     departedAtFarmMinute: Math.max(0, boundedNumber(source.departedAtFarmMinute, 1000000000) ?? 0),

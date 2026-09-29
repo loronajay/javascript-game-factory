@@ -10,6 +10,7 @@ import { DISH_STARS, RECIPE_CATALOG, dishKey, parseDishKey } from "./farm-catalo
 import { starsLabel } from "./farm-kitchen.mjs";
 import { PATTERN_CATALOG, PIECE_STARS, PLANKS_PER_LOG, parsePieceKey, pieceKey } from "./farm-catalog/carpentry.mjs";
 import { QUALITIES, QUALITY_PRICE, gradedTitle, parseProduceKey, produceKey } from "./farm-quality.mjs";
+import { LIVESTOCK_GOODS, livestockGoodPrice } from "./farm-catalog/livestock.mjs";
 /** Ticket margin one productive cell earns per farm day of growth when its crop is sold raw. */
 export const MARKET_MARGIN_PER_CELL_DAY = 12;
 export const MAX_SALE_QUANTITY = 99;
@@ -24,6 +25,7 @@ export function derivedFruitPrice(species) {
 export const PRODUCE_PRICES = Object.freeze(Object.fromEntries([
     ...CROP_CATALOG.map((crop) => [crop.id, derivedProducePrice(crop)]),
     ...FRUIT_TREES.map((species) => [species.fruitId, derivedFruitPrice(species)]),
+    ...LIVESTOCK_GOODS.map((good) => [good.itemId, livestockGoodPrice(good)]),
 ]));
 /**
  * Everything the Produce Merchant buys, in the order the counter lists it: each
@@ -35,6 +37,10 @@ export const SELLABLE_PRODUCE = Object.freeze([
         return Object.freeze({ id, title: gradedTitle(crop.title, quality), itemKey: `produce:${id}` });
     })),
     ...FRUIT_TREES.map((species) => Object.freeze({ id: species.fruitId, title: species.fruitTitle, itemKey: `produce:${species.fruitId}` })),
+    ...LIVESTOCK_GOODS.flatMap((good) => [...QUALITIES].reverse().map((quality) => {
+        const id = produceKey(good.itemId, quality);
+        return Object.freeze({ id, title: gradedTitle(good.title, quality), itemKey: `produce:${id}` });
+    })),
 ]);
 /**
  * A basket key's STANDING price: its crop's Normal price by its grade. The

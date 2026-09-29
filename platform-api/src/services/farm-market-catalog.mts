@@ -12,6 +12,7 @@
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
+import { FARM_LIVESTOCK_GOODS, farmLivestockGoodPrice } from "./farm-livestock-catalog.mjs";
 import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey, type DishStars } from "./farm-recipe-catalog.mjs";
 import { farmPiecePrice, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
 import { QUALITY_PRICE, parseFarmProduceKey } from "./farm-quality-catalog.mjs";
@@ -46,6 +47,7 @@ export const FARM_PRODUCE_PRICES: Readonly<Record<string, number>> = Object.free
     return [cropId, derivedProducePrice(rule, seed.price)];
   }),
   ...Object.entries(FARM_TREE_RULES).filter(([, rule]) => rule.kind === "fruit").map(([fruitId, rule]) => [fruitId, derivedFruitPrice(rule)]),
+  ...FARM_LIVESTOCK_GOODS.map((good) => [good.itemId, farmLivestockGoodPrice(good)]),
 ]));
 
 export function farmProducePrice(cropId: unknown): number {

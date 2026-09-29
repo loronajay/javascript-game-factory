@@ -32,10 +32,11 @@ export function createVendorShelf(elements, options) {
         const title = document.createElement("strong");
         title.textContent = line.title;
         const held = options.held(line);
+        const unitPrice = options.price?.(line.price) ?? line.price;
         const meta = document.createElement("small");
         meta.textContent = "recipeId" in line
-            ? held ? "Learned · permanent cookbook recipe" : `${line.price} tickets · permanent cookbook recipe`
-            : `${line.price} tickets each · ${held} in your basket`;
+            ? held ? "Learned · permanent cookbook recipe" : `${unitPrice} tickets · permanent cookbook recipe`
+            : `${unitPrice} tickets each · ${held} in your basket`;
         label.append(title, meta);
         const actions = document.createElement("div");
         actions.className = "sale-footer__actions vendor-shelf__actions";
@@ -44,7 +45,8 @@ export function createVendorShelf(elements, options) {
             const button = document.createElement("button");
             button.type = "button";
             button.className = "farm-button";
-            button.textContent = busy === line.itemId ? "Buying…" : `Buy${quantity > 1 ? ` ${quantity}` : ""} · ${line.price * quantity}`;
+            const price = options.price?.(line.price * quantity) ?? line.price * quantity;
+            button.textContent = busy === line.itemId ? "Buying…" : `Buy${quantity > 1 ? ` ${quantity}` : ""} · ${price}`;
             button.disabled = Boolean(busy) || ("recipeId" in line && held > 0) || (!("recipeId" in line) && held + quantity > 99);
             button.addEventListener("click", () => void buy(line, quantity));
             actions.append(button);

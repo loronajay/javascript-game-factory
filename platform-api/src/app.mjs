@@ -352,6 +352,7 @@ export function createApp(options = {}) {
     const buyFarmLivestock = typeof options?.buyFarmLivestock === "function" ? options.buyFarmLivestock : null;
     const moveFarmLivestock = typeof options?.moveFarmLivestock === "function" ? options.moveFarmLivestock : null;
     const renameFarmLivestock = typeof options?.renameFarmLivestock === "function" ? options.renameFarmLivestock : null;
+    const careFarmLivestock = typeof options?.careFarmLivestock === "function" ? options.careFarmLivestock : null;
     const castFarmLine = typeof options?.castFarmLine === "function" ? options.castFarmLine : null;
     const landFarmCast = typeof options?.landFarmCast === "function" ? options.landFarmCast : null;
     const sellFarmFish = typeof options?.sellFarmFish === "function" ? options.sellFarmFish : null;
@@ -697,7 +698,7 @@ export function createApp(options = {}) {
     const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
     const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
     const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };
-    const farmLivestockServices = { getFarmLivestock, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock };
+    const farmLivestockServices = { getFarmLivestock, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock };
     const gameResultServices = { submitGameResult, getPetGameCareer };
     const progressionServices = {
         getGameXpProgress,
@@ -841,9 +842,9 @@ export function createApp(options = {}) {
         {
             // Livestock: the Dealer's sales, moves and names. Room and tickets bound
             // what a purchase can do; this only stops hammering.
-            match: (p) => /^\/games\/farm\/livestock\/(purchases|moves|names)$/.test(p),
+            match: (p) => /^\/games\/farm\/livestock\/(purchases|moves|names|care)$/.test(p),
             bucket: "farm-livestock",
-            limit: 120,
+            limit: 400,
             windowMs: 10 * MINUTE_MS,
         },
     ];

@@ -18,7 +18,7 @@
 // bite is rolled here, and nothing is kept.
 
 import * as THREE_VENDOR from "./vendor/three.module.js";
-import { createRoomLayoutStore } from "./arcade-room-store.mjs";
+import { createLayoutStore, createRoomLayoutStore } from "./arcade-room-store.mjs";
 import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
 import { spawnOffsetForCompany } from "./arcade-room-interaction.mjs";
 import { createRoomPresence, type RemoteMember } from "./arcade-room-presence.mjs";
@@ -66,6 +66,8 @@ import { createAchievementToaster } from "./platform/achievements/achievements.m
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
+import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
+import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -92,6 +94,15 @@ const tackleBar = requiredElement<HTMLElement>("#tackleBar");
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const marketUrl = `../market/index.html?from=cove${fromFarm ? `&farm=${encodeURIComponent(fromFarm)}` : ""}`;
 backLink.href = marketUrl;
+
+const inventoryFarm = await createLayoutStore(FARM_LAYOUT_SPEC).load();
+const inventorySummary = createFarmInventorySummary({
+  root: requiredElement<HTMLElement>("#inventoryPanel"),
+  openButton: requiredElement<HTMLButtonElement>("#openInventory"),
+  closeButton: requiredElement<HTMLButtonElement>("#closeInventory"),
+  body: requiredElement<HTMLElement>("#inventorySummary"),
+});
+inventorySummary.render(inventoryFarm.layout);
 
 // ---------------------------------------------------------------- the angler
 
@@ -487,10 +498,11 @@ function repaintPanels(): void {
 }
 
 function panelOpen(): boolean {
-  return creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
+  return inventorySummary.isOpen() || creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
 }
 
 function closePanels(): void {
+  inventorySummary.close();
   creelPanel.close();
   fishmongerPanel.close();
   tacklePanel.close();
@@ -623,7 +635,7 @@ function steerFromKeys(): void {
 
 window.addEventListener("keydown", (event) => {
   if (panelOpen()) {
-    if (event.code === "Escape") closePanels();
+    if (event.code === "Escape" || (event.code === "KeyI" && inventorySummary.isOpen())) closePanels();
     keys.clear();
     return;
   }
@@ -632,6 +644,12 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (!entered) return;
+  if (event.code === "KeyI" && !event.repeat && !fishing.busy()) {
+    event.preventDefault();
+    keys.clear();
+    inventorySummary.toggle();
+    return;
+  }
   if (event.code === "Space") {
     event.preventDefault();
     if (event.repeat) return;

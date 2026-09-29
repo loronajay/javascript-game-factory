@@ -2,6 +2,7 @@
 // the page, server normalizer and headless tests all use the same farming contract.
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
+import { LIVESTOCK_FEEDS, LIVESTOCK_GOODS } from "./farm-catalog/livestock.mjs";
 import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
 import { PIECE_KEYS } from "./farm-catalog/carpentry.mjs";
 import { QUALITIES, cropQuality, produceKey } from "./farm-quality.mjs";
@@ -61,10 +62,15 @@ export function deadCropModel(stage) {
 }
 /** Everything the harvest basket holds: the crops, then the fruit. */
 export const PRODUCE_IDS = Object.freeze([...CROP_CATALOG.map((entry) => entry.id), ...FRUIT_IDS]);
-/** Every basket stack: each crop at every grade (Normal is the bare id), then the fruit, which has no grades. */
+/**
+ * Every basket stack: each crop at every grade (Normal is the bare id), then the
+ * fruit, which has no grades, then the livestock's goods (milk, wool), graded
+ * like crops by the care the animal had (farm-livestock-care.mts).
+ */
 export const PRODUCE_KEYS = Object.freeze([
     ...CROP_CATALOG.flatMap((entry) => QUALITIES.map((quality) => produceKey(entry.id, quality))),
     ...FRUIT_IDS,
+    ...LIVESTOCK_GOODS.flatMap((good) => QUALITIES.map((quality) => produceKey(good.itemId, quality))),
 ]);
 export function findCrop(id) {
     return typeof id === "string" ? CROP_CATALOG.find((entry) => entry.id === id) : undefined;
@@ -141,10 +147,14 @@ function inventoryWith(defaultSeeds, source, defaultSaplings = {}) {
         // document with no seed stack at all.
         seeds: Object.freeze(Object.fromEntries(CROP_CATALOG.map((entry) => [entry.id, entry.id in seeds ? count(seeds[entry.id]) : typeof defaultSeeds === "number" ? (storedSeeds ? 0 : defaultSeeds) : count(defaultSeeds[entry.id])]))),
         produce: Object.freeze(Object.fromEntries(PRODUCE_KEYS.map((id) => [id, count(produce[id])]))),
-        supplies: Object.freeze(Object.fromEntries(PET_CARE.map((care) => [
-            care.food.itemId,
-            care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
-        ]))),
+        supplies: Object.freeze(Object.fromEntries([
+            ...PET_CARE.map((care) => [
+                care.food.itemId,
+                care.food.itemId in supplies ? count(supplies[care.food.itemId]) : care.food.starterQuantity,
+            ]),
+            // Livestock feed (farm-catalog/livestock.mts): bought, never granted.
+            ...LIVESTOCK_FEEDS.map((feed) => [feed.itemId, count(supplies[feed.itemId])]),
+        ])),
         saplings: Object.freeze(Object.fromEntries(TREE_CATALOG.map((species) => [species.id, count(saplings[species.id])]))),
         logs: Object.freeze(Object.fromEntries(TIMBER_TREES.map((species) => [species.id, count(logs[species.id])]))),
         dishes: Object.freeze(Object.fromEntries(DISH_KEYS.map((key) => [key, count(dishes[key])]))),

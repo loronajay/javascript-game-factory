@@ -23,11 +23,17 @@ export const LIVESTOCK_NAME_MAX = 24;
 export const MAX_HERD = 60;
 export const GRADE_THRESHOLDS = Object.freeze([0, 25, 40, 55, 70] as const);
 
+export type LivestockGoodRule = Readonly<{ itemId: string; everyDays: number; dayValue: number }>;
+
 export type LivestockRule = Readonly<{
   id: string;
   title: string;
   price: number;
   adultDays: number;
+  /** What it gives once grown; basket ids, graded like crops. */
+  products: readonly LivestockGoodRule[];
+  /** Its own feed from the supply shop, else these crops from the basket. */
+  feeds: Readonly<{ supply: string; crops: readonly string[] }>;
   stats: Readonly<Record<LivestockStat, Range>>;
   coats: readonly Readonly<{ id: string; weight: number }>[];
   names: readonly string[];
@@ -40,6 +46,8 @@ function rule(variant: string, spec: Omit<LivestockRule, "id">): LivestockRule {
     ...spec,
     id: `livestock.${variant}`,
     stats: Object.freeze({ ...spec.stats }),
+    products: Object.freeze(spec.products.map((product) => Object.freeze({ ...product }))),
+    feeds: Object.freeze({ supply: spec.feeds.supply, crops: Object.freeze([...spec.feeds.crops]) }),
     coats: Object.freeze(spec.coats.map((coat) => Object.freeze({ ...coat }))),
     names: Object.freeze([...spec.names]),
   });
@@ -48,24 +56,32 @@ function rule(variant: string, spec: Omit<LivestockRule, "id">): LivestockRule {
 export const FARM_LIVESTOCK_RULES: readonly LivestockRule[] = Object.freeze([
   rule("sheep", {
     title: "Sheep", price: 350, adultDays: 2,
+    products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
+    feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
     stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
     coats: [{ id: "standard", weight: 60 }, { id: "black", weight: 20 }, { id: "moorit", weight: 15 }, { id: "silver", weight: 5 }],
     names: ["Clover", "Woolly", "Dolly", "Bramble", "Fleecy", "Lambert", "Willow", "Pip", "Nutmeg", "Snowdrop"],
   }),
   rule("pig", {
     title: "Pig", price: 400, adultDays: 2,
+    products: [],
+    feeds: { supply: "food.pig-feed", crops: ["potato", "pumpkin", "corn", "beetroot", "watermelon", "apple"] },
     stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(30, 75) },
     coats: [{ id: "standard", weight: 55 }, { id: "berkshire", weight: 20 }, { id: "tamworth", weight: 20 }, { id: "spotted", weight: 5 }],
     names: ["Truffle", "Hamlet", "Porkchop", "Rosie", "Wilbur", "Peony", "Babe", "Mudge", "Oinkers", "Bacon"],
   }),
   rule("cow", {
     title: "Cow", price: 750, adultDays: 3,
+    products: [{ itemId: "milk", everyDays: 1, dayValue: 28 }],
+    feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
     stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
     coats: [{ id: "standard", weight: 50 }, { id: "jersey", weight: 25 }, { id: "angus", weight: 20 }, { id: "highland", weight: 5 }],
     names: ["Bessie", "Daisy", "Buttercup", "Clementine", "Moolan", "Hazel", "Marigold", "Duchess", "Bluebell", "Caramel"],
   }),
   rule("llama", {
     title: "Llama", price: 650, adultDays: 3,
+    products: [{ itemId: "wool-llama", everyDays: 3, dayValue: 22 }],
+    feeds: { supply: "food.hay", crops: ["carrot", "corn", "cabbage"] },
     stats: { yield: range(15, 60), quality: range(20, 65), growth: range(20, 65), hardiness: range(40, 85) },
     coats: [{ id: "standard", weight: 50 }, { id: "cream", weight: 25 }, { id: "charcoal", weight: 20 }, { id: "appaloosa", weight: 5 }],
     names: ["Dolly", "Kuzco", "Paco", "Pisco", "Andes", "Machu", "Tina", "Quinoa", "Chewie", "Fernando"],
@@ -156,4 +172,136 @@ export function pickFarmLivestockHome(homes: readonly FarmLivestockHome[], herdH
     return chosen && hasRoom(chosen) ? chosen : null;
   }
   return homes.find(hasRoom) ?? null;
+}
+
+// ---------------------------------------------------------------- goods and feed
+
+/** Every good livestock give (basket ids): the Produce Merchant buys them, graded like crops. */
+export const FARM_LIVESTOCK_GOODS: readonly LivestockGoodRule[] = Object.freeze(FARM_LIVESTOCK_RULES.flatMap((entry) => entry.products));
+export const AVERAGE_GOODS_PER_COLLECTION = 1.5;
+
+export function farmLivestockGood(itemId: unknown): LivestockGoodRule | null {
+  return FARM_LIVESTOCK_GOODS.find((good) => good.itemId === itemId) ?? null;
+}
+
+/** A good's Normal price: its day value over its cycle, per piece (the page's `livestockGoodPrice`). */
+export function farmLivestockGoodPrice(good: Pick<LivestockGoodRule, "dayValue" | "everyDays">): number {
+  return Math.ceil((good.dayValue * good.everyDays) / AVERAGE_GOODS_PER_COLLECTION);
+}
+
+/** Livestock feed in the supply shop, by price (the page's LIVESTOCK_FEEDS; services/farm-economy-catalog sells the same two). */
+export const FARM_LIVESTOCK_FEED_PRICES: Readonly<Record<string, number>> = Object.freeze({ "food.hay": 8, "food.pig-feed": 8 });
+
+// ---------------------------------------------------------------- care (js/farm-livestock-care.mts, rule for rule)
+
+const DAY = 24 * 60;
+export const HUNGER_PER_DAY = 25;
+export const HARDINESS_SPREAD = 0.6;
+export const GROWTH_SPREAD = 0.6;
+export const SERVING = 35;
+export const FULL = 100;
+export const HUNGRY_AT = 40;
+export const STARVE_GRACE_MINUTES = DAY;
+export const YIELD_STEP = 40;
+export const STRESS_WEIGHT = 60;
+export const GOOD_GRADE_SCORES = Object.freeze({ perfect: 70, fine: 45, normal: 20 } as const);
+
+export type LivestockCare = { hunger: number; at: number; starvedAt: number | null; progress: Record<string, number>; stress: Record<string, number> };
+export type CareSubject = Readonly<{ speciesId: string; stats: LivestockStats; bornAt: number }>;
+export type GoodQuality = "poor" | "normal" | "fine" | "perfect";
+
+export function newLivestockCare(at: number): LivestockCare {
+  return { hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: {}, stress: {} };
+}
+
+function finite(value: unknown, fallback = 0): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+export function normalizeLivestockCare(value: unknown, fallbackAt: number): LivestockCare {
+  if (!value || typeof value !== "object") return newLivestockCare(fallbackAt);
+  const source = value as Record<string, any>;
+  const minutes = (table: unknown): Record<string, number> => {
+    const out: Record<string, number> = {};
+    if (table && typeof table === "object") {
+      for (const [id, raw] of Object.entries(table as Record<string, unknown>).slice(0, 8)) {
+        if (/^[a-z0-9-]{1,40}$/.test(id)) out[id] = Math.max(0, finite(raw));
+      }
+    }
+    return out;
+  };
+  return {
+    hunger: Math.min(FULL, Math.max(0, finite(source.hunger, FULL))),
+    at: Math.max(0, finite(source.at, fallbackAt)),
+    starvedAt: source.starvedAt === null || source.starvedAt === undefined ? null : Math.max(0, finite(source.starvedAt)),
+    progress: minutes(source.progress),
+    stress: minutes(source.stress),
+  };
+}
+
+export function hungerPerMinute(stats: LivestockStats): number {
+  return (HUNGER_PER_DAY * (1 + HARDINESS_SPREAD * (0.5 - stats.hardiness / STAT_MAX))) / DAY;
+}
+
+export function adultAgeDays(entry: Pick<LivestockRule, "adultDays">, stats: LivestockStats): number {
+  return entry.adultDays * (1 + GROWTH_SPREAD * (0.5 - stats.growth / STAT_MAX));
+}
+
+export function adultMinute(subject: CareSubject, entry: LivestockRule): number {
+  return subject.bornAt + adultAgeDays(entry, subject.stats) * DAY;
+}
+
+function overlap(start: number, end: number, from: number): number {
+  return Math.max(0, end - Math.max(start, from));
+}
+
+export function advanceLivestockCare(subject: CareSubject, care: LivestockCare, now: number): LivestockCare {
+  const entry = farmLivestockRule(subject.speciesId);
+  if (!entry || !(now > care.at)) return care;
+  const start = care.at;
+  const end = now;
+  const rate = hungerPerMinute(subject.stats);
+  const wellUntil = Math.min(end, care.hunger > HUNGRY_AT ? start + (care.hunger - HUNGRY_AT) / rate : start);
+  const grownFrom = adultMinute(subject, entry);
+  const well = overlap(start, wellUntil, grownFrom);
+  const hungry = overlap(Math.max(start, wellUntil), end, grownFrom);
+  const progress: Record<string, number> = { ...care.progress };
+  const stress: Record<string, number> = { ...care.stress };
+  for (const product of entry.products) {
+    const cycle = product.everyDays * DAY;
+    const before = progress[product.itemId] ?? 0;
+    if (before < cycle) stress[product.itemId] = Math.min(cycle, (stress[product.itemId] ?? 0) + hungry);
+    progress[product.itemId] = Math.min(cycle, before + well);
+  }
+  const hunger = Math.max(0, care.hunger - rate * (end - start));
+  const emptyAt = start + care.hunger / rate;
+  const starvedAt = hunger > 0 ? null : care.starvedAt ?? Math.min(end, emptyAt);
+  return { hunger, at: end, starvedAt, progress, stress };
+}
+
+export function livestockDeathMinute(subject: CareSubject, care: LivestockCare): number {
+  if (care.hunger > 0 && care.starvedAt === null) return care.at + care.hunger / hungerPerMinute(subject.stats) + STARVE_GRACE_MINUTES;
+  return (care.starvedAt ?? care.at) + STARVE_GRACE_MINUTES;
+}
+
+export function feedLivestockCare(care: LivestockCare): LivestockCare {
+  const hunger = Math.min(FULL, care.hunger + SERVING);
+  return { ...care, hunger, starvedAt: hunger > 0 ? null : care.starvedAt };
+}
+
+export function wantsFood(care: LivestockCare): boolean {
+  return care.hunger < FULL - 0.5;
+}
+
+export function goodsPerCollection(stats: LivestockStats): number {
+  return 1 + Math.floor(stats.yield / YIELD_STEP);
+}
+
+export function goodQuality(stats: LivestockStats, stressMinutes: number, cycleMinutes: number): GoodQuality {
+  const score = stats.quality - STRESS_WEIGHT * Math.min(1, Math.max(0, stressMinutes) / Math.max(1, cycleMinutes));
+  if (score >= GOOD_GRADE_SCORES.perfect) return "perfect";
+  if (score >= GOOD_GRADE_SCORES.fine) return "fine";
+  if (score >= GOOD_GRADE_SCORES.normal) return "normal";
+  return "poor";
 }

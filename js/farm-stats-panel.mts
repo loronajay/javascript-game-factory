@@ -1,7 +1,7 @@
 // Read-only Stats panel. It renders the pure view model from farm-stats.mts and
 // owns only panel visibility; no stat can be edited or persisted from here.
 
-import { buildFarmStats, type FarmSkillStats } from "./farm-stats.mjs";
+import { buildFarmStats, type FarmSkillStats, type FishingStats } from "./farm-stats.mjs";
 import type { FarmSkills } from "./farm-skills.mjs";
 
 type Elements = Readonly<{
@@ -19,7 +19,7 @@ export type FarmStatsPanel = Readonly<{
   close: () => void;
   toggle: () => void;
   isOpen: () => boolean;
-  render: (skills: FarmSkills) => void;
+  render: (skills: FarmSkills, fishing?: FishingStats | null) => void;
 }>;
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = ""): HTMLElementTagNameMap[K] {
@@ -91,8 +91,8 @@ export function createFarmStatsPanel(elements: Elements, options: Options = {}):
     document.exitPointerLock?.();
   }
   function toggle(): void { isOpen() ? close() : open(); }
-  function render(skills: FarmSkills): void {
-    const view = buildFarmStats(skills);
+  function render(skills: FarmSkills, fishing?: FishingStats | null): void {
+    const view = buildFarmStats(skills, { fishing });
     elements.summary.textContent = `Total level ${view.totalLevel} · ${view.totalXp.toLocaleString()} lifetime XP`;
     elements.grid.replaceChildren(...view.skills.map(statCard));
   }

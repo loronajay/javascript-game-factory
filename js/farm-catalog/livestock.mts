@@ -49,8 +49,24 @@ export type LivestockCoat = Readonly<{
   colors: Readonly<Record<string, string>>;
 }>;
 
-/** A renewable good: milk every so many farm days, wool once the fleece has grown back. */
-export type LivestockProduct = Readonly<{ itemId: string; title: string; everyDays: number }>;
+/**
+ * A renewable good: milk every so many farm days, wool once the fleece has
+ * grown back. It lands in the harvest basket like a crop, graded
+ * Poor/Normal/Fine/Perfect. `dayValue` is what one grown animal's good is worth
+ * to the Produce Merchant per farm day, on average: the price is DERIVED from
+ * it (`livestockGoodPrice`), the way a crop's is from its growing days.
+ */
+export type LivestockProduct = Readonly<{ itemId: string; title: string; everyDays: number; dayValue: number }>;
+
+/** What an animal eats: its own feed from the supply shop first, else a crop from the basket it likes. */
+export type LivestockFeeds = Readonly<{ supply: string; crops: readonly string[] }>;
+
+/** The livestock feeds, sold in the farm's supply shop beside the pet foods. The server's price is the price. */
+export type LivestockFeed = Readonly<{ itemId: string; title: string; price: number }>;
+export const LIVESTOCK_FEEDS: readonly LivestockFeed[] = Object.freeze([
+  Object.freeze({ itemId: "food.hay", title: "Hay", price: 8 }),
+  Object.freeze({ itemId: "food.pig-feed", title: "Pig Feed", price: 8 }),
+]);
 
 export type LivestockSpecies = Readonly<{
   id: string;
@@ -72,8 +88,9 @@ export type LivestockSpecies = Readonly<{
   price: number;
   /** Farm days from birth to grown at Growth 50. */
   adultDays: number;
-  /** What it gives once grown (Phase 2). Pigs give nothing but meat. */
+  /** What it gives once grown. Pigs give nothing but meat. */
   products: readonly LivestockProduct[];
+  feeds: LivestockFeeds;
   /** The range the Dealer's animals are born in, per stat (1–100). */
   stats: Readonly<Record<LivestockStat, StatRange>>;
   /** Names the Dealer's animals come with; the player may rename. */
@@ -97,6 +114,7 @@ function species(variant: string, spec: Spec): LivestockSpecies {
     clips: spec.clips ?? QUATERNIUS_CLIPS,
     coats: Object.freeze(spec.coats.map((coat) => Object.freeze({ ...coat, colors: Object.freeze({ ...coat.colors }) }))),
     products: Object.freeze(spec.products.map((product) => Object.freeze({ ...product }))),
+    feeds: Object.freeze({ supply: spec.feeds.supply, crops: Object.freeze([...spec.feeds.crops]) }),
     stats: Object.freeze({ ...spec.stats }),
     names: Object.freeze([...spec.names]),
   });
@@ -114,9 +132,10 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
     ],
     price: 350, adultDays: 2,
     products: [
-      { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1 },
-      { itemId: "wool", title: "Wool", everyDays: 3 },
+      { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1, dayValue: 14 },
+      { itemId: "wool", title: "Wool", everyDays: 3, dayValue: 12 },
     ],
+    feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
     stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
     names: ["Clover", "Woolly", "Dolly", "Bramble", "Fleecy", "Lambert", "Willow", "Pip", "Nutmeg", "Snowdrop"],
   }),
@@ -131,6 +150,7 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
     ],
     price: 400, adultDays: 2,
     products: [],
+    feeds: { supply: "food.pig-feed", crops: ["potato", "pumpkin", "corn", "beetroot", "watermelon", "apple"] },
     stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(30, 75) },
     names: ["Truffle", "Hamlet", "Porkchop", "Rosie", "Wilbur", "Peony", "Babe", "Mudge", "Oinkers", "Bacon"],
   }),
@@ -144,7 +164,8 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
       { id: "highland", title: "Highland", weight: 5, colors: { White: "#b8672f", Black: "#7a3d17" } },
     ],
     price: 750, adultDays: 3,
-    products: [{ itemId: "milk", title: "Milk", everyDays: 1 }],
+    products: [{ itemId: "milk", title: "Milk", everyDays: 1, dayValue: 28 }],
+    feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
     stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
     names: ["Bessie", "Daisy", "Buttercup", "Clementine", "Moolan", "Hazel", "Marigold", "Duchess", "Bluebell", "Caramel"],
   }),
@@ -158,7 +179,8 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
       { id: "appaloosa", title: "Appaloosa", weight: 5, colors: { Brown: "#e6ddd2", White: "#7a4e36", Grey: "#5a5250" } },
     ],
     price: 650, adultDays: 3,
-    products: [{ itemId: "wool-llama", title: "Llama Wool", everyDays: 3 }],
+    products: [{ itemId: "wool-llama", title: "Llama Wool", everyDays: 3, dayValue: 22 }],
+    feeds: { supply: "food.hay", crops: ["carrot", "corn", "cabbage"] },
     stats: { yield: range(15, 60), quality: range(20, 65), growth: range(20, 65), hardiness: range(40, 85) },
     names: ["Dolly", "Kuzco", "Paco", "Pisco", "Andes", "Machu", "Tina", "Quinoa", "Chewie", "Fernando"],
   }),
@@ -175,4 +197,19 @@ export function findLivestockCoat(speciesId: unknown, coatId: unknown): Livestoc
 
 export function allLivestockIds(): string[] {
   return LIVESTOCK_CATALOG.map((entry) => entry.id);
+}
+
+/** Every good livestock give, once each (a basket id), with the species that give it. */
+export const LIVESTOCK_GOODS: readonly LivestockProduct[] = Object.freeze(LIVESTOCK_CATALOG.flatMap((entry) => entry.products));
+
+export function findLivestockGood(itemId: unknown): LivestockProduct | undefined {
+  return LIVESTOCK_GOODS.find((product) => product.itemId === itemId);
+}
+
+/** How many of a good one collection gives, on average across the Yield stat's reach: the price divides by it. */
+export const AVERAGE_GOODS_PER_COLLECTION = 1.5;
+
+/** A good's Normal price: its day value over its cycle, per piece. The server derives it the same way. */
+export function livestockGoodPrice(product: Pick<LivestockProduct, "dayValue" | "everyDays">): number {
+  return Math.ceil((product.dayValue * product.everyDays) / AVERAGE_GOODS_PER_COLLECTION);
 }
