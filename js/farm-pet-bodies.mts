@@ -27,7 +27,15 @@ import type { PetBody as PetPose } from "./farm-pets.mjs";
 type ThreeNamespace = Record<string, any>;
 
 /** What a body needs to know of its species: how big to draw it and how much room it takes. */
-export type BodySpecies = Readonly<{ id: string; radius: number; height: number }>;
+export type BodySpecies = Readonly<{
+  id: string;
+  radius: number;
+  height: number;
+  /** Extra turn for a model that faces the other way. */
+  modelYaw?: number;
+  /** Measure the model as its skeleton stands, not by its bind-pose box (a rig whose bones scale it: the chicken). */
+  fitPosed?: boolean;
+}>;
 
 /** How one family of animals is drawn. */
 export type BodyOptions<S extends BodySpecies = BodySpecies> = Readonly<{
@@ -175,16 +183,32 @@ export function createPetBodies<S extends BodySpecies = AnimalDefinition>(THREE:
     body.current = clip;
   }
 
-  /** Scale to the species' height (the pack is hundreds of units tall) and stand the model on its footprint centre. */
-  function fitModel(body: Body, model: any): void {
-    const initial = new THREE.Box3().setFromObject(model);
+  /**
+   * Scale to the species' height (the pack is hundreds of units tall) and stand
+   * the model on its footprint centre. A `fitPosed` species is measured standing
+   * in its idle clip, bones and all.
+   */
+  function fitModel(body: Body, model: any, idle: any): void {
+    const posed = Boolean(body.species.fitPosed);
+    // Held in its idle pose while it is measured (stopping the mixer puts the bones back at rest).
+    const mixer = posed && idle ? new THREE.AnimationMixer(model) : null;
+    if (mixer) {
+      mixer.clipAction(idle).play();
+      mixer.update(0);
+    }
+    const measure = (): any => {
+      if (posed) model.updateMatrixWorld(true);
+      return new THREE.Box3().setFromObject(model, posed);
+    };
+    const initial = measure();
     const size = initial.getSize(new THREE.Vector3());
     model.scale.setScalar(size.y > 0 ? body.species.height / size.y : 1);
-    const fitted = new THREE.Box3().setFromObject(model);
+    const fitted = measure();
     const centre = fitted.getCenter(new THREE.Vector3());
     model.position.set(-centre.x, -fitted.min.y, -centre.z);
     body.height = fitted.max.y - fitted.min.y;
-    model.rotation.y = MODEL_YAW_OFFSET;
+    model.rotation.y = MODEL_YAW_OFFSET + (body.species.modelYaw ?? 0);
+    mixer?.stopAllAction();
   }
 
   function loadModel(body: Body): void {
@@ -193,7 +217,8 @@ export function createPetBodies<S extends BodySpecies = AnimalDefinition>(THREE:
     loader.load(options.assetUrl(species), (gltf: any) => {
       if (token !== body.loadToken || !bodies.has(body.instanceId)) return;
       body.model = gltf.scene;
-      fitModel(body, body.model);
+      const clips = options.clips(THREE, gltf, species);
+      fitModel(body, body.model, clips.idle);
       body.model.traverse((node: any) => {
         if (node.isMesh) {
           const paint = (material: any): any => options.paint(THREE, material, species, body.paletteId);
@@ -204,7 +229,7 @@ export function createPetBodies<S extends BodySpecies = AnimalDefinition>(THREE:
       });
       body.visual.add(body.model);
       body.placeholder.visible = false;
-      body.clips = options.clips(THREE, gltf, species);
+      body.clips = clips;
       body.mixer = body.clips.idle ? new THREE.AnimationMixer(body.model) : null;
       body.current = null;
       play(body, body.clips.idle);

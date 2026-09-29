@@ -61,21 +61,27 @@ export const BREEDING_REFUSAL_WORDS: Readonly<Record<BreedingRefusal, string>> =
   not_male: "She needs a male to be paired with.",
   other_species: "They are not the same kind of animal.",
   not_grown: "Both must be grown.",
-  not_together: "They must live in the same pen or barn floor.",
+  not_together: "They must live in the same pen, coop or barn floor.",
   pregnant: "She is already expecting.",
   resting: "She is resting after her last birth.",
   hungry: "Both must be well fed.",
   no_room: "There is no free place on the farm for a young one.",
 });
 
-type Home = Readonly<{ id: string; slots: number }>;
+type Home = Readonly<{ id: string; slots: number; species?: readonly string[] | null }>;
 type Resident = Readonly<{ homeId: string | null; care?: Readonly<{ pregnancy?: unknown }> }>;
 
-/** Places a young one could be born into: empty slots in standing homes, less those other mothers' young are owed. */
-export function freePlacesForYoung(homes: readonly Home[], herd: readonly Resident[]): number {
+/**
+ * Places a young one could be born into: empty slots in standing homes (those
+ * that take `speciesId`, when given — a calf is never born into the coop), less
+ * those other mothers' young are owed. Every owed young one is counted against
+ * every species, so the answer may be short, never long.
+ */
+export function freePlacesForYoung(homes: readonly Home[], herd: readonly Resident[], speciesId?: string): number {
   const counts = new Map<string, number>(homes.map((home) => [home.id, 0]));
   for (const animal of herd) if (animal.homeId && counts.has(animal.homeId)) counts.set(animal.homeId, counts.get(animal.homeId)! + 1);
-  const empty = homes.reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
+  const takes = (home: Home): boolean => speciesId === undefined || !home.species || home.species.includes(speciesId);
+  const empty = homes.filter(takes).reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
   const owed = herd.filter((animal) => Boolean(animal.care?.pregnancy)).length;
   return Math.max(0, empty - owed);
 }

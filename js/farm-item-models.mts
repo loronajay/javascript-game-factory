@@ -165,6 +165,7 @@ const SACK_COLORS: Readonly<Record<string, string>> = Object.freeze({
   "food.deep-sea-feed": "#30263f",
   "food.plankton-blend": "#2f9a8f",
   "food.pig-feed": "#c9748a",
+  "food.chicken-feed": "#d9a02e",
 });
 
 /** A small bale of hay: a golden block with two twine bands. */

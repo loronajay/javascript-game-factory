@@ -29,7 +29,9 @@
 // customers (a creamery wants milk, a mill wants wool) and their own stream,
 // so every notice before them keeps its id and its lines. The kitchen's pool
 // leaves out dishes that need livestock goods for the same reason: adding the
-// dairy recipes changed no kitchen notice that was already up.
+// dairy recipes changed no kitchen notice that was already up. The hens' eggs
+// joined both herd tiers with the chicken (2026-09-29), with egg buyers of
+// their own (a diner, a bakery); that reshuffled only the herd notices.
 
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { farmDishPrice, farmProducePrice } from "./farm-market-catalog.mjs";
@@ -142,8 +144,8 @@ export type FarmHerdOrderTier = Readonly<{
 }>;
 
 export const FARM_HERD_ORDER_TIERS: readonly FarmHerdOrderTier[] = Object.freeze([
-  Object.freeze({ tier: "herd", minLevel: 1, goods: Object.freeze(["milk-sheep", "wool"]), lines: 1, count: Object.freeze([3, 6]) as readonly [number, number], premium: 1.6 }),
-  Object.freeze({ tier: "herd-contract", minLevel: 10, goods: Object.freeze(["milk", "milk-sheep", "wool", "wool-llama"]), lines: 2, count: Object.freeze([3, 6]) as readonly [number, number], premium: 1.75 }),
+  Object.freeze({ tier: "herd", minLevel: 1, goods: Object.freeze(["milk-sheep", "wool", "egg"]), lines: 1, count: Object.freeze([3, 6]) as readonly [number, number], premium: 1.6 }),
+  Object.freeze({ tier: "herd-contract", minLevel: 10, goods: Object.freeze(["milk", "milk-sheep", "wool", "wool-llama", "egg"]), lines: 2, count: Object.freeze([3, 6]) as readonly [number, number], premium: 1.75 }),
 ]);
 
 /**
@@ -151,7 +153,7 @@ export const FARM_HERD_ORDER_TIERS: readonly FarmHerdOrderTier[] = Object.freeze
  * fair or a farm shop takes both. A notice is written first and then pinned by
  * someone who would want exactly that, so a cheese cave never asks for fleece.
  */
-export type FarmHerdCustomer = Readonly<{ name: string; note: string; wants: "milk" | "wool" | "both" }>;
+export type FarmHerdCustomer = Readonly<{ name: string; note: string; wants: "milk" | "wool" | "egg" | "both" }>;
 export const FARM_HERD_ORDER_CUSTOMERS: readonly FarmHerdCustomer[] = Object.freeze(([
   { name: "Hollow Creek Creamery", note: "The churns are standing idle. Bring it fresh from the pail.", wants: "milk" },
   { name: "Dunmore Cheese Cave", note: "The wheels won't age themselves.", wants: "milk" },
@@ -159,14 +161,16 @@ export const FARM_HERD_ORDER_CUSTOMERS: readonly FarmHerdCustomer[] = Object.fre
   { name: "The Spinning Wheel", note: "Knitting circle meets Thursday and the baskets are empty.", wants: "wool" },
   { name: "Fleece & Fiber Mercantile", note: "Winter orders are piling up. Clean fleece only!", wants: "wool" },
   { name: "Brambleford Woollen Mill", note: "The looms eat faster than the flocks can grow it.", wants: "wool" },
+  { name: "Sunnyside Diner", note: "Breakfast rush starts at six, and we go through eggs by the crate.", wants: "egg" },
+  { name: "Rosehip Bakery", note: "The sponges won't rise on promises. Fresh eggs, please.", wants: "egg" },
   { name: "Thornbury Country Fair", note: "The dairy tent and the fleece tent both need filling by Saturday.", wants: "both" },
   { name: "Old Mill Farmstead Shop", note: "Anything off a farm animal sells out by noon. Bring plenty.", wants: "both" },
 ] as const).map((entry) => Object.freeze({ ...entry })));
 
-/** Which customers would want these lines: milk only, wool only, or a mix. */
+/** Which customers would want these lines: milk only, wool only, eggs only, or a mix. */
 function herdWants(lines: Readonly<Record<string, number>>): FarmHerdCustomer["wants"] {
-  const kinds = new Set(Object.keys(lines).map((itemId) => (itemId.startsWith("milk") ? "milk" : "wool")));
-  return kinds.size === 1 ? [...kinds][0] as "milk" | "wool" : "both";
+  const kinds = new Set(Object.keys(lines).map((itemId) => (itemId.startsWith("milk") ? "milk" : itemId === "egg" ? "egg" : "wool")));
+  return kinds.size === 1 ? [...kinds][0] as "milk" | "wool" | "egg" : "both";
 }
 
 /** A herd order's Husbandry XP is this share of what collecting its goods earned. */

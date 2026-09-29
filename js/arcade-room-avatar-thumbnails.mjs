@@ -59,28 +59,40 @@ export function createAvatarThumbnails(THREE, options = {}) {
         return true;
     }
     /** Stand the model on the origin at a common height and turn it a little towards the key light. */
-    function fitModel(model, height) {
-        const initial = new THREE.Box3().setFromObject(model);
+    function fitModel(model, height, yaw = 0, posed = false) {
+        const measure = () => {
+            if (posed)
+                model.updateMatrixWorld(true);
+            return new THREE.Box3().setFromObject(model, posed);
+        };
+        const initial = measure();
         const size = initial.getSize(new THREE.Vector3());
         model.scale.setScalar(size.y > 0 ? height / size.y : 1);
-        const fitted = new THREE.Box3().setFromObject(model);
+        const fitted = measure();
         const centre = fitted.getCenter(new THREE.Vector3());
         model.position.set(-centre.x, -fitted.min.y, -centre.z);
-        model.rotation.y = -Math.PI * 0.12;
+        model.rotation.y = -Math.PI * 0.12 + yaw;
     }
     function render(gltf, subject) {
         for (const child of [...stage.children])
             stage.remove(child);
-        fitModel(gltf.scene, subject.height ?? 2.0);
-        stage.add(gltf.scene);
         const clip = subject.poseClip
             ? subject.poseClip(gltf)
             : (gltf.animations?.find((candidate) => /idle/i.test(candidate.name)) ?? gltf.animations?.[0] ?? null);
-        if (clip) {
+        const pose = () => {
+            if (!clip)
+                return;
             const mixer = new THREE.AnimationMixer(gltf.scene);
             mixer.clipAction(clip).play();
             mixer.update(POSE_SECONDS);
-        }
+        };
+        // A `fitPosed` subject is measured standing in its pose; everything else by its bind box, then posed.
+        if (subject.fitPosed)
+            pose();
+        fitModel(gltf.scene, subject.height ?? 2.0, subject.yaw ?? 0, subject.fitPosed ?? false);
+        stage.add(gltf.scene);
+        if (!subject.fitPosed)
+            pose();
         camera.lookAt(0, subject.lookAtY ?? 1.0, 0);
         renderer.render(scene, camera);
         const url = renderer.domElement.toDataURL("image/png");

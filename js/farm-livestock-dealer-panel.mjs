@@ -20,7 +20,8 @@ function element(tag, className, text = "") {
 export function livestockGoods(species) {
     if (!species.products.length)
         return "Raised for the butcher";
-    return species.products.map((product) => `${product.title} every ${product.everyDays === 1 ? "day" : `${product.everyDays} days`}`).join(" · ");
+    const from = (product) => (product.onlyFrom ? ` (${species.sexTitles?.[product.onlyFrom]?.toLowerCase() ?? product.onlyFrom}s only)` : "");
+    return species.products.map((product) => `${product.title} every ${product.everyDays === 1 ? "day" : `${product.everyDays} days`}${from(product)}`).join(" · ");
 }
 export function createLivestockDealerPanel(elements, options) {
     let busy = false;
@@ -59,20 +60,23 @@ export function createLivestockDealerPanel(elements, options) {
     }
     function render() {
         const farm = options.farm();
-        const free = homesWithRoom(farm.homes, farm.herd).reduce((sum, home) => {
+        // Free places, all told and for one species (the coop takes only chickens).
+        const freeFor = (speciesId) => homesWithRoom(farm.homes, farm.herd, speciesId).reduce((sum, home) => {
             const taken = farm.herd.filter((animal) => animal.homeId === home.id).length;
             return sum + (home.slots - taken);
         }, 0);
+        const free = freeFor();
         const total = totalLivestockSlots(farm.homes);
         const level = options.husbandryLevel?.() ?? 1;
         elements.room.textContent = total
             ? `Room at home: ${free} of ${total} ${total === 1 ? "place" : "places"} free · ${farm.herd.length} head on the farm`
-            : "Your farm has nowhere to keep livestock yet — build a pen, or use the barn floor or a stable's stalls.";
+            : "Your farm has nowhere to keep livestock yet — build a pen or a chicken coop, or use the barn floor or a stable's stalls.";
         elements.list.replaceChildren();
         for (const species of LIVESTOCK_CATALOG) {
             const card = element("li", "dealer-card");
             card.dataset.speciesId = species.id;
             const locked = level < species.minLevel;
+            const room = freeFor(species.id);
             card.classList.toggle("is-locked", locked);
             const words = element("div", "dealer-card__words");
             words.append(element("strong", "", `${species.youngTitle} · grows into a ${species.title}`), element("small", "", livestockGoods(species)), element("small", "dealer-card__grow", `${species.price.toLocaleString()} tickets · grown in about ${species.adultDays} farm days`));
@@ -81,10 +85,10 @@ export function createLivestockDealerPanel(elements, options) {
             button.setAttribute("aria-label", `Buy a ${species.youngTitle.toLowerCase()} for ${species.price.toLocaleString()} tickets`);
             if (locked)
                 button.textContent = `Husbandry ${species.minLevel}`;
-            button.disabled = busy || free <= 0 || locked;
+            button.disabled = busy || room <= 0 || locked;
             button.title = locked
                 ? `Hollis sells ${species.title.toLowerCase()}s from Husbandry ${species.minLevel}. You are Husbandry ${level}.`
-                : free <= 0 ? "No room at home" : `Buy a ${species.youngTitle.toLowerCase()} for ${species.price.toLocaleString()} tickets`;
+                : room <= 0 ? (free > 0 ? `No room for a ${species.title.toLowerCase()} — the coop is for chickens` : "No room at home") : `Buy a ${species.youngTitle.toLowerCase()} for ${species.price.toLocaleString()} tickets`;
             button.addEventListener("click", () => void buy(species.id));
             card.append(picture(species), words, button);
             elements.list.append(card);

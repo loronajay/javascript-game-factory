@@ -1,6 +1,6 @@
 # Farm Livestock Plan
 
-Status: **Phases 0–5 shipped** (2026-09-28): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes; then breeding. Next: Phase 6 (trading live animals). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
+Status: **Phases 0–5 shipped** (2026-09-28), **plus the chicken** (2026-09-29): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes; then breeding. Next: Phase 6 (trading live animals). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
 and `FARM_HARVEST_MARKET_SKILLS_PLAN.md`.
 
 Livestock are farm animals that **yield goods** — milk, wool, and meat
@@ -13,7 +13,9 @@ the stable stalls and the coop a job.
 1. **Meat = send to the butcher.** A grown animal is sold to a Butcher in the
    Market Square; it leaves the farm and the player receives meat cuts. Nothing
    is shown on-screen. The pack's `Death` clip is not used for this.
-2. **Species:** cow, pig, sheep, llama. **No zebra, no pug.**
+2. **Species:** cow, pig, sheep, llama — and the **chicken** (2026-09-29, a
+   rigged CC-BY model the owner added; hens lay eggs, roosters don't, and
+   roosters are drawn bigger and in their own colours). **No zebra, no pug.**
    - Llama is a wool animal.
    - **Horse is a pet, not livestock** — a pet that works differently: it can
      be **ridden** and does **not** play Pet Games. Its own phase below.
@@ -39,7 +41,9 @@ the stable stalls and the coop a job.
 
 ## Assets
 
-`farm/assets/yield-animals/` — Quaternius *Farm Animals* pack, CC0 (`License.txt`).
+`farm/assets/yield-animals/` — Quaternius *Farm Animals* pack, CC0 (`License.txt`),
+and `chicken.glb` (Maf'j Alvarez, CC-BY-4.0, credited in `CREDITS.md`; not
+built by `convert.py`, it came as a GLB).
 Blends/FBX/OBJ only. Clips found in the FBX:
 
 | Model | Clips |
@@ -103,7 +107,7 @@ so **stats cannot live in the client-saved farm document.** Same shape as fish:
 
 1. **Housing.** Each animal needs a slot: stable stalls (3), barn stalls,
    pens (a new placeable decor row per size, each with a slot count and a
-   gate), coop reserved for chickens if an asset turns up. Total slots =
+   gate), and the Chicken Coop's floor (six, chickens only). Total slots =
    capacity. A shut stall already pens an animal.
 2. **Feed.** Hay / grain / suitable crops from inventory. Fed and housed =
    the product timer runs; hungry = it stalls and care grade drops.

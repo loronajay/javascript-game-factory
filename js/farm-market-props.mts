@@ -185,9 +185,11 @@ function setLivestock(THREE: ThreeNamespace, group: any, width: number, front: n
     context.textAlign = "center";
     context.font = "700 32px Georgia, serif";
     context.fillText("Young stock", w / 2, 46);
-    context.font = "26px Georgia, serif";
+    context.font = "24px Georgia, serif";
+    // As many rows as the catalog has species, spaced to fit the board.
+    const spacing = Math.min(36, (h - 106) / Math.max(1, LIVESTOCK_CATALOG.length - 1));
     LIVESTOCK_CATALOG.forEach((species, index) => {
-      const row = 84 + index * 36;
+      const row = 82 + index * spacing;
       context.textAlign = "left";
       context.fillText(species.youngTitle, 60, row);
       context.textAlign = "right";
@@ -205,7 +207,9 @@ function setButcher(THREE: ThreeNamespace, group: any, width: number, front: num
   LIVESTOCK_CATALOG.forEach((species, index) => {
     const cut = createProduceModel(THREE, species.meat.itemId);
     if (!cut) return;
-    cut.position.set(-1.1 + index * 0.5, y + 0.04, front - 0.32);
+    // Spread along the slab, however many meats there are.
+    const step = Math.min(0.5, 1.76 / Math.max(1, LIVESTOCK_CATALOG.length - 1));
+    cut.position.set(-1.1 + index * step, y + 0.04, front - 0.32);
     cut.rotation.y = index % 2 ? 0.3 : -0.25;
     cut.scale.setScalar(1.7);
     group.add(cut);
@@ -232,9 +236,10 @@ function setButcher(THREE: ThreeNamespace, group: any, width: number, front: num
     context.textAlign = "center";
     context.font = "700 32px Georgia, serif";
     context.fillText("Cuts · per piece", w / 2, 46);
-    context.font = "26px Georgia, serif";
+    context.font = "24px Georgia, serif";
+    const spacing = Math.min(36, (h - 106) / Math.max(1, LIVESTOCK_CATALOG.length - 1));
     LIVESTOCK_CATALOG.forEach((species, index) => {
-      const row = 84 + index * 36;
+      const row = 82 + index * spacing;
       context.textAlign = "left";
       context.fillText(species.meat.title, 60, row, w * 0.42);
       context.textAlign = "right";

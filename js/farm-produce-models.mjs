@@ -260,6 +260,15 @@ function fleece(color) {
         place(THREE, group, new THREE.TorusGeometry(0.066, 0.005, 6, 18), surface(THREE, "#8a5a2b", { roughness: 0.9 }), [0, 0.055, 0], [Math.PI / 2, 0, 0]);
     };
 }
+/** A hen's eggs: three brown eggs sitting in a moulded pulp tray. */
+const egg = (THREE, group) => {
+    const pulp = surface(THREE, "#c9b28c", { roughness: 1 });
+    place(THREE, group, new THREE.BoxGeometry(0.13, 0.018, 0.058), pulp, [0, 0.009, 0]);
+    for (const [x, tilt] of [[-0.04, 0.12], [0, -0.08], [0.04, 0.05]]) {
+        const shell = surface(THREE, tint("#d9a877", x * 3), { roughness: 0.55, flat: false });
+        place(THREE, group, new THREE.SphereGeometry(0.019, 16, 12), shell, [x, 0.038, 0], [tilt, 0, tilt], [1, 1.32, 1]);
+    }
+};
 /**
  * A raw cut on a square of butcher's paper: a marbled slab with a rind of fat
  * round one side and, for a chop or a T-bone, the bone. The flesh colour says
@@ -312,6 +321,15 @@ function meatCut(spec) {
         }
     };
 }
+/** A chicken leg: a plump drumstick of pale raw meat with its bone showing at the knuckle. */
+const drumstick = (THREE, group) => {
+    const skin = surface(THREE, "#f0c2a8", { roughness: 0.6, flat: false });
+    place(THREE, group, new THREE.SphereGeometry(0.034, 18, 14), skin, [0.02, 0.028, 0], [0, 0, 0.1], [1.45, 0.82, 1]);
+    const bone = surface(THREE, "#f1e8d6", { roughness: 0.7, flat: false });
+    place(THREE, group, new THREE.CylinderGeometry(0.007, 0.009, 0.06, 10), bone, [-0.046, 0.026, 0], [0, 0, Math.PI / 2 - 0.1]);
+    place(THREE, group, new THREE.SphereGeometry(0.012, 12, 10), bone, [-0.078, 0.023, 0.005]);
+    place(THREE, group, new THREE.SphereGeometry(0.011, 12, 10), bone, [-0.078, 0.023, -0.008]);
+};
 export const PRODUCE_BUILDERS = Object.freeze({
     bean, beetroot, blueberry, cabbage, carrot, cauliflower, corn, eggplant, garlic, potato, pumpkin, radish, strawberry, sunflower, tomato, watermelon,
     apple, pear, cherry, peach, orange,
@@ -321,6 +339,8 @@ export const PRODUCE_BUILDERS = Object.freeze({
     pork: meatCut({ flesh: "#e59a8e", fat: "#faf1e4", width: 0.13, depth: 0.1, thickness: 0.025, bone: "rib" }),
     mutton: meatCut({ flesh: "#9c3a36", fat: "#f4ead6", width: 0.1, depth: 0.08, thickness: 0.028, bone: "rib" }),
     "llama-meat": meatCut({ flesh: "#7e2626", fat: "#efe2cc", width: 0.14, depth: 0.1, thickness: 0.03, bone: "none" }),
+    egg,
+    "chicken-meat": drumstick,
 });
 /** A harvest-basket item as a model, or null for an id the basket does not hold. */
 export function createProduceModel(THREE, id) {

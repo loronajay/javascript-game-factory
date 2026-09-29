@@ -9,7 +9,7 @@
 // AGE IS FARM TIME. An animal is born at a farm-clock minute (`bornAt`), and
 // grows as the farm's clock runs — which only happens while the owner plays or
 // naps. Nothing grows while the farm is away (the farm's own rule).
-import { LIVESTOCK_NAME_MAX, LIVESTOCK_STATS, LIVESTOCK_STAT_TITLES, STAT_MAX, STAT_MIN, YOUNG_SIZE, findLivestockCoat, findLivestockSpecies, } from "./farm-catalog/livestock.mjs";
+import { LIVESTOCK_NAME_MAX, LIVESTOCK_STATS, LIVESTOCK_STAT_TITLES, STAT_MAX, STAT_MIN, YOUNG_SIZE, findLivestockCoat, findLivestockSpecies, livestockCoatTitle, } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
 import { adultAgeDays, normalizeLivestockCare } from "./farm-livestock-care.mjs";
 export { adultAgeDays, GROWTH_SPREAD } from "./farm-livestock-care.mjs";
@@ -51,16 +51,19 @@ export function livestockMaturity(animal, clockMinutes) {
 export function livestockStage(animal, clockMinutes) {
     return livestockMaturity(animal, clockMinutes) >= 1 ? "adult" : "young";
 }
-/** How big it is drawn (and how much room it takes), against a grown one. */
+/** How big it is drawn (and how much room it takes), against a grown female: a male of a species with a `maleSize` grows into it. */
 export function livestockSize(animal, clockMinutes) {
-    return YOUNG_SIZE + (1 - YOUNG_SIZE) * livestockMaturity(animal, clockMinutes);
+    const grown = animal.gender === "male" ? findLivestockSpecies(animal.speciesId)?.maleSize ?? 1 : 1;
+    return (YOUNG_SIZE + (1 - YOUNG_SIZE) * livestockMaturity(animal, clockMinutes)) * grown;
 }
-/** What it is called at its stage: "Lamb" while young, "Sheep" once grown. */
+/** What it is called at its stage: "Lamb" while young, "Sheep" once grown ("Hen" or "Rooster" where the sexes have words). */
 export function livestockKind(animal, clockMinutes) {
     const species = findLivestockSpecies(animal.speciesId);
     if (!species)
         return "";
-    return livestockStage(animal, clockMinutes) === "adult" ? species.title : species.youngTitle;
+    if (livestockStage(animal, clockMinutes) !== "adult")
+        return species.youngTitle;
+    return species.sexTitles?.[animal.gender] ?? species.title;
 }
 /** Roll a stat inside a range: uniform, whole, clamped. The server's roll is the same rule. */
 export function rollStat(range, random) {
@@ -133,7 +136,7 @@ export function livestockSummary(animal, clockMinutes) {
         grownPercent: Math.floor(livestockMaturity(animal, clockMinutes) * 100),
         grade,
         stars: gradeStars(grade),
-        coat: findLivestockCoat(animal.speciesId, animal.coatId)?.title ?? "",
+        coat: livestockCoatTitle(findLivestockCoat(animal.speciesId, animal.coatId), animal.gender),
         gender: animal.gender === "male" ? "♂" : "♀",
         stats: Object.freeze(LIVESTOCK_STATS.map((id) => Object.freeze({ id, title: LIVESTOCK_STAT_TITLES[id], value: animal.stats[id] }))),
     });

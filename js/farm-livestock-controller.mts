@@ -27,7 +27,7 @@ import type { FloorObstacle } from "./arcade-room-layout.mjs";
 import type { PondRegion } from "./farm-pond.mjs";
 import { findPetInReach } from "./farm-interaction.mjs";
 import type { PetBodyView } from "./farm-pet-bodies.mjs";
-import { createLivestockBodies } from "./farm-livestock-bodies.mjs";
+import { createLivestockBodies, livestockPaletteId } from "./farm-livestock-bodies.mjs";
 import { createHerdSim, type HerdEntry } from "./farm-livestock-sim.mjs";
 import { livestockHomes, type LivestockHome } from "./farm-livestock-housing.mjs";
 import { gradeStars, livestockSize, livestockSummary, normalizeLivestockAnimal, normalizeLivestockHerd, type LivestockAnimal } from "./farm-livestock.mjs";
@@ -124,7 +124,8 @@ export function createFarmLivestockController(options: Readonly<{
       id: animal.id,
       speciesId: animal.speciesId,
       name: `${animal.name} ${livestockSummary(animal, clock).stars}`,
-      coatId: animal.coatId,
+      // A rooster is drawn in his own colours, and bigger (`livestockSize`).
+      coatId: livestockPaletteId(animal),
       sizeMultiplier: livestockSize(animal, clock),
       homeId: animal.homeId,
     }));

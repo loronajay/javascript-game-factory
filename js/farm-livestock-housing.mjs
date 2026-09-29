@@ -10,6 +10,10 @@
 //   · every Stable stall is a home for one (`<instanceId>#stall-N`) — it stands
 //   · the Barn's floor in front of the loft is a home for two (`#floor`)
 //   · a Small Pen holds two, a Large Pen four (`#pen`) — they roam
+//   · the Chicken Coop's floor holds six chickens and nothing else (`#coop`)
+//
+// A home may take only some species (`species`): the coop is for chickens.
+// Chickens may still live in a pen, a stall or on the barn floor.
 //
 // The server counts the same homes from the same rows
 // (`platform-api/src/services/farm-livestock-catalog.mts` `farmLivestockHomes`)
@@ -17,7 +21,7 @@
 // Room is the buildings' to give, never a species cap: a bigger farm later is
 // more buildings, not a rule change.
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
-import { barnFloor, stableStalls } from "./farm-fixtures.mjs";
+import { barnFloor, coopFloor, stableStalls } from "./farm-fixtures.mjs";
 import { buildingLocalToWorld } from "./farm-shell.mjs";
 /** How many a pen holds, by catalog id. */
 export const PEN_SLOTS = Object.freeze({
@@ -25,9 +29,12 @@ export const PEN_SLOTS = Object.freeze({
     "decor.building.pen-large": 4,
 });
 export const BARN_SLOTS = 2;
+export const COOP_SLOTS = 6;
+/** The coop is for chickens only. */
+export const COOP_SPECIES = Object.freeze(["livestock.chicken"]);
 /** A pen's animals keep this far in from its rails. */
 const PEN_INSET = 0.12;
-function home(row, suffix, kind, title, slots, roam, box) {
+function home(row, suffix, kind, title, slots, roam, box, species = null) {
     const centre = buildingLocalToWorld(row, box);
     return Object.freeze({
         id: `${row.instanceId}#${suffix}`,
@@ -36,6 +43,7 @@ function home(row, suffix, kind, title, slots, roam, box) {
         title,
         slots,
         roam,
+        species,
         x: centre.x,
         z: centre.z,
         rotationY: row.rotationY,
@@ -48,6 +56,7 @@ export function livestockHomes(decor) {
     const homes = [];
     let stables = 0;
     let pens = 0;
+    let coops = 0;
     for (const row of decor) {
         const definition = findFarmDecor(row.itemId);
         if (!definition?.shell)
@@ -67,6 +76,10 @@ export function livestockHomes(decor) {
             const box = { x: 0, z: 0, width: definition.footprint.width - (t + PEN_INSET) * 2, depth: definition.footprint.depth - (t + PEN_INSET) * 2 };
             homes.push(home(row, "pen", "pen", `${definition.title} ${pens}`, PEN_SLOTS[definition.id], true, box));
         }
+        else if (definition.id === "decor.building.coop") {
+            coops += 1;
+            homes.push(home(row, "coop", "coop", `Chicken Coop${coops > 1 ? ` ${coops}` : ""}`, COOP_SLOTS, true, coopFloor(definition), COOP_SPECIES));
+        }
     }
     return Object.freeze(homes);
 }
@@ -82,10 +95,14 @@ export function homeOccupancy(homes, herd) {
     }
     return counts;
 }
-/** The homes with room for one more, in order. */
-export function homesWithRoom(homes, herd) {
+/** Whether a home takes this species (every home takes any species unless it names some). */
+export function homeTakes(entry, speciesId) {
+    return !entry.species || entry.species.includes(speciesId);
+}
+/** The homes with room for one more, in order — for one of `speciesId`, when given. */
+export function homesWithRoom(homes, herd, speciesId) {
     const counts = homeOccupancy(homes, herd);
-    return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots);
+    return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
 }
 /** A field point in the home's own frame. */
 export function homeLocal(entry, point) {

@@ -40,6 +40,10 @@ export type ThumbnailSubject = Readonly<{
   /** Portrait framing: how tall the model is made (world units) and the camera's aim height. */
   height?: number;
   lookAtY?: number;
+  /** Extra turn (radians) for a model that faces away from the camera as shipped. */
+  yaw?: number;
+  /** Measure the model as its skeleton stands rather than by its bind-pose box. */
+  fitPosed?: boolean;
 }>;
 
 export type ThumbnailOptions = Readonly<{
@@ -88,28 +92,36 @@ export function createAvatarThumbnails(THREE: ThreeNamespace, options: Thumbnail
   }
 
   /** Stand the model on the origin at a common height and turn it a little towards the key light. */
-  function fitModel(model: any, height: number): void {
-    const initial = new THREE.Box3().setFromObject(model);
+  function fitModel(model: any, height: number, yaw = 0, posed = false): void {
+    const measure = (): any => {
+      if (posed) model.updateMatrixWorld(true);
+      return new THREE.Box3().setFromObject(model, posed);
+    };
+    const initial = measure();
     const size = initial.getSize(new THREE.Vector3());
     model.scale.setScalar(size.y > 0 ? height / size.y : 1);
-    const fitted = new THREE.Box3().setFromObject(model);
+    const fitted = measure();
     const centre = fitted.getCenter(new THREE.Vector3());
     model.position.set(-centre.x, -fitted.min.y, -centre.z);
-    model.rotation.y = -Math.PI * 0.12;
+    model.rotation.y = -Math.PI * 0.12 + yaw;
   }
 
   function render(gltf: any, subject: ThumbnailSubject): string {
     for (const child of [...stage.children]) stage.remove(child);
-    fitModel(gltf.scene, subject.height ?? 2.0);
-    stage.add(gltf.scene);
     const clip = subject.poseClip
       ? subject.poseClip(gltf)
       : (gltf.animations?.find((candidate: any) => /idle/i.test(candidate.name)) ?? gltf.animations?.[0] ?? null);
-    if (clip) {
+    const pose = (): void => {
+      if (!clip) return;
       const mixer = new THREE.AnimationMixer(gltf.scene);
       mixer.clipAction(clip).play();
       mixer.update(POSE_SECONDS);
-    }
+    };
+    // A `fitPosed` subject is measured standing in its pose; everything else by its bind box, then posed.
+    if (subject.fitPosed) pose();
+    fitModel(gltf.scene, subject.height ?? 2.0, subject.yaw ?? 0, subject.fitPosed ?? false);
+    stage.add(gltf.scene);
+    if (!subject.fitPosed) pose();
     camera.lookAt(0, subject.lookAtY ?? 1.0, 0);
     renderer.render(scene, camera);
     const url = renderer.domElement.toDataURL("image/png");

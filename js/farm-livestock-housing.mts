@@ -10,6 +10,10 @@
 //   · every Stable stall is a home for one (`<instanceId>#stall-N`) — it stands
 //   · the Barn's floor in front of the loft is a home for two (`#floor`)
 //   · a Small Pen holds two, a Large Pen four (`#pen`) — they roam
+//   · the Chicken Coop's floor holds six chickens and nothing else (`#coop`)
+//
+// A home may take only some species (`species`): the coop is for chickens.
+// Chickens may still live in a pen, a stall or on the barn floor.
 //
 // The server counts the same homes from the same rows
 // (`platform-api/src/services/farm-livestock-catalog.mts` `farmLivestockHomes`)
@@ -18,12 +22,12 @@
 // more buildings, not a rule change.
 
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
-import { barnFloor, stableStalls } from "./farm-fixtures.mjs";
+import { barnFloor, coopFloor, stableStalls } from "./farm-fixtures.mjs";
 import { buildingLocalToWorld } from "./farm-shell.mjs";
 import type { FarmDecorRow } from "./farm-layout.mjs";
 import type { LivestockAnimal } from "./farm-livestock.mjs";
 
-export type LivestockHomeKind = "stall" | "barn" | "pen";
+export type LivestockHomeKind = "stall" | "barn" | "pen" | "coop";
 
 export type LivestockHome = Readonly<{
   id: string;
@@ -34,6 +38,8 @@ export type LivestockHome = Readonly<{
   slots: number;
   /** True where an animal strolls; a stall's animal stands in its place and turns now and then. */
   roam: boolean;
+  /** The only species it takes, or null for any. */
+  species: readonly string[] | null;
   /** The region on the field: centre, turn and size (width along its own x). */
   x: number;
   z: number;
@@ -48,12 +54,15 @@ export const PEN_SLOTS: Readonly<Record<string, number>> = Object.freeze({
   "decor.building.pen-large": 4,
 });
 export const BARN_SLOTS = 2;
+export const COOP_SLOTS = 6;
+/** The coop is for chickens only. */
+export const COOP_SPECIES: readonly string[] = Object.freeze(["livestock.chicken"]);
 /** A pen's animals keep this far in from its rails. */
 const PEN_INSET = 0.12;
 
 type Box = Readonly<{ x: number; z: number; width: number; depth: number }>;
 
-function home(row: FarmDecorRow, suffix: string, kind: LivestockHomeKind, title: string, slots: number, roam: boolean, box: Box): LivestockHome {
+function home(row: FarmDecorRow, suffix: string, kind: LivestockHomeKind, title: string, slots: number, roam: boolean, box: Box, species: readonly string[] | null = null): LivestockHome {
   const centre = buildingLocalToWorld(row, box);
   return Object.freeze({
     id: `${row.instanceId}#${suffix}`,
@@ -62,6 +71,7 @@ function home(row: FarmDecorRow, suffix: string, kind: LivestockHomeKind, title:
     title,
     slots,
     roam,
+    species,
     x: centre.x,
     z: centre.z,
     rotationY: row.rotationY,
@@ -75,6 +85,7 @@ export function livestockHomes(decor: readonly FarmDecorRow[]): readonly Livesto
   const homes: LivestockHome[] = [];
   let stables = 0;
   let pens = 0;
+  let coops = 0;
   for (const row of decor) {
     const definition = findFarmDecor(row.itemId);
     if (!definition?.shell) continue;
@@ -90,6 +101,9 @@ export function livestockHomes(decor: readonly FarmDecorRow[]): readonly Livesto
       const t = definition.shell.wallThickness;
       const box = { x: 0, z: 0, width: definition.footprint.width - (t + PEN_INSET) * 2, depth: definition.footprint.depth - (t + PEN_INSET) * 2 };
       homes.push(home(row, "pen", "pen", `${definition.title} ${pens}`, PEN_SLOTS[definition.id]!, true, box));
+    } else if (definition.id === "decor.building.coop") {
+      coops += 1;
+      homes.push(home(row, "coop", "coop", `Chicken Coop${coops > 1 ? ` ${coops}` : ""}`, COOP_SLOTS, true, coopFloor(definition), COOP_SPECIES));
     }
   }
   return Object.freeze(homes);
@@ -108,10 +122,15 @@ export function homeOccupancy(homes: readonly LivestockHome[], herd: readonly Pi
   return counts;
 }
 
-/** The homes with room for one more, in order. */
-export function homesWithRoom(homes: readonly LivestockHome[], herd: readonly Pick<LivestockAnimal, "homeId">[]): readonly LivestockHome[] {
+/** Whether a home takes this species (every home takes any species unless it names some). */
+export function homeTakes(entry: Pick<LivestockHome, "species">, speciesId: string): boolean {
+  return !entry.species || entry.species.includes(speciesId);
+}
+
+/** The homes with room for one more, in order — for one of `speciesId`, when given. */
+export function homesWithRoom(homes: readonly LivestockHome[], herd: readonly Pick<LivestockAnimal, "homeId">[], speciesId?: string): readonly LivestockHome[] {
   const counts = homeOccupancy(homes, herd);
-  return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots);
+  return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
 }
 
 /** A field point in the home's own frame. */

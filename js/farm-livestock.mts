@@ -19,6 +19,7 @@ import {
   YOUNG_SIZE,
   findLivestockCoat,
   findLivestockSpecies,
+  livestockCoatTitle,
   type LivestockSpecies,
   type LivestockStats,
   type StatRange,
@@ -97,16 +98,18 @@ export function livestockStage(animal: LivestockAnimal, clockMinutes: number): L
   return livestockMaturity(animal, clockMinutes) >= 1 ? "adult" : "young";
 }
 
-/** How big it is drawn (and how much room it takes), against a grown one. */
+/** How big it is drawn (and how much room it takes), against a grown female: a male of a species with a `maleSize` grows into it. */
 export function livestockSize(animal: LivestockAnimal, clockMinutes: number): number {
-  return YOUNG_SIZE + (1 - YOUNG_SIZE) * livestockMaturity(animal, clockMinutes);
+  const grown = animal.gender === "male" ? findLivestockSpecies(animal.speciesId)?.maleSize ?? 1 : 1;
+  return (YOUNG_SIZE + (1 - YOUNG_SIZE) * livestockMaturity(animal, clockMinutes)) * grown;
 }
 
-/** What it is called at its stage: "Lamb" while young, "Sheep" once grown. */
+/** What it is called at its stage: "Lamb" while young, "Sheep" once grown ("Hen" or "Rooster" where the sexes have words). */
 export function livestockKind(animal: LivestockAnimal, clockMinutes: number): string {
   const species = findLivestockSpecies(animal.speciesId);
   if (!species) return "";
-  return livestockStage(animal, clockMinutes) === "adult" ? species.title : species.youngTitle;
+  if (livestockStage(animal, clockMinutes) !== "adult") return species.youngTitle;
+  return species.sexTitles?.[animal.gender] ?? species.title;
 }
 
 /** Roll a stat inside a range: uniform, whole, clamped. The server's roll is the same rule. */
@@ -194,7 +197,7 @@ export function livestockSummary(animal: LivestockAnimal, clockMinutes: number):
     grownPercent: Math.floor(livestockMaturity(animal, clockMinutes) * 100),
     grade,
     stars: gradeStars(grade),
-    coat: findLivestockCoat(animal.speciesId, animal.coatId)?.title ?? "",
+    coat: livestockCoatTitle(findLivestockCoat(animal.speciesId, animal.coatId)!, animal.gender),
     gender: animal.gender === "male" ? "♂" : "♀",
     stats: Object.freeze(LIVESTOCK_STATS.map((id) => Object.freeze({ id, title: LIVESTOCK_STAT_TITLES[id], value: animal.stats[id] }))),
   });

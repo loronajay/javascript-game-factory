@@ -73,7 +73,7 @@ test("the farming catalog exposes every growth-cycle crop and the inventory incl
   const agriculture = createStarterAgriculture(() => 0);
   assert.equal(agriculture.inventory.supplies["food.dog-food"], 20);
   // Pet foods, then livestock feed (farm-catalog/livestock.mts), none of which a new farm is given.
-  assert.deepEqual(Object.keys(agriculture.inventory.supplies), [...PET_CARE.map((care) => care.food.itemId), "food.hay", "food.pig-feed"]);
+  assert.deepEqual(Object.keys(agriculture.inventory.supplies), [...PET_CARE.map((care) => care.food.itemId), "food.hay", "food.pig-feed", "food.chicken-feed"]);
   assert.equal(agriculture.inventory.supplies["food.hay"], 0);
   for (const care of PET_CARE.filter((row) => row.speciesId !== "pet.corgi")) assert.equal(agriculture.inventory.supplies[care.food.itemId], 0);
   assert.equal(Object.values(agriculture.inventory.seeds).filter((count) => count === 1).length, 6);

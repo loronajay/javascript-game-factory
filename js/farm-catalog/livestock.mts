@@ -1,8 +1,9 @@
 // The livestock catalog: the farm animals that yield goods, as DATA.
 //
-// One row per Quaternius Farm Animals file (`farm/assets/yield-animals/`, CC0,
-// converted by that folder's `tools/convert.py`). A test asserts each row's
-// GLB exists on disk. Pure — no THREE, no DOM — and mirrored on the server by
+// One row per model in `farm/assets/yield-animals/`: the Quaternius Farm
+// Animals pack (CC0, converted by that folder's `tools/convert.py`) and the
+// chicken (Maf'j Alvarez on Sketchfab, CC-BY-4.0 — credited in that folder's
+// `CREDITS.md`). A test asserts each row's GLB exists on disk. Pure — no THREE, no DOM — and mirrored on the server by
 // `platform-api/src/services/farm-livestock-catalog.mts` (prices, stat ranges,
 // growth), which a test holds equal. The SERVER decides every animal's stats;
 // this copy only presents them.
@@ -12,8 +13,15 @@
 // affection, no toys, no tricks, no Pet Games. An animal is judged by four
 // stats — Yield, Quality, Growth, Hardiness — and a grade drawn from them.
 //
-// THE PACK SHIPS NAMED CLIPS (Idle, Walk, WalkSlow, Run, Jump, Death), not
+// THE MODELS SHIP NAMED CLIPS (Idle, Walk, WalkSlow, Run, Jump, Death; the
+// chicken's are `chicken-rig|idle`, `…|walking`, `…|pecking` and friends), not
 // the Gobkit animals' one long track, so a row names its clips by name.
+//
+// THE SEXES CAN DIFFER. A good may come from one sex only (`onlyFrom` — hens
+// lay, roosters do not), a coat may paint the male in his own colours
+// (`maleColors`), and a species may draw its males bigger (`maleSize`), so a
+// rooster reads as a rooster across the yard. The colours and the size are
+// presentation only; the server holds the same `onlyFrom` rule.
 
 export const LIVESTOCK_STATS = Object.freeze(["yield", "quality", "growth", "hardiness"] as const);
 export type LivestockStat = typeof LIVESTOCK_STATS[number];
@@ -38,6 +46,9 @@ export const LIVESTOCK_STAT_BLURBS: Readonly<Record<LivestockStat, string>> = Ob
 /** The clip each state plays, by the name the pack gave it. */
 export type LivestockClipNames = Readonly<{ idle: string; walk: string; attack: string; dead: string }>;
 export const QUATERNIUS_CLIPS: LivestockClipNames = Object.freeze({ idle: "Idle", walk: "WalkSlow", attack: "Jump", dead: "Death" });
+export const CHICKEN_CLIPS: LivestockClipNames = Object.freeze({ idle: "chicken-rig|idle", walk: "chicken-rig|walking", attack: "chicken-rig|pecking", dead: "chicken-rig|sitting-down" });
+
+export type LivestockSex = "female" | "male";
 
 /** A coat: which of the model's own materials is repainted which colour. The first coat of every species is the model as shipped. */
 export type LivestockCoat = Readonly<{
@@ -47,6 +58,9 @@ export type LivestockCoat = Readonly<{
   weight: number;
   /** Material name → colour. Materials not named keep the pack's colour. */
   colors: Readonly<Record<string, string>>;
+  /** The male's own colours, laid over `colors`, and what the coat is called on him. Absent: the sexes look alike. */
+  maleColors?: Readonly<Record<string, string>>;
+  maleTitle?: string;
 }>;
 
 /**
@@ -56,7 +70,14 @@ export type LivestockCoat = Readonly<{
  * to the Produce Merchant per farm day, on average: the price is DERIVED from
  * it (`livestockGoodPrice`), the way a crop's is from its growing days.
  */
-export type LivestockProduct = Readonly<{ itemId: string; title: string; everyDays: number; dayValue: number }>;
+export type LivestockProduct = Readonly<{
+  itemId: string;
+  title: string;
+  everyDays: number;
+  dayValue: number;
+  /** Given by this sex only (a hen's eggs); absent, by either. The server holds the same rule. */
+  onlyFrom?: LivestockSex;
+}>;
 
 /**
  * What the Butcher in the Market Square cuts a grown animal into
@@ -76,6 +97,7 @@ export type LivestockFeed = Readonly<{ itemId: string; title: string; price: num
 export const LIVESTOCK_FEEDS: readonly LivestockFeed[] = Object.freeze([
   Object.freeze({ itemId: "food.hay", title: "Hay", price: 8 }),
   Object.freeze({ itemId: "food.pig-feed", title: "Pig Feed", price: 8 }),
+  Object.freeze({ itemId: "food.chicken-feed", title: "Chicken Feed", price: 6 }),
 ]);
 
 export type LivestockSpecies = Readonly<{
@@ -83,10 +105,20 @@ export type LivestockSpecies = Readonly<{
   title: string;
   /** What one young one is called at the Dealer. */
   youngTitle: string;
+  /** What a grown one of each sex is called, where the words differ ("Hen", "Rooster"); absent, `title`. */
+  sexTitles?: Readonly<Record<LivestockSex, string>>;
   /** File name under `farm/assets/yield-animals/`. */
   file: string;
   /** How tall a grown one stands, in metres; the GLB is scaled to this. A young one is `YOUNG_SIZE` of it. */
   height: number;
+  /** A grown male is drawn this much bigger than a grown female (1: the same). */
+  maleSize: number;
+  /** Extra turn (radians) for a model that faces the other way from the Quaternius pack. */
+  modelYaw: number;
+  /** Fit its height to the model as its skeleton stands: the chicken's rig stands it far taller than its bind-pose box. */
+  fitPosed?: boolean;
+  /** Extra turn on the Dealer's portrait card, for an animal that reads best side-on (radians). */
+  portraitTurn?: number;
   /** Personal-space radius of a grown one, in metres. */
   radius: number;
   /** Metres per second while it strolls its home. */
@@ -119,7 +151,7 @@ export const STAT_MIN = 1;
 export const STAT_MAX = 100;
 export const LIVESTOCK_NAME_MAX = 24;
 
-type Spec = Omit<LivestockSpecies, "id" | "clips"> & Readonly<{ clips?: LivestockClipNames }>;
+type Spec = Omit<LivestockSpecies, "id" | "clips" | "maleSize" | "modelYaw"> & Readonly<{ clips?: LivestockClipNames; maleSize?: number; modelYaw?: number }>;
 
 const range = (min: number, max: number): StatRange => Object.freeze({ min, max });
 
@@ -128,16 +160,64 @@ function species(variant: string, spec: Spec): LivestockSpecies {
     ...spec,
     id: `livestock.${variant}`,
     clips: spec.clips ?? QUATERNIUS_CLIPS,
-    coats: Object.freeze(spec.coats.map((coat) => Object.freeze({ ...coat, colors: Object.freeze({ ...coat.colors }) }))),
+    maleSize: spec.maleSize ?? 1,
+    modelYaw: spec.modelYaw ?? 0,
+    coats: Object.freeze(spec.coats.map((coat) => Object.freeze({
+      ...coat,
+      colors: Object.freeze({ ...coat.colors }),
+      ...(coat.maleColors ? { maleColors: Object.freeze({ ...coat.maleColors }) } : {}),
+    }))),
     products: Object.freeze(spec.products.map((product) => Object.freeze({ ...product }))),
     meat: Object.freeze({ ...spec.meat }),
     feeds: Object.freeze({ supply: spec.feeds.supply, crops: Object.freeze([...spec.feeds.crops]) }),
     stats: Object.freeze({ ...spec.stats }),
     names: Object.freeze([...spec.names]),
+    ...(spec.sexTitles ? { sexTitles: Object.freeze({ ...spec.sexTitles }) } : {}),
   });
 }
 
 export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
+  // The chicken's materials: `white` is the neck and hackles, `pale_grey` the
+  // body, `mid_grey` the wings and tail, `pale_red` the comb and wattles,
+  // `gold` the beak, `buttermilk` the legs, `black` the eyes. A rooster wears
+  // his coat bolder — a dark sickle tail, a bright comb, a coloured hackle —
+  // and stands a quarter taller than a hen.
+  species("chicken", {
+    title: "Chicken", youngTitle: "Chick", sexTitles: { female: "Hen", male: "Rooster" }, file: "chicken.glb",
+    clips: CHICKEN_CLIPS, modelYaw: Math.PI, fitPosed: true, portraitTurn: -0.7, maleSize: 1.25,
+    height: 0.42, radius: 0.22, walkSpeed: 0.55, turnRate: 3,
+    coats: [
+      {
+        id: "standard", title: "White", weight: 50, colors: {},
+        maleTitle: "White, black tail",
+        maleColors: { mid_grey: "#1c2723", pale_red: "#e0232b", buttermilk: "#f2c43a" },
+      },
+      {
+        id: "buff", title: "Buff", weight: 25,
+        colors: { white: "#e2b46e", pale_grey: "#d49d56", mid_grey: "#b67b3a" },
+        maleTitle: "Red & gold",
+        maleColors: { white: "#eba43a", pale_grey: "#a8421f", mid_grey: "#1c2723", pale_red: "#e0232b" },
+      },
+      {
+        id: "black", title: "Black", weight: 20,
+        colors: { white: "#2e2d31", pale_grey: "#252428", mid_grey: "#1d2622", buttermilk: "#6a6258" },
+        maleTitle: "Black, gold hackle",
+        maleColors: { white: "#d3a23c", pale_grey: "#1f1e22", mid_grey: "#17332a", pale_red: "#e0232b", buttermilk: "#6a6258" },
+      },
+      {
+        id: "speckled", title: "Speckled", weight: 5,
+        colors: { white: "#8f4b2c", pale_grey: "#74371f", mid_grey: "#f0e8da" },
+        maleTitle: "Speckled, cream hackle",
+        maleColors: { white: "#f1e4c8", pale_grey: "#5a2416", mid_grey: "#12171a", pale_red: "#e0232b" },
+      },
+    ],
+    price: 120, minLevel: 1, adultDays: 2, gestationDays: 1,
+    products: [{ itemId: "egg", title: "Egg", everyDays: 1, dayValue: 10, onlyFrom: "female" }],
+    meat: { itemId: "chicken-meat", title: "Chicken", cuts: 3 },
+    feeds: { supply: "food.chicken-feed", crops: ["corn", "sunflower", "bean", "blueberry"] },
+    stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(25, 70) },
+    names: ["Henny", "Nugget", "Ginger", "Biscuit", "Popcorn", "Peaches", "Dumpling", "Sunny", "Pepper", "Goldie"],
+  }),
   species("sheep", {
     title: "Sheep", youngTitle: "Lamb", file: "sheep.glb",
     height: 0.85, radius: 0.5, walkSpeed: 0.75, turnRate: 2.2,
@@ -214,6 +294,21 @@ export function findLivestockSpecies(id: unknown): LivestockSpecies | undefined 
 export function findLivestockCoat(speciesId: unknown, coatId: unknown): LivestockCoat | undefined {
   const entry = findLivestockSpecies(speciesId);
   return entry?.coats.find((coat) => coat.id === coatId) ?? entry?.coats[0];
+}
+
+/** The coat's colours on this animal: the male's own laid over the coat's, where the coat has them. */
+export function livestockCoatColors(coat: LivestockCoat, gender: unknown): Readonly<Record<string, string>> {
+  return gender === "male" && coat.maleColors ? { ...coat.colors, ...coat.maleColors } : coat.colors;
+}
+
+/** What the coat is called on this animal. */
+export function livestockCoatTitle(coat: LivestockCoat, gender: unknown): string {
+  return gender === "male" && coat.maleTitle ? coat.maleTitle : coat.title;
+}
+
+/** The goods this animal gives: its species' goods, less those only the other sex gives. */
+export function livestockProductsFor(species: Pick<LivestockSpecies, "products">, gender: unknown): readonly LivestockProduct[] {
+  return species.products.filter((product) => !product.onlyFrom || product.onlyFrom === gender);
 }
 
 export function allLivestockIds(): string[] {

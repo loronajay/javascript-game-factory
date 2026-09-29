@@ -186,7 +186,7 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
     id: LIVESTOCK_STALL_ID, kind: "stall", title: "Livestock Dealer", open: true,
     x: 10.9, z: 8.2, rotationY: -QUARTER, colors: ["#6b8a3f", "#f4ecd6"],
-    keeper: Object.freeze({ name: "Hollis", avatarId: "avatar.hero-m", greeting: "Lambs, piglets, calves and crias — every one a character. Got room at home?" }),
+    keeper: Object.freeze({ name: "Hollis", avatarId: "avatar.hero-m", greeting: "Chicks, lambs, piglets, calves and crias — every one a character. Got room at home?" }),
     closedNote: "",
   }),
   stall({

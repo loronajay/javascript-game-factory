@@ -51,7 +51,7 @@ import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { farmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeHusbandryRecord, recordFarmBirth, recordFarmButcher, recordFarmCollection } from "../services/farm-skill-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
-import { LIVESTOCK_STATS, MAX_HERD, REST_DAYS, breedingRefusal, clampStat, freePlacesForYoung, inheritLivestock, livestockBirthXp, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmLivestockHomes, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
+import { LIVESTOCK_STATS, MAX_HERD, REST_DAYS, breedingRefusal, clampStat, freePlacesForYoung, inheritLivestock, livestockBirthXp, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmLivestockHomes, farmLivestockProductsFor, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const ANIMAL_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 const HOME_ID = /^[A-Za-z0-9_-]{1,80}#[a-z0-9-]{1,20}$/;
@@ -120,7 +120,7 @@ export async function buyFarmLivestock(pool, input, random = Math.random) {
         const level = farmingLevelForXp(normalizeHusbandryRecord(farm.layout.skills?.husbandry).xp);
         if (level < species.minLevel)
             return { ok: false, error: "level_too_low", minLevel: species.minLevel, level };
-        const home = pickFarmLivestockHome(farmLivestockHomes(farm.layout.decor), herd.map((row) => row.home_id ?? null), input?.homeId);
+        const home = pickFarmLivestockHome(farmLivestockHomes(farm.layout.decor), herd.map((row) => row.home_id ?? null), input?.homeId, species.id);
         if (!home)
             return { ok: false, error: input?.homeId ? "home_full" : "no_room" };
         const spend = await spendTicketsInTransaction(client, {
@@ -170,7 +170,7 @@ export async function moveFarmLivestock(pool, input) {
             if (!homes.some((entry) => entry.id === wanted))
                 return { ok: false, error: "unknown_home" };
             const others = herd.filter((row) => row.animal_id !== animalId).map((row) => row.home_id ?? null);
-            if (!pickFarmLivestockHome(homes, others, wanted))
+            if (!pickFarmLivestockHome(homes, others, wanted, animal.species_id))
                 return { ok: false, error: "home_full" };
         }
         await client.query(`update farm_livestock set home_id = $3, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, animalId, wanted]);
@@ -280,7 +280,7 @@ async function deliverYoung(client, playerId, layout, living, clock, random) {
         if (!rule)
             continue;
         const occupied = living.map((row) => row.home_id ?? null);
-        const home = pickFarmLivestockHome(homes, occupied, mother.home_id ?? undefined) ?? pickFarmLivestockHome(homes, occupied);
+        const home = pickFarmLivestockHome(homes, occupied, mother.home_id ?? undefined, rule.id) ?? pickFarmLivestockHome(homes, occupied, undefined, rule.id);
         if (!home)
             continue;
         const bornAt = Math.min(clock, Math.max(pregnancy.dueAt, Number(mother.lastSettledAt) || 0));
@@ -360,7 +360,7 @@ export async function careFarmLivestock(pool, input, now = Date.now(), random = 
             if (!mother || !sire)
                 return answer({ ok: false, error: settled.deaths.some((death) => death.id === animalId || death.id === mateId) ? "died" : "not_found" });
             const level = farmingLevelForXp(normalizeHusbandryRecord(layout.skills?.husbandry).xp);
-            const freePlaces = freePlacesForYoung(farmLivestockHomes(layout.decor), settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })));
+            const freePlaces = freePlacesForYoung(farmLivestockHomes(layout.decor), settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })), String(mother.species_id));
             const refusal = breedingRefusal(breedingSubject(mother), breedingSubject(sire), { clock, level, freePlaces });
             if (refusal)
                 return answer({ ok: false, error: refusal, ...(refusal === "level_too_low" ? { level } : {}) });
@@ -409,7 +409,8 @@ export async function careFarmLivestock(pool, input, now = Date.now(), random = 
         }
         // collect
         const wanted = typeof input?.itemId === "string" ? input.itemId : "";
-        const product = rule.products.find((entry) => (!wanted || entry.itemId === wanted) && (care.progress[entry.itemId] ?? 0) >= entry.everyDays * 24 * 60);
+        // Only the goods this animal gives: a rooster lays no eggs.
+        const product = farmLivestockProductsFor(rule, row.gender).find((entry) => (!wanted || entry.itemId === wanted) && (care.progress[entry.itemId] ?? 0) >= entry.everyDays * 24 * 60);
         if (!product)
             return answer({ ok: false, error: "not_ready" });
         const cycle = product.everyDays * 24 * 60;

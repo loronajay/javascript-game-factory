@@ -25,7 +25,7 @@
 // The farm clock only runs while the owner plays or naps, so nothing here
 // happens while the farm is away.
 
-import { LIVESTOCK_STATS, STAT_MAX, STAT_MIN, findLivestockSpecies, type LivestockProduct, type LivestockSpecies, type LivestockStats } from "./farm-catalog/livestock.mjs";
+import { LIVESTOCK_STATS, STAT_MAX, STAT_MIN, findLivestockSpecies, livestockProductsFor, type LivestockProduct, type LivestockSpecies, type LivestockStats } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
 
 /**
@@ -64,7 +64,8 @@ export type LivestockCare = Readonly<{
   restUntil: number;
 }>;
 
-export type CareSubject = Readonly<{ speciesId: string; stats: LivestockStats; bornAt: number }>;
+/** `gender` decides which goods it gives (a rooster lays no eggs); without it, all its species' goods. */
+export type CareSubject = Readonly<{ speciesId: string; stats: LivestockStats; bornAt: number; gender?: string }>;
 
 /** Hunger a Hardiness-50 animal loses in a farm day: the pets' rate. */
 export const HUNGER_PER_DAY = 25;
@@ -274,11 +275,12 @@ export function goodQuality(stats: LivestockStats, stressMinutes: number, cycleM
   return "poor";
 }
 
-/** Each good's state: how far along (0–1) and whether it can be collected now. */
+/** Each good it gives: how far along (0–1) and whether it can be collected now. A good only the other sex gives is not listed. */
 export function goodsState(subject: CareSubject, care: LivestockCare): ReadonlyArray<Readonly<{ product: LivestockProduct; fraction: number; ready: boolean; quality: GoodQuality }>> {
   const species = findLivestockSpecies(subject.speciesId);
   if (!species) return [];
-  return species.products.map((product) => {
+  const products = subject.gender === undefined ? species.products : livestockProductsFor(species, subject.gender);
+  return products.map((product) => {
     const cycle = goodCycleMinutes(product);
     const done = care.progress[product.itemId] ?? 0;
     return Object.freeze({ product, fraction: Math.min(1, done / cycle), ready: done >= cycle, quality: goodQuality(subject.stats, care.stress[product.itemId] ?? 0, cycle) });

@@ -7,9 +7,10 @@
 // prices, stat ranges, coats, growth and the home ids — so neither can drift.
 //
 // Room comes from buildings, never from a species cap: every Stable stall
-// holds one, the Barn floor two, a Small Pen two and a Large Pen four. The ids
-// are the page's (`js/farm-livestock-housing.mts`): `<instanceId>#stall-N`,
-// `<instanceId>#floor`, `<instanceId>#pen`.
+// holds one, the Barn floor two, a Small Pen two, a Large Pen four and a
+// Chicken Coop six chickens (and nothing but chickens). The ids are the
+// page's (`js/farm-livestock-housing.mts`): `<instanceId>#stall-N`,
+// `<instanceId>#floor`, `<instanceId>#pen`, `<instanceId>#coop`.
 export const LIVESTOCK_STATS = Object.freeze(["yield", "quality", "growth", "hardiness"]);
 export const STAT_MIN = 1;
 export const STAT_MAX = 100;
@@ -31,6 +32,15 @@ function rule(variant, spec) {
     });
 }
 export const FARM_LIVESTOCK_RULES = Object.freeze([
+    rule("chicken", {
+        title: "Chicken", price: 120, minLevel: 1, adultDays: 2, gestationDays: 1,
+        products: [{ itemId: "egg", everyDays: 1, dayValue: 10, onlyFrom: "female" }],
+        meat: { itemId: "chicken-meat", cuts: 3 },
+        feeds: { supply: "food.chicken-feed", crops: ["corn", "sunflower", "bean", "blueberry"] },
+        stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(25, 70) },
+        coats: [{ id: "standard", weight: 50 }, { id: "buff", weight: 25 }, { id: "black", weight: 20 }, { id: "speckled", weight: 5 }],
+        names: ["Henny", "Nugget", "Ginger", "Biscuit", "Popcorn", "Peaches", "Dumpling", "Sunny", "Pepper", "Goldie"],
+    }),
     rule("sheep", {
         title: "Sheep", price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
         products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
@@ -70,6 +80,10 @@ export const FARM_LIVESTOCK_RULES = Object.freeze([
 ]);
 export function farmLivestockRule(id) {
     return typeof id === "string" ? FARM_LIVESTOCK_RULES.find((entry) => entry.id === id) ?? null : null;
+}
+/** The goods one animal gives: its species' goods, less those only the other sex gives (a rooster lays no eggs). */
+export function farmLivestockProductsFor(entry, gender) {
+    return entry.products.filter((product) => !product.onlyFrom || product.onlyFrom === gender);
 }
 function unit(random) {
     const sample = random();
@@ -111,10 +125,16 @@ export function cleanLivestockName(value, fallback) {
 // ---------------------------------------------------------------- homes
 const STABLE_STALLS = 3;
 const BARN_SLOTS = 2;
+const COOP_SLOTS = 6;
+/** The coop is for chickens only. */
+const COOP_SPECIES = Object.freeze(["livestock.chicken"]);
 const PEN_SLOTS = Object.freeze({
     "decor.building.pen-small": 2,
     "decor.building.pen-large": 4,
 });
+export function farmHomeTakes(home, speciesId) {
+    return !home.species || (typeof speciesId === "string" && home.species.includes(speciesId));
+}
 /** Every home a farm's decor rows make, in row order — the page's `livestockHomes` without the geometry. */
 export function farmLivestockHomes(decor) {
     const homes = [];
@@ -133,16 +153,23 @@ export function farmLivestockHomes(decor) {
         else if (PEN_SLOTS[itemId]) {
             homes.push({ id: `${instanceId}#pen`, slots: PEN_SLOTS[itemId] });
         }
+        else if (itemId === "decor.building.coop") {
+            homes.push({ id: `${instanceId}#coop`, slots: COOP_SLOTS, species: COOP_SPECIES });
+        }
     }
     return homes;
 }
-/** The first home with room, or `wanted` if it has room; null when the farm is full. `herdHomes` are the homes the live herd names. */
-export function pickFarmLivestockHome(homes, herdHomes, wanted) {
+/**
+ * The first home with room for one of `speciesId`, or `wanted` if it has room
+ * and takes that species; null when the farm is full for it. `herdHomes` are
+ * the homes the live herd names.
+ */
+export function pickFarmLivestockHome(homes, herdHomes, wanted, speciesId) {
     const counts = new Map();
     for (const id of herdHomes)
         if (id)
             counts.set(id, (counts.get(id) ?? 0) + 1);
-    const hasRoom = (entry) => (counts.get(entry.id) ?? 0) < entry.slots;
+    const hasRoom = (entry) => (counts.get(entry.id) ?? 0) < entry.slots && farmHomeTakes(entry, speciesId);
     if (typeof wanted === "string" && wanted) {
         const chosen = homes.find((entry) => entry.id === wanted);
         return chosen && hasRoom(chosen) ? chosen : null;
@@ -160,8 +187,8 @@ export function farmLivestockGood(itemId) {
 export function farmLivestockGoodPrice(good) {
     return Math.ceil((good.dayValue * good.everyDays) / AVERAGE_GOODS_PER_COLLECTION);
 }
-/** Livestock feed in the supply shop, by price (the page's LIVESTOCK_FEEDS; services/farm-economy-catalog sells the same two). */
-export const FARM_LIVESTOCK_FEED_PRICES = Object.freeze({ "food.hay": 8, "food.pig-feed": 8 });
+/** Livestock feed in the supply shop, by price (the page's LIVESTOCK_FEEDS; services/farm-economy-catalog sells the same three). */
+export const FARM_LIVESTOCK_FEED_PRICES = Object.freeze({ "food.hay": 8, "food.pig-feed": 8, "food.chicken-feed": 6 });
 // ---------------------------------------------------------------- care (js/farm-livestock-care.mts, rule for rule)
 const DAY = 24 * 60;
 export const HUNGER_PER_DAY = 25;
@@ -363,13 +390,13 @@ export const JUMP_MIN = 6;
 export const JUMP_MAX = 12;
 export const MOTHER_COAT_SHARE = 0.45;
 export const SIRE_COAT_SHARE = 0.45;
-/** Empty slots in standing homes, less the places other mothers' young are owed. */
-export function freePlacesForYoung(homes, herd) {
+/** Empty slots in standing homes that take `speciesId` (every home, without one), less the places other mothers' young are owed. */
+export function freePlacesForYoung(homes, herd, speciesId) {
     const counts = new Map(homes.map((home) => [home.id, 0]));
     for (const animal of herd)
         if (animal.homeId && counts.has(animal.homeId))
             counts.set(animal.homeId, counts.get(animal.homeId) + 1);
-    const empty = homes.reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
+    const empty = homes.filter((home) => speciesId === undefined || farmHomeTakes(home, speciesId)).reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
     return Math.max(0, empty - herd.filter((animal) => animal.pregnant).length);
 }
 /** Why this pair cannot be bred now, or null — the page's `breedingRefusal`, reason for reason, in the same order. */

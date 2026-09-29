@@ -505,7 +505,7 @@ async function buyLivestock(speciesId) {
 const livestockPortraits = createAvatarThumbnails(THREE, {
     resolve: (speciesId) => {
         const species = findLivestockSpecies(speciesId);
-        return species ? { assetUrl: livestockAssetUrl(species), poseClip: (gltf) => livestockClips(gltf, species).idle, height: 1.45, lookAtY: 0.7 } : undefined;
+        return species ? { assetUrl: livestockAssetUrl(species), poseClip: (gltf) => livestockClips(gltf, species).idle, height: 1.45, lookAtY: 0.7, yaw: species.modelYaw + (species.portraitTurn ?? 0), fitPosed: species.fitPosed } : undefined;
     },
 });
 const dealerPanel = createLivestockDealerPanel({

@@ -1,5 +1,21 @@
 # Changelog
 
+## Livestock: the chicken (2026-09-29)
+
+A fifth species, from a rigged chicken the owner added (`farm/assets/yield-animals/chicken.glb`, Maf'j Alvarez on Sketchfab, **CC-BY-4.0** — credited in that folder's `CREDITS.md`, which the licence requires). The file came in as `chicken_-_rigged.glb` and was renamed to match the others.
+
+**The row** (`livestock.chicken`, first in both catalogs): a Chick at the Dealer for 120 tickets at Husbandry 1, grown in 2 farm days, a 1-day incubation for breeding, Chicken Feed (6 tickets, new in the supply shop) or corn/sunflower/bean/blueberry, 3 cuts of Chicken at the Butcher (80 a cut, derived as always). Its clips have their own names (`chicken-rig|idle`, `…|walking`, `…|pecking`, `…|sitting-down`), so the row carries `CHICKEN_CLIPS`.
+
+**Hens and roosters differ, and three new catalog fields say how.** A good may be given by one sex only (`onlyFrom: "female"` on the egg), held on both sides: `livestockProductsFor` / `farmLivestockProductsFor`, used by the page's `goodsState` (a rooster has no egg line at all) and by the server's collect (a rooster answers `not_ready` forever). A coat may give the male his own colours (`maleColors`, `maleTitle`): every chicken coat does — a dark sickle tail, a bright comb and a coloured hackle — and the body is drawn from palette id `<coat>@male` (`livestockPaletteId`). A species may draw its males bigger (`maleSize`: 1.25 for the chicken, folded into `livestockSize`, so the sim's room and pace follow). `sexTitles` names a grown one Hen or Rooster. All presentation except `onlyFrom`, which the server enforces.
+
+**The model faces the other way and stands taller than its bind box.** `modelYaw` (π) turns it on the farm and on the Dealer's card. Its rig scales the bones, so the bind-pose box is ~56% of the bird as it actually stands. A species with `fitPosed` is measured with precise skinned bounds while held in its idle clip (the mixer is stopped only after measuring, since stopping puts the bones back at rest). Every other animal keeps the old fit, and the Quaternius models measure the same either way. Measured in a harness: hen 0.420 m, rooster 0.525 m, sheep 0.851 m. `arcade-room-avatar-thumbnails` gained the same `fitPosed` and a `yaw` per subject (the chicken's card also turns `portraitTurn` for a three-quarter view).
+
+**The Chicken Coop is a home at last**: its floor in front of the nest boxes (`coopFloor` in `farm-fixtures.mts`) holds six, and **only chickens** — a home may now name the species it takes (`species` on the page, `farmHomeTakes` on the server). `homesWithRoom`, `pickFarmLivestockHome` (now takes the species), `freePlacesForYoung` (optional species) and the Herd panel's home picker all respect it; the Dealer counts room per species and says when the only room is the coop. Chickens may still live in pens, stalls or on the barn floor.
+
+**Eggs and chicken in the economy**: `egg` (1 a day per hen, graded like milk, 7 tickets Normal) and `chicken-meat` are basket goods with models (three brown eggs in a pulp tray; a drumstick). Both herd order tiers ask for eggs, with two egg buyers of their own (Sunnyside Diner, Rosehip Bakery) — this reshuffled only the herd notices. Eight level-taught recipes: Farmhouse Breakfast 2, Chicken & Corn Soup 5, Deviled Eggs 6, Garden Omelette 8, Roast Chicken 10, Chicken Cacciatore 14, Custard Tart 17, Chicken Pot Pie 21, kept off the kitchen's notices like every livestock dish. The Market's two price boards and the Butcher's slab now space themselves by the catalog's length.
+
+No migration. Tests: coop homes on both sides and the Dealer refusing a calf into a coop; hens-only eggs on both sides and through `careFarmLivestock`; rooster colours/size/titles; a flock walked four minutes stays on the coop floor; the lists that pinned four species updated.
+
 ## Livestock, fifth slice: breeding (2026-09-28)
 
 Phase 5 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. Two grown animals of one species can now be paired, and the young one inherits from both. This is how a herd gets better than anything the Dealer sells.

@@ -11,7 +11,7 @@
 import { livestockGrade, livestockSummary, gradeStars } from "./farm-livestock.mjs";
 import { BREEDING_MIN_LEVEL, BREEDING_REFUSAL_WORDS, breedingRefusal, freePlacesForYoung, pregnancyView } from "./farm-livestock-breeding.mjs";
 import { LIVESTOCK_STATS, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
-import { homeOccupancy, totalLivestockSlots } from "./farm-livestock-housing.mjs";
+import { homeOccupancy, homeTakes, totalLivestockSlots } from "./farm-livestock-housing.mjs";
 import { LIVESTOCK_NAME_MAX } from "./farm-catalog/livestock.mjs";
 import { goodsState, livestockNeed } from "./farm-livestock-care.mjs";
 import { QUALITY_TITLES } from "./farm-quality.mjs";
@@ -52,8 +52,11 @@ export function createLivestockPanel(elements, actions, options = {}) {
         select.disabled = !canManage;
         const known = current.some((entry) => entry.id === animal.homeId);
         for (const entry of current) {
-            const taken = occupancy.get(entry.id) ?? 0;
             const mine = entry.id === animal.homeId;
+            // The coop takes chickens only: it is not offered to anything else.
+            if (!mine && !homeTakes(entry, animal.speciesId))
+                continue;
+            const taken = occupancy.get(entry.id) ?? 0;
             const option = element("option", "", `${entry.title} · ${taken}/${entry.slots}`);
             option.value = entry.id;
             option.disabled = !mine && taken >= entry.slots;
@@ -91,7 +94,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
             return null;
         if (current.husbandryLevel < BREEDING_MIN_LEVEL)
             return element("p", "livestock-breed", BREEDING_REFUSAL_WORDS.level_too_low);
-        const context = { clock: current.clockMinutes, level: current.husbandryLevel, freePlaces: freePlacesForYoung(current.homes, current.herd) };
+        const context = { clock: current.clockMinutes, level: current.husbandryLevel, freePlaces: freePlacesForYoung(current.homes, current.herd, animal.speciesId) };
         const males = current.herd.filter((other) => other.speciesId === animal.speciesId && other.gender === "male");
         if (!males.length)
             return element("p", "livestock-breed", `No ${species?.title.toLowerCase() ?? "male"} ♂ of her kind on the farm to pair her with.`);

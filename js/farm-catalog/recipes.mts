@@ -18,7 +18,7 @@
 //
 // Ingredients are harvest-basket ids: the sixteen crops and the five fruits,
 // and — since livestock — the herd's milk (`milk`, `milk-sheep`) for the
-// dairy dishes and the Butcher's meat (`beef`, `pork`, `mutton`, `llama-meat`). Every crop and fruit is wanted by at least one recipe. A recipe may also want
+// dairy dishes, the hens' eggs (`egg`), and the Butcher's meat (`beef`, `pork`, `mutton`, `llama-meat`, `chicken-meat`). Every crop and fruit is wanted by at least one recipe. A recipe may also want
 // FISH from the Cove's creel: a fish need (farm-fish.mts `parseFishNeed`) and a
 // count. The cook takes the least valuable fish that will do, never a locked one.
 
@@ -113,6 +113,9 @@ const BEEF = "#6b2e1e";
 const PORK = "#c98a5e";
 const SAUSAGE = "#9a4a2e";
 const LLAMA = "#7a3f2a";
+const CHICKEN = "#d99a55";
+const EGG_WHITE = "#fbf8ef";
+const YOLK = "#f5b52a";
 
 export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
   recipe("tomato-sauce", "Tomato Sauce", {
@@ -124,6 +127,11 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     blurb: "Crisp cabbage, carrot and radish, tossed in a wooden bowl.",
     minLevel: 1, ingredients: { cabbage: 1, carrot: 1, radish: 1 }, steps: ["chop", "stir"], xp: 70,
     model: { vessel: "bowl", vesselColor: "#9a6a3e", fill: "#6aa84f", bits: [bit("leaf", "#a8d46a", 7, 1.1), bit("cube", CARROT, 6, 0.8), bit("half", "#d8455a", 4, 0.9)] },
+  }),
+  recipe("farmhouse-breakfast", "Farmhouse Breakfast", {
+    blurb: "Two eggs sunny side up with fried potatoes and a grilled tomato.",
+    minLevel: 2, ingredients: { egg: 2, potato: 1, tomato: 1 }, steps: ["chop", "bake"], xp: 100,
+    model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("round", EGG_WHITE, 2, 3), bit("round", YOLK, 2, 1.2), bit("cube", POTATO, 5, 1), bit("half", "#c9302c", 1, 1.6)] },
   }),
   recipe("farm-stew", "Farm Stew", {
     blurb: "Potato, carrot and garlic simmered thick. A farmhand's supper.",
@@ -155,10 +163,20 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     minLevel: 5, ingredients: { milk: 3 }, steps: ["stir", "chop"], xp: 110,
     model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("cube", "#f6dc7a", 1, 4.2), bit("leaf", HERB, 1, 0.7)] },
   }),
+  recipe("chicken-corn-soup", "Chicken & Corn Soup", {
+    blurb: "Shredded chicken, sweet corn and carrot in a golden broth.",
+    minLevel: 5, ingredients: { "chicken-meat": 1, corn: 2, carrot: 1 }, steps: ["chop", "stir", "simmer"], xp: 140,
+    model: { vessel: "bowl", vesselColor: "#e8dcc2", fill: "#e6c46a", bits: [bit("cube", CHICKEN, 5, 1), bit("kernel", "#f2c83a", 12), bit("round", CARROT, 4, 0.8)] },
+  }),
   recipe("sunflower-seeds", "Toasted Sunflower Seeds", {
     blurb: "A paper twist of seeds, toasted and salted.",
     minLevel: 6, ingredients: { sunflower: 1 }, steps: ["chop", "bake"], xp: 90,
     model: { vessel: "bag", vesselColor: "#c9a878", fill: "#5a4a36", bits: [bit("seed", "#3b3326", 14, 1.8), bit("seed", "#d8cfb0", 8, 1.8)] },
+  }),
+  recipe("deviled-eggs", "Deviled Eggs", {
+    blurb: "Hard-boiled eggs halved, the yolks whipped with garlic and piped back in.",
+    minLevel: 6, ingredients: { egg: 3, garlic: 1 }, steps: ["simmer", "chop", "stir"], xp: 130,
+    model: { vessel: "plate", vesselColor: "#3f6f9a", fill: "#3f6f9a", bits: [bit("half", EGG_WHITE, 6, 2), bit("round", YOLK, 6, 1)] },
   }),
   recipe("shepherds-pie", "Shepherd's Pie", {
     blurb: "Minced mutton and carrot under a ridged lid of mashed potato.",
@@ -169,6 +187,11 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     blurb: "Strawberries and blueberries cooked down and jarred for winter.",
     minLevel: 8, ingredients: { strawberry: 3, blueberry: 2 }, steps: ["stir", "simmer"], xp: 140,
     model: { vessel: "jar", vesselColor: "#d8eef0", fill: "#5a1d4a", cloth: "#3f6fb8", bits: [bit("round", "#d02e3a", 1, 1.1)] },
+  }),
+  recipe("garden-omelette", "Garden Omelette", {
+    blurb: "A fluffy three-egg omelette folded over tomato and shredded cabbage.",
+    minLevel: 8, ingredients: { egg: 3, tomato: 1, cabbage: 1 }, steps: ["chop", "stir", "bake"], xp: 160,
+    model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("half", "#f2d06a", 1, 4.4), bit("cube", "#c9302c", 3, 0.8), bit("leaf", "#8ab55a", 3, 0.9)] },
   }),
   recipe("grilled-snapper", "Grilled Snapper", {
     blurb: "A whole Red Snapper off the pier, grilled with garlic and tomato.",
@@ -184,6 +207,11 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     blurb: "Sweet corn and potato in a creamy, peppery broth.",
     minLevel: 10, ingredients: { corn: 2, potato: 1, garlic: 1 }, steps: ["chop", "stir", "simmer"], xp: 180,
     model: { vessel: "bowl", vesselColor: "#3f6f9a", fill: "#efe3b8", bits: [bit("kernel", "#f2c83a", 14), bit("cube", POTATO, 3, 0.9), bit("leaf", HERB, 2, 0.6)] },
+  }),
+  recipe("roast-chicken", "Roast Chicken", {
+    blurb: "Chicken roasted golden over potatoes, with a whole bulb of garlic.",
+    minLevel: 10, ingredients: { "chicken-meat": 2, potato: 2, garlic: 1 }, steps: ["chop", "simmer", "bake"], xp: 210,
+    model: { vessel: "plate", vesselColor: "#e9eef2", fill: "#e9eef2", bits: [bit("half", CHICKEN, 1, 4.2), bit("half", POTATO, 4, 1.4), bit("round", GARLIC, 3, 0.9), bit("leaf", HERB, 2, 0.9)] },
   }),
   recipe("feta-salad", "Feta & Tomato Salad", {
     blurb: "Crumbly sheep's-milk feta over tomato and torn cabbage.",
@@ -210,6 +238,11 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     minLevel: 14, ingredients: { strawberry: 3, milk: 2 }, steps: ["chop", "stir"], xp: 230,
     model: { vessel: "cup", vesselColor: "#f2ece0", fill: CREAM, bits: [bit("half", "#d02e3a", 5, 1.4), bit("leaf", HERB, 1, 0.6)] },
   }),
+  recipe("chicken-cacciatore", "Chicken Cacciatore", {
+    blurb: "Hunter's-style chicken braised in tomato and garlic until it falls apart.",
+    minLevel: 14, ingredients: { "chicken-meat": 2, tomato: 2, garlic: 1 }, steps: ["chop", "stir", "simmer"], xp: 240,
+    model: { vessel: "bowl", vesselColor: "#7a3a2a", fill: "#b5402e", bits: [bit("cube", CHICKEN, 5, 1.3), bit("half", "#c9302c", 3, 0.9), bit("leaf", HERB, 3, 0.8)] },
+  }),
   recipe("roasted-roots", "Roasted Roots", {
     blurb: "Beetroot, carrot and radish roasted until the edges char.",
     minLevel: 15, ingredients: { beetroot: 2, carrot: 2, radish: 1 }, steps: ["chop", "bake"], xp: 220,
@@ -224,6 +257,11 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     blurb: "Two lagoon fish under a lid of mashed potato, baked golden.",
     minLevel: 17, fish: { need: "zone=lagoon", count: 2 }, ingredients: { potato: 2, carrot: 1 }, steps: ["chop", "stir", "bake"], xp: 270,
     model: { vessel: "baking-dish", vesselColor: "#e6e0d4", fill: "#f2dca0", crust: "crumble", crustColor: "#e6c27a", bits: [bit("cube", CARROT, 3, 0.7)] },
+  }),
+  recipe("custard-tart", "Custard Tart", {
+    blurb: "A wobbling egg-and-milk custard, nutmeg-dusted, in a cornmeal crust.",
+    minLevel: 17, ingredients: { egg: 3, milk: 2, corn: 1 }, steps: ["stir", "simmer", "bake"], xp: 270,
+    model: { vessel: "pie", vesselColor: "#b9bec4", fill: "#f2dc8a", bits: [bit("seed", "#8a5a2b", 8, 0.8)], crustColor: "#d9a45a" },
   }),
   recipe("pumpkin-soup", "Pumpkin Soup", {
     blurb: "Served in the pumpkin it came from, with its seeds toasted on top.",
@@ -249,6 +287,11 @@ export const LEVEL_RECIPE_CATALOG: readonly Recipe[] = Object.freeze([
     blurb: "Thick slices of tuna from the Deep, seared at the edges and pink inside.",
     minLevel: 21, fish: { need: "species=fish.tuna", count: 1 }, ingredients: { garlic: 1, radish: 1 }, steps: ["chop", "bake"], xp: 320,
     model: { vessel: "plate", vesselColor: "#2f3a44", fill: "#2f3a44", bits: [bit("slice", "#c44a5a", 6, 2.4), bit("half", "#d8455a", 3, 0.8)] },
+  }),
+  recipe("chicken-pot-pie", "Chicken Pot Pie", {
+    blurb: "Chicken, carrot and potato in a creamy sauce under an egg-glazed lattice.",
+    minLevel: 21, ingredients: { "chicken-meat": 2, carrot: 1, potato: 1, milk: 1, egg: 1 }, steps: ["chop", "stir", "bake"], xp: 320,
+    model: { vessel: "pie", vesselColor: "#b9bec4", fill: "#f1dca6", crust: "lattice", crustColor: "#d9973e", bits: [bit("cube", CHICKEN, 3, 1)] },
   }),
   recipe("stuffed-eggplant", "Stuffed Eggplant", {
     blurb: "Eggplant halves baked with a tomato-and-garlic filling.",

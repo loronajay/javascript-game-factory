@@ -24,7 +24,7 @@
 //
 // The farm clock only runs while the owner plays or naps, so nothing here
 // happens while the farm is away.
-import { LIVESTOCK_STATS, STAT_MAX, STAT_MIN, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
+import { LIVESTOCK_STATS, STAT_MAX, STAT_MIN, findLivestockSpecies, livestockProductsFor } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
 /** Hunger a Hardiness-50 animal loses in a farm day: the pets' rate. */
 export const HUNGER_PER_DAY = 25;
@@ -218,12 +218,13 @@ export function goodQuality(stats, stressMinutes, cycleMinutes) {
         return "normal";
     return "poor";
 }
-/** Each good's state: how far along (0–1) and whether it can be collected now. */
+/** Each good it gives: how far along (0–1) and whether it can be collected now. A good only the other sex gives is not listed. */
 export function goodsState(subject, care) {
     const species = findLivestockSpecies(subject.speciesId);
     if (!species)
         return [];
-    return species.products.map((product) => {
+    const products = subject.gender === undefined ? species.products : livestockProductsFor(species, subject.gender);
+    return products.map((product) => {
         const cycle = goodCycleMinutes(product);
         const done = care.progress[product.itemId] ?? 0;
         return Object.freeze({ product, fraction: Math.min(1, done / cycle), ready: done >= cycle, quality: goodQuality(subject.stats, care.stress[product.itemId] ?? 0, cycle) });

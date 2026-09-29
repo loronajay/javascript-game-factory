@@ -170,6 +170,18 @@ export function barnFloor({ footprint, shell }: Building): Readonly<{ x: number;
   return { x: (west + east) / 2, z: (north + south) / 2, width: east - west, depth: south - north };
 }
 
+/** The coop's floor, where its chickens scratch about: wall to wall, from in front of the nest boxes to the door wall. */
+export function coopFloor({ footprint, shell }: Building): Readonly<{ x: number; z: number; width: number; depth: number }> {
+  const t = shell!.wallThickness;
+  const halfW = footprint.width / 2;
+  const halfD = footprint.depth / 2;
+  const west = -halfW + t + 0.1;
+  const east = halfW - t - 0.1;
+  const north = -halfD + t + COOP_NEST_DEPTH + 0.1;
+  const south = halfD - t - 0.2;
+  return { x: (west + east) / 2, z: (north + south) / 2, width: east - west, depth: south - north };
+}
+
 /** The stable's stalls: how many, and each one's box in the stable's frame (between its partitions, behind its front). */
 export const STABLE_STALLS = 3;
 export const STABLE_STALL_DEPTH = 1.6;
@@ -259,12 +271,15 @@ function shedFixtures({ footprint, shell }: Building): FarmFixture[] {
   ];
 }
 
+/** How deep the coop's nest boxes run from its back wall; the floor in front of them is the chickens' (`coopFloor`). */
+const COOP_NEST_DEPTH = 0.5;
+
 function coopFixtures({ footprint, shell }: Building): FarmFixture[] {
   const t = shell!.wallThickness;
   const halfW = footprint.width / 2;
   const halfD = footprint.depth / 2;
   return [
-    fixture("nest-boxes", { x: 0, z: -halfD + t + 0.25, width: footprint.width - t * 2 - 0.2, depth: 0.5, bottom: 0.675, top: 1.2 }),
+    fixture("nest-boxes", { x: 0, z: -halfD + t + COOP_NEST_DEPTH / 2, width: footprint.width - t * 2 - 0.2, depth: COOP_NEST_DEPTH, bottom: 0.675, top: 1.2 }),
     // The roost is a perch along the west side, so the path to the nest boxes stays open on the east.
     fixture("roost", { x: -halfW + t + 0.5, z: 0.3, width: 0.9, depth: 0.06, bottom: 0.97, top: 1.03 }),
   ];

@@ -2,8 +2,10 @@
 // herd's options. The Quaternius pack names its clips (Idle, WalkSlow, Jump,
 // Death) and colours its animals with a few flat materials named for what they
 // are (a cow's "White" and "Black"), so a coat is a repaint of those materials
-// by name and every other material keeps the pack's colour.
-import { findLivestockCoat, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
+// by name and every other material keeps the pack's colour. A male whose coat
+// has colours of its own (a rooster) is drawn in them: his body's palette id
+// is `<coatId>@male` (`livestockPaletteId`).
+import { findLivestockCoat, findLivestockSpecies, livestockCoatColors } from "./farm-catalog/livestock.mjs";
 import { createPetBodies } from "./farm-pet-bodies.mjs";
 export function livestockAssetUrl(species) {
     return new URL(`../farm/assets/yield-animals/${species.file}`, import.meta.url).toString();
@@ -18,10 +20,17 @@ export function livestockClips(gltf, species) {
         dead: named(species.clips.dead),
     });
 }
-/** A material repainted for a coat: the coat's colour for a material it names, the pack's own otherwise. */
-export function paintLivestockMaterial(THREE, material, species, coatId) {
+/** A body's palette id: its coat, and `@male` for a male whose coat paints him his own colours. */
+export function livestockPaletteId(animal) {
+    const coat = findLivestockCoat(animal.speciesId, animal.coatId);
+    return animal.gender === "male" && coat?.maleColors ? `${animal.coatId}@male` : animal.coatId;
+}
+/** A material repainted for a coat: the coat's colour for a material it names, the pack's own otherwise. `paletteId` is `livestockPaletteId`'s. */
+export function paintLivestockMaterial(THREE, material, species, paletteId) {
     const copy = material.clone();
-    const color = findLivestockCoat(species.id, coatId)?.colors[String(material.name ?? "")];
+    const [coatId, sex] = String(paletteId).split("@");
+    const coat = findLivestockCoat(species.id, coatId);
+    const color = coat ? livestockCoatColors(coat, sex)[String(material.name ?? "")] : undefined;
     if (color)
         copy.color = new THREE.Color(color);
     copy.roughness = Math.max(copy.roughness ?? 0.8, 0.75);

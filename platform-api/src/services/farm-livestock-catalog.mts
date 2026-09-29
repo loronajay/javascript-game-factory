@@ -7,9 +7,10 @@
 // prices, stat ranges, coats, growth and the home ids — so neither can drift.
 //
 // Room comes from buildings, never from a species cap: every Stable stall
-// holds one, the Barn floor two, a Small Pen two and a Large Pen four. The ids
-// are the page's (`js/farm-livestock-housing.mts`): `<instanceId>#stall-N`,
-// `<instanceId>#floor`, `<instanceId>#pen`.
+// holds one, the Barn floor two, a Small Pen two, a Large Pen four and a
+// Chicken Coop six chickens (and nothing but chickens). The ids are the
+// page's (`js/farm-livestock-housing.mts`): `<instanceId>#stall-N`,
+// `<instanceId>#floor`, `<instanceId>#pen`, `<instanceId>#coop`.
 
 export const LIVESTOCK_STATS = Object.freeze(["yield", "quality", "growth", "hardiness"] as const);
 export type LivestockStat = typeof LIVESTOCK_STATS[number];
@@ -23,7 +24,8 @@ export const LIVESTOCK_NAME_MAX = 24;
 export const MAX_HERD = 60;
 export const GRADE_THRESHOLDS = Object.freeze([0, 25, 40, 55, 70] as const);
 
-export type LivestockGoodRule = Readonly<{ itemId: string; everyDays: number; dayValue: number }>;
+/** `onlyFrom`: given by that sex only (a hen's eggs); absent, by either. */
+export type LivestockGoodRule = Readonly<{ itemId: string; everyDays: number; dayValue: number; onlyFrom?: "female" | "male" }>;
 /** What the Butcher cuts a grown one into: one meat per species, `cuts` from an average one at its prime. */
 export type LivestockMeatRule = Readonly<{ itemId: string; cuts: number }>;
 
@@ -62,6 +64,15 @@ function rule(variant: string, spec: Omit<LivestockRule, "id">): LivestockRule {
 }
 
 export const FARM_LIVESTOCK_RULES: readonly LivestockRule[] = Object.freeze([
+  rule("chicken", {
+    title: "Chicken", price: 120, minLevel: 1, adultDays: 2, gestationDays: 1,
+    products: [{ itemId: "egg", everyDays: 1, dayValue: 10, onlyFrom: "female" }],
+    meat: { itemId: "chicken-meat", cuts: 3 },
+    feeds: { supply: "food.chicken-feed", crops: ["corn", "sunflower", "bean", "blueberry"] },
+    stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(25, 70) },
+    coats: [{ id: "standard", weight: 50 }, { id: "buff", weight: 25 }, { id: "black", weight: 20 }, { id: "speckled", weight: 5 }],
+    names: ["Henny", "Nugget", "Ginger", "Biscuit", "Popcorn", "Peaches", "Dumpling", "Sunny", "Pepper", "Goldie"],
+  }),
   rule("sheep", {
     title: "Sheep", price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
     products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
@@ -102,6 +113,11 @@ export const FARM_LIVESTOCK_RULES: readonly LivestockRule[] = Object.freeze([
 
 export function farmLivestockRule(id: unknown): LivestockRule | null {
   return typeof id === "string" ? FARM_LIVESTOCK_RULES.find((entry) => entry.id === id) ?? null : null;
+}
+
+/** The goods one animal gives: its species' goods, less those only the other sex gives (a rooster lays no eggs). */
+export function farmLivestockProductsFor(entry: Pick<LivestockRule, "products">, gender: unknown): readonly LivestockGoodRule[] {
+  return entry.products.filter((product) => !product.onlyFrom || product.onlyFrom === gender);
 }
 
 function unit(random: () => number): number {
@@ -149,12 +165,20 @@ export function cleanLivestockName(value: unknown, fallback: string): string {
 
 const STABLE_STALLS = 3;
 const BARN_SLOTS = 2;
+const COOP_SLOTS = 6;
+/** The coop is for chickens only. */
+const COOP_SPECIES: readonly string[] = Object.freeze(["livestock.chicken"]);
 const PEN_SLOTS: Readonly<Record<string, number>> = Object.freeze({
   "decor.building.pen-small": 2,
   "decor.building.pen-large": 4,
 });
 
-export type FarmLivestockHome = Readonly<{ id: string; slots: number }>;
+/** `species`: the only species it takes; absent, any. */
+export type FarmLivestockHome = Readonly<{ id: string; slots: number; species?: readonly string[] }>;
+
+export function farmHomeTakes(home: FarmLivestockHome, speciesId: unknown): boolean {
+  return !home.species || (typeof speciesId === "string" && home.species.includes(speciesId));
+}
 
 /** Every home a farm's decor rows make, in row order — the page's `livestockHomes` without the geometry. */
 export function farmLivestockHomes(decor: unknown): FarmLivestockHome[] {
@@ -169,16 +193,22 @@ export function farmLivestockHomes(decor: unknown): FarmLivestockHome[] {
       homes.push({ id: `${instanceId}#floor`, slots: BARN_SLOTS });
     } else if (PEN_SLOTS[itemId]) {
       homes.push({ id: `${instanceId}#pen`, slots: PEN_SLOTS[itemId]! });
+    } else if (itemId === "decor.building.coop") {
+      homes.push({ id: `${instanceId}#coop`, slots: COOP_SLOTS, species: COOP_SPECIES });
     }
   }
   return homes;
 }
 
-/** The first home with room, or `wanted` if it has room; null when the farm is full. `herdHomes` are the homes the live herd names. */
-export function pickFarmLivestockHome(homes: readonly FarmLivestockHome[], herdHomes: readonly (string | null)[], wanted?: unknown): FarmLivestockHome | null {
+/**
+ * The first home with room for one of `speciesId`, or `wanted` if it has room
+ * and takes that species; null when the farm is full for it. `herdHomes` are
+ * the homes the live herd names.
+ */
+export function pickFarmLivestockHome(homes: readonly FarmLivestockHome[], herdHomes: readonly (string | null)[], wanted: unknown, speciesId: unknown): FarmLivestockHome | null {
   const counts = new Map<string, number>();
   for (const id of herdHomes) if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
-  const hasRoom = (entry: FarmLivestockHome): boolean => (counts.get(entry.id) ?? 0) < entry.slots;
+  const hasRoom = (entry: FarmLivestockHome): boolean => (counts.get(entry.id) ?? 0) < entry.slots && farmHomeTakes(entry, speciesId);
   if (typeof wanted === "string" && wanted) {
     const chosen = homes.find((entry) => entry.id === wanted);
     return chosen && hasRoom(chosen) ? chosen : null;
@@ -201,8 +231,8 @@ export function farmLivestockGoodPrice(good: Pick<LivestockGoodRule, "dayValue" 
   return Math.ceil((good.dayValue * good.everyDays) / AVERAGE_GOODS_PER_COLLECTION);
 }
 
-/** Livestock feed in the supply shop, by price (the page's LIVESTOCK_FEEDS; services/farm-economy-catalog sells the same two). */
-export const FARM_LIVESTOCK_FEED_PRICES: Readonly<Record<string, number>> = Object.freeze({ "food.hay": 8, "food.pig-feed": 8 });
+/** Livestock feed in the supply shop, by price (the page's LIVESTOCK_FEEDS; services/farm-economy-catalog sells the same three). */
+export const FARM_LIVESTOCK_FEED_PRICES: Readonly<Record<string, number>> = Object.freeze({ "food.hay": 8, "food.pig-feed": 8, "food.chicken-feed": 6 });
 
 // ---------------------------------------------------------------- care (js/farm-livestock-care.mts, rule for rule)
 
@@ -441,11 +471,11 @@ export type BreedingRefusal =
   | "level_too_low" | "not_female" | "not_male" | "other_species" | "not_grown"
   | "not_together" | "pregnant" | "resting" | "hungry" | "no_room";
 
-/** Empty slots in standing homes, less the places other mothers' young are owed. */
-export function freePlacesForYoung(homes: readonly FarmLivestockHome[], herd: readonly { homeId: string | null; pregnant: boolean }[]): number {
+/** Empty slots in standing homes that take `speciesId` (every home, without one), less the places other mothers' young are owed. */
+export function freePlacesForYoung(homes: readonly FarmLivestockHome[], herd: readonly { homeId: string | null; pregnant: boolean }[], speciesId?: string): number {
   const counts = new Map<string, number>(homes.map((home) => [home.id, 0]));
   for (const animal of herd) if (animal.homeId && counts.has(animal.homeId)) counts.set(animal.homeId, counts.get(animal.homeId)! + 1);
-  const empty = homes.reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
+  const empty = homes.filter((home) => speciesId === undefined || farmHomeTakes(home, speciesId)).reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
   return Math.max(0, empty - herd.filter((animal) => animal.pregnant).length);
 }
 
