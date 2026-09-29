@@ -25,6 +25,8 @@ import { createRoomVisitors } from "./arcade-room-visitors.mjs";
 import { createRoomChat } from "./arcade-room-chat.mjs";
 import { createRoomChatView } from "./arcade-room-chat-view.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
+import { presenceRodFor } from "./farm-cove-anglers.mjs";
+import { createCoveAnglersView } from "./farm-cove-anglers-view.mjs";
 import { EYE_HEIGHT, doorRows, farmObstacles, farmSeats, nearestDoor } from "./farm-scene.mjs";
 import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } from "./farm-body.mjs";
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
@@ -300,7 +302,7 @@ function renderVisitorsChip() {
         return;
     }
     visitorsChipLabel.textContent = `AT THE COVE · ${members.length}`;
-    visitorsChipNames.textContent = members.map((member) => member.displayName).join(", ");
+    visitorsChipNames.textContent = members.map((member) => member.pose.activity ? `${member.displayName} (${member.pose.activity})` : member.displayName).join(", ");
 }
 const chat = createRoomChat({ send: (text) => presence.sendChat(text), selfName: presenceName });
 const chatView = createRoomChatView({
@@ -349,6 +351,8 @@ const fishing = createFishingController({
 });
 const fishingView = createFishingView(THREE, scene, camera);
 fishingView.setRod(rodId);
+// Everyone else's lines: their rod, line and bobber, read off their presence poses.
+const anglersView = createCoveAnglersView(THREE, scene);
 const hud = createFishingHud(requiredElement("#fishingHud"), requiredElement("#catchCard"));
 const REFUSALS = Object.freeze({
     zone_locked: "",
@@ -847,13 +851,16 @@ function resize() {
     camera.updateProjectionMatrix();
 }
 function publishPresence() {
-    const phase = fishing.state().phase;
+    const snapshot = fishing.state();
+    const phase = snapshot.phase;
+    const rod = presenceRodFor(phase, snapshot.landing, rodId);
     presence.publishPose({
         x: player.x,
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking" && !fishing.busy(),
         ...(away.presenceMount() ? { mount: away.presenceMount() } : {}),
+        ...(rod ? { rod } : {}),
         activity: ACTIVITY[phase] ?? (fishmongerPanel.isOpen() ? "at the Fishmonger" : tacklePanel.isOpen() ? "at Bait & Tackle" : recordsPanel.isOpen() ? "reading the Cove Records" : ""),
     });
 }
@@ -895,7 +902,9 @@ function frame(now) {
     keepers.update(frameSeconds, now, keeperMembers);
     visitors.update(frameSeconds, now, presence.members());
     riderClock += frameSeconds;
-    away.draw(frameSeconds, riderClock, visitors.placements());
+    const placements = visitors.placements();
+    away.draw(frameSeconds, riderClock, placements);
+    anglersView.update(frameSeconds, seconds, placements);
     chatView.tick();
     applyCamera();
     resize();

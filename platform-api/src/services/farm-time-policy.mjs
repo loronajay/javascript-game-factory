@@ -11,7 +11,8 @@
 //
 // and never backwards. Crops may then grow by no more than their own farm-time
 // stamp moved inside that verified clock, plus the most offline production could
-// have given them over the same real interval. Mirrors js/farm-time.mts,
+// have given them over the same real interval, at the owner's chosen away rate
+// (0 up to MAX_OFFLINE_PRODUCTION_RATE). Mirrors js/farm-time.mts,
 // js/farm-nap-bank.mts and js/farm-offline.mts (held together by tests).
 export const ACTIVE_FARM_MINUTES_PER_SECOND = 0.4;
 /** A little slack on the active rate for request timing; multiplicative, so it cannot be farmed by saving often. */
@@ -19,6 +20,8 @@ export const ACTIVE_RATE_SLACK = 1.02;
 export const NAP_BANK_CAPACITY_MINUTES = 24 * 60;
 export const NAP_BANK_REFILL_MINUTES_PER_REAL_DAY = 18 * 60;
 export const OFFLINE_PRODUCTION_RATE = 0.1;
+/** The owner picks the away rate (`settings.awayGrowth`), 0 up to this; mirrors js/farm-offline.mts. */
+export const MAX_OFFLINE_PRODUCTION_RATE = 0.2;
 export const OFFLINE_CATCH_UP_CAP_SECONDS = 24 * 60 * 60;
 const REAL_DAY_SECONDS = 24 * 60 * 60;
 const finite = (value, fallback) => typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -44,9 +47,25 @@ export function verifyFarmClock(stored, storedAt, submittedMinutes, now) {
     }
     return Object.freeze({ farmMinutes: previous + active + bank, napBank: 0, verifiedAt: now, elapsedSeconds, clamped: true });
 }
-/** The most growth offline production could have added over `elapsedSeconds` of real time. */
-export function offlineGrowthAllowance(elapsedSeconds) {
-    return Math.min(Math.max(0, elapsedSeconds), OFFLINE_CATCH_UP_CAP_SECONDS) * ACTIVE_FARM_MINUTES_PER_SECOND * OFFLINE_PRODUCTION_RATE;
+/** A stored or submitted away rate → one the farm may use. Not a number = the default. */
+export function clampOfflineRate(value) {
+    if (typeof value !== "number" || !Number.isFinite(value))
+        return OFFLINE_PRODUCTION_RATE;
+    return Number(Math.min(MAX_OFFLINE_PRODUCTION_RATE, Math.max(0, value)).toFixed(2));
+}
+/**
+ * The away rate a save is bounded by: the higher of the stored setting and the
+ * submitted one. The stored one was in force while the owner was away; the
+ * submitted one only matters when this very save raised it, and the ceiling
+ * holds either way, so a forged setting can buy nothing a player may not choose.
+ */
+export function offlineRateForSave(stored, submitted) {
+    const storedRate = stored ? clampOfflineRate(stored?.awayGrowth) : 0;
+    return Math.max(storedRate, clampOfflineRate(submitted?.awayGrowth));
+}
+/** The most growth offline production could have added over `elapsedSeconds` of real time at `rate`. */
+export function offlineGrowthAllowance(elapsedSeconds, rate = OFFLINE_PRODUCTION_RATE) {
+    return Math.min(Math.max(0, elapsedSeconds), OFFLINE_CATCH_UP_CAP_SECONDS) * ACTIVE_FARM_MINUTES_PER_SECOND * clampOfflineRate(rate);
 }
 const cropKey = (row) => `${row.plotId}:${row.cellId}:${row.cropId}`;
 /**
@@ -56,9 +75,9 @@ const cropKey = (row) => `${row.plotId}:${row.cellId}:${row.cropId}`;
  * allowance. A crop planted since the stored save counts from the stored
  * clock. Death is permanent and the care penalty never falls.
  */
-export function boundCropGrowth(crops, storedCrops, storedClockMinutes, verified, growLimit) {
+export function boundCropGrowth(crops, storedCrops, storedClockMinutes, verified, growLimit, offlineRate = OFFLINE_PRODUCTION_RATE) {
     const stored = new Map(storedCrops.map((row) => [cropKey(row), row]));
-    const offline = offlineGrowthAllowance(verified.elapsedSeconds);
+    const offline = offlineGrowthAllowance(verified.elapsedSeconds, offlineRate);
     const ceiling = verified.farmMinutes;
     return crops.map((row) => {
         const previous = stored.get(cropKey(row));

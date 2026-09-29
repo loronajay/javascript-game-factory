@@ -4,7 +4,6 @@
 
 #downsCanvas { display: block; width: 100%; height: 100%; outline: 0; }
 
-.downs-shell .room-chat { bottom: 20px; }
 
 .market-tickets, .downs-riding-chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 10px 15px; border: 1px solid var(--farm-accent); border-radius: 999px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
 .market-tickets[hidden], .downs-riding-chip[hidden] { display: none; }

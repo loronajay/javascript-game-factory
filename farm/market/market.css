@@ -9,8 +9,6 @@
 .market-tickets span { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
 .market-tickets strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; }
 
-/* Chat sits bottom-left where the farm keeps its clock; the square has no clock. */
-.market-shell .room-chat { bottom: 20px; }
 
 .sale-panel { width: min(520px, calc(100vw - 36px)); }
 .vendor-shelf__title { margin: 16px 0 8px; color: var(--farm-leaf); font: 900 11px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }

@@ -43,6 +43,18 @@ export type PresenceMount = Readonly<{
   size: number;
 }>;
 
+/**
+ * An angler's line (the Cove, FARM_FISHING_PLAN.md): which rod, what the line
+ * is doing, and where the lure sits on the water, so everyone else sees a
+ * person fishing. `charge` is the rod drawn back before a cast (no lure yet).
+ */
+export type PresenceRod = Readonly<{
+  rodId: string;
+  phase: "charge" | "cast" | "line" | "fight";
+  x: number;
+  z: number;
+}>;
+
 export type PresencePose = Readonly<{
   x: number;
   z: number;
@@ -52,6 +64,8 @@ export type PresencePose = Readonly<{
   activity: string;
   /** The horse under them, when riding. */
   mount?: PresenceMount;
+  /** Their line, when fishing. */
+  rod?: PresenceRod;
 }>;
 
 export type PresenceIdentity = Readonly<{
@@ -173,9 +187,20 @@ export function normalizePresenceMount(value: unknown): PresenceMount | null {
   });
 }
 
+const ROD_PHASES = new Set(["charge", "cast", "line", "fight"]);
+
+export function normalizePresenceRod(value: unknown): PresenceRod | null {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!source) return null;
+  const rodId = typeof source.rodId === "string" ? source.rodId : "";
+  if (!/^rod\.[a-z0-9-]{1,16}$/.test(rodId) || !ROD_PHASES.has(String(source.phase))) return null;
+  return Object.freeze({ rodId, phase: source.phase as PresenceRod["phase"], x: finite(source.x, 0), z: finite(source.z, 0) });
+}
+
 export function normalizePresencePose(value: unknown, previous: PresencePose | null = null): PresencePose {
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   const mount = normalizePresenceMount(source.mount);
+  const rod = normalizePresenceRod(source.rod);
   return Object.freeze({
     x: finite(source.x, previous?.x ?? 0),
     z: finite(source.z, previous?.z ?? 0),
@@ -183,6 +208,7 @@ export function normalizePresencePose(value: unknown, previous: PresencePose | n
     moving: source.moving === true,
     activity: cleanText(source.activity).slice(0, 40),
     ...(mount ? { mount } : {}),
+    ...(rod ? { rod } : {}),
   });
 }
 
@@ -195,7 +221,11 @@ export function posesDiffer(a: PresencePose | null, b: PresencePose): boolean {
     || a.activity !== b.activity
     || a.mount?.gait !== b.mount?.gait
     || a.mount?.paletteId !== b.mount?.paletteId
-    || Math.abs((a.mount?.y ?? 0) - (b.mount?.y ?? 0)) > 0.05;
+    || Math.abs((a.mount?.y ?? 0) - (b.mount?.y ?? 0)) > 0.05
+    || a.rod?.phase !== b.rod?.phase
+    || a.rod?.rodId !== b.rod?.rodId
+    || Math.abs((a.rod?.x ?? 0) - (b.rod?.x ?? 0)) > POSE_EPSILON
+    || Math.abs((a.rod?.z ?? 0) - (b.rod?.z ?? 0)) > POSE_EPSILON;
 }
 
 function normalizeMember(value: unknown, now: number): RemoteMember | null {

@@ -25,6 +25,7 @@ import { createStarterAgriculture, normalizeAgriculture } from "./farm-crops.mjs
 import { NAP_BANK_CAPACITY_MINUTES, napBankAt } from "./farm-nap-bank.mjs";
 import { EMPTY_FARM_SKILLS, normalizeFarmSkills } from "./farm-skills.mjs";
 import { normalizeFarmTrees } from "./farm-trees.mjs";
+import { OFFLINE_PRODUCTION_RATE, clampOfflineRate } from "./farm-offline.mjs";
 import { TREE_PLOT_ITEM_ID } from "./farm-catalog/trees.mjs";
 import { createPetProfile, normalizePetProfile } from "./farm-pet-care.mjs";
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
@@ -35,6 +36,11 @@ export const MAX_PETS = 12;
 export const MAX_DECOR = 120;
 const MAX_PERSISTED_DECOR = MAX_DECOR + MAX_PETS; // terminal outcomes may add one unique memorial per resident to a full field
 export const PET_NAME_MAX_LENGTH = 20;
+export const DEFAULT_FARM_SETTINGS = Object.freeze({ awayGrowth: OFFLINE_PRODUCTION_RATE });
+export function normalizeFarmSettings(value) {
+    const source = value && typeof value === "object" ? value : {};
+    return Object.freeze({ awayGrowth: clampOfflineRate(source.awayGrowth) });
+}
 /** One line, printable, trimmed and capped — what a pet may be called. */
 export function cleanPetName(value, maxLength = PET_NAME_MAX_LENGTH) {
     if (typeof value !== "string")
@@ -163,6 +169,7 @@ export function createDefaultFarmLayout(random = Math.random) {
         trees: Object.freeze([]),
         clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES }),
         skills: EMPTY_FARM_SKILLS,
+        settings: DEFAULT_FARM_SETTINGS,
     });
 }
 function freezeLayout(layout) {
@@ -175,6 +182,7 @@ function freezeLayout(layout) {
         agriculture: layout.agriculture,
         trees: Object.freeze(layout.trees.map((tree) => Object.freeze({ ...tree }))),
         clock: Object.freeze({ ...layout.clock }),
+        settings: Object.freeze({ ...layout.settings }),
     });
 }
 /** Stable per-row entropy for pre-profile pets: migration must individualize once without rerolling on every load. */
@@ -374,7 +382,7 @@ export function normalizeFarmLayout(value) {
         napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
     };
     const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-    return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills) });
+    return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings) });
 }
 export function parseFarmLayout(serialized) {
     if (!serialized)
@@ -477,6 +485,10 @@ export function withNapTaken(layout, minutes, farmMinutes, now) {
     const stamped = withFarmClock(layout, farmMinutes, now);
     return freezeLayout({ ...stamped, clock: { ...stamped.clock, napBank: Math.max(0, stamped.clock.napBank - Math.max(0, minutes)) } });
 }
+/** The owner's away-growth rate (0 = the farm waits for them), clamped to what the farm allows. */
+export function withAwayGrowth(layout, rate) {
+    return freezeLayout({ ...layout, settings: { ...layout.settings, awayGrowth: clampOfflineRate(rate) } });
+}
 /** Record that the owner is on the farm at real time `at`: offline production counts from here. */
 export function withProductionCheckpoint(layout, at) {
     return freezeLayout({ ...layout, clock: { ...layout.clock, checkpointAt: Number.isFinite(at) ? Math.max(0, at) : 0 } });
@@ -496,6 +508,7 @@ export function farmLayoutsEqual(first, second) {
         && first.clock.updatedAt === second.clock.updatedAt
         && first.clock.checkpointAt === second.clock.checkpointAt
         && first.clock.napBank === second.clock.napBank
+        && first.settings.awayGrowth === second.settings.awayGrowth
         && JSON.stringify(first.skills) === JSON.stringify(second.skills)
         && first.pets.length === second.pets.length
         && first.pets.every((pet, index) => {

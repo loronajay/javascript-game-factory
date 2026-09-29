@@ -353,7 +353,7 @@ test("farm build mode uses the shared ticket shop and permanent Farm inventory",
 
 test("a farm never progresses before its owner first steps onto it, and only crops catch up offline", () => {
   assert.match(source, /if \(farmEntered\) updateFarmTime\(TICK_SECONDS\)/, "the clock stands still at the gate");
-  assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt > 0\) \{\s*const caughtUp = applyOfflineProduction\(layout\.agriculture, offlineSpan\(layout\.clock\.checkpointAt, resumedClock\.updatedAt\), resumedClock\.farmMinutes, layout\.trees\)/, "offline production needs a checkpoint and touches production (crops and trees) only");
+  assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt > 0\) \{\s*const caughtUp = applyOfflineProduction\(layout\.agriculture, offlineSpan\(layout\.clock\.checkpointAt, resumedClock\.updatedAt, layout\.settings\.awayGrowth\), resumedClock\.farmMinutes, layout\.trees\)/, "offline production needs a checkpoint and touches production (crops and trees) only");
   assert.match(source, /if \(canManageFarm && layout\.clock\.checkpointAt <= 0\) void persistLayout\(withProductionCheckpoint\(layout, Date\.now\(\)\)\)/, "the first entry is recorded at once");
   assert.match(source, /if \(!canManageFarm \|\| next\.clock\.checkpointAt <= 0\) return next;/, "saves before the first entry never start offline production");
   const crops = readFileSync(resolve(repoRoot, "js", "farm-crops-controller.mts"), "utf8");

@@ -22,7 +22,7 @@ import { GROUNDED_BODY, bodyObstacles, createFarmBody, eyeHeight, grabLadder, is
 import { getRidingPrompt } from "./farm-interaction.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type PetInteractionId, type SeatInReach } from "./farm-interaction.mjs";
 import { canNap, formatNapMinutes, napBankReadyIn } from "./farm-nap-bank.mjs";
-import { FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withFarmTrees, withNapTaken, withProductionCheckpoint, type FarmLayout } from "./farm-layout.mjs";
+import { FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withFarmTrees, withAwayGrowth, withNapTaken, withProductionCheckpoint, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -66,6 +66,7 @@ import { createAnglerLink } from "./farm-angler-link.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { createAchievementToaster } from "./platform/achievements/achievements.mjs";
 import { applyOfflineProduction, offlineSpan, type OfflineReport } from "./farm-offline.mjs";
+import { createFarmAwaySettings } from "./farm-away-settings.mjs";
 import { createAwayReport } from "./farm-away-report.mjs";
 import { createFarmCropsView } from "./farm-crops-view.mjs";
 import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
@@ -173,7 +174,7 @@ layout = withFarmClock(advancePetNeeds(layout, resumedClock.farmMinutes), resume
 // and so never moves. Visitors see the farm exactly as it was saved.
 let pendingAwayReport: OfflineReport | null = null;
 if (canManageFarm && layout.clock.checkpointAt > 0) {
-  const caughtUp = applyOfflineProduction(layout.agriculture, offlineSpan(layout.clock.checkpointAt, resumedClock.updatedAt), resumedClock.farmMinutes, layout.trees);
+  const caughtUp = applyOfflineProduction(layout.agriculture, offlineSpan(layout.clock.checkpointAt, resumedClock.updatedAt, layout.settings.awayGrowth), resumedClock.farmMinutes, layout.trees);
   layout = withProductionCheckpoint(withFarmTrees(withFarmAgriculture(layout, caughtUp.agriculture), caughtUp.trees), resumedClock.updatedAt);
   pendingAwayReport = caughtUp.report;
 }
@@ -1095,7 +1096,7 @@ document.addEventListener("visibilitychange", () => {
   }
   const since = hiddenSince;
   hiddenSince = 0;
-  const span = offlineSpan(since, Date.now());
+  const span = offlineSpan(since, Date.now(), layout.settings.awayGrowth);
   if (span.awayMs < 60_000 || layout.clock.checkpointAt <= 0) return;
   const progressed = progressedLayout();
   const caughtUp = applyOfflineProduction(progressed.agriculture, span, clockMinutes, progressed.trees);
@@ -1347,6 +1348,17 @@ const statsPanel = createFarmStatsPanel({
   beforeOpen: () => { inventoryPanel.close(); petsPanel.close(); },
 });
 statsPanel.render(layout.skills, anglerLink.stats());
+// The owner's away-growth rate lives beside their stats: 0 is a farm that waits for them.
+const awaySettingsRoot = requiredElement<HTMLElement>("#awaySettings");
+const awaySettings = createFarmAwaySettings({
+  root: awaySettingsRoot,
+  onChange: async (rate) => {
+    const said = await persistLayout(withAwayGrowth(progressedLayout(), rate));
+    return said.startsWith("Saved to your account") ? "Saved to your account." : said;
+  },
+});
+awaySettings.render(layout.settings.awayGrowth);
+awaySettingsRoot.hidden = visiting;
 openInventoryButton.addEventListener("click", () => statsPanel.close());
 openPetsButton.addEventListener("click", () => statsPanel.close());
 if (visiting) openStatsButton.hidden = true;

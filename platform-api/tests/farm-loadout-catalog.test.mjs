@@ -122,6 +122,7 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] },
     trees: [],
     clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 },
+    settings: { awayGrowth: 0.1 },
     skills: {
       farming: { xp: 0, harvests: 0, orders: 0, crops: {}, fruit: {} },
       woodcutting: { xp: 0, fellings: 0, trees: {} },

@@ -406,7 +406,7 @@ export function createRoomVisitors(THREE, scene, options = {}) {
         nearest: (viewer) => findVisitorInReach(viewer, [...bodies.values()].map((body) => body.member)),
         setVisible: (visible) => { root.visible = visible; },
         count: () => bodies.size,
-        placements: () => [...bodies.values()].map((body) => Object.freeze({ clientId: body.member.clientId, x: body.group.position.x, z: body.group.position.z, yaw: body.group.rotation.y - Math.PI, member: body.member })),
+        placements: () => [...bodies.values()].map((body) => Object.freeze({ clientId: body.member.clientId, x: body.group.position.x, y: body.group.position.y, z: body.group.position.z, yaw: body.group.rotation.y - Math.PI, member: body.member })),
         dispose: () => {
             for (const body of bodies.values())
                 removeBody(body);

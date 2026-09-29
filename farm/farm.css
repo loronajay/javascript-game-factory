@@ -206,10 +206,36 @@ button, a { font: inherit; }
 .control-hint span { padding: 7px 9px; background: var(--farm-ink-soft); border: 1px solid rgba(255,255,255,.12); border-radius: 7px; }
 .control-hint b { color: #fff; margin-right: 5px; }
 
+/* Chat in the farm's shared places (Market, Cove, Downs): a readable panel on the
+   left, lifted clear of the bottom row of chips (the Cove's tackle bar, the hints),
+   and always backed — bare text over grass, sand and water cannot be read. */
+.farm-shell .room-chat { left: 18px; bottom: 68px; width: min(460px, calc(100vw - 36px)); z-index: 6; }
+.farm-shell .room-chat__log {
+  max-height: 36vh;
+  padding: 10px 14px;
+  row-gap: 5px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(14, 24, 16, .74);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 34px rgba(0,0,0,.35);
+  font-size: 15px;
+  line-height: 1.4;
+  text-shadow: 0 1px 1px rgba(0,0,0,.6);
+}
+.farm-shell .room-chat__log:empty { display: none; }
+.farm-shell .room-chat[data-open="true"] .room-chat__log { background: rgba(14, 24, 16, .9); border-color: rgba(255, 211, 61, .35); }
+.farm-shell .room-chat__name { color: #9be7ff; }
+.farm-shell .room-chat__line--self .room-chat__name { color: var(--farm-accent); }
+.farm-shell .room-chat__line--system { color: #b9c9ad; font-size: 13px; }
+.farm-shell .room-chat__input { font-size: 15px; }
+
 @media (max-width: 720px) {
   .farm-header { gap: 12px; padding: 14px 16px; }
   .farm-header h1 { font-size: 20px; }
   .control-hint { display: none; }
+  /* The tackle bar wraps to two rows on a phone. */
+  .farm-shell .room-chat { bottom: 104px; }
+  .farm-shell .room-chat__log { max-height: 28vh; font-size: 14px; }
 }
 
 /* Build mode: the shared frame (css/space-editor.css) in the farm's daylight
@@ -375,6 +401,19 @@ button, a { font: inherit; }
 .stats-panel { width: min(820px, calc(100vw - 36px)); }
 .stats-panel__summary { display: block; margin-top: 4px; color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
 .stats-panel__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
+.away-settings { display: grid; gap: 10px; margin-bottom: 14px; padding: 15px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: linear-gradient(145deg, rgba(126, 200, 255, .08), rgba(255,255,255,.035)); }
+.away-settings[hidden] { display: none; }
+.away-settings__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.away-settings__head h3 { margin: 3px 0 0; color: #fff6cf; font-size: 20px; }
+.away-settings__switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: #fff6cf; font: 800 12px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.away-settings__switch input { width: 20px; height: 20px; accent-color: var(--farm-accent); cursor: pointer; }
+.away-settings__rate { display: grid; grid-template-columns: auto minmax(0, 1fr) 48px; align-items: center; gap: 12px; color: #c9d7bd; font-size: 12.5px; }
+.away-settings__rate input { width: 100%; accent-color: var(--farm-accent); cursor: pointer; }
+.away-settings__rate strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; text-align: right; }
+.away-settings__rate.is-off { opacity: .45; }
+.away-settings__rate.is-off input { cursor: not-allowed; }
+.away-settings__description { margin: 0; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
+.away-settings__status { min-height: 1em; color: var(--farm-leaf); font: 700 11px ui-monospace, monospace; }
 .farm-stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .farm-stat-card { --skill-color: var(--farm-leaf); display: grid; align-content: start; gap: 11px; min-width: 0; padding: 15px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: linear-gradient(145deg, color-mix(in srgb, var(--skill-color) 9%, transparent), rgba(255,255,255,.035)); }
 .farm-stat-card--woodcutting { --skill-color: #d79b5b; }

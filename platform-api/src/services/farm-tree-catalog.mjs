@@ -7,7 +7,7 @@
 // A productive tree is not decor. Decor trees are cosmetic and yield nothing
 // however many stand; a productive tree grows from a sapling bought with
 // tickets, in a Tree Plot, and the number standing at once is capped by skill.
-import { offlineGrowthAllowance } from "./farm-time-policy.mjs";
+import { OFFLINE_PRODUCTION_RATE, offlineGrowthAllowance } from "./farm-time-policy.mjs";
 const DAY = 24 * 60;
 /** A tree drinks like a crop (js/farm-crops.mts): the same soil capacity, thirst clock and wilting cap. */
 const MOISTURE_CAPACITY_MINUTES = 18 * 60;
@@ -110,9 +110,9 @@ const treeKey = (row) => `${row.plotId}:${row.speciesId}`;
  * wilting penalty never falls in a save (only a pick or a felling, which the
  * server makes, starts a tree's next harvest clean).
  */
-export function boundTreeGrowth(trees, storedTrees, storedClockMinutes, verified) {
+export function boundTreeGrowth(trees, storedTrees, storedClockMinutes, verified, offlineRate = OFFLINE_PRODUCTION_RATE) {
     const stored = new Map(storedTrees.map((row) => [treeKey(row), row]));
-    const offline = offlineGrowthAllowance(verified.elapsedSeconds);
+    const offline = offlineGrowthAllowance(verified.elapsedSeconds, offlineRate);
     return trees.map((row) => {
         const rule = farmTreeRule(row.speciesId);
         const previous = stored.get(treeKey(row));

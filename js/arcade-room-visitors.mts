@@ -93,7 +93,8 @@ export type RoomVisitors = Readonly<{
   dispose: () => void;
 }>;
 
-export type VisitorPlacement = Readonly<{ clientId: string; x: number; z: number; yaw: number; member: RemoteMember }>;
+/** Where a member's body is drawn this frame: `y` is its feet (a rider's saddle height), `yaw` the way it faces. */
+export type VisitorPlacement = Readonly<{ clientId: string; x: number; y: number; z: number; yaw: number; member: RemoteMember }>;
 
 export type RoomVisitorsOptions = Readonly<{
   /** How high a member riding `mount` sits (the saddle); a place with no mounts leaves this out and everyone stands on the ground. */
@@ -452,7 +453,7 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any, options: R
     nearest: (viewer) => findVisitorInReach(viewer, [...bodies.values()].map((body) => body.member)),
     setVisible: (visible: boolean) => { root.visible = visible; },
     count: () => bodies.size,
-    placements: () => [...bodies.values()].map((body) => Object.freeze({ clientId: body.member.clientId, x: body.group.position.x, z: body.group.position.z, yaw: body.group.rotation.y - Math.PI, member: body.member })),
+    placements: () => [...bodies.values()].map((body) => Object.freeze({ clientId: body.member.clientId, x: body.group.position.x, y: body.group.position.y, z: body.group.position.z, yaw: body.group.rotation.y - Math.PI, member: body.member })),
     dispose: () => {
       for (const body of bodies.values()) removeBody(body);
       bodies.clear();

@@ -14,19 +14,32 @@ import { FARM_MINUTES_PER_REAL_SECOND } from "./farm-time.mjs";
 import { advanceAgricultureBy, cropStatus, findCrop } from "./farm-crops.mjs";
 import { advanceFarmTreesBy, treeStatus } from "./farm-trees.mjs";
 import { findTreeSpecies } from "./farm-catalog/trees.mjs";
-/** Offline crops grow at a tenth of active speed: one active hour takes ten away. */
+/** Offline crops grow at a tenth of active speed by default: one active hour takes ten away. */
 export const OFFLINE_PRODUCTION_RATE = 0.1;
+/**
+ * The owner chooses the away rate (`settings.awayGrowth` on the farm): 0 is a
+ * farm that waits for them, and no more than a fifth of active speed. The
+ * server bounds a save by the same ceiling (services/farm-time-policy.mts).
+ */
+export const MAX_OFFLINE_PRODUCTION_RATE = 0.2;
+/** Any stored or typed value → a rate the farm may use. Not a number = the default. */
+export function clampOfflineRate(value) {
+    if (typeof value !== "number" || !Number.isFinite(value))
+        return OFFLINE_PRODUCTION_RATE;
+    return Number(Math.min(MAX_OFFLINE_PRODUCTION_RATE, Math.max(0, value)).toFixed(2));
+}
 /** Only the first real day away counts; three weeks away is not three weeks of harvest. */
 export const OFFLINE_CATCH_UP_CAP_MS = 24 * 60 * 60 * 1000;
 /** Shorter absences still progress; they just do not interrupt the player with a report. */
 export const OFFLINE_REPORT_MIN_MS = 10 * 60 * 1000;
 const NO_TIME = Object.freeze({ awayMs: 0, countedMs: 0, farmMinutes: 0 });
-export function offlineSpan(checkpointAt, now) {
+/** The away time since `checkpointAt`, and what it buys at `rate` (the owner's setting; a farm set to 0 buys nothing). */
+export function offlineSpan(checkpointAt, now, rate = OFFLINE_PRODUCTION_RATE) {
     if (!Number.isFinite(checkpointAt) || checkpointAt <= 0 || !Number.isFinite(now))
         return NO_TIME;
     const awayMs = Math.max(0, now - checkpointAt);
     const countedMs = Math.min(awayMs, OFFLINE_CATCH_UP_CAP_MS);
-    return Object.freeze({ awayMs, countedMs, farmMinutes: (countedMs / 1000) * FARM_MINUTES_PER_REAL_SECOND * OFFLINE_PRODUCTION_RATE });
+    return Object.freeze({ awayMs, countedMs, farmMinutes: (countedMs / 1000) * FARM_MINUTES_PER_REAL_SECOND * clampOfflineRate(rate) });
 }
 /**
  * Apply an absence to the crops and trees at farm minute `now`, and say what

@@ -63,9 +63,20 @@ export function normalizePresenceMount(value) {
         size: clampTo(source.size, 0.4, 1.3, 1),
     });
 }
+const ROD_PHASES = new Set(["charge", "cast", "line", "fight"]);
+export function normalizePresenceRod(value) {
+    const source = value && typeof value === "object" ? value : null;
+    if (!source)
+        return null;
+    const rodId = typeof source.rodId === "string" ? source.rodId : "";
+    if (!/^rod\.[a-z0-9-]{1,16}$/.test(rodId) || !ROD_PHASES.has(String(source.phase)))
+        return null;
+    return Object.freeze({ rodId, phase: source.phase, x: finite(source.x, 0), z: finite(source.z, 0) });
+}
 export function normalizePresencePose(value, previous = null) {
     const source = value && typeof value === "object" ? value : {};
     const mount = normalizePresenceMount(source.mount);
+    const rod = normalizePresenceRod(source.rod);
     return Object.freeze({
         x: finite(source.x, previous?.x ?? 0),
         z: finite(source.z, previous?.z ?? 0),
@@ -73,6 +84,7 @@ export function normalizePresencePose(value, previous = null) {
         moving: source.moving === true,
         activity: cleanText(source.activity).slice(0, 40),
         ...(mount ? { mount } : {}),
+        ...(rod ? { rod } : {}),
     });
 }
 export function posesDiffer(a, b) {
@@ -85,7 +97,11 @@ export function posesDiffer(a, b) {
         || a.activity !== b.activity
         || a.mount?.gait !== b.mount?.gait
         || a.mount?.paletteId !== b.mount?.paletteId
-        || Math.abs((a.mount?.y ?? 0) - (b.mount?.y ?? 0)) > 0.05;
+        || Math.abs((a.mount?.y ?? 0) - (b.mount?.y ?? 0)) > 0.05
+        || a.rod?.phase !== b.rod?.phase
+        || a.rod?.rodId !== b.rod?.rodId
+        || Math.abs((a.rod?.x ?? 0) - (b.rod?.x ?? 0)) > POSE_EPSILON
+        || Math.abs((a.rod?.z ?? 0) - (b.rod?.z ?? 0)) > POSE_EPSILON;
 }
 function normalizeMember(value, now) {
     const source = value && typeof value === "object" ? value : null;

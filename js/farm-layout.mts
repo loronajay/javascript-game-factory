@@ -26,6 +26,7 @@ import { createStarterAgriculture, normalizeAgriculture, type FarmAgriculture } 
 import { NAP_BANK_CAPACITY_MINUTES, napBankAt } from "./farm-nap-bank.mjs";
 import { EMPTY_FARM_SKILLS, normalizeFarmSkills, type FarmSkills } from "./farm-skills.mjs";
 import { normalizeFarmTrees, type FarmTree } from "./farm-trees.mjs";
+import { OFFLINE_PRODUCTION_RATE, clampOfflineRate } from "./farm-offline.mjs";
 import { TREE_PLOT_ITEM_ID } from "./farm-catalog/trees.mjs";
 import { createPetProfile, normalizePetProfile, type PetProfile } from "./farm-pet-care.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
@@ -109,7 +110,22 @@ export type FarmLayout = Readonly<{
    * farms keep them empty.
    */
   skills: FarmSkills;
+  /**
+   * The owner's choices about how the farm runs. `awayGrowth` is the rate crops
+   * and trees grow at while they are away (farm-offline.mts): 0 is a farm that
+   * waits for them, at most MAX_OFFLINE_PRODUCTION_RATE, OFFLINE_PRODUCTION_RATE
+   * when never set.
+   */
+  settings: FarmSettings;
 }>;
+
+export type FarmSettings = Readonly<{ awayGrowth: number }>;
+export const DEFAULT_FARM_SETTINGS: FarmSettings = Object.freeze({ awayGrowth: OFFLINE_PRODUCTION_RATE });
+
+export function normalizeFarmSettings(value: unknown): FarmSettings {
+  const source = value && typeof value === "object" ? value as { awayGrowth?: unknown } : {};
+  return Object.freeze({ awayGrowth: clampOfflineRate(source.awayGrowth) });
+}
 
 export type FarmPetResult = Readonly<{ valid: boolean; layout: FarmLayout; instanceId: string; reason: string }>;
 
@@ -252,6 +268,7 @@ export function createDefaultFarmLayout(random: () => number = Math.random): Far
     trees: Object.freeze([]),
     clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES }),
     skills: EMPTY_FARM_SKILLS,
+    settings: DEFAULT_FARM_SETTINGS,
   });
 }
 
@@ -265,6 +282,7 @@ function freezeLayout(layout: FarmLayout): FarmLayout {
     agriculture: layout.agriculture,
     trees: Object.freeze(layout.trees.map((tree) => Object.freeze({ ...tree }))),
     clock: Object.freeze({ ...layout.clock }),
+    settings: Object.freeze({ ...layout.settings }),
   });
 }
 
@@ -376,7 +394,7 @@ export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }
 
 export function normalizeFarmLayout(value: unknown): FarmLayout {
   if (!value || typeof value !== "object") return createDefaultFarmLayout();
-  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown };
+  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown };
   if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
   const seen = new Set<string>();
   // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
@@ -448,7 +466,7 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
   };
   const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-  return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills) });
+  return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings) });
 }
 
 export function parseFarmLayout(serialized: string | null): FarmLayout {
@@ -557,6 +575,11 @@ export function withNapTaken(layout: FarmLayout, minutes: number, farmMinutes: n
   return freezeLayout({ ...stamped, clock: { ...stamped.clock, napBank: Math.max(0, stamped.clock.napBank - Math.max(0, minutes)) } });
 }
 
+/** The owner's away-growth rate (0 = the farm waits for them), clamped to what the farm allows. */
+export function withAwayGrowth(layout: FarmLayout, rate: number): FarmLayout {
+  return freezeLayout({ ...layout, settings: { ...layout.settings, awayGrowth: clampOfflineRate(rate) } });
+}
+
 /** Record that the owner is on the farm at real time `at`: offline production counts from here. */
 export function withProductionCheckpoint(layout: FarmLayout, at: number): FarmLayout {
   return freezeLayout({ ...layout, clock: { ...layout.clock, checkpointAt: Number.isFinite(at) ? Math.max(0, at) : 0 } });
@@ -578,6 +601,7 @@ export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean
     && first.clock.updatedAt === second.clock.updatedAt
     && first.clock.checkpointAt === second.clock.checkpointAt
     && first.clock.napBank === second.clock.napBank
+    && first.settings.awayGrowth === second.settings.awayGrowth
     && JSON.stringify(first.skills) === JSON.stringify(second.skills)
     && first.pets.length === second.pets.length
     && first.pets.every((pet, index) => {
