@@ -32,7 +32,7 @@ function rule(variant, spec) {
 }
 export const FARM_LIVESTOCK_RULES = Object.freeze([
     rule("sheep", {
-        title: "Sheep", price: 350, minLevel: 1, adultDays: 2,
+        title: "Sheep", price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
         products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
         meat: { itemId: "mutton", cuts: 4 },
         feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
@@ -41,7 +41,7 @@ export const FARM_LIVESTOCK_RULES = Object.freeze([
         names: ["Clover", "Woolly", "Dolly", "Bramble", "Fleecy", "Lambert", "Willow", "Pip", "Nutmeg", "Snowdrop"],
     }),
     rule("pig", {
-        title: "Pig", price: 400, minLevel: 5, adultDays: 2,
+        title: "Pig", price: 400, minLevel: 5, adultDays: 2, gestationDays: 2,
         products: [],
         meat: { itemId: "pork", cuts: 6 },
         feeds: { supply: "food.pig-feed", crops: ["potato", "pumpkin", "corn", "beetroot", "watermelon", "apple"] },
@@ -50,7 +50,7 @@ export const FARM_LIVESTOCK_RULES = Object.freeze([
         names: ["Truffle", "Hamlet", "Porkchop", "Rosie", "Wilbur", "Peony", "Babe", "Mudge", "Oinkers", "Bacon"],
     }),
     rule("cow", {
-        title: "Cow", price: 750, minLevel: 10, adultDays: 3,
+        title: "Cow", price: 750, minLevel: 10, adultDays: 3, gestationDays: 3,
         products: [{ itemId: "milk", everyDays: 1, dayValue: 28 }],
         meat: { itemId: "beef", cuts: 8 },
         feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
@@ -59,7 +59,7 @@ export const FARM_LIVESTOCK_RULES = Object.freeze([
         names: ["Bessie", "Daisy", "Buttercup", "Clementine", "Moolan", "Hazel", "Marigold", "Duchess", "Bluebell", "Caramel"],
     }),
     rule("llama", {
-        title: "Llama", price: 650, minLevel: 15, adultDays: 3,
+        title: "Llama", price: 650, minLevel: 15, adultDays: 3, gestationDays: 3,
         products: [{ itemId: "wool-llama", everyDays: 3, dayValue: 22 }],
         meat: { itemId: "llama-meat", cuts: 5 },
         feeds: { supply: "food.hay", crops: ["carrot", "corn", "cabbage"] },
@@ -175,11 +175,30 @@ export const YIELD_STEP = 40;
 export const STRESS_WEIGHT = 60;
 export const GOOD_GRADE_SCORES = Object.freeze({ perfect: 70, fine: 45, normal: 20 });
 export function newLivestockCare(at) {
-    return { hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: {}, stress: {}, neglect: 0 };
+    return { hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: {}, stress: {}, neglect: 0, pregnancy: null, restUntil: 0 };
 }
 function finite(value, fallback = 0) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
+}
+const STOCK_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
+export function normalizeLivestockPregnancy(value) {
+    if (!value || typeof value !== "object")
+        return null;
+    const source = value;
+    const sireId = typeof source.sireId === "string" && STOCK_ID.test(source.sireId) ? source.sireId : "";
+    if (!sireId)
+        return null;
+    const stats = source.sireStats && typeof source.sireStats === "object" ? source.sireStats : {};
+    return {
+        sireId,
+        sireName: typeof source.sireName === "string" ? source.sireName.slice(0, 40) : "",
+        sireStats: Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, clampStat(stats[key])])),
+        sireCoatId: typeof source.sireCoatId === "string" ? source.sireCoatId.slice(0, 40) : "",
+        conceivedAt: Math.max(0, finite(source.conceivedAt)),
+        progress: Math.max(0, finite(source.progress)),
+        dueAt: source.dueAt === null || source.dueAt === undefined ? null : Math.max(0, finite(source.dueAt)),
+    };
 }
 export function normalizeLivestockCare(value, fallbackAt) {
     if (!value || typeof value !== "object")
@@ -202,6 +221,8 @@ export function normalizeLivestockCare(value, fallbackAt) {
         progress: minutes(source.progress),
         stress: minutes(source.stress),
         neglect: Math.max(0, finite(source.neglect)),
+        pregnancy: normalizeLivestockPregnancy(source.pregnancy),
+        restUntil: Math.max(0, finite(source.restUntil)),
     };
 }
 export function hungerPerMinute(stats) {
@@ -240,7 +261,19 @@ export function advanceLivestockCare(subject, care, now) {
     const emptyAt = start + care.hunger / rate;
     const starvedAt = hunger > 0 ? null : care.starvedAt ?? Math.min(end, emptyAt);
     const neglect = care.neglect + Math.max(0, end - Math.max(start, wellUntil));
-    return { hunger, at: end, starvedAt, progress, stress, neglect };
+    const pregnancy = carryPregnancy(care.pregnancy, entry.gestationDays * DAY, Math.max(start, grownFrom), well);
+    return { ...care, hunger, at: end, starvedAt, progress, stress, neglect, pregnancy };
+}
+/** The page's `carryPregnancy`: well-fed minutes toward the gestation, and the exact minute it came due. */
+function carryPregnancy(pregnancy, gestation, from, well) {
+    if (!pregnancy || pregnancy.dueAt !== null || !(well > 0))
+        return pregnancy;
+    const reached = pregnancy.progress + well >= gestation;
+    return {
+        ...pregnancy,
+        progress: Math.min(gestation, pregnancy.progress + well),
+        dueAt: reached ? from + Math.max(0, gestation - pregnancy.progress) : null,
+    };
 }
 export function livestockDeathMinute(subject, care) {
     if (care.hunger > 0 && care.starvedAt === null)
@@ -320,4 +353,75 @@ export function butcherQuality(stats, neglectMinutes, lifeMinutes) {
 export function livestockButcherXp(entry, neglectMinutes, lifeMinutes) {
     const share = Math.min(1, Math.max(0, Number(neglectMinutes) || 0) / Math.max(1, lifeMinutes));
     return Math.max(1, Math.round(HUSBANDRY_XP_PER_CYCLE_DAY * entry.adultDays * (1 - share)));
+}
+// ---------------------------------------------------------------- Breeding (js/farm-livestock-breeding.mts, rule for rule)
+export const BREEDING_MIN_LEVEL = 3;
+export const REST_DAYS = 1;
+export const INHERIT_SPREAD = 5;
+export const JUMP_CHANCE = 0.1;
+export const JUMP_MIN = 6;
+export const JUMP_MAX = 12;
+export const MOTHER_COAT_SHARE = 0.45;
+export const SIRE_COAT_SHARE = 0.45;
+/** Empty slots in standing homes, less the places other mothers' young are owed. */
+export function freePlacesForYoung(homes, herd) {
+    const counts = new Map(homes.map((home) => [home.id, 0]));
+    for (const animal of herd)
+        if (animal.homeId && counts.has(animal.homeId))
+            counts.set(animal.homeId, counts.get(animal.homeId) + 1);
+    const empty = homes.reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
+    return Math.max(0, empty - herd.filter((animal) => animal.pregnant).length);
+}
+/** Why this pair cannot be bred now, or null — the page's `breedingRefusal`, reason for reason, in the same order. */
+export function breedingRefusal(mother, sire, context) {
+    const entry = farmLivestockRule(mother.speciesId);
+    if (!entry)
+        return "other_species";
+    if (context.level < BREEDING_MIN_LEVEL)
+        return "level_too_low";
+    if (mother.gender !== "female")
+        return "not_female";
+    if (sire.gender !== "male")
+        return "not_male";
+    if (sire.speciesId !== mother.speciesId)
+        return "other_species";
+    const grown = (animal) => (context.clock - animal.bornAt) / DAY >= adultAgeDays(entry, animal.stats);
+    if (!grown(mother) || !grown(sire))
+        return "not_grown";
+    if (!mother.homeId || mother.homeId !== sire.homeId)
+        return "not_together";
+    if (mother.care.pregnancy)
+        return "pregnant";
+    if (mother.care.restUntil > context.clock)
+        return "resting";
+    if (!(mother.care.hunger > HUNGRY_AT) || !(sire.care.hunger > HUNGRY_AT))
+        return "hungry";
+    if (context.freePlaces < 1)
+        return "no_room";
+    return null;
+}
+export function livestockBirthXp(entry) {
+    return HUSBANDRY_XP_PER_CYCLE_DAY * entry.gestationDays;
+}
+export function inheritStat(motherValue, sireValue, random) {
+    const spread = Math.floor(unit(random) * (INHERIT_SPREAD * 2 + 1)) - INHERIT_SPREAD;
+    const leaps = unit(random) < JUMP_CHANCE;
+    const leap = JUMP_MIN + Math.floor(unit(random) * (JUMP_MAX - JUMP_MIN + 1));
+    return clampStat(Math.round((motherValue + sireValue) / 2) + spread + (leaps ? leap : 0));
+}
+/** The young one: sex, coat source, species coat, three draws per stat, name — the page's order. */
+export function inheritLivestock(entry, mother, sire, random) {
+    const gender = unit(random) < 0.5 ? "female" : "male";
+    const source = unit(random);
+    const total = entry.coats.reduce((sum, coat) => sum + coat.weight, 0);
+    const roll = unit(random) * total;
+    let cursor = 0;
+    const drawn = (entry.coats.find((coat) => (cursor += coat.weight) > roll) ?? entry.coats[0]).id;
+    const known = (id) => entry.coats.some((coat) => coat.id === id);
+    const coatId = source < MOTHER_COAT_SHARE && known(mother.coatId) ? mother.coatId
+        : source >= MOTHER_COAT_SHARE && source < MOTHER_COAT_SHARE + SIRE_COAT_SHARE && known(sire.coatId) ? sire.coatId
+            : drawn;
+    const stats = Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, inheritStat(mother.stats[key], sire.stats[key], random)]));
+    const name = entry.names[Math.floor(unit(random) * entry.names.length)];
+    return { gender, coatId, stats, name };
 }

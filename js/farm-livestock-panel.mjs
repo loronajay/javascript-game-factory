@@ -2,11 +2,15 @@
 // home it lives in.
 //
 // DOM only — no THREE, no storage, no fetching. It is handed the herd, the
-// homes and the farm clock to draw, and two actions (move, rename) that go to
-// the server through the controller; it redraws from what it is handed back.
+// homes and the farm clock to draw, and three actions (move, rename, breed)
+// that go to the server through the controller; it redraws from what it is
+// handed back. Breeding (Phase 5) is asked from a grown female's row: the males
+// of her kind are listed, and one the shared rule refuses is shown with why.
 // Buying is not here: young stock come from the Livestock Dealer in the Market
 // Square, which is where the note at the foot of the panel sends the player.
-import { livestockSummary } from "./farm-livestock.mjs";
+import { livestockGrade, livestockSummary, gradeStars } from "./farm-livestock.mjs";
+import { BREEDING_MIN_LEVEL, BREEDING_REFUSAL_WORDS, breedingRefusal, freePlacesForYoung, pregnancyView } from "./farm-livestock-breeding.mjs";
+import { LIVESTOCK_STATS, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { homeOccupancy, totalLivestockSlots } from "./farm-livestock-housing.mjs";
 import { LIVESTOCK_NAME_MAX } from "./farm-catalog/livestock.mjs";
 import { goodsState, livestockNeed } from "./farm-livestock-care.mjs";
@@ -66,6 +70,59 @@ export function createLivestockPanel(elements, actions, options = {}) {
         });
         return select;
     }
+    /** The young one's grade if it came out at the parents' average: a guide, not a promise. */
+    function expectedStars(mother, sire) {
+        const stats = Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, Math.round((mother.stats[key] + sire.stats[key]) / 2)]));
+        return gradeStars(livestockGrade(stats));
+    }
+    /** A grown female's breeding line: expecting, resting, or whom she could be paired with. */
+    function breeding(animal, current, stage) {
+        const carrying = pregnancyView(animal, current.clockMinutes);
+        const species = findLivestockSpecies(animal.speciesId);
+        if (carrying?.stage === "expecting") {
+            return element("p", "livestock-breed livestock-breed--expecting", `Expecting by ${carrying.sireName || "?"} · ${carrying.percent}% · only well-fed days count`);
+        }
+        if (carrying?.stage === "due") {
+            return element("p", "livestock-breed livestock-breed--due", `Due by ${carrying.sireName || "?"} — the ${species?.youngTitle.toLowerCase() ?? "young one"} waits for a free place`);
+        }
+        if (carrying?.stage === "resting")
+            return element("p", "livestock-breed", `Resting after her birth · ${carrying.hours} h`);
+        if (animal.gender !== "female" || stage !== "adult" || !current.canBreed)
+            return null;
+        if (current.husbandryLevel < BREEDING_MIN_LEVEL)
+            return element("p", "livestock-breed", BREEDING_REFUSAL_WORDS.level_too_low);
+        const context = { clock: current.clockMinutes, level: current.husbandryLevel, freePlaces: freePlacesForYoung(current.homes, current.herd) };
+        const males = current.herd.filter((other) => other.speciesId === animal.speciesId && other.gender === "male");
+        if (!males.length)
+            return element("p", "livestock-breed", `No ${species?.title.toLowerCase() ?? "male"} ♂ of her kind on the farm to pair her with.`);
+        const block = element("div", "livestock-breed livestock-breed--pick");
+        const select = element("select", "livestock-breed__mate");
+        select.setAttribute("aria-label", `Pair ${animal.name} with`);
+        let firstOpen = "";
+        let firstReason = "";
+        for (const male of males) {
+            const refusal = breedingRefusal(animal, male, context);
+            const option = element("option", "", `${male.name} ${gradeStars(livestockGrade(male.stats))} · young ≈ ${expectedStars(animal, male)}${refusal ? ` — ${BREEDING_REFUSAL_WORDS[refusal]}` : ""}`);
+            option.value = male.id;
+            option.disabled = Boolean(refusal);
+            if (!refusal && !firstOpen)
+                firstOpen = male.id;
+            if (refusal && !firstReason)
+                firstReason = BREEDING_REFUSAL_WORDS[refusal];
+            select.append(option);
+        }
+        select.value = firstOpen;
+        const button = element("button", "livestock-breed__go", "Breed");
+        button.type = "button";
+        button.disabled = !firstOpen;
+        button.title = firstOpen ? "Pair them: she carries the young one" : firstReason;
+        button.addEventListener("click", () => {
+            if (select.value)
+                void run(() => actions.breed(animal.id, select.value));
+        });
+        block.append(element("span", "livestock-breed__label", "Pair with"), select, button);
+        return block;
+    }
     function row(animal, current, occupancy) {
         const summary = livestockSummary(animal, current.clockMinutes);
         const card = element("article", `livestock-row livestock-row--${summary.stage}`);
@@ -111,7 +168,9 @@ export function createLivestockPanel(elements, actions, options = {}) {
             cell.append(element("dt", "", stat.title), element("dd", "", String(stat.value)), bar);
             stats.append(cell);
         }
-        card.append(head, line, care, stats, homeSelect(animal, current.homes, occupancy, current.canManage));
+        const lineage = animal.parents ? element("p", "livestock-row__lineage", `Born here · out of ${animal.parents.motherName} by ${animal.parents.sireName}`) : null;
+        const pairing = breeding(animal, current, summary.stage);
+        card.append(head, line, ...(lineage ? [lineage] : []), care, ...(pairing ? [pairing] : []), stats, homeSelect(animal, current.homes, occupancy, current.canManage));
         return card;
     }
     function draw() {

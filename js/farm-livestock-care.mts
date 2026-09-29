@@ -18,13 +18,32 @@
 //   · the minute its hunger reached nothing — `starvedAt`. A whole farm day
 //     starving and it dies, the pets' rule;
 //   · how long it has been hungry over its whole life, at any age —
-//     `neglect`, which grades its meat at the Butcher.
+//     `neglect`, which grades its meat at the Butcher;
+//   · how far a mother has carried her young (`pregnancy`, Phase 5) — only
+//     well-fed time counts, the goods' rule — and the minute it came due.
 //
 // The farm clock only runs while the owner plays or naps, so nothing here
 // happens while the farm is away.
 
-import { STAT_MAX, findLivestockSpecies, type LivestockProduct, type LivestockSpecies, type LivestockStats } from "./farm-catalog/livestock.mjs";
+import { LIVESTOCK_STATS, STAT_MAX, STAT_MIN, findLivestockSpecies, type LivestockProduct, type LivestockSpecies, type LivestockStats } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
+
+/**
+ * A mother carrying a young one (Phase 5). The sire is remembered as he was
+ * the day they were paired — his stats are half of what the young one gets —
+ * so selling or losing him later changes nothing. `progress` is well-fed
+ * minutes carried; `dueAt` is the farm minute it reached the species'
+ * gestation, and stays set while she waits for a free place to give birth in.
+ */
+export type LivestockPregnancy = Readonly<{
+  sireId: string;
+  sireName: string;
+  sireStats: LivestockStats;
+  sireCoatId: string;
+  conceivedAt: number;
+  progress: number;
+  dueAt: number | null;
+}>;
 
 export type LivestockCare = Readonly<{
   /** 0–100 at `at`. */
@@ -39,6 +58,10 @@ export type LivestockCare = Readonly<{
   stress: Readonly<Record<string, number>>;
   /** Lifetime minutes spent hungry (at or below `HUNGRY_AT`), at any age: the Butcher grades the meat by it. */
   neglect: number;
+  /** The young one she carries, or null. */
+  pregnancy: LivestockPregnancy | null;
+  /** She rests after a birth: no pairing before this farm minute. */
+  restUntil: number;
 }>;
 
 export type CareSubject = Readonly<{ speciesId: string; stats: LivestockStats; bornAt: number }>;
@@ -65,7 +88,7 @@ export type GoodQuality = "poor" | "normal" | "fine" | "perfect";
 
 /** A freshly arrived animal: fed, nothing owed, from the minute given. */
 export function newLivestockCare(at: number): LivestockCare {
-  return Object.freeze({ hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: Object.freeze({}), stress: Object.freeze({}), neglect: 0 });
+  return Object.freeze({ hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: Object.freeze({}), stress: Object.freeze({}), neglect: 0, pregnancy: null, restUntil: 0 });
 }
 
 /** Hunger lost per farm minute for this individual. */
@@ -99,6 +122,32 @@ function finite(value: unknown, fallback = 0): number {
   return Number.isFinite(number) ? number : fallback;
 }
 
+const STOCK_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
+
+function statOf(value: unknown): number {
+  const number = Math.round(Number(value));
+  return Number.isFinite(number) ? Math.min(STAT_MAX, Math.max(STAT_MIN, number)) : STAT_MIN;
+}
+
+/** A stored pregnancy made safe, or null when it is not one. */
+export function normalizeLivestockPregnancy(value: unknown): LivestockPregnancy | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, any>;
+  const sireId = typeof source.sireId === "string" && STOCK_ID.test(source.sireId) ? source.sireId : "";
+  if (!sireId) return null;
+  const stats = source.sireStats && typeof source.sireStats === "object" ? source.sireStats : {};
+  const due = source.dueAt === null || source.dueAt === undefined ? null : Math.max(0, finite(source.dueAt));
+  return Object.freeze({
+    sireId,
+    sireName: typeof source.sireName === "string" ? source.sireName.slice(0, 40) : "",
+    sireStats: Object.freeze(Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, statOf(stats[key])]))) as LivestockStats,
+    sireCoatId: typeof source.sireCoatId === "string" ? source.sireCoatId.slice(0, 40) : "",
+    conceivedAt: Math.max(0, finite(source.conceivedAt)),
+    progress: Math.max(0, finite(source.progress)),
+    dueAt: due,
+  });
+}
+
 /** A stored care record made safe; a missing one is a fed animal from `fallbackAt`. */
 export function normalizeLivestockCare(value: unknown, fallbackAt: number): LivestockCare {
   if (!value || typeof value !== "object") return newLivestockCare(fallbackAt);
@@ -120,6 +169,8 @@ export function normalizeLivestockCare(value: unknown, fallbackAt: number): Live
     progress: Object.freeze(minutes(source.progress)),
     stress: Object.freeze(minutes(source.stress)),
     neglect: Math.max(0, finite(source.neglect)),
+    pregnancy: normalizeLivestockPregnancy(source.pregnancy),
+    restUntil: Math.max(0, finite(source.restUntil)),
   });
 }
 
@@ -151,7 +202,28 @@ export function advanceLivestockCare(subject: CareSubject, care: LivestockCare, 
   const emptyAt = start + care.hunger / rate;
   const starvedAt = hunger > 0 ? null : care.starvedAt ?? Math.min(end, emptyAt);
   const neglect = care.neglect + Math.max(0, end - Math.max(start, wellUntil));
-  return Object.freeze({ hunger, at: end, starvedAt, progress: Object.freeze(progress), stress: Object.freeze(stress), neglect });
+  const pregnancy = carryPregnancy(care.pregnancy, gestationMinutes(species), Math.max(start, grownFrom), well);
+  return Object.freeze({ ...care, hunger, at: end, starvedAt, progress: Object.freeze(progress), stress: Object.freeze(stress), neglect, pregnancy });
+}
+
+/** Well-fed farm minutes a mother of this species carries a young one. */
+export function gestationMinutes(species: Pick<LivestockSpecies, "gestationDays">): number {
+  return species.gestationDays * DAY_MINUTES;
+}
+
+/**
+ * A pregnancy carried over `well` well-fed minutes that began at `from` (the
+ * well-fed stretch is one unbroken run, so the minute it came due is exact).
+ * One already due is left as it is.
+ */
+function carryPregnancy(pregnancy: LivestockPregnancy | null, gestation: number, from: number, well: number): LivestockPregnancy | null {
+  if (!pregnancy || pregnancy.dueAt !== null || !(well > 0)) return pregnancy;
+  const reached = pregnancy.progress + well >= gestation;
+  return Object.freeze({
+    ...pregnancy,
+    progress: Math.min(gestation, pregnancy.progress + well),
+    dueAt: reached ? from + Math.max(0, gestation - pregnancy.progress) : null,
+  });
 }
 
 /** The farm minute it dies of neglect if nobody feeds it, or null while it has food in it. */

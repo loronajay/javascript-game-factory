@@ -86,7 +86,7 @@ export function emptyBarteringRecord() {
     return { xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 };
 }
 export function emptyHusbandryRecord() {
-    return { xp: 0, collections: 0, orders: 0, goods: {}, butchered: 0, meat: {} };
+    return { xp: 0, collections: 0, orders: 0, goods: {}, butchered: 0, meat: {}, births: 0 };
 }
 const LIVESTOCK_GOOD_IDS = FARM_LIVESTOCK_GOODS.map((good) => good.itemId);
 const LIVESTOCK_MEAT_IDS = FARM_LIVESTOCK_MEATS.map((meat) => meat.itemId);
@@ -144,7 +144,7 @@ export function normalizeHusbandryRecord(value) {
     const source = value && typeof value === "object" ? value : {};
     return {
         xp: count(source.xp, FARMING_MAX_XP), collections: count(source.collections), orders: count(source.orders), goods: counts(source.goods, LIVESTOCK_GOOD_IDS),
-        butchered: count(source.butchered), meat: counts(source.meat, LIVESTOCK_MEAT_IDS),
+        butchered: count(source.butchered), meat: counts(source.meat, LIVESTOCK_MEAT_IDS), births: count(source.births),
     };
 }
 /** Every server-owned skill record, shape-bounded. */
@@ -235,6 +235,10 @@ export function recordFarmButcher(record, meatId, cuts, xp) {
         butchered: record.butchered + 1,
         meat: { ...record.meat, [meatId]: (record.meat[meatId] ?? 0) + Math.max(0, Math.floor(cuts)) },
     };
+}
+/** A young one was born on the farm: its Husbandry XP and one more birth. */
+export function recordFarmBirth(record, xp) {
+    return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), births: record.births + 1 };
 }
 /** A herd order was filled: its Husbandry XP and one more herd order. */
 export function recordFarmHerdOrder(record, xp) {

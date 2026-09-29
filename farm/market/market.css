@@ -146,3 +146,4 @@
 .dealer-card.is-locked .dealer-card__picture { filter: grayscale(.8) brightness(.8); }
 /* The Butcher asks twice: the second press is the one that sends. */
 .butcher-card .farm-button--danger { border-color: #e06a5a; background: rgba(224, 106, 90, .24); color: #ffe3dc; }
+.butcher-card__warning { color: #f5b8d8 !important; font-weight: 700; }

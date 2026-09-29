@@ -44,7 +44,13 @@ export type LivestockAnimal = Readonly<{
   homeId: string | null;
   /** Hunger and the goods it is working up to, as of the server's last checkpoint (`farm-livestock-care.mts`). */
   care: LivestockCare;
+  /** Where it came from: the Livestock Dealer, or born on the farm (Phase 5). */
+  origin: "dealer" | "bred";
+  /** A bred one's mother and sire, by id and by the names they had when it was born. */
+  parents: LivestockParents | null;
 }>;
+
+export type LivestockParents = Readonly<{ motherId: string; motherName: string; sireId: string; sireName: string }>;
 
 export const LIVESTOCK_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 /** Grades by the mean of the four stats: at least this much for each star. */
@@ -135,6 +141,20 @@ export function normalizeLivestockAnimal(value: unknown): LivestockAnimal | null
     bornAt: Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0,
     homeId: typeof source.homeId === "string" && source.homeId ? source.homeId : null,
     care: normalizeLivestockCare(source.care, Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0),
+    origin: source.origin === "bred" ? "bred" : "dealer",
+    parents: normalizeParents(source.parents),
+  });
+}
+
+function normalizeParents(value: unknown): LivestockParents | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  if (typeof source.motherId !== "string" || !LIVESTOCK_ID.test(source.motherId) || typeof source.sireId !== "string" || !LIVESTOCK_ID.test(source.sireId)) return null;
+  return Object.freeze({
+    motherId: source.motherId,
+    motherName: cleanLivestockName(source.motherName, "?"),
+    sireId: source.sireId,
+    sireName: cleanLivestockName(source.sireName, "?"),
   });
 }
 

@@ -337,6 +337,14 @@ button, a { font: inherit; }
 .livestock-care--starving .livestock-care__fill { background: #ff7a6b; }
 .livestock-good { padding: 2px 8px; border-radius: 999px; color: #c9d7bd; background: rgba(255,255,255,.06); font: 700 11px ui-monospace, monospace; }
 .livestock-good.is-ready { color: #1d2a16; background: #9ee27a; }
+.livestock-row__lineage { margin: 0; color: #b9c9ad; font: italic 600 12px system-ui, sans-serif; }
+.livestock-breed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; color: #d6e3c8; font: 700 12px system-ui, sans-serif; }
+.livestock-breed--expecting { color: #f5b8d8; }
+.livestock-breed--due { color: #f2c14e; }
+.livestock-breed__label { color: #b9c9ad; font: 700 10px ui-monospace, monospace; text-transform: uppercase; }
+.livestock-breed__mate { flex: 1 1 180px; min-width: 0; padding: 5px 8px; border: 1px solid var(--farm-line); border-radius: 9px; color: #fff6cf; background: rgba(0,0,0,.3); font: 600 12px system-ui, sans-serif; }
+.livestock-breed__go { flex: 0 0 auto; padding: 5px 12px; border: 1px solid rgba(245,184,216,.55); border-radius: 9px; color: #2a1622; background: #f5b8d8; font: 800 12px system-ui, sans-serif; cursor: pointer; }
+.livestock-breed__go:disabled { opacity: .45; cursor: not-allowed; }
 .livestock-panel__note { margin: 12px 0 0; color: #9fb294; font-size: 12px; line-height: 1.45; }
 @media (max-width: 560px) { .livestock-row__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stats-panel { width: min(820px, calc(100vw - 36px)); }

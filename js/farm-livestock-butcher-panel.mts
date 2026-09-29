@@ -133,6 +133,8 @@ export function createButcherPanel(elements: Elements, options: Options): Butche
         element("small", "", lines.offer),
         element("small", "dealer-card__grow", lines.note),
       );
+      // A mother's pregnancy goes with her (Phase 5): say so before the choice is made.
+      if (animal.care.pregnancy) words.append(element("small", "butcher-card__warning", `Expecting — her young one by ${animal.care.pregnancy.sireName || "her sire"} would go with her.`));
       const asking = confirming === animal.id;
       const button = element("button", `farm-button ${asking ? "farm-button--danger" : "farm-button--accent"} dealer-card__buy`, asking ? "Confirm · for good" : "Send to Otto");
       button.type = "button";

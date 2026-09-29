@@ -1179,6 +1179,7 @@ const livestockPanel = createLivestockPanel({
 }, {
     move: (animalId, homeId) => livestock.move(animalId, homeId),
     rename: (animalId, name) => livestock.rename(animalId, name),
+    breed: (motherId, sireId) => livestock.breed(motherId, sireId),
 }, {
     beforeOpen: () => { petsPanel.close(); inventoryPanel.close(); statsPanel.close(); },
     onClose: () => canvas.focus(),

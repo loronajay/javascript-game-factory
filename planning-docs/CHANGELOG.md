@@ -1,5 +1,19 @@
 # Changelog
 
+## Livestock, fifth slice: breeding (2026-09-28)
+
+Phase 5 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. Two grown animals of one species can now be paired, and the young one inherits from both. This is how a herd gets better than anything the Dealer sells.
+
+**Pairing** happens in the Herd panel (L). A grown female's row lists the males of her species, each with the grade its young would have at the parents' average stats. A male who can't be paired is listed with the reason. The rule is `breedingRefusal`, shared by page and server and checked in this order: Husbandry 3 or higher; female and male of one species; both grown; both living in the **same home** (a pen or the barn floor; a stall holds one animal, so stalls never breed); she is not already expecting or resting; both are well fed; and the farm has a free place for the young one. Places already owed to other mothers' young count as taken. Pairing is free. It goes through the care route as `action: "breed"` with a `mateId`, at the verified clock.
+
+**Pregnancy lives in the mother's `care`** (`pregnancy`: the sire's id, name, stats and coat as they were at pairing, plus progress and `dueAt`), next to a new `restUntil` field. No migration: the table already had `parents` and `origin`. Only **well-fed time** counts toward it, the same rule as her goods. `advanceLivestockCare` on both sides carries it and records the exact minute it comes due. Gestation is a new catalog field, `gestationDays` (sheep and pig 2, cow and llama 3).
+
+**Birth happens at a settle.** At the next checkup, feed, collection or Butcher visit after she comes due, the server mints the young one as a new row (`origin = 'bred'`, `parents` naming both). It goes into her home if there is room, otherwise the first home with room. It is born the minute she came due, or at the settle that first found no room, and is cared for from then on. The page's own sums notice the due date and ask for a checkup, the same way they do for a death. With no room anywhere, the birth waits; nothing is lost. The mother then rests for one farm day. A birth pays 60 Husbandry XP per gestation day and counts into a new `husbandry.births`. If the mother dies or goes to the Butcher, her pregnancy goes with her, and Otto's counter warns about that before you send her.
+
+**Inheritance** (`inheritLivestock`, one seeded roll the same on both sides): each stat is the parents' average ±5, with a 10% chance of a +6–12 jump, clamped to **1–100**. The Dealer's ranges don't cap it, which makes ★5 stock something only breeding reaches. The coat comes from the mother (45%), the sire (45%) or any coat of the species (10%). Sex is 50/50. The name comes from the species list and can be renamed. The panel shows "Born here · out of X by Y".
+
+Two achievements: New Arrival (first birth) and Best of Breed (breed a ★5). New pure module: `js/farm-livestock-breeding.mts`, mirrored by the Breeding section of `services/farm-livestock-catalog.mts`. Seven new tests in `platform-api/tests/farm-livestock.test.mjs` cover parity (a seeded young one, every refusal), stats past the Dealer's range, well-fed-only gestation, pairing, birth into her pen, a birth that waits for room, and a pregnancy lost at the Butcher. Not built: a pedigree view, and horse breeding (the horse is a pet).
+
 ## Livestock, fourth slice: the Butcher, meat, and meat recipes (2026-09-28)
 
 Phase 4 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. A grown animal can now be sent to the Butcher in the Market Square for meat, and the meat cooks.

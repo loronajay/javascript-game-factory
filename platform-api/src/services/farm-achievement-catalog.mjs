@@ -70,6 +70,8 @@ export const FARM_ACHIEVEMENT_DEFINITIONS = Object.freeze([
     def("farm_stockman", "Stockman", "Reach Husbandry level 10.", "progression", { points: 20 }),
     def("farm_off_to_the_butcher", "Off to the Butcher", "Send a grown animal to the Butcher in the Market Square.", "progression"),
     def("farm_prime_cut", "Prime Cut", "Have the Butcher cut Perfect meat.", "challenge", { parentId: "farm_off_to_the_butcher", tier: 2, points: 30 }),
+    def("farm_new_arrival", "New Arrival", "Have a young one born on your farm.", "progression"),
+    def("farm_best_of_breed", "Best of Breed", "Breed a ★5 animal.", "challenge", { parentId: "farm_new_arrival", tier: 2, points: 40 }),
 ]);
 export function detectFarmAchievements(facts) {
     const { farming } = facts;
@@ -145,6 +147,10 @@ export function detectFarmAchievements(facts) {
         earned.push("farm_off_to_the_butcher");
     if (facts.butcher?.quality === "perfect")
         earned.push("farm_prime_cut");
+    if (husbandry.births >= 1)
+        earned.push("farm_new_arrival");
+    if ((facts.birth?.grade ?? 0) >= 5)
+        earned.push("farm_best_of_breed");
     const fishing = facts.fishing;
     if (fishing) {
         if (fishing.catches >= 1)

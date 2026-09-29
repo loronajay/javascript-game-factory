@@ -1,6 +1,6 @@
 # Farm Livestock Plan
 
-Status: **Phases 0–4 shipped** (2026-09-28): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes. Next: Phase 5 (breeding). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
+Status: **Phases 0–5 shipped** (2026-09-28): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes; then breeding. Next: Phase 6 (trading live animals). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
 and `FARM_HARVEST_MARKET_SKILLS_PLAN.md`.
 
 Livestock are farm animals that **yield goods** — milk, wool, and meat
@@ -201,7 +201,20 @@ land gets bigger, so it follows the livestock phases.
    & Turf a reef fish), kept off the kitchen's notices like the dairy ones.
    Two achievements (Off to the Butcher, Prime Cut). No migration. Not built:
    meat on herd order notices.
-5. **Breeding** — pairing, gestation, inherited stats, lineage.
+5. ✅ **Breeding** — decided with the owner 2026-09-28: pair from the Herd
+   panel, the pair must **share a home** (pen or barn floor), free, from
+   Husbandry 3, **one young per birth**, and bred stats may pass the Dealer's
+   ranges up to 100 (the plan's "clamped to the species range" would have made
+   ★5 unreachable). `js/farm-livestock-breeding.mts` ↔ the server's Breeding
+   section. The pregnancy lives in the mother's `care` and carries the sire as
+   he was. Only well-fed time counts toward the species' `gestationDays` (2/2/3/3).
+   The server mints the young one at the first settle after it comes due, into
+   her home or the first with room. If there is no room, the birth waits. She
+   rests 1 farm day. Stats are the parents' average ±5 with a 10% chance of
+   +6–12; the coat is hers, his, or 10% any. A birth pays 60 XP per gestation
+   day (`husbandry.births`). Achievements: New Arrival, Best of Breed. A
+   pregnancy is lost with its mother (death or Butcher). No migration.
+   Not built: a pedigree view.
 6. **Trading** — live animals on the barter table (row changes owner) and
    possibly the Exchange Board.
 7. **Horse** — ridable pet.
@@ -211,6 +224,6 @@ Later, outside this plan: **Weaving** (wool → cloth/goods at a loom), pig
 
 ## Open questions
 
-- Can a butchered or sold animal's name/lineage be seen anywhere afterwards? (Its row is kept — `state = 'butchered'`, `ended_minute` — so a pedigree view can read it later; nothing shows it yet.)
+- Can a butchered or sold animal's name/lineage be seen anywhere afterwards? (Bred rows now carry `parents` with both names, which the Herd panel shows while the young one lives.) (Its row is kept — `state = 'butchered'`, `ended_minute` — so a pedigree view can read it later; nothing shows it yet.)
 - ~~Does a dead animal leave a memorial prop?~~ Yes, like a pet (owner, 2026-09-28).
 - Pet breeding's own plan (hidden compatibility) — when?

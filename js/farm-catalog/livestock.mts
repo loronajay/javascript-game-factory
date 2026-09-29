@@ -100,6 +100,8 @@ export type LivestockSpecies = Readonly<{
   minLevel: number;
   /** Farm days from birth to grown at Growth 50. */
   adultDays: number;
+  /** Well-fed farm days a mother carries a young one (planning-docs/FARM_LIVESTOCK_PLAN.md Phase 5). */
+  gestationDays: number;
   /** What it gives once grown. Pigs give nothing but meat. */
   products: readonly LivestockProduct[];
   /** What the Butcher cuts it into. */
@@ -145,7 +147,7 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
       { id: "moorit", title: "Moorit", weight: 15, colors: { White: "#8a5b3c", Black: "#3b2618" } },
       { id: "silver", title: "Silver", weight: 5, colors: { White: "#b9bcc2", Black: "#2e3136" } },
     ],
-    price: 350, minLevel: 1, adultDays: 2,
+    price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
     products: [
       { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1, dayValue: 14 },
       { itemId: "wool", title: "Wool", everyDays: 3, dayValue: 12 },
@@ -164,7 +166,7 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
       { id: "tamworth", title: "Tamworth", weight: 20, colors: { "Material.003": "#b0602f", Material: "#5b3018" } },
       { id: "spotted", title: "Gloucester Spot", weight: 5, colors: { "Material.003": "#efe2d8", Material: "#2b2424" } },
     ],
-    price: 400, minLevel: 5, adultDays: 2,
+    price: 400, minLevel: 5, adultDays: 2, gestationDays: 2,
     products: [],
     meat: { itemId: "pork", title: "Pork", cuts: 6 },
     feeds: { supply: "food.pig-feed", crops: ["potato", "pumpkin", "corn", "beetroot", "watermelon", "apple"] },
@@ -180,7 +182,7 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
       { id: "angus", title: "Angus", weight: 20, colors: { White: "#2b2624", Black: "#171413" } },
       { id: "highland", title: "Highland", weight: 5, colors: { White: "#b8672f", Black: "#7a3d17" } },
     ],
-    price: 750, minLevel: 10, adultDays: 3,
+    price: 750, minLevel: 10, adultDays: 3, gestationDays: 3,
     products: [{ itemId: "milk", title: "Milk", everyDays: 1, dayValue: 28 }],
     meat: { itemId: "beef", title: "Beef", cuts: 8 },
     feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
@@ -196,7 +198,7 @@ export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
       { id: "charcoal", title: "Charcoal", weight: 20, colors: { Brown: "#3b3534", White: "#8d8a88" } },
       { id: "appaloosa", title: "Appaloosa", weight: 5, colors: { Brown: "#e6ddd2", White: "#7a4e36", Grey: "#5a5250" } },
     ],
-    price: 650, minLevel: 15, adultDays: 3,
+    price: 650, minLevel: 15, adultDays: 3, gestationDays: 3,
     products: [{ itemId: "wool-llama", title: "Llama Wool", everyDays: 3, dayValue: 22 }],
     meat: { itemId: "llama-meat", title: "Llama Meat", cuts: 5 },
     feeds: { supply: "food.hay", crops: ["carrot", "corn", "cabbage"] },

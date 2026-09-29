@@ -27,6 +27,18 @@
 // transaction, with the Husbandry XP. A basket with no room for every cut
 // refuses: an animal is never cut into meat that is thrown away.
 //
+// BREEDING (Phase 5) is a care action and a settle rule. `breed` pairs a grown
+// female with a grown male of her species who shares her home (the shared
+// `breedingRefusal` decides, at the verified clock); the pairing is written
+// into HER care as a pregnancy that carries the sire as he was. Well-fed time
+// carries it (`advanceLivestockCare`), and the next settle after it comes due
+// — any settle: a checkup, a feed, the Butcher — mints the young one here as a
+// new row (`origin = 'bred'`, `parents` naming both), rolled from the two by
+// `inheritLivestock`, into her home if it has room or else the first that does,
+// and pays Husbandry for the birth. With no room anywhere the birth waits for
+// the settle that finds some; nothing is lost. A mother who dies or goes to the
+// Butcher takes her pregnancy with her.
+//
 // Room is checked against the farm's own buildings, read from the saved farm
 // under a row lock, so two tabs cannot squeeze a fifth animal into a pen for
 // four. A home that has since been taken down is simply not a home: its
@@ -37,9 +49,9 @@ import { spendTicketsInTransaction } from "./tickets.mjs";
 import { lockedFarm, saveFarm, transaction, verifiedSubmittedFarm } from "./farm-economy.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { farmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
-import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeHusbandryRecord, recordFarmButcher, recordFarmCollection } from "../services/farm-skill-catalog.mjs";
+import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeHusbandryRecord, recordFarmBirth, recordFarmButcher, recordFarmCollection } from "../services/farm-skill-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
-import { LIVESTOCK_STATS, MAX_HERD, clampStat, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmLivestockHomes, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
+import { LIVESTOCK_STATS, MAX_HERD, REST_DAYS, breedingRefusal, clampStat, freePlacesForYoung, inheritLivestock, livestockBirthXp, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmLivestockHomes, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const ANIMAL_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 const HOME_ID = /^[A-Za-z0-9_-]{1,80}#[a-z0-9-]{1,20}$/;
@@ -63,9 +75,17 @@ export function presentLivestock(row) {
         bornAt: Number(row.born_minute) || 0,
         homeId: row.home_id ? String(row.home_id) : null,
         care: normalizeLivestockCare(row.care, Number(row.born_minute) || 0),
+        origin: row.origin === "bred" ? "bred" : "dealer",
+        parents: presentParents(row.parents),
     };
 }
-const HERD_COLUMNS = `animal_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care`;
+/** Who a bred animal came from, by id and by the names they had that day (a parent may be gone since). */
+function presentParents(value) {
+    if (!value || typeof value !== "object" || typeof value.motherId !== "string" || typeof value.sireId !== "string")
+        return null;
+    return { motherId: value.motherId, motherName: String(value.motherName ?? ""), sireId: value.sireId, sireName: String(value.sireName ?? "") };
+}
+const HERD_COLUMNS = `animal_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, parents`;
 async function liveHerd(client, playerId, lock = false) {
     const result = await client.query(`select ${HERD_COLUMNS} from farm_livestock where player_id = $1 and state = 'alive' order by created_at, animal_id${lock ? " for update" : ""}`, [playerId]);
     return result.rows ?? [];
@@ -173,7 +193,7 @@ export async function renameFarmLivestock(pool, input) {
 }
 // ---------------------------------------------------------------- care
 const MAX_STACK = 99;
-const CARE_ACTIONS = new Set(["checkup", "feed", "collect"]);
+const CARE_ACTIONS = new Set(["checkup", "feed", "collect", "breed"]);
 function stableUnit(text) {
     let state = 2166136261;
     for (let index = 0; index < text.length; index += 1) {
@@ -196,7 +216,7 @@ function subjectOf(row) {
  * gains its history entry and a memorial stone (placed as the pets' are).
  * Returns the farm as it now stands, the living rows, and who died.
  */
-async function settleHerd(client, playerId, layout, rows, clock) {
+async function settleHerd(client, playerId, layout, rows, clock, random) {
     const living = [];
     const deaths = [];
     let petHistory = [...(layout.petHistory ?? [])];
@@ -231,11 +251,71 @@ async function settleHerd(client, playerId, layout, rows, clock) {
             deaths.push({ id: String(row.animal_id), name: String(row.name), speciesId: subject.speciesId });
             continue;
         }
+        row.lastSettledAt = care.at;
         row.care = advanceLivestockCare(subject, care, clock);
         await client.query(`update farm_livestock set care = $3::jsonb, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, row.animal_id, JSON.stringify(row.care)]);
         living.push(row);
     }
-    return { layout: deaths.length ? { ...layout, petHistory, decor } : layout, living, deaths };
+    const settled = deaths.length ? { ...layout, petHistory, decor } : layout;
+    const born = await deliverYoung(client, playerId, settled, living, clock, random);
+    return { layout: born.layout, living, deaths, births: born.births, achievements: born.achievements };
+}
+/**
+ * Every mother whose young one has come due gives birth, if the farm has a
+ * place: her own home first, else the first with room. The young one is born
+ * the minute she came due — or, if a settle since then found no room, at that
+ * settle — and is cared for from then to `clock`. Mutates `living`.
+ */
+async function deliverYoung(client, playerId, layout, living, clock, random) {
+    const births = [];
+    const achievements = [];
+    const homes = farmLivestockHomes(layout.decor);
+    const skills = normalizeFarmSkillRecords(layout.skills);
+    let husbandry = skills.husbandry;
+    for (const mother of [...living]) {
+        const pregnancy = mother.care?.pregnancy;
+        if (!pregnancy || pregnancy.dueAt === null || living.length >= MAX_HERD)
+            continue;
+        const rule = farmLivestockRule(mother.species_id);
+        if (!rule)
+            continue;
+        const occupied = living.map((row) => row.home_id ?? null);
+        const home = pickFarmLivestockHome(homes, occupied, mother.home_id ?? undefined) ?? pickFarmLivestockHome(homes, occupied);
+        if (!home)
+            continue;
+        const bornAt = Math.min(clock, Math.max(pregnancy.dueAt, Number(mother.lastSettledAt) || 0));
+        const motherStats = presentLivestock(mother).stats;
+        const young = inheritLivestock(rule, { coatId: String(mother.coat_id), stats: motherStats }, { coatId: pregnancy.sireCoatId, stats: pregnancy.sireStats }, random);
+        const row = {
+            animal_id: `stock-${randomUUID()}`,
+            species_id: rule.id,
+            name: young.name,
+            gender: young.gender,
+            coat_id: young.coatId,
+            stats: young.stats,
+            born_minute: bornAt,
+            home_id: home.id,
+            care: advanceLivestockCare({ speciesId: rule.id, stats: young.stats, bornAt }, newLivestockCare(bornAt), clock),
+            parents: { motherId: String(mother.animal_id), motherName: String(mother.name), sireId: pregnancy.sireId, sireName: pregnancy.sireName },
+            origin: "bred",
+        };
+        await client.query(`insert into farm_livestock (animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, parents)
+       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, 'bred', $11::jsonb)`, [row.animal_id, playerId, row.species_id, row.name, row.gender, row.coat_id, JSON.stringify(row.stats), row.born_minute, row.home_id, JSON.stringify(row.care), JSON.stringify(row.parents)]);
+        mother.care = { ...mother.care, pregnancy: null, restUntil: bornAt + REST_DAYS * 24 * 60 };
+        await client.query(`update farm_livestock set care = $3::jsonb, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, mother.animal_id, JSON.stringify(mother.care)]);
+        living.push(row);
+        husbandry = recordFarmBirth(husbandry, livestockBirthXp(rule));
+        const grade = livestockGrade(young.stats);
+        births.push({ id: row.animal_id, name: row.name, speciesId: rule.id, motherName: String(mother.name), grade });
+        achievements.push(...await awardServerAchievementsInTransaction(client, {
+            playerId, gameSlug: "farm", facts: { farming: skills.farming, husbandry, birth: { grade } }, sourceId: `birth:${row.animal_id}`,
+        }));
+    }
+    return { layout: births.length ? { ...layout, skills: { ...skills, husbandry } } : layout, births, achievements };
+}
+function breedingSubject(row) {
+    const animal = presentLivestock(row);
+    return { speciesId: animal.speciesId, gender: animal.gender, stats: animal.stats, bornAt: animal.bornAt, homeId: animal.homeId, care: row.care };
 }
 /**
  * Livestock care, at the farm's verified clock. `checkup` only settles (the
@@ -245,7 +325,7 @@ async function settleHerd(client, playerId, layout, rows, clock) {
  * ready into the basket at the grade its care earned. Whatever the answer,
  * the settled farm and herd are what is now true, and both are returned.
  */
-export async function careFarmLivestock(pool, input, now = Date.now()) {
+export async function careFarmLivestock(pool, input, now = Date.now(), random = Math.random) {
     const playerId = required(input?.playerId, "playerId");
     const action = required(input?.action, "action");
     if (!CARE_ACTIONS.has(action))
@@ -261,15 +341,37 @@ export async function careFarmLivestock(pool, input, now = Date.now()) {
             return { ok: false, error: "farm_not_initialized" };
         const clock = Math.max(0, Number(farm.verified.clock?.farmMinutes) || 0);
         const rows = await liveHerd(client, playerId, true);
-        const settled = await settleHerd(client, playerId, farm.verified, rows, clock);
+        const settled = await settleHerd(client, playerId, farm.verified, rows, clock, random);
         let layout = settled.layout;
         const answer = async (result) => {
             const saved = normalizeFarmGarage(layout, { ownedEntitlementIds: farm.owned });
             await saveFarm(client, playerId, saved);
-            return { ...result, layout: saved, herd: settled.living.map(presentLivestock), deaths: settled.deaths };
+            return {
+                ...result, layout: saved, herd: settled.living.map(presentLivestock), deaths: settled.deaths, births: settled.births,
+                achievements: [...settled.achievements, ...(result.achievements ?? [])],
+            };
         };
         if (action === "checkup")
             return answer({ ok: true });
+        if (action === "breed") {
+            const mateId = required(input?.mateId, "mateId");
+            const mother = settled.living.find((entry) => entry.animal_id === animalId);
+            const sire = ANIMAL_ID.test(mateId) ? settled.living.find((entry) => entry.animal_id === mateId) : undefined;
+            if (!mother || !sire)
+                return answer({ ok: false, error: settled.deaths.some((death) => death.id === animalId || death.id === mateId) ? "died" : "not_found" });
+            const level = farmingLevelForXp(normalizeHusbandryRecord(layout.skills?.husbandry).xp);
+            const freePlaces = freePlacesForYoung(farmLivestockHomes(layout.decor), settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })));
+            const refusal = breedingRefusal(breedingSubject(mother), breedingSubject(sire), { clock, level, freePlaces });
+            if (refusal)
+                return answer({ ok: false, error: refusal, ...(refusal === "level_too_low" ? { level } : {}) });
+            const sireAnimal = presentLivestock(sire);
+            mother.care = {
+                ...mother.care,
+                pregnancy: { sireId: sireAnimal.id, sireName: sireAnimal.name, sireStats: sireAnimal.stats, sireCoatId: sireAnimal.coatId, conceivedAt: clock, progress: 0, dueAt: null },
+            };
+            await client.query(`update farm_livestock set care = $3::jsonb, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, animalId, JSON.stringify(mother.care)]);
+            return answer({ ok: true, animal: presentLivestock(mother) });
+        }
         const row = settled.living.find((entry) => entry.animal_id === animalId);
         if (!row)
             return answer({ ok: false, error: settled.deaths.some((death) => death.id === animalId) ? "died" : "not_found" });
@@ -345,7 +447,7 @@ export async function careFarmLivestock(pool, input, now = Date.now()) {
  * grade and Husbandry is paid — all in one transaction. The animal's row is
  * kept as its record, like a dead one's.
  */
-export async function butcherFarmLivestock(pool, input) {
+export async function butcherFarmLivestock(pool, input, random = Math.random) {
     const playerId = required(input?.playerId, "playerId");
     const animalId = required(input?.animalId, "animalId");
     if (!ANIMAL_ID.test(animalId))
@@ -355,13 +457,16 @@ export async function butcherFarmLivestock(pool, input) {
         if (!farm || farm.layout.onboarding?.status !== "complete")
             return { ok: false, error: "farm_not_initialized" };
         const clock = Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0);
-        const settled = await settleHerd(client, playerId, farm.layout, await liveHerd(client, playerId, true), clock);
+        const settled = await settleHerd(client, playerId, farm.layout, await liveHerd(client, playerId, true), clock, random);
         let layout = settled.layout;
         const answer = async (result) => {
             const saved = normalizeFarmGarage(layout, { ownedEntitlementIds: farm.owned });
-            if (settled.deaths.length || result.ok)
+            if (settled.deaths.length || settled.births.length || result.ok)
                 await saveFarm(client, playerId, saved);
-            return { ...result, layout: saved, herd: settled.living.filter((row) => row.animal_id !== (result.ok ? animalId : "")).map(presentLivestock), deaths: settled.deaths };
+            return {
+                ...result, layout: saved, herd: settled.living.filter((row) => row.animal_id !== (result.ok ? animalId : "")).map(presentLivestock),
+                deaths: settled.deaths, births: settled.births, achievements: [...settled.achievements, ...(result.achievements ?? [])],
+            };
         };
         const row = settled.living.find((entry) => entry.animal_id === animalId);
         if (!row)

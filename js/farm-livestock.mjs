@@ -94,6 +94,21 @@ export function normalizeLivestockAnimal(value) {
         bornAt: Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0,
         homeId: typeof source.homeId === "string" && source.homeId ? source.homeId : null,
         care: normalizeLivestockCare(source.care, Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0),
+        origin: source.origin === "bred" ? "bred" : "dealer",
+        parents: normalizeParents(source.parents),
+    });
+}
+function normalizeParents(value) {
+    if (!value || typeof value !== "object")
+        return null;
+    const source = value;
+    if (typeof source.motherId !== "string" || !LIVESTOCK_ID.test(source.motherId) || typeof source.sireId !== "string" || !LIVESTOCK_ID.test(source.sireId))
+        return null;
+    return Object.freeze({
+        motherId: source.motherId,
+        motherName: cleanLivestockName(source.motherName, "?"),
+        sireId: source.sireId,
+        sireName: cleanLivestockName(source.sireName, "?"),
     });
 }
 export function normalizeLivestockHerd(value) {

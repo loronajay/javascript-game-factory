@@ -112,6 +112,8 @@ export type HusbandryRecord = Readonly<{
   /** Animals sent to the Butcher, and the cuts he made of them per meat. */
   butchered: number;
   meat: Readonly<Record<string, number>>;
+  /** Young ones born on the farm. */
+  births: number;
 }>;
 
 export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord; husbandry: HusbandryRecord }>;
@@ -122,7 +124,7 @@ export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}), learned: Object.freeze([]) }),
   carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
   bartering: Object.freeze({ xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 }),
-  husbandry: Object.freeze({ xp: 0, collections: 0, orders: 0, goods: Object.freeze({}), butchered: 0, meat: Object.freeze({}) }),
+  husbandry: Object.freeze({ xp: 0, collections: 0, orders: 0, goods: Object.freeze({}), butchered: 0, meat: Object.freeze({}), births: 0 }),
 });
 
 function count(value: unknown, limit = 100_000_000): number {
@@ -191,6 +193,7 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
       goods: counts(husbandry.goods, LIVESTOCK_GOODS.map((good) => good.itemId)),
       butchered: count(husbandry.butchered),
       meat: counts(husbandry.meat, LIVESTOCK_MEATS.map((meat) => meat.itemId)),
+      births: count(husbandry.births),
     }) : EMPTY_FARM_SKILLS.husbandry,
   });
 }

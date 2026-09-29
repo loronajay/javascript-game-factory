@@ -15,6 +15,11 @@
 // die it asks for a checkup, so the server is the one that marks it. A
 // signed-out farm has no herd: livestock are bought with tickets, and tickets
 // are an account's.
+//
+// BREEDING (Phase 5) rides the same seam: the panel's Breed asks `breed`, and a
+// young one is minted by the server at the settle after it comes due — so when
+// the page's own sums say a mother is due, it asks for a checkup (once, until
+// the homes change), exactly as it does for a death.
 
 import { FARM_BOUNDS } from "./farm-layout.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
@@ -25,9 +30,11 @@ import type { PetBodyView } from "./farm-pet-bodies.mjs";
 import { createLivestockBodies } from "./farm-livestock-bodies.mjs";
 import { createHerdSim, type HerdEntry } from "./farm-livestock-sim.mjs";
 import { livestockHomes, type LivestockHome } from "./farm-livestock-housing.mjs";
-import { livestockSize, livestockSummary, normalizeLivestockAnimal, normalizeLivestockHerd, type LivestockAnimal } from "./farm-livestock.mjs";
+import { gradeStars, livestockSize, livestockSummary, normalizeLivestockAnimal, normalizeLivestockHerd, type LivestockAnimal } from "./farm-livestock.mjs";
 import { advanceLivestockCare, goodsState, livestockDueToDie, livestockNeed, wantsFood } from "./farm-livestock-care.mjs";
 import { findLivestockSpecies, findLivestockGood, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
+import { BREEDING_REFUSAL_WORDS, pregnancyView, type BreedingRefusal } from "./farm-livestock-breeding.mjs";
+import { skillLevelForXp } from "./farm-skills.mjs";
 import { QUALITY_TITLES, produceHeld } from "./farm-quality.mjs";
 import { findCrop } from "./farm-crops.mjs";
 import { findFruit } from "./farm-catalog/trees.mjs";
@@ -39,7 +46,7 @@ export type LivestockApi = Readonly<{
   fetchFarmLivestock: (playerId: string) => Promise<any>;
   moveFarmLivestock: (input: { animalId: string; homeId: string | null }) => Promise<any>;
   renameFarmLivestock: (input: { animalId: string; name: string }) => Promise<any>;
-  careFarmLivestock: (input: { layout: unknown; action: "checkup" | "feed" | "collect"; animalId?: string; itemId?: string }) => Promise<any>;
+  careFarmLivestock: (input: { layout: unknown; action: "checkup" | "feed" | "collect" | "breed"; animalId?: string; itemId?: string; mateId?: string }) => Promise<any>;
 }>;
 
 /** The page's harvest seam: send the farm as it stands, adopt the farm that comes back (`farm.mts` `submitServerHarvest`). */
@@ -62,6 +69,8 @@ export type LivestockController = Readonly<{
   homes: () => readonly LivestockHome[];
   move: (animalId: string, homeId: string | null) => Promise<string>;
   rename: (animalId: string, name: string) => Promise<string>;
+  /** Pair a mother with a sire who shares her home. */
+  breed: (motherId: string, sireId: string) => Promise<string>;
   poses: () => ReturnType<ReturnType<typeof createHerdSim>["animals"]>;
 }>;
 
@@ -97,6 +106,8 @@ export function createFarmLivestockController(options: Readonly<{
   let growthTimer = 0;
   let caring = false;
   const checkedDue = new Set<string>();
+  /** Mothers whose due birth has been asked for; cleared when the homes change (a new place may have opened). */
+  const askedBirth = new Set<string>();
   const sim = createHerdSim({
     bounds: FARM_BOUNDS,
     random: Math.random,
@@ -130,7 +141,9 @@ export function createFarmLivestockController(options: Readonly<{
       herd: current(),
       homes,
       clockMinutes: options.clockMinutes(),
+      husbandryLevel: skillLevelForXp(options.layout().skills.husbandry.xp),
       canManage: options.canManage && Boolean(options.api),
+      canBreed: options.canManage && Boolean(options.api) && Boolean(options.submit),
       note: options.api && options.ownerId ? "" : "Livestock are bought with tickets, so they live on an account farm. Sign in to keep them.",
     });
   }
@@ -168,13 +181,25 @@ export function createFarmLivestockController(options: Readonly<{
     options.setStatus(`${names} died of hunger. A memorial stone stands for ${deaths.length === 1 ? "them" : "each of them"}.`);
   }
 
-  async function care(action: "checkup" | "feed" | "collect", animalId?: string): Promise<any> {
+  function tellBirths(result: any): void {
+    const births = Array.isArray(result?.births) ? result.births : [];
+    if (!births.length) return;
+    const words = births.map((entry: any) => {
+      const species = findLivestockSpecies(entry?.speciesId);
+      return `${String(entry?.motherName ?? "A mother")} had a ${species?.youngTitle.toLowerCase() ?? "young one"}: ${String(entry?.name ?? "")} ${gradeStars(Number(entry?.grade) || 1)}`;
+    });
+    options.setStatus(`${words.join(". ")}. Name ${births.length === 1 ? "it" : "them"} in the Herd panel (L).`);
+  }
+
+  async function care(action: "checkup" | "feed" | "collect" | "breed", animalId?: string, mateId?: string): Promise<any> {
     if (!options.submit || !options.api || caring) return null;
     caring = true;
     try {
-      const result = await options.submit((sent) => options.api!.careFarmLivestock({ layout: sent, action, animalId })).catch(() => null);
+      const result = await options.submit((sent) => options.api!.careFarmLivestock({ layout: sent, action, animalId, mateId })).catch(() => null);
       absorb(result);
       tellDeaths(result);
+      tellBirths(result);
+      if (action !== "collect" && Array.isArray(result?.achievements) && result.achievements.length) options.onAchievements?.(result.achievements);
       return result;
     } finally {
       caring = false;
@@ -200,6 +225,7 @@ export function createFarmLivestockController(options: Readonly<{
     },
     sync() {
       homes = livestockHomes(options.layout().decor);
+      askedBirth.clear();
       sim.sync(entries());
       render();
     },
@@ -216,6 +242,13 @@ export function createFarmLivestockController(options: Readonly<{
           if (due && options.submit) {
             checkedDue.add(due.id);
             void care("checkup");
+          } else if (options.submit) {
+            // A young one has come due: the server mints it at a settle, so ask for one.
+            const mother = current().find((animal) => animal.care.pregnancy?.dueAt != null && !askedBirth.has(animal.id));
+            if (mother) {
+              askedBirth.add(mother.id);
+              void care("checkup");
+            }
           }
         }
       }
@@ -238,6 +271,9 @@ export function createFarmLivestockController(options: Readonly<{
       const home = homes.find((entry) => entry.id === animal.homeId);
       const parts = [`${animal.name} · ${summary.kind} ${summary.stars}`, `${need.label} ${Math.round(animal.care.hunger)}%`];
       if (summary.stage === "young") parts.push(`${summary.grownPercent}% grown`);
+      const carrying = pregnancyView(animal, clock);
+      if (carrying?.stage === "expecting") parts.push(`expecting · ${carrying.percent}%`);
+      else if (carrying?.stage === "due") parts.push("due · needs a free place");
       if (!home) parts.push("needs a home (L)");
       const ready = goodsState(animal, animal.care).find((entry) => entry.ready);
       const canCare = Boolean(options.submit);
@@ -296,9 +332,22 @@ export function createFarmLivestockController(options: Readonly<{
       const result = await options.api.moveFarmLivestock({ animalId, homeId }).catch(() => null);
       if (!result?.ok) return MOVE_ERRORS[result?.error] ?? "That did not work. Try again.";
       absorb(result);
+      askedBirth.clear();
       const animal = herd.find((entry) => entry.id === animalId);
       const home = homes.find((entry) => entry.id === homeId);
       return animal ? `${animal.name} ${home ? `moved to ${home.title}` : "is out on the field"}.` : "Moved.";
+    },
+    async breed(motherId, sireId) {
+      if (!options.submit || !options.api) return "Sign in to keep livestock.";
+      const mother = herd.find((entry) => entry.id === motherId);
+      const sire = herd.find((entry) => entry.id === sireId);
+      const result = await care("breed", motherId, sireId);
+      if (result?.ok) {
+        const species = findLivestockSpecies(mother?.speciesId);
+        return `${mother?.name ?? "She"} and ${sire?.name ?? "he"} are paired. She is expecting — keep her fed and a ${species?.youngTitle.toLowerCase() ?? "young one"} will come in about ${species?.gestationDays ?? "a few"} farm days.`;
+      }
+      if (result?.error) return BREEDING_REFUSAL_WORDS[result.error as BreedingRefusal] ?? (result.error === "died" ? "One of them is gone." : "That pairing did not work. Try again.");
+      return "That pairing did not work. Try again.";
     },
     async rename(animalId, name) {
       if (!options.api) return "Sign in to keep livestock.";

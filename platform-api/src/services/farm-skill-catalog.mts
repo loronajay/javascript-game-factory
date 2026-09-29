@@ -94,9 +94,9 @@ export type BarteringRecord = { xp: number; deals: number; bought: number; sold:
  * from livestock, animals it sent to the Butcher and herd orders it filled.
  * `collections` counts trips to an animal, `goods` the pieces taken home per
  * good (milk, wool…), `butchered` the animals the Butcher took and `meat` the
- * cuts he made of them, per meat.
+ * cuts he made of them, per meat, and `births` the young born on the farm.
  */
-export type HusbandryRecord = { xp: number; collections: number; orders: number; goods: Record<string, number>; butchered: number; meat: Record<string, number> };
+export type HusbandryRecord = { xp: number; collections: number; orders: number; goods: Record<string, number>; butchered: number; meat: Record<string, number>; births: number };
 
 const COUNT_LIMIT = 100_000_000;
 
@@ -126,7 +126,7 @@ export function emptyBarteringRecord(): BarteringRecord {
 }
 
 export function emptyHusbandryRecord(): HusbandryRecord {
-  return { xp: 0, collections: 0, orders: 0, goods: {}, butchered: 0, meat: {} };
+  return { xp: 0, collections: 0, orders: 0, goods: {}, butchered: 0, meat: {}, births: 0 };
 }
 
 const LIVESTOCK_GOOD_IDS: readonly string[] = FARM_LIVESTOCK_GOODS.map((good) => good.itemId);
@@ -191,7 +191,7 @@ export function normalizeHusbandryRecord(value: unknown): HusbandryRecord {
   const source: any = value && typeof value === "object" ? value : {};
   return {
     xp: count(source.xp, FARMING_MAX_XP), collections: count(source.collections), orders: count(source.orders), goods: counts(source.goods, LIVESTOCK_GOOD_IDS),
-    butchered: count(source.butchered), meat: counts(source.meat, LIVESTOCK_MEAT_IDS),
+    butchered: count(source.butchered), meat: counts(source.meat, LIVESTOCK_MEAT_IDS), births: count(source.births),
   };
 }
 
@@ -296,6 +296,11 @@ export function recordFarmButcher(record: HusbandryRecord, meatId: string, cuts:
     butchered: record.butchered + 1,
     meat: { ...record.meat, [meatId]: (record.meat[meatId] ?? 0) + Math.max(0, Math.floor(cuts)) },
   };
+}
+
+/** A young one was born on the farm: its Husbandry XP and one more birth. */
+export function recordFarmBirth(record: HusbandryRecord, xp: number): HusbandryRecord {
+  return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), births: record.births + 1 };
 }
 
 /** A herd order was filled: its Husbandry XP and one more herd order. */

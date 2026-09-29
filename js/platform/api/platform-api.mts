@@ -674,8 +674,8 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       return post("/games/farm/livestock/names", { animalId, name }, "result", {}, true);
     },
     /** Livestock care at the farm's verified clock: a checkup, a feed or a collection. Sends the farm like a harvest. */
-    careFarmLivestock({ layout, action, animalId, itemId }: { layout: unknown; action: "checkup" | "feed" | "collect"; animalId?: string; itemId?: string }) {
-      return post("/games/farm/livestock/care", { layout, action, animalId, itemId }, "result", {}, true);
+    careFarmLivestock({ layout, action, animalId, itemId, mateId }: { layout: unknown; action: "checkup" | "feed" | "collect" | "breed"; animalId?: string; itemId?: string; mateId?: string }) {
+      return post("/games/farm/livestock/care", { layout, action, animalId, itemId, mateId }, "result", {}, true);
     },
     /** The Market's Butcher: a grown animal leaves the farm for meat in the basket (at the farm's stored clock). */
     butcherFarmLivestock({ animalId }: { animalId: string }) {
