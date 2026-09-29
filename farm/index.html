@@ -25,6 +25,7 @@
         <button id="toggleFarmMusic" class="farm-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Mute farm music (M)">Music on <kbd>M</kbd></button>
         <button id="openStats" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="See all farm skills and lifetime stats (K)">Stats <kbd>K</kbd></button>
         <button id="openPets" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Adopt, name and release animals (P)">Pets <kbd>P</kbd></button>
+        <button id="openLivestock" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Your livestock and where they live (L)">Herd <kbd>L</kbd></button>
         <button id="openInventory" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Choose seeds and check the harvest (I)">Inventory <kbd>I</kbd></button>
         <button id="editFarm" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Toggle build mode (B)">Build <kbd>B</kbd></button>
         <button id="fullscreenFarm" class="farm-button farm-fullscreen" type="button" aria-pressed="false" title="Fill the screen with the farm (F)">Fullscreen <kbd>F</kbd></button>
@@ -94,6 +95,21 @@
           </div>
           <p id="petsStatus" class="pets-status" aria-live="polite"></p>
         </section>
+      </div>
+    </aside>
+
+    <aside id="livestockPanel" class="inventory-panel livestock-panel" aria-label="Your livestock" hidden>
+      <header class="pets-panel__head">
+        <div>
+          <span class="eyebrow">STALLS, BARN &amp; PENS</span>
+          <strong>Livestock <span id="livestockCount" class="pets-panel__count">0 head</span></strong>
+        </div>
+        <button id="closeLivestock" class="farm-button" type="button" title="Back to the field (L)">Done <kbd>L</kbd></button>
+      </header>
+      <div class="livestock-panel__body">
+        <div id="livestockList" class="livestock-list"></div>
+        <p id="livestockStatus" class="pets-status" aria-live="polite"></p>
+        <p class="livestock-panel__note">Young stock come from the Livestock Dealer in the Market Square. Every stable stall holds one, the barn floor two, a Small Pen two and a Large Pen four.</p>
       </div>
     </aside>
 

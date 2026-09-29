@@ -658,6 +658,21 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     fetchFarmFishDetails(ids: readonly string[]) {
       return get(`/games/farm/fishing/fish?ids=${encodeURIComponent(ids.join(","))}`, "details");
     },
+    /** A farm's herd: every head of livestock alive on it. Public. */
+    fetchFarmLivestock(playerId: string) {
+      return get(`/games/farm/livestock/${encodeURIComponent(playerId)}`, "herd");
+    },
+    /** The Livestock Dealer: a young one for tickets, into a home with room. */
+    buyFarmLivestock({ purchaseId, speciesId, homeId, name }: { purchaseId: string; speciesId: string; homeId?: string; name?: string }) {
+      return post("/games/farm/livestock/purchases", { purchaseId, speciesId, homeId, name }, "result", {}, true);
+    },
+    /** Lead an animal to another home (null: out onto the field). */
+    moveFarmLivestock({ animalId, homeId }: { animalId: string; homeId: string | null }) {
+      return post("/games/farm/livestock/moves", { animalId, homeId }, "result", {}, true);
+    },
+    renameFarmLivestock({ animalId, name }: { animalId: string; name: string }) {
+      return post("/games/farm/livestock/names", { animalId, name }, "result", {}, true);
+    },
     /** Mount a fish from the creel (Old Pike's fee), or take one down back into the creel. */
     mountFarmFish({ fishId, mounted, purchaseId }: { fishId: string; mounted: boolean; purchaseId?: string }) {
       return post("/games/farm/fishing/mounts", { fishId, mounted, purchaseId }, "result", {}, true);

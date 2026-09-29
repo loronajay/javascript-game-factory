@@ -150,3 +150,8 @@ games/mini-hoops/tools/bin-contact-sheet/
 farm/assets/fishing/Blends/
 farm/assets/fishing/FBX/
 farm/assets/fishing/OBJ/
+# The Quaternius Farm Animals pack's sources; only the converted GLBs are committed.
+# farm/assets/yield-animals/tools/convert.py rebuilds them from a fresh download.
+farm/assets/yield-animals/Blends/
+farm/assets/yield-animals/FBX/
+farm/assets/yield-animals/OBJ/

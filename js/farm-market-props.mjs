@@ -10,7 +10,8 @@
 // stacked planks and the furniture Bram buys.
 import { canvasPlane } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
-import { KITCHEN_STALL_ID, SAWMILL_STALL_ID } from "./farm-market-square.mjs";
+import { KITCHEN_STALL_ID, LIVESTOCK_STALL_ID, SAWMILL_STALL_ID } from "./farm-market-square.mjs";
+import { LIVESTOCK_CATALOG } from "./farm-catalog/livestock.mjs";
 import { createPlankModel } from "./farm-item-models.mjs";
 import { createFurniturePiece } from "./farm-props-furniture.mjs";
 import { createProduceModel } from "./farm-produce-models.mjs";
@@ -136,6 +137,56 @@ function setSawmill(THREE, group, width, front, back) {
         tcylinder(THREE, group, 0.022, 0.022, 0.2, [sx * 0.66, 1.9, back + 0.12], farmMaterial(THREE, "wood"), 8, false);
     void width;
 }
+/** The Livestock Dealer's counter: hay and a milk churn, a cowbell and a coiled halter, and today's young stock chalked on a board. */
+function setLivestock(THREE, group, width, front, back) {
+    const y = COUNTER_HEIGHT + 0.06;
+    const straw = farmMaterial(THREE, "straw");
+    const twine = new THREE.MeshStandardMaterial({ color: "#8a5a2b", roughness: 0.9 });
+    for (const [x, turn] of [[-1.05, 0.1], [-0.5, -0.12]]) {
+        const bale = tbox(THREE, group, [0.5, 0.3, 0.34], [x, y + 0.15, front - 0.32], straw);
+        bale.rotation.y = turn;
+        for (const dx of [-0.12, 0.12]) {
+            const band = tbox(THREE, group, [0.025, 0.31, 0.35], [x + dx, y + 0.15, front - 0.32], twine, false);
+            band.rotation.y = turn;
+        }
+    }
+    const galvanised = farmMaterial(THREE, "galvanised", { metresPerTile: 0.4 });
+    tcylinder(THREE, group, 0.13, 0.16, 0.42, [0.2, y + 0.21, front - 0.3], galvanised, 14);
+    tcylinder(THREE, group, 0.08, 0.13, 0.08, [0.2, y + 0.46, front - 0.3], galvanised, 14);
+    tcylinder(THREE, group, 0.09, 0.09, 0.05, [0.2, y + 0.52, front - 0.3], galvanised, 14);
+    // A brass cowbell on a leather strap, and a coiled rope halter.
+    const brass = new THREE.MeshStandardMaterial({ color: "#c9a24a", roughness: 0.35, metalness: 0.8 });
+    tcylinder(THREE, group, 0.06, 0.09, 0.14, [0.72, y + 0.07, front - 0.25], brass, 12);
+    tbox(THREE, group, [0.2, 0.02, 0.04], [0.72, y + 0.15, front - 0.25], twine, false);
+    const rope = new THREE.MeshStandardMaterial({ color: "#c7a472", roughness: 0.95 });
+    for (let loop = 0; loop < 3; loop += 1) {
+        const coil = new THREE.Mesh(new THREE.TorusGeometry(0.13 - loop * 0.015, 0.018, 8, 20), rope);
+        coil.rotation.x = Math.PI / 2;
+        coil.position.set(1.12, y + 0.02 + loop * 0.03, front - 0.32);
+        group.add(coil);
+    }
+    // The price board on the back wall, read from the catalog so a price change is one row.
+    canvasPlane(THREE, group, 1.9, 0.78, [560, 230], (context, w, h) => {
+        context.fillStyle = "#23302a";
+        context.fillRect(0, 0, w, h);
+        context.strokeStyle = "#8a6440";
+        context.lineWidth = 14;
+        context.strokeRect(7, 7, w - 14, h - 14);
+        context.fillStyle = "#f2efe4";
+        context.textAlign = "center";
+        context.font = "700 32px Georgia, serif";
+        context.fillText("Young stock", w / 2, 46);
+        context.font = "26px Georgia, serif";
+        LIVESTOCK_CATALOG.forEach((species, index) => {
+            const row = 84 + index * 36;
+            context.textAlign = "left";
+            context.fillText(species.youngTitle, 60, row);
+            context.textAlign = "right";
+            context.fillText(`${species.price} tickets`, w - 60, row);
+        });
+    }, [0, 1.68, back + 0.09], false);
+    void width;
+}
 function buildStall(THREE, group, stall, stock) {
     const { width, depth } = stall.footprint;
     const wood = farmMaterial(THREE, "wood", { colors: ["#8a6440", "#5f4128"] });
@@ -178,6 +229,10 @@ function buildStall(THREE, group, stall, stock) {
     }
     if (stall.open && stall.id === SAWMILL_STALL_ID) {
         setSawmill(THREE, group, width, front, back);
+        return;
+    }
+    if (stall.open && stall.id === LIVESTOCK_STALL_ID) {
+        setLivestock(THREE, group, width, front, back);
         return;
     }
     if (stall.open && stall.id === KITCHEN_STALL_ID) {

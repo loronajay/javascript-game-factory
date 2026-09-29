@@ -337,6 +337,19 @@ function drawLeaf(THREE, leaf, style, side, leafWidth, height, materials) {
         cylinder(THREE, leaf, 0.012, 0.012, 0.2, [-side * (leafWidth - 0.12), height * 0.5, 0.05], iron(THREE), 8);
         return;
     }
+    if (style === "rail") {
+        // A five-bar field gate: a stile at each end, four rails between, a brace from the hinge foot to the latch head.
+        tbox(THREE, leaf, [0.09, height, 0.09], [-side * 0.045, height / 2, 0], materials.trim);
+        tbox(THREE, leaf, [0.07, height - 0.1, 0.07], [-side * (leafWidth - 0.035), (height - 0.1) / 2 + 0.05, 0], materials.trim);
+        for (let index = 0; index < 4; index += 1) {
+            const y = 0.18 + index * ((height - 0.3) / 3);
+            tbox(THREE, leaf, [leafWidth - 0.06, 0.08, 0.05], [centreX, y, 0], materials.leaf);
+        }
+        const brace = tbox(THREE, leaf, [0.06, Math.hypot(leafWidth - 0.16, height - 0.36), 0.04], [centreX, height / 2, 0.045], materials.leaf, false);
+        brace.rotation.z = side * Math.atan2(leafWidth - 0.16, height - 0.36);
+        box(THREE, leaf, [0.1, 0.04, 0.12], [-side * (leafWidth - 0.05), height - 0.2, 0.05], iron(THREE), false);
+        return;
+    }
     tbox(THREE, leaf, [leafWidth, height - 0.04, 0.09], [centreX, height / 2, 0], materials.leaf);
     if (style === "barn") {
         // Vertical boards, a rail top and bottom, and two crossed braces in trim — the classic barn X.
@@ -1550,6 +1563,64 @@ export function createGazebo(THREE, definition) {
     roomLight(THREE, group, [0, shell.wallHeight - 0.35, 0], 3, 7, shell.wallHeight + 0.1);
     return Object.freeze({ group, doors: null, fixtureDoors: {}, animate: null });
 }
+/**
+ * A livestock pen: no roof and no walls to speak of, but a shell all the same.
+ * Each of `shellWalls`' boxes is drawn as posts and three rails at its own
+ * length and turn, so the rails the eye sees are exactly the line the body and
+ * the animals cannot cross, and the gap in the front face is the gate's. A
+ * worn earth floor, a hay rack and a water trough make it somewhere to live.
+ */
+export function createPen(THREE, definition) {
+    const group = new THREE.Group();
+    const { width, depth } = definition.footprint;
+    const shell = definition.shell;
+    const t = shell.wallThickness;
+    const rail = farmMaterial(THREE, "wood", { colors: ["#9a7248", "#5e3f22", "#b8905f"] });
+    const post = farmMaterial(THREE, "wood", { colors: ["#6e4d2c", "#3a2612", "#8a6440"] });
+    const height = shell.wallHeight;
+    for (const wall of shellWalls(definition, true)) {
+        const segment = new THREE.Group();
+        segment.position.set(wall.x, 0, wall.z);
+        segment.rotation.y = wall.rotationY;
+        group.add(segment);
+        const posts = Math.max(2, Math.round(wall.length / 1.3) + 1);
+        for (let index = 0; index < posts; index += 1) {
+            const x = -wall.length / 2 + 0.06 + (index / (posts - 1)) * (wall.length - 0.12);
+            tbox(THREE, segment, [0.12, height + 0.08, 0.12], [x, (height + 0.08) / 2, 0], post);
+        }
+        for (const y of [height * 0.3, height * 0.62, height - 0.06])
+            tbox(THREE, segment, [wall.length, 0.1, t * 0.6], [0, y, 0], rail);
+    }
+    // The gate's own posts, a little taller than the rails, so the opening reads as a gateway.
+    const at = doorLocal(definition);
+    const gateWidth = shell.door.width;
+    for (const side of [-1, 1])
+        tbox(THREE, group, [0.16, height + 0.25, 0.16], [at.x + side * (gateWidth / 2 + 0.08), (height + 0.25) / 2, at.z], post);
+    const doors = createDoorLeaves(THREE, group, definition, "rail", { leaf: rail, trim: post });
+    // Trodden earth inside, straw scattered on it.
+    tbox(THREE, group, [width - t * 2, 0.02, depth - t * 2], [0, 0.01, 0], farmMaterial(THREE, "soil"), false);
+    const straw = farmMaterial(THREE, "straw", { metresPerTile: 0.5 });
+    // Loose tufts scattered about, each turned its own way (fractions of the floor, so a big pen gets them spread wider).
+    for (const [x, z, size, turn] of [[-0.3, -0.12, 0.7, 0.3], [-0.05, 0.22, 0.55, 1.1], [0.24, -0.05, 0.6, 2.2], [0.12, 0.3, 0.4, 0.7], [-0.32, 0.28, 0.45, 1.9], [0.33, 0.26, 0.35, 0.2], [0.02, -0.28, 0.4, 2.7]]) {
+        const tuft = tbox(THREE, group, [size, 0.02, size * 0.7], [width * x, 0.025, depth * z], straw, false);
+        tuft.rotation.y = turn;
+    }
+    // The hay rack on the back rail and the water trough in the back corner, each drawn in its fixture's box.
+    const rackBox = fixtureNamed(definition, "hay-rack");
+    // The rack faces +z in the pen's frame, so its pieces are laid out from the fixture's centre directly in the pen's group.
+    const { x: rx, z: rz } = rackBox;
+    tagFixture(tbox(THREE, group, [rackBox.width, 0.08, rackBox.depth], [rx, 0.55, rz], post, false), rackBox);
+    for (const x of [-rackBox.width / 2 + 0.04, rackBox.width / 2 - 0.04])
+        tbox(THREE, group, [0.06, 0.55, 0.06], [rx + x, 0.275, rz], post, false);
+    for (let index = 0; index < 7; index += 1)
+        tbox(THREE, group, [0.03, rackBox.top - 0.58, 0.03], [rx - rackBox.width / 2 + 0.06 + index * ((rackBox.width - 0.12) / 6), (rackBox.top + 0.58) / 2, rz + rackBox.depth / 2 - 0.05], post, false);
+    tbox(THREE, group, [rackBox.width - 0.1, 0.35, rackBox.depth - 0.06], [rx, 0.78, rz], farmMaterial(THREE, "straw"), false);
+    const troughBox = fixtureNamed(definition, "trough");
+    const galvanised = farmMaterial(THREE, "galvanised", { metresPerTile: 0.4 });
+    tagFixture(tbox(THREE, group, [troughBox.width, troughBox.top, troughBox.depth], [troughBox.x, troughBox.top / 2, troughBox.z], galvanised, true), troughBox);
+    box(THREE, group, [troughBox.width - 0.08, 0.02, troughBox.depth - 0.08], [troughBox.x, troughBox.top - 0.03, troughBox.z], standard(THREE, "#5c8fa3", 0.15, 0.1), false);
+    return Object.freeze({ group, doors, fixtureDoors: {}, animate: null });
+}
 /** Every building builder by the catalog's `model` name. */
 export const FARM_BUILDING_BUILDERS = Object.freeze({
     barn: createBarn,
@@ -1561,4 +1632,5 @@ export const FARM_BUILDING_BUILDERS = Object.freeze({
     silo: createSilo,
     windmill: createWindmill,
     gazebo: createGazebo,
+    pen: createPen,
 });

@@ -77,13 +77,13 @@ export function swimCeiling(species, sizeMultiplier = 1) {
 export function petForward(yaw) {
     return { x: -Math.sin(yaw), z: -Math.cos(yaw) };
 }
-function yawToward(from, to) {
+export function yawToward(from, to) {
     return Math.atan2(-(to.x - from.x), -(to.z - from.z));
 }
-function wrapAngle(angle) {
+export function wrapAngle(angle) {
     return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
-function turnToward(yaw, target, rate, dt) {
+export function turnToward(yaw, target, rate, dt) {
     const delta = wrapAngle(target - yaw);
     const step = rate * dt;
     return Math.abs(delta) <= step ? target : yaw + Math.sign(delta) * step;

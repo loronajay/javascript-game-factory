@@ -235,6 +235,8 @@ const PLAYER_SCOPED_DELETES: ReadonlyArray<readonly [string, readonly string[]]>
   ["farm_anglers", ["player_id"]],
   ["farm_fish_casts", ["player_id"]],
   ["farm_fish", ["player_id"]],
+  // Livestock: every animal the player bought or bred, alive or gone.
+  ["farm_livestock", ["player_id"]],
 ]);
 
 /**

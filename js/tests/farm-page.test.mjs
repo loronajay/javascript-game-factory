@@ -270,7 +270,7 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(editorSource, /relocating/, "pond relocation is a click-to-place editor gesture");
   assert.match(editorSource, /Aquatic pets stay adopted/, "the relocation instruction makes pet ownership safety explicit");
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
-  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !statsPanel\.isOpen\(\) && !stationPanelOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
+  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !livestockPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !statsPanel\.isOpen\(\) && !stationPanelOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
   assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| statsPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");

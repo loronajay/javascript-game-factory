@@ -125,6 +125,8 @@ const STABLE_DOOR = Object.freeze({ width: 2.4, height: 2.5, leaves: 2, reach: 2
 const GLASS_DOOR = Object.freeze({ width: 1.8, height: 2.2, leaves: 2, reach: 2.2 });
 const SINGLE_DOOR = Object.freeze({ width: 1, height: 2.1, leaves: 1, reach: 1.9 });
 const SMALL_DOOR = Object.freeze({ width: 0.9, height: 1.9, leaves: 1, reach: 1.8 });
+/** A pen's gate: a single rail-height leaf, wide enough to lead a cow through. */
+const PEN_GATE = Object.freeze({ width: 1.5, height: 1.1, leaves: 1, reach: 1.9 });
 export const FARM_DECOR_CATALOG = Object.freeze([
     // Fences: stretchable, cross freely, and the walker treats them as walls.
     item("post-rail", { title: "Post & Rail", category: "fence", footprint: { width: 4, depth: 0.14 }, length: FENCE_LENGTH, swatch: ["#8a5a34", "#5d3a1f"], model: "fence-post-rail", unlock: STARTER }),
@@ -146,6 +148,11 @@ export const FARM_DECOR_CATALOG = Object.freeze([
     item("coop", { title: "Chicken Coop", category: "building", footprint: { width: 2.8, depth: 2.4 }, keepOut: true, shell: walls(2.2, SMALL_DOOR, 0.12), swatch: ["#c98a4b", "#5d3a1f"], model: "coop" }),
     item("silo", { title: "Grain Silo", category: "building", footprint: { width: 3.4, depth: 3.4 }, keepOut: true, shell: round(6.5, SMALL_DOOR, 8, 0.16), snapDegrees: 45, swatch: ["#b9bec4", "#7e8790"], model: "silo" }),
     item("windmill", { title: "Windmill", category: "building", footprint: { width: 4, depth: 4 }, keepOut: true, shell: round(5.2, SINGLE_DOOR, 8, 0.24), snapDegrees: 45, swatch: ["#d9cdb5", "#5d3a1f"], model: "windmill" }),
+    // Livestock pens (planning-docs/FARM_LIVESTOCK_PLAN.md): a roofless ring of post-and-rail walls with a
+    // gate, a shell like any building's, so the rails are solid and the gate works with E. How many animals
+    // one holds is `farm-livestock-housing.mts`'s to say.
+    item("pen-small", { title: "Small Pen", category: "building", footprint: { width: 4, depth: 3.6 }, keepOut: true, shell: walls(1.1, PEN_GATE, 0.12), swatch: ["#9a7248", "#7fb35a"], model: "pen" }),
+    item("pen-large", { title: "Large Pen", category: "building", footprint: { width: 6.4, depth: 5.2 }, keepOut: true, shell: walls(1.1, PEN_GATE, 0.12), swatch: ["#8a5a34", "#7fb35a"], model: "pen" }),
     item("gazebo", { title: "Gazebo", category: "building", footprint: { width: 4, depth: 4 }, keepOut: true, shell: open(2.6, 0.18), swatch: ["#f1e6d2", "#4a3a33"], model: "gazebo" }),
     // Plants: a tree's footprint is its trunk (you walk under the canopy); beds are not solid.
     item("oak", { title: "Oak Tree", category: "plant", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#3f7f34", "#5d3a1f"], model: "tree-oak", unlock: STARTER }),

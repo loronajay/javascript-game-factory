@@ -23,6 +23,7 @@ import { handleFarmEconomyRoute } from "./routes/farm-economy-routes.mjs";
 import { handleFarmTradeRoute } from "./routes/farm-trade-routes.mjs";
 import { handleFarmListingRoute } from "./routes/farm-listing-routes.mjs";
 import { handleFarmFishingRoute } from "./routes/farm-fishing-routes.mjs";
+import { handleFarmLivestockRoute } from "./routes/farm-livestock-routes.mjs";
 import { handleGameResultRoute } from "./routes/game-result-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
@@ -355,6 +356,10 @@ export function createApp(options: any = {}) {
   const getFarmFishShadows = typeof options?.getFarmFishShadows === "function" ? options.getFarmFishShadows : null;
   const getFarmFishRecords = typeof options?.getFarmFishRecords === "function" ? options.getFarmFishRecords : null;
   const getFarmFishing = typeof options?.getFarmFishing === "function" ? options.getFarmFishing : null;
+  const getFarmLivestock = typeof options?.getFarmLivestock === "function" ? options.getFarmLivestock : null;
+  const buyFarmLivestock = typeof options?.buyFarmLivestock === "function" ? options.buyFarmLivestock : null;
+  const moveFarmLivestock = typeof options?.moveFarmLivestock === "function" ? options.moveFarmLivestock : null;
+  const renameFarmLivestock = typeof options?.renameFarmLivestock === "function" ? options.renameFarmLivestock : null;
   const castFarmLine = typeof options?.castFarmLine === "function" ? options.castFarmLine : null;
   const landFarmCast = typeof options?.landFarmCast === "function" ? options.landFarmCast : null;
   const sellFarmFish = typeof options?.sellFarmFish === "function" ? options.sellFarmFish : null;
@@ -700,6 +705,7 @@ export function createApp(options: any = {}) {
   const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
   const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
   const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };
+  const farmLivestockServices = { getFarmLivestock, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock };
   const gameResultServices = { submitGameResult, getPetGameCareer };
   const progressionServices = {
     getGameXpProgress,
@@ -839,6 +845,14 @@ export function createApp(options: any = {}) {
       match: (p: string) => /^\/games\/farm\/fishing\/(casts(\/[^/]+\/landing)?|sales|releases|locks|tackle|mounts)$/.test(p),
       bucket: "farm-fishing",
       limit: 600,
+      windowMs: 10 * MINUTE_MS,
+    },
+    {
+      // Livestock: the Dealer's sales, moves and names. Room and tickets bound
+      // what a purchase can do; this only stops hammering.
+      match: (p: string) => /^\/games\/farm\/livestock\/(purchases|moves|names)$/.test(p),
+      bucket: "farm-livestock",
+      limit: 120,
       windowMs: 10 * MINUTE_MS,
     },
   ];
@@ -1188,6 +1202,11 @@ export function createApp(options: any = {}) {
     if (await handleFarmFishingRoute({
       req, res, method, pathname, authClaims, requestOrigin, timestamp,
       services: farmFishingServices,
+    })) return;
+
+    if (await handleFarmLivestockRoute({
+      req, res, method, pathname, authClaims, requestOrigin, timestamp,
+      services: farmLivestockServices,
     })) return;
 
     if (await handleGameSocialRoute({

@@ -12,6 +12,11 @@
 // load free) and cuts the pack's single track into named clips through
 // `farm-animal-clips.mts`. Until the model lands a body is a soft blob so a
 // freshly adopted pet is never invisible.
+//
+// LIVESTOCK WEAR THE SAME BODIES. What differs between a pet and a cow — where
+// the species row comes from, which folder its GLB is in, how its clips are
+// named, how its coat is painted — is `BodyOptions`; the pets' options are the
+// default, and `farm-livestock-bodies.mts` hands in the herd's.
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { findAnimal, findAnimalPalette, type AnimalDefinition } from "./farm-catalog/animals.mjs";
@@ -20,6 +25,31 @@ import { materialForAnimalPalette } from "./farm-pet-palettes.mjs";
 import type { PetBody as PetPose } from "./farm-pets.mjs";
 
 type ThreeNamespace = Record<string, any>;
+
+/** What a body needs to know of its species: how big to draw it and how much room it takes. */
+export type BodySpecies = Readonly<{ id: string; radius: number; height: number }>;
+
+/** How one family of animals is drawn. */
+export type BodyOptions<S extends BodySpecies = BodySpecies> = Readonly<{
+  /** The scene group's name. */
+  name: string;
+  lookup: (speciesId: string) => S | undefined;
+  assetUrl: (species: S) => string;
+  /** The loaded GLB's clips by state. */
+  clips: (THREE: ThreeNamespace, gltf: any, species: S) => AnimalClips;
+  /** One of the model's materials, repainted for this individual (`paletteId` is its palette or coat). */
+  paint: (THREE: ThreeNamespace, material: any, species: S, paletteId: string) => any;
+}>;
+
+/** The pets: Gobkit animals, one track cut into clips, the palette ramp over the atlas. */
+export const PET_BODY_OPTIONS: BodyOptions<AnimalDefinition> = Object.freeze({
+  name: "pets",
+  lookup: (speciesId: string) => findAnimal(speciesId),
+  assetUrl: (species: AnimalDefinition) => assetUrlFor(species),
+  clips: (THREE: ThreeNamespace, gltf: any, species: AnimalDefinition) => splitAnimalClips(THREE, animalTrack(gltf), species.clips),
+  paint: (THREE: ThreeNamespace, material: any, species: AnimalDefinition, paletteId: string) =>
+    materialForAnimalPalette(THREE, material, findAnimalPalette(species.id, paletteId) ?? species.palettes[0]!),
+});
 
 export type PetBodyView = Readonly<{ instanceId: string; name: string; radius: number; pose: Readonly<{ x: number; z: number }> }>;
 
@@ -43,7 +73,7 @@ const EASE_RATE = 14;
 
 type Body = {
   instanceId: string;
-  species: AnimalDefinition;
+  species: BodySpecies;
   paletteId: string;
   group: any;
   /** Scaled animal art only; tags and feedback stay legible at every age. */
@@ -74,9 +104,9 @@ function wrapAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
-export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
+export function createPetBodies<S extends BodySpecies = AnimalDefinition>(THREE: ThreeNamespace, scene: any, options: BodyOptions<S> = PET_BODY_OPTIONS as unknown as BodyOptions<S>): PetBodies {
   const root = new THREE.Group();
-  root.name = "pets";
+  root.name = options.name;
   scene.add(root);
   const loader = new GLTFLoader();
   const bodies = new Map<string, Body>();
@@ -159,14 +189,14 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
 
   function loadModel(body: Body): void {
     const token = ++body.loadToken;
-    loader.load(assetUrlFor(body.species), (gltf: any) => {
+    const species = body.species as S;
+    loader.load(options.assetUrl(species), (gltf: any) => {
       if (token !== body.loadToken || !bodies.has(body.instanceId)) return;
       body.model = gltf.scene;
       fitModel(body, body.model);
       body.model.traverse((node: any) => {
         if (node.isMesh) {
-          const palette = findAnimalPalette(body.species.id, body.paletteId) ?? body.species.palettes[0];
-          const paint = (material: any): any => materialForAnimalPalette(THREE, material, palette);
+          const paint = (material: any): any => options.paint(THREE, material, species, body.paletteId);
           node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
           node.castShadow = true;
           node.frustumCulled = false;
@@ -174,7 +204,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
       });
       body.visual.add(body.model);
       body.placeholder.visible = false;
-      body.clips = splitAnimalClips(THREE, animalTrack(gltf), body.species.clips);
+      body.clips = options.clips(THREE, gltf, species);
       body.mixer = body.clips.idle ? new THREE.AnimationMixer(body.model) : null;
       body.current = null;
       play(body, body.clips.idle);
@@ -184,7 +214,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
     });
   }
 
-  function createBody(pet: PetPose, species: AnimalDefinition): Body {
+  function createBody(pet: PetPose, species: S): Body {
     const group = new THREE.Group();
     group.position.set(pet.x, pet.hover, pet.z);
     group.rotation.y = pet.yaw;
@@ -265,7 +295,7 @@ export function createPetBodies(THREE: ThreeNamespace, scene: any): PetBodies {
           body = undefined;
         }
         if (!body) {
-          const species = findAnimal(pet.speciesId);
+          const species = options.lookup(pet.speciesId);
           if (!species) continue;
           body = createBody(pet, species);
           bodies.set(pet.instanceId, body);

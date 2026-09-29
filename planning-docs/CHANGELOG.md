@@ -1,5 +1,41 @@
 # Changelog
 
+## Livestock, first slice: the herd, its homes, and the Livestock Dealer (2026-09-28)
+
+Farm animals that yield goods are now their own system beside pets (plan in `planning-docs/FARM_LIVESTOCK_PLAN.md`). This slice covers the plan's Phases 0 and 1: the animals exist, live somewhere, and can be bought. Products, feeding, the butcher and breeding come next.
+
+**Assets.** Cow, pig, sheep and llama, plus the horse for its later ridable-pet phase, come from Quaternius's CC0 Farm Animals pack in `farm/assets/yield-animals/`. They are converted to GLB by `tools/convert.py` (Blender CLI), and only the GLBs are committed. Every model ships real named clips (Idle, Walk, WalkSlow, Run, Jump, Death), so the procedural gait the plan budgeted for was not needed.
+
+**One server row per animal.** Migration 057 adds `farm_livestock`. When the Dealer sells a young one, the server rolls its sex, coat and four stats (Yield, Quality, Growth, Hardiness; `services/farm-livestock-catalog.mts`) and stamps its birth at the farm clock's minute. The ★1–5 grade is worked out from the stats. The client-saved farm document never carries any of this. The page presents the rules in `js/farm-catalog/livestock.mts` and `js/farm-livestock.mts`, and `tests/farm-livestock.test.mjs` holds the two copies equal. Routes (`routes/farm-livestock-routes.mts`):
+- `GET /games/farm/livestock/:playerId` reads a farm's herd and is public.
+- `POST .../purchases`, `.../moves` and `.../names` buy, move and rename, owner only.
+
+**Homes come from buildings.** A stable stall holds one animal, the barn floor in front of the loft holds two, and there are two new placeable **pens**: a Small Pen for two and a Large Pen for four, priced at 500 and 900 tickets. The home ids are `<instanceId>#stall-N`, `#floor` and `#pen`. `js/farm-livestock-housing.mts` and the server's `farmLivestockHomes` build the same homes from the same decor rows. The server refuses a purchase with `no_room` when every home is full, and no species has a cap of its own, so a bigger farm later just means more buildings.
+
+A pen is a building with a low shell (`createPen`). Its rails are the shell's own walls and its gate is a real door, so the gate opens with E. Its hay rack and trough are fixtures, so the player and the animals walk round them. The stall and barn-floor boxes are now exported from `farm-fixtures.mts` (`stableStalls`, `barnFloor`), so the walls and the homes read one description.
+
+**The herd on the field.** `js/farm-livestock-sim.mts` is a pure 60 Hz sim built on the pet sim's steering, which it imports rather than copies:
+- An animal in a pen or on the barn floor strolls inside that box.
+- An animal in a stall stands in its place and turns now and then.
+- An animal whose home was taken down roams the open field until the player gives it a new one.
+
+The bodies are the pets' own. `farm-pet-bodies.mts` gained `BodyOptions`, which covers the species lookup, the asset folder, clips by name and coat painting. `farm-livestock-bodies.mts` supplies the herd's options, and a coat repaints the model's named materials (Holstein, Jersey, Angus, Highland…). Young animals are drawn at 55% size and grow to full size on the farm clock, faster with higher Growth.
+
+**On the page.**
+- `farm-livestock-controller.mts` connects the herd to `farm.mts` in a few lines at its existing seams.
+- E on an animal pats it and shows its grade, stage and home.
+- **L** (the header's **Herd** button) opens the Livestock panel: each animal's grade, stat bars, rename, and a home picker that only offers homes with room.
+- In the Market Square, **Hollis the Livestock Dealer** has a new stall in the south-east corner. It is dressed with hay, a milk churn and a price board drawn from the catalog, and its counter panel shows real portraits of each animal and how much room is left at home.
+- A signed-out farm has no herd, because livestock are bought with tickets and only accounts hold tickets.
+
+**Verified:**
+- **API:** 1178 tests pass. They cover catalog and home parity, the stat-roll range and grade agreement, idempotent purchases, `no_room`, an unbought pen not counting as a home, moves and renames, and the routes (public read, 401 on write).
+- **Frontend:** 768 tests pass. They check each GLB's named clips and each coat's materials, and walk a herd of seven for four minutes: every animal stays in its home, none ever stands in a solid, the stalled cow stands still, and the homeless pig stays out of buildings.
+- **Visual:** headless renders of the four species and their coats, both pens with animals, stable stalls, the barn floor, the Dealer's stall in the square and both panels. The real farm page boots with no errors, and L opens and closes the panel.
+- **Still failing, predates this work:** the `farm-body` "pond is walked into" test.
+
+**Not built yet:** hunger, feeding and neglect death, products and collecting, the Husbandry skill, the butcher and meat recipes, breeding, trading live animals, and the horse.
+
 ## The Cove's fish reach the rest of the farm: cooking, orders, trading, trophy mounts (2026-09-28)
 
 A caught fish can now be used across the farm. All four tie-ins read the same **fish need**, a small key that both sides parse the same way (`parseFishNeed` in `services/farm-fish-catalog.mts`, mirrored in `js/farm-fish.mts`). A need names a species, a water or a minimum rarity, and can add a minimum size, e.g. `zone=reef,size=large`. Wherever fish are taken, the rule is the same: the **least valuable fish that meet the need, never a locked one** (`pickFishForNeed`). A need is priced at the cheapest fish that would satisfy it (`farmFishNeedValue`), so a dish or an order never pays for more fish than it asks for.

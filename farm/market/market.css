@@ -131,3 +131,15 @@
   .trade-side--theirs { padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.1); }
   .trade-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
 }
+
+/* The Livestock Dealer: one card per species, its portrait, what it gives, and a Buy. */
+.dealer-card { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); }
+.dealer-card__picture { display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border-radius: 12px; background: radial-gradient(circle at 50% 70%, rgba(112,148,59,.4), rgba(20,35,18,.25) 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.dealer-card__picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dealer-card__letter { color: #fff6cf; font: 900 24px system-ui, sans-serif; }
+.dealer-card__words { display: grid; gap: 3px; min-width: 0; }
+.dealer-card__words strong { color: #fff6cf; font-size: 14px; }
+.dealer-card__words small { color: #c9d7bd; font-size: 12px; }
+.dealer-card__grow { color: #9fb294 !important; }
+.dealer-card__buy { white-space: nowrap; }
+.dealer-card__buy:disabled { opacity: .45; cursor: not-allowed; }

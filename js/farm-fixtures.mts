@@ -131,12 +131,17 @@ function door(name: string, spec: Readonly<{ hingeX: number; z: number; width: n
 
 type Building = Readonly<{ footprint: Readonly<{ width: number; depth: number }>; shell: BuildingShell | null }>;
 
+/** How deep the barn's hay loft runs from its back wall; the floor in front of it is where livestock stand (`barnFloor`). */
+export const BARN_LOFT_DEPTH = 1.6;
+/** The barn's workbench on the west wall: livestock keep east of it. */
+const BARN_WORKBENCH_WIDTH = 0.7;
+
 function barnFixtures({ footprint, shell }: Building): FarmFixture[] {
   const t = shell!.wallThickness;
   const halfW = footprint.width / 2;
   const halfD = footprint.depth / 2;
   const loftTop = 2.2;
-  const loftDepth = 1.6;
+  const loftDepth = BARN_LOFT_DEPTH;
   const loftFront = -halfD + t + loftDepth;
   return [
     // The hay loft across the back, its ladder against the loft's front edge, and a stack of hay up on it.
@@ -145,17 +150,50 @@ function barnFixtures({ footprint, shell }: Building): FarmFixture[] {
     fixture("loft-hay", { x: -2.2, z: -halfD + t + 0.75, width: 1.4, depth: 1.0, bottom: loftTop, top: loftTop + 0.8 }),
     // Under the loft: the hay pile in the back-west corner. The workbench is on the WEST wall's front half, well away from the ladder.
     fixture("hay-pile", { x: -halfW + t + 1.2, z: -halfD + t + 0.8, width: 2.2, depth: 1.4, top: 1.6 }),
-    fixture("workbench", { x: -halfW + t + 0.45, z: 1.2, width: 0.7, depth: 2, top: 0.94 }),
+    fixture("workbench", { x: -halfW + t + 0.45, z: 1.2, width: BARN_WORKBENCH_WIDTH, depth: 2, top: 0.94 }),
   ];
+}
+
+/**
+ * The barn's open floor in front of the loft, clear of the workbench and a
+ * step in from the walls and the door: the box livestock stand in, in the
+ * barn's frame (`farm-livestock-housing.mts`).
+ */
+export function barnFloor({ footprint, shell }: Building): Readonly<{ x: number; z: number; width: number; depth: number }> {
+  const t = shell!.wallThickness;
+  const halfW = footprint.width / 2;
+  const halfD = footprint.depth / 2;
+  const west = -halfW + t + 0.1 + BARN_WORKBENCH_WIDTH + 0.4;
+  const east = halfW - t - 0.3;
+  const north = -halfD + t + BARN_LOFT_DEPTH + 0.5;
+  const south = halfD - t - 0.3;
+  return { x: (west + east) / 2, z: (north + south) / 2, width: east - west, depth: south - north };
+}
+
+/** The stable's stalls: how many, and each one's box in the stable's frame (between its partitions, behind its front). */
+export const STABLE_STALLS = 3;
+export const STABLE_STALL_DEPTH = 1.6;
+export function stableStalls({ footprint, shell }: Building): ReadonlyArray<Readonly<{ name: string; x: number; z: number; width: number; depth: number }>> {
+  const t = shell!.wallThickness;
+  const halfW = footprint.width / 2;
+  const halfD = footprint.depth / 2;
+  const stallWidth = (footprint.width - t * 2) / STABLE_STALLS;
+  return Array.from({ length: STABLE_STALLS }, (_, index) => ({
+    name: `stall-${index + 1}`,
+    x: -halfW + t + (index + 0.5) * stallWidth,
+    z: -halfD + t + STABLE_STALL_DEPTH / 2,
+    width: stallWidth,
+    depth: STABLE_STALL_DEPTH,
+  }));
 }
 
 function stableFixtures({ footprint, shell }: Building): FarmFixture[] {
   const t = shell!.wallThickness;
   const halfW = footprint.width / 2;
   const halfD = footprint.depth / 2;
-  const stalls = 3;
+  const stalls = STABLE_STALLS;
   const stallWidth = (footprint.width - t * 2) / stalls;
-  const stallDepth = 1.6;
+  const stallDepth = STABLE_STALL_DEPTH;
   const frontZ = -halfD + t + stallDepth + 0.02;
   const doorWidth = 1.0;
   const fixtures: FarmFixture[] = [];
@@ -174,6 +212,17 @@ function stableFixtures({ footprint, shell }: Building): FarmFixture[] {
   }
   fixtures.push(fixture("saddle-rack", { x: halfW - t - 0.4, z: 0.9, width: 0.5, depth: 0.3, top: 1.12 }));
   return fixtures;
+}
+
+/** A livestock pen's hay rack against the back rail and its water trough in the back corner: things the herd eats and drinks at, and walks round. */
+function penFixtures({ footprint, shell }: Building): FarmFixture[] {
+  const t = shell!.wallThickness;
+  const halfW = footprint.width / 2;
+  const halfD = footprint.depth / 2;
+  return [
+    fixture("hay-rack", { x: -halfW + t + 0.75, z: -halfD + t + 0.22, width: 1.2, depth: 0.35, top: 1.05 }),
+    fixture("trough", { x: halfW - t - 0.6, z: -halfD + t + 0.3, width: 0.9, depth: 0.4, top: 0.36 }),
+  ];
 }
 
 function cottageFixtures({ footprint, shell }: Building): FarmFixture[] {
@@ -338,6 +387,7 @@ const FIXTURES_BY_MODEL: Readonly<Record<string, (building: FarmDecorDefinition)
   silo: siloFixtures,
   windmill: windmillFixtures,
   gazebo: gazeboFixtures,
+  pen: penFixtures,
   bench: benchFixtures,
   "furniture-chair": chairFixtures,
   "furniture-stool": stoolFixtures,

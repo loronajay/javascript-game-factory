@@ -43,10 +43,16 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
+import { createLivestockDealerPanel } from "./farm-livestock-dealer-panel.mjs";
+import { livestockHomes } from "./farm-livestock-housing.mjs";
+import { livestockKind, normalizeLivestockAnimal, normalizeLivestockHerd } from "./farm-livestock.mjs";
+import { findLivestockSpecies } from "./farm-catalog/livestock.mjs";
+import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
+import { livestockAssetUrl, livestockClips } from "./farm-livestock-bodies.mjs";
 import { dayPrice, normalizeMarketDay, trendNote, turnoverNote } from "./farm-market-day.mjs";
 import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
 import { createExchangePanel } from "./farm-exchange-panel.mjs";
@@ -292,7 +298,7 @@ function publishPresence() {
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking",
-        activity: trading.activity() || (salePanel.isOpen() ? "at the Produce Merchant" : seedPanel.isOpen() ? "buying seeds" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "at the Kitchen" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
+        activity: trading.activity() || (salePanel.isOpen() ? "at the Produce Merchant" : seedPanel.isOpen() ? "buying seeds" : dealerPanel.isOpen() ? "at the Livestock Dealer" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "at the Kitchen" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
     });
 }
 // ---------------------------------------------------------------- the Produce Merchant and the Kitchen
@@ -407,6 +413,63 @@ const seedPanel = createSeedMerchantPanel({
     thumbnail: cropThumbnails.get,
     onClose: () => canvas.focus(),
 });
+// ---------------------------------------------------------------- the Livestock Dealer
+/** The player's herd, as the server last said: the Dealer counts the room it leaves. */
+let herd = [];
+const livestockApi = createPlatformApiClient();
+async function loadHerd() {
+    if (!canSell || !farmStore.ownerPlayerId)
+        return;
+    const answer = await livestockApi.fetchFarmLivestock(farmStore.ownerPlayerId).catch(() => null);
+    if (Array.isArray(answer))
+        herd = normalizeLivestockHerd(answer);
+    dealerPanel.repaint();
+}
+const livestockMessages = Object.freeze({
+    insufficient_tickets: "Not enough tickets for that one yet.",
+    no_room: "There is no room at home. Build a pen, or free a stall, first.",
+    home_full: "That home is full.",
+    herd_full: "Your farm has as many animals as it can manage.",
+    farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
+});
+async function buyLivestock(speciesId) {
+    const purchaseId = `stock-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+    const result = await livestockApi.buyFarmLivestock({ purchaseId, speciesId }).catch(() => null);
+    if (!result?.ok)
+        return { ok: false, message: livestockMessages[result?.error] ?? "The sale did not go through. Nothing was bought — try again in a moment." };
+    if (Array.isArray(result.herd))
+        herd = normalizeLivestockHerd(result.herd);
+    takeBalance(result.balance);
+    const animal = result.animal ? normalizeLivestockAnimal(result.animal) : null;
+    if (!animal)
+        return { ok: true, message: "Bought. It is on its way to your farm." };
+    const home = livestockHomes(farm.decor).find((entry) => entry.id === animal.homeId);
+    keeperSays(findMarketStall(LIVESTOCK_STALL_ID), `${animal.name}'s a good one. Look after ${animal.gender === "male" ? "him" : "her"}.`);
+    return {
+        ok: true,
+        message: `${animal.name} the ${livestockKind(animal, farm.clock.farmMinutes).toLowerCase()} is on the way to ${home?.title ?? "your farm"} — ${Number(result.price).toLocaleString()} tickets. Press L on the farm to see its stats.`,
+    };
+}
+// The Dealer's cards show the real animal, from the room's offscreen portrait renderer.
+const livestockPortraits = createAvatarThumbnails(THREE, {
+    resolve: (speciesId) => {
+        const species = findLivestockSpecies(speciesId);
+        return species ? { assetUrl: livestockAssetUrl(species), poseClip: (gltf) => livestockClips(gltf, species).idle, height: 1.45, lookAtY: 0.7 } : undefined;
+    },
+});
+const dealerPanel = createLivestockDealerPanel({
+    root: requiredElement("#dealerPanel"),
+    closeButton: requiredElement("#closeDealer"),
+    room: requiredElement("#dealerRoom"),
+    list: requiredElement("#dealerList"),
+    status: requiredElement("#dealerStatus"),
+}, {
+    buy: buyLivestock,
+    farm: () => ({ homes: livestockHomes(farm.decor), herd }),
+    thumbnail: livestockPortraits.get,
+    onClose: () => canvas.focus(),
+});
+void loadHerd();
 const kitchenPanel = createMarketSalePanel({
     root: requiredElement("#kitchenPanel"),
     closeButton: requiredElement("#closeKitchen"),
@@ -585,7 +648,7 @@ window.addEventListener("pageshow", () => { if (entered)
     trading.start(); });
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 function panelOpen() {
-    return salePanel.isOpen() || seedPanel.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
+    return salePanel.isOpen() || seedPanel.isOpen() || dealerPanel.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
 }
 function workStall(stall) {
     if (!stall.open) {
@@ -605,7 +668,9 @@ function workStall(stall) {
                             ? "Sign in to saw logs and sell furniture — only an account farm's timber and pieces count."
                             : stall.id === SEED_STALL_ID
                                 ? "Sign in to buy seeds — they go to your account farm's Inventory."
-                                : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
+                                : stall.id === LIVESTOCK_STALL_ID
+                                    ? "Sign in to buy livestock — they are bought with tickets and live on your account farm."
+                                    : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
         return;
     }
     keys.clear();
@@ -623,6 +688,10 @@ function workStall(stall) {
     }
     else if (stall.id === SAWMILL_STALL_ID)
         sawmill.open();
+    else if (stall.id === LIVESTOCK_STALL_ID) {
+        dealerPanel.open();
+        void loadHerd();
+    }
     else if (stall.id === SEED_STALL_ID) {
         seedPanel.open(seeds);
         if (!market)
@@ -740,6 +809,7 @@ window.addEventListener("keydown", (event) => {
         else if (event.code === "Escape") {
             salePanel.close();
             seedPanel.close();
+            dealerPanel.close();
             exchangePanel.close();
             kitchenPanel.close();
             ordersPanel.close();

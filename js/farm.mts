@@ -27,6 +27,8 @@ import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
 import { assetUrlFor, createPetBodies, type PetBodyView } from "./farm-pet-bodies.mjs";
 import { createPetsPanel } from "./farm-pets-panel.mjs";
+import { createFarmLivestockController } from "./farm-livestock-controller.mjs";
+import { createLivestockPanel } from "./farm-livestock-panel.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { findAnimal } from "./farm-catalog/animals.mjs";
 import { createFarmInventory } from "./farm-catalog/inventory.mjs";
@@ -279,6 +281,8 @@ let kitchenSync: () => void = () => undefined;
 // Carpentry, in the world: the board on the Workbench and the finished piece (farm-workshop-view.mts).
 const workshopView = createWorkshopView(THREE, scene, world);
 let workshopSync: () => void = () => undefined;
+// Livestock (farm-livestock-controller.mts): homes move with their buildings on every layout change.
+let livestockSync: () => void = () => undefined;
 
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
@@ -424,6 +428,7 @@ function updateInteraction(): void {
   const producing = crops.inReach() || trees.inReach() || kitchen.inReach() || workshop.inReach();
   seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing ? findSeatInReach(seats, pose) : null;
   nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
+  livestock.update(pose, handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing && !seatInReach && !nearbyPet);
   const nearbyPetState = nearbyPet ? petSim.find(nearbyPet.instanceId) : null;
   const nearbyPetRow = nearbyPet ? layout.pets.find((pet) => pet.instanceId === nearbyPet!.instanceId) : null;
   const nearbyPetProfile = nearbyPetRow?.profile
@@ -442,7 +447,7 @@ function updateInteraction(): void {
   const putDownFits = putDownAt !== null;
   // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
   if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId)) doorInReach = null;
-  if (petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
+  if (petsPanel.isOpen() || livestockPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
     setPrompt("");
     return;
   }
@@ -509,6 +514,10 @@ function updateInteraction(): void {
     setPrompt(feedback + getPetInteractionPrompt(nearbyPet.name, { canPickUp, canFeed, canPlay }));
     return;
   }
+  if (livestock.inReach()) {
+    setPrompt(livestock.prompt());
+    return;
+  }
   setPrompt("");
 }
 
@@ -564,7 +573,7 @@ function interact(): boolean {
   if (nearbyPet) {
     return interactWithPet("pet");
   }
-  return false;
+  return livestock.interact();
 }
 
 // Signed-out farms live on this device and harvest locally; an account farm harvests through the API.
@@ -747,6 +756,7 @@ function applyLayout(next: FarmLayout): void {
   inventoryPanel.render(layout.agriculture, skillLevels());
   kitchenSync();
   workshopSync();
+  livestockSync();
   statsPanel.render(layout.skills);
   renderFieldCapacity();
 }
@@ -843,6 +853,18 @@ window.addEventListener("keydown", (event) => {
     keys.clear();
     return;
   }
+  // L opens and closes the Livestock panel (farm-livestock-panel.mts); while it is open every other key is the panel's.
+  if (event.code === "KeyL" && !event.repeat && farmEntered && !(event.target instanceof HTMLInputElement)) {
+    event.preventDefault();
+    livestockPanel.toggle();
+    keys.clear();
+    return;
+  }
+  if (livestockPanel.isOpen()) {
+    if (event.code === "Escape") livestockPanel.close();
+    keys.clear();
+    return;
+  }
   // P opens and closes the pets panel; while it is open every other key is the panel's.
   if (event.code === "KeyP" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
     event.preventDefault();
@@ -896,7 +918,7 @@ window.addEventListener("blur", () => {
 });
 
 canvas.addEventListener("click", () => {
-  if (farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !farmEditor.isEditing()) canvas.requestPointerLock?.().catch(() => undefined);
+  if (farmEntered && !petsPanel.isOpen() && !livestockPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !farmEditor.isEditing()) canvas.requestPointerLock?.().catch(() => undefined);
 });
 starterDogForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1102,6 +1124,39 @@ const anglerLink = createAnglerLink({
   modelFor: (instanceId) => world.modelFor(instanceId),
 });
 void anglerLink.refresh();
+
+// Livestock (planning-docs/FARM_LIVESTOCK_PLAN.md): the server's herd, kept in the farm's stalls, barn and pens.
+const livestockPanel = createLivestockPanel({
+  root: requiredElement<HTMLElement>("#livestockPanel"),
+  openButton: requiredElement<HTMLButtonElement>("#openLivestock"),
+  closeButton: requiredElement<HTMLButtonElement>("#closeLivestock"),
+  list: requiredElement<HTMLElement>("#livestockList"),
+  count: requiredElement<HTMLElement>("#livestockCount"),
+  status: requiredElement<HTMLElement>("#livestockStatus"),
+}, {
+  move: (animalId, homeId) => livestock.move(animalId, homeId),
+  rename: (animalId, name) => livestock.rename(animalId, name),
+}, {
+  beforeOpen: () => { petsPanel.close(); inventoryPanel.close(); statsPanel.close(); },
+  onClose: () => canvas.focus(),
+});
+const livestock = createFarmLivestockController({
+  THREE,
+  scene,
+  api: layoutStore.ownerPlayerId ? createPlatformApiClient() : null,
+  ownerId: layoutStore.ownerPlayerId,
+  canManage: canManageFarm && layoutStore.accountBacked,
+  layout: () => layout,
+  clockMinutes: () => clockMinutes,
+  obstacles: () => obstaclesForSpan(obstacles, 0.05, 1.2),
+  keepOut: () => keepOutBoxes(layout),
+  water: () => waterRegions(layout),
+  panel: livestockPanel,
+});
+livestockSync = () => livestock.sync();
+void livestock.refresh();
+for (const button of [openPetsButton, openInventoryButton, openStatsButton]) button.addEventListener("click", () => livestockPanel.close());
+if (visiting) requiredElement<HTMLButtonElement>("#openLivestock").title = "The livestock on this farm (L)";
 const inventoryPanel = createFarmInventoryPanel({
   root: requiredElement<HTMLElement>("#inventoryPanel"),
   openButton: openInventoryButton,
@@ -1312,7 +1367,7 @@ const farmEditor = createFarmEditor({
     inspector: requiredElement<HTMLElement>("#farmInspector"),
   },
   // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-  canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
+  canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !livestockPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
   onEditingChange: (editing) => {
     keys.clear();
     draggingLook = false;
@@ -1380,6 +1435,7 @@ function frame(now: number): void {
     updatePlayer(TICK_SECONDS);
     checkGateway();
     petSim.tick(TICK_SECONDS, { x: player.x, z: player.z, yaw: player.yaw, y: body.y });
+    livestock.tick(TICK_SECONDS, player);
     updateInteraction();
     trees.tick();
     kitchen.tick();
@@ -1393,6 +1449,7 @@ function frame(now: number): void {
   treesView.update(frameSeconds);
   kitchenView.update(frameSeconds);
   petBodies.sync(petSim.pets(), frameSeconds);
+  livestock.draw(frameSeconds);
   if (!farmEditor.isEditing()) applyCamera();
   updateUnderwater();
   resize();
@@ -1409,6 +1466,8 @@ function frame(now: number): void {
   doorInReach: () => Boolean(doorInReach),
   doorsOpen: () => (doorInReach ? openDoors.has(doorInReach.doorId) : openDoors.size > 0),
   pets: () => petSim.pets(),
+  livestock: () => livestock.poses(),
+  livestockInReach: () => livestock.inReach(),
   nearbyPet: () => nearbyPet?.instanceId ?? "",
   carrying: () => carrying,
   putDownFits: () => putDownAt !== null,

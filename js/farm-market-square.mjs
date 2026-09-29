@@ -104,12 +104,15 @@ export const KITCHEN_STALL_ID = "kitchen";
 export const SAWMILL_STALL_ID = "sawmill";
 export const SEED_STALL_ID = "seeds";
 export const EXCHANGE_BOARD_ID = "exchange";
+export const LIVESTOCK_STALL_ID = "livestock";
 /**
  * The square's stalls. The Produce Merchant (v1, paying the day's prices), the
  * Order Board (Phase 4), the Kitchen (Phase 6, buying cooked dishes), the
  * Sawmill (Phase 7: saws logs into planks for a fee, and buys furniture) and
  * the Seed Merchant (every seed, with three on special each day) are open,
  * and the Exchange Board, where players list goods for each other's tickets.
+ * The Livestock Dealer sells young stock into the player's stalls, barn and
+ * pens (planning-docs/FARM_LIVESTOCK_PLAN.md).
  */
 export const MARKET_STALLS = Object.freeze([
     stall({
@@ -140,6 +143,12 @@ export const MARKET_STALLS = Object.freeze([
         id: ORDER_BOARD_ID, kind: "board", title: "Order Board", open: true,
         x: 11.2, z: 1.2, rotationY: -QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
         colors: ["#6b4b2c", "#f4ecd6"], keeper: null,
+        closedNote: "",
+    }),
+    stall({
+        id: LIVESTOCK_STALL_ID, kind: "stall", title: "Livestock Dealer", open: true,
+        x: 10.9, z: 8.2, rotationY: -QUARTER, colors: ["#6b8a3f", "#f4ecd6"],
+        keeper: Object.freeze({ name: "Hollis", avatarId: "avatar.hero-m", greeting: "Lambs, piglets, calves and crias — every one a character. Got room at home?" }),
         closedNote: "",
     }),
     stall({
@@ -212,6 +221,8 @@ export function stallPrompt(entry, signedIn) {
         return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;
     if (entry.id === SAWMILL_STALL_ID)
         return signedIn ? `Press E to saw logs and sell furniture to ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to saw logs and sell furniture`;
+    if (entry.id === LIVESTOCK_STALL_ID)
+        return signedIn ? `Press E to buy young stock from ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to buy livestock`;
     if (entry.id === SEED_STALL_ID)
         return signedIn ? `Press E to buy seeds from ${entry.keeper?.name ?? entry.title} · today's specials` : `${entry.title} · sign in to buy seeds`;
     const goods = entry.id === KITCHEN_STALL_ID ? "cooking" : "produce";

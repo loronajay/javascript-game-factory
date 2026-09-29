@@ -171,15 +171,15 @@ export function petForward(yaw: number): Readonly<{ x: number; z: number }> {
   return { x: -Math.sin(yaw), z: -Math.cos(yaw) };
 }
 
-function yawToward(from: Readonly<{ x: number; z: number }>, to: Readonly<{ x: number; z: number }>): number {
+export function yawToward(from: Readonly<{ x: number; z: number }>, to: Readonly<{ x: number; z: number }>): number {
   return Math.atan2(-(to.x - from.x), -(to.z - from.z));
 }
 
-function wrapAngle(angle: number): number {
+export function wrapAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
-function turnToward(yaw: number, target: number, rate: number, dt: number): number {
+export function turnToward(yaw: number, target: number, rate: number, dt: number): number {
   const delta = wrapAngle(target - yaw);
   const step = rate * dt;
   return Math.abs(delta) <= step ? target : yaw + Math.sign(delta) * step;

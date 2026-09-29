@@ -1,0 +1,178 @@
+// The livestock catalog: the farm animals that yield goods, as DATA.
+//
+// One row per Quaternius Farm Animals file (`farm/assets/yield-animals/`, CC0,
+// converted by that folder's `tools/convert.py`). A test asserts each row's
+// GLB exists on disk. Pure — no THREE, no DOM — and mirrored on the server by
+// `platform-api/src/services/farm-livestock-catalog.mts` (prices, stat ranges,
+// growth), which a test holds equal. The SERVER decides every animal's stats;
+// this copy only presents them.
+//
+// LIVESTOCK ARE NOT PETS (planning-docs/FARM_LIVESTOCK_PLAN.md). They share
+// the pets' bodies and their movement vocabulary, never their care: no
+// affection, no toys, no tricks, no Pet Games. An animal is judged by four
+// stats — Yield, Quality, Growth, Hardiness — and a grade drawn from them.
+//
+// THE PACK SHIPS NAMED CLIPS (Idle, Walk, WalkSlow, Run, Jump, Death), not
+// the Gobkit animals' one long track, so a row names its clips by name.
+
+export const LIVESTOCK_STATS = Object.freeze(["yield", "quality", "growth", "hardiness"] as const);
+export type LivestockStat = typeof LIVESTOCK_STATS[number];
+export type LivestockStats = Readonly<Record<LivestockStat, number>>;
+export type StatRange = Readonly<{ min: number; max: number }>;
+
+export const LIVESTOCK_STAT_TITLES: Readonly<Record<LivestockStat, string>> = Object.freeze({
+  yield: "Yield",
+  quality: "Quality",
+  growth: "Growth",
+  hardiness: "Hardiness",
+});
+
+/** What each stat does, for the panel's tooltip line. */
+export const LIVESTOCK_STAT_BLURBS: Readonly<Record<LivestockStat, string>> = Object.freeze({
+  yield: "How much it gives each time, and how much meat it makes.",
+  quality: "How fine what it gives tends to be.",
+  growth: "How quickly a young one grows up.",
+  hardiness: "How slowly it gets hungry, and how much neglect it shrugs off.",
+});
+
+/** The clip each state plays, by the name the pack gave it. */
+export type LivestockClipNames = Readonly<{ idle: string; walk: string; attack: string; dead: string }>;
+export const QUATERNIUS_CLIPS: LivestockClipNames = Object.freeze({ idle: "Idle", walk: "WalkSlow", attack: "Jump", dead: "Death" });
+
+/** A coat: which of the model's own materials is repainted which colour. The first coat of every species is the model as shipped. */
+export type LivestockCoat = Readonly<{
+  id: string;
+  title: string;
+  /** Relative weight when the Dealer's animal is born; out of 100 per species. */
+  weight: number;
+  /** Material name → colour. Materials not named keep the pack's colour. */
+  colors: Readonly<Record<string, string>>;
+}>;
+
+/** A renewable good: milk every so many farm days, wool once the fleece has grown back. */
+export type LivestockProduct = Readonly<{ itemId: string; title: string; everyDays: number }>;
+
+export type LivestockSpecies = Readonly<{
+  id: string;
+  title: string;
+  /** What one young one is called at the Dealer. */
+  youngTitle: string;
+  /** File name under `farm/assets/yield-animals/`. */
+  file: string;
+  /** How tall a grown one stands, in metres; the GLB is scaled to this. A young one is `YOUNG_SIZE` of it. */
+  height: number;
+  /** Personal-space radius of a grown one, in metres. */
+  radius: number;
+  /** Metres per second while it strolls its home. */
+  walkSpeed: number;
+  turnRate: number;
+  clips: LivestockClipNames;
+  coats: readonly LivestockCoat[];
+  /** Tickets for a young one at the Livestock Dealer (the server's copy is the price). */
+  price: number;
+  /** Farm days from birth to grown at Growth 50. */
+  adultDays: number;
+  /** What it gives once grown (Phase 2). Pigs give nothing but meat. */
+  products: readonly LivestockProduct[];
+  /** The range the Dealer's animals are born in, per stat (1–100). */
+  stats: Readonly<Record<LivestockStat, StatRange>>;
+  /** Names the Dealer's animals come with; the player may rename. */
+  names: readonly string[];
+}>;
+
+/** A young one is drawn this big against a grown one, growing linearly to 1 at adulthood. */
+export const YOUNG_SIZE = 0.55;
+export const STAT_MIN = 1;
+export const STAT_MAX = 100;
+export const LIVESTOCK_NAME_MAX = 24;
+
+type Spec = Omit<LivestockSpecies, "id" | "clips"> & Readonly<{ clips?: LivestockClipNames }>;
+
+const range = (min: number, max: number): StatRange => Object.freeze({ min, max });
+
+function species(variant: string, spec: Spec): LivestockSpecies {
+  return Object.freeze({
+    ...spec,
+    id: `livestock.${variant}`,
+    clips: spec.clips ?? QUATERNIUS_CLIPS,
+    coats: Object.freeze(spec.coats.map((coat) => Object.freeze({ ...coat, colors: Object.freeze({ ...coat.colors }) }))),
+    products: Object.freeze(spec.products.map((product) => Object.freeze({ ...product }))),
+    stats: Object.freeze({ ...spec.stats }),
+    names: Object.freeze([...spec.names]),
+  });
+}
+
+export const LIVESTOCK_CATALOG: readonly LivestockSpecies[] = Object.freeze([
+  species("sheep", {
+    title: "Sheep", youngTitle: "Lamb", file: "sheep.glb",
+    height: 0.85, radius: 0.5, walkSpeed: 0.75, turnRate: 2.2,
+    coats: [
+      { id: "standard", title: "White", weight: 60, colors: {} },
+      { id: "black", title: "Black", weight: 20, colors: { White: "#3a3533", Black: "#1d1a19" } },
+      { id: "moorit", title: "Moorit", weight: 15, colors: { White: "#8a5b3c", Black: "#3b2618" } },
+      { id: "silver", title: "Silver", weight: 5, colors: { White: "#b9bcc2", Black: "#2e3136" } },
+    ],
+    price: 350, adultDays: 2,
+    products: [
+      { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1 },
+      { itemId: "wool", title: "Wool", everyDays: 3 },
+    ],
+    stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
+    names: ["Clover", "Woolly", "Dolly", "Bramble", "Fleecy", "Lambert", "Willow", "Pip", "Nutmeg", "Snowdrop"],
+  }),
+  species("pig", {
+    title: "Pig", youngTitle: "Piglet", file: "pig.glb",
+    height: 0.8, radius: 0.55, walkSpeed: 0.8, turnRate: 2.2,
+    coats: [
+      { id: "standard", title: "Pink", weight: 55, colors: {} },
+      { id: "berkshire", title: "Berkshire", weight: 20, colors: { "Material.003": "#2d2626", Material: "#e8d7cf" } },
+      { id: "tamworth", title: "Tamworth", weight: 20, colors: { "Material.003": "#b0602f", Material: "#5b3018" } },
+      { id: "spotted", title: "Gloucester Spot", weight: 5, colors: { "Material.003": "#efe2d8", Material: "#2b2424" } },
+    ],
+    price: 400, adultDays: 2,
+    products: [],
+    stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(30, 75) },
+    names: ["Truffle", "Hamlet", "Porkchop", "Rosie", "Wilbur", "Peony", "Babe", "Mudge", "Oinkers", "Bacon"],
+  }),
+  species("cow", {
+    title: "Cow", youngTitle: "Calf", file: "cow.glb",
+    height: 1.2, radius: 0.75, walkSpeed: 0.65, turnRate: 1.6,
+    coats: [
+      { id: "standard", title: "Holstein", weight: 50, colors: {} },
+      { id: "jersey", title: "Jersey", weight: 25, colors: { White: "#c99a62", Black: "#6b4a2e" } },
+      { id: "angus", title: "Angus", weight: 20, colors: { White: "#2b2624", Black: "#171413" } },
+      { id: "highland", title: "Highland", weight: 5, colors: { White: "#b8672f", Black: "#7a3d17" } },
+    ],
+    price: 750, adultDays: 3,
+    products: [{ itemId: "milk", title: "Milk", everyDays: 1 }],
+    stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
+    names: ["Bessie", "Daisy", "Buttercup", "Clementine", "Moolan", "Hazel", "Marigold", "Duchess", "Bluebell", "Caramel"],
+  }),
+  species("llama", {
+    title: "Llama", youngTitle: "Cria", file: "llama.glb",
+    height: 1.55, radius: 0.5, walkSpeed: 0.85, turnRate: 2,
+    coats: [
+      { id: "standard", title: "Brown & White", weight: 50, colors: {} },
+      { id: "cream", title: "Cream", weight: 25, colors: { Brown: "#d8c3a0", Grey: "#a79a87" } },
+      { id: "charcoal", title: "Charcoal", weight: 20, colors: { Brown: "#3b3534", White: "#8d8a88" } },
+      { id: "appaloosa", title: "Appaloosa", weight: 5, colors: { Brown: "#e6ddd2", White: "#7a4e36", Grey: "#5a5250" } },
+    ],
+    price: 650, adultDays: 3,
+    products: [{ itemId: "wool-llama", title: "Llama Wool", everyDays: 3 }],
+    stats: { yield: range(15, 60), quality: range(20, 65), growth: range(20, 65), hardiness: range(40, 85) },
+    names: ["Dolly", "Kuzco", "Paco", "Pisco", "Andes", "Machu", "Tina", "Quinoa", "Chewie", "Fernando"],
+  }),
+]);
+
+export function findLivestockSpecies(id: unknown): LivestockSpecies | undefined {
+  return typeof id === "string" ? LIVESTOCK_CATALOG.find((entry) => entry.id === id) : undefined;
+}
+
+export function findLivestockCoat(speciesId: unknown, coatId: unknown): LivestockCoat | undefined {
+  const entry = findLivestockSpecies(speciesId);
+  return entry?.coats.find((coat) => coat.id === coatId) ?? entry?.coats[0];
+}
+
+export function allLivestockIds(): string[] {
+  return LIVESTOCK_CATALOG.map((entry) => entry.id);
+}

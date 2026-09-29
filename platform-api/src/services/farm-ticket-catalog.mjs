@@ -21,6 +21,8 @@ const prices = Object.freeze({
     "decor.building.shed": 650, "decor.building.coop": 800, "decor.building.gazebo": 900,
     "decor.building.greenhouse": 1400, "decor.building.stable": 1700, "decor.building.silo": 1800,
     "decor.building.windmill": 2400,
+    // Livestock pens (services/farm-livestock-catalog: two head and four).
+    "decor.building.pen-small": 500, "decor.building.pen-large": 900,
     "decor.plant.stump": 25, "decor.plant.bush": 50, "decor.plant.flower-bed": 75,
     "decor.plant.sunflowers": 75, "decor.plant.lavender": 75, "decor.plant.pine": 100,
     "decor.plant.birch": 125, "decor.plant.apple": 175, "decor.plant.willow": 200,
