@@ -22,6 +22,7 @@ import { createFarmEditorPanel } from "./farm-editor-panel.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import { createEditorCameraController } from "./space-editor/editor-camera-controller.mjs";
 import { createEditHistory } from "./space-editor/editor-history.mjs";
+import { editorRotationDirection } from "./space-editor/editor-shortcuts.mjs";
 /** B flips build mode, like the room: pointer lock hides the cursor, and the browser eats Escape. */
 export const FARM_EDITOR_TOGGLE_KEY = "KeyB";
 const NUDGE_STEP = 0.1;
@@ -289,7 +290,7 @@ export function createFarmEditor(options) {
         if (quiet)
             return;
         const size = definition.length.enabled ? " · drag an end arrow to stretch it" : "";
-        setStatus(`${definition.title} selected · drag it, arrows to nudge, Q/R to turn${size} · hold Alt to skip snapping · Delete to remove.`);
+        setStatus(`${definition.title} selected · drag it, arrows to nudge, Q/E to turn${size} · hold Alt to skip snapping · Delete to remove.`);
     }
     function clearSelection() {
         if (!selection)
@@ -737,6 +738,12 @@ export function createFarmEditor(options) {
                 duplicate(selection);
             return;
         }
+        const rotationDirection = editorRotationDirection(event.code);
+        if (rotationDirection !== null) {
+            event.preventDefault();
+            rotate(rotationDirection);
+            return;
+        }
         const bindings = {
             Escape: () => { if (relocating)
                 cancelRelocate();
@@ -744,8 +751,6 @@ export function createFarmEditor(options) {
                 clearSelection();
             else
                 finish(); },
-            KeyQ: () => rotate(-1),
-            KeyR: () => rotate(1),
             KeyF: () => view.setView("front"),
             KeyT: () => view.setView("top"),
             KeyO: () => view.setView("overview"),

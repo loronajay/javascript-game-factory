@@ -43,11 +43,12 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
 import { createLivestockDealerPanel } from "./farm-livestock-dealer-panel.mjs";
+import { createMarketButcher } from "./farm-market-butcher.mjs";
 import { livestockHomes } from "./farm-livestock-housing.mjs";
 import { livestockKind, normalizeLivestockAnimal, normalizeLivestockHerd } from "./farm-livestock.mjs";
 import { findLivestockSpecies } from "./farm-catalog/livestock.mjs";
@@ -63,7 +64,7 @@ import { createOrderBoardPanel } from "./farm-orders-panel.mjs";
 import { createMarketSawmill } from "./farm-market-sawmill.mjs";
 import { createMarketTrading } from "./farm-market-trading.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
-import { normalizeOrderBoard } from "./farm-orders.mjs";
+import { SKILL_TITLES, normalizeOrderBoard } from "./farm-orders.mjs";
 import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
 import { barterPurchasePrice, barterSalePrice } from "./farm-bartering.mjs";
@@ -76,6 +77,8 @@ import { createVendorShelf } from "./farm-vendor-shelf.mjs";
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
+import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
+import { normalizeAngler } from "./farm-angler.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -114,13 +117,43 @@ let dishes = farmLoad.layout.agriculture.inventory.dishes;
 let seeds = farmLoad.layout.agriculture.inventory.seeds;
 /** The whole farm as the server last answered: the Sawmill reads its logs, planks and furniture shelf from it. */
 let farm = farmLoad.layout;
+let farmFishing = null;
 const inventorySummary = createFarmInventorySummary({
     root: requiredElement("#inventoryPanel"),
     openButton: requiredElement("#openInventory"),
     closeButton: requiredElement("#closeInventory"),
     body: requiredElement("#inventorySummary"),
 });
-inventorySummary.render(farm);
+const statsPanel = createFarmStatsPanel({
+    root: requiredElement("#statsPanel"),
+    openButton: requiredElement("#openStats"),
+    closeButton: requiredElement("#closeStats"),
+    summary: requiredElement("#statsSummary"),
+    grid: requiredElement("#statsGrid"),
+}, {
+    beforeOpen: () => inventorySummary.close(),
+    onClose: () => canvas.focus(),
+});
+const farmPanelsApi = createPlatformApiClient();
+function renderPersonalPanels() {
+    inventorySummary.render(farm, farmFishing);
+    statsPanel.render(farm.skills, farmFishing);
+}
+async function refreshFarmFishing() {
+    if (!farmStore.accountBacked)
+        return;
+    const next = normalizeAngler(await farmPanelsApi.fetchFarmFishing().catch(() => null));
+    if (next)
+        farmFishing = next;
+    renderPersonalPanels();
+}
+renderPersonalPanels();
+requiredElement("#openInventory").addEventListener("click", () => {
+    statsPanel.close();
+    void refreshFarmFishing();
+});
+requiredElement("#openStats").addEventListener("click", () => { void refreshFarmFishing(); });
+void refreshFarmFishing();
 /** Take the basket and pantry from a farm the server answered with. */
 function takeStock(layoutValue) {
     if (!layoutValue)
@@ -130,7 +163,7 @@ function takeStock(layoutValue) {
     produce = next.agriculture.inventory.produce;
     dishes = next.agriculture.inventory.dishes;
     seeds = next.agriculture.inventory.seeds;
-    inventorySummary.render(next);
+    renderPersonalPanels();
     salePanel?.repaint?.();
     ingredientShelf?.render?.();
     recipeShelf?.render?.();
@@ -312,7 +345,7 @@ function publishPresence() {
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking",
-        activity: trading.activity() || (salePanel.isOpen() ? "at the Produce Merchant" : seedPanel.isOpen() ? "buying seeds" : dealerPanel.isOpen() ? "at the Livestock Dealer" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "at the Kitchen" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
+        activity: trading.activity() || (salePanel.isOpen() ? "at the Produce Merchant" : seedPanel.isOpen() ? "buying seeds" : dealerPanel.isOpen() ? "at the Livestock Dealer" : butcherCounter.isOpen() ? "at the Butcher" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "at the Kitchen" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
     });
 }
 // ---------------------------------------------------------------- the Produce Merchant and the Kitchen
@@ -440,12 +473,14 @@ async function loadHerd() {
     if (Array.isArray(answer))
         herd = normalizeLivestockHerd(answer);
     dealerPanel.repaint();
+    butcherCounter.repaint();
 }
 const livestockMessages = Object.freeze({
     insufficient_tickets: "Not enough tickets for that one yet.",
     no_room: "There is no room at home. Build a pen, or free a stall, first.",
     home_full: "That home is full.",
     herd_full: "Your farm has as many animals as it can manage.",
+    level_too_low: "Hollis won't sell you that one yet — raise your Husbandry by caring for the animals you have.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
 });
 async function buyLivestock(speciesId) {
@@ -482,6 +517,22 @@ const dealerPanel = createLivestockDealerPanel({
 }, {
     buy: buyLivestock,
     farm: () => ({ homes: livestockHomes(farm.decor), herd }),
+    husbandryLevel: () => farmingLevelForXp(farm.skills.husbandry.xp),
+    thumbnail: livestockPortraits.get,
+    onClose: () => canvas.focus(),
+});
+// The Butcher (farm-market-butcher.mts): Otto takes a grown animal from the herd for meat in the basket.
+const butcherCounter = createMarketButcher({
+    api: livestockApi,
+    farm: () => farm,
+    herd: () => herd,
+    takeHerd: (next) => {
+        herd = next;
+        dealerPanel.repaint();
+    },
+    takeStock,
+    keeperSays: (text) => keeperSays(findMarketStall(BUTCHER_STALL_ID), text),
+    onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
     thumbnail: livestockPortraits.get,
     onClose: () => canvas.focus(),
 });
@@ -531,6 +582,7 @@ const orderMessages = Object.freeze({
     not_enough_produce: "Your basket came up short when it was counted. Nothing was delivered.",
     not_enough_dishes: "Your pantry came up short when it was counted. Nothing was delivered.",
     not_enough_fish: "Your creel came up short when it was counted (a locked fish never goes). Nothing was delivered.",
+    not_enough_goods: "Your basket came up short of milk or wool when it was counted. Nothing was delivered.",
     level_too_low: "That order needs a higher level. Nothing was delivered.",
     order_expired: "That notice came down while you were reading it — the board has turned over. Nothing was delivered.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
@@ -558,7 +610,10 @@ async function fillOrder(orderId) {
     const result = await ticketClient.fillFarmOrder(orderId);
     const layout = takeStock(result?.layout);
     const fishingLevel = Number(result?.fishing?.level) || lastBoard?.levels.fishing || 1;
-    const levels = layout ? { farming: farmingLevelForXp(layout.skills.farming.xp), cooking: farmingLevelForXp(layout.skills.cooking.xp), fishing: fishingLevel } : undefined;
+    const levels = layout ? {
+        farming: farmingLevelForXp(layout.skills.farming.xp), cooking: farmingLevelForXp(layout.skills.cooking.xp), fishing: fishingLevel,
+        husbandry: farmingLevelForXp(layout.skills.husbandry.xp),
+    } : undefined;
     // A fish order took its fish: the creel the board shows is what is left.
     const used = new Set(Array.isArray(result?.fishUsed) ? result.fishUsed.map((fish) => String(fish?.id)) : []);
     const fish = lastBoard ? lastBoard.fish.filter((entry) => !used.has(entry.id)) : undefined;
@@ -574,10 +629,9 @@ async function fillOrder(orderId) {
     if (result.duplicate)
         return { ok: true, message: "That order was already delivered.", ...stock, filled: true };
     const customer = typeof result.order?.customer === "string" ? result.order.customer : "The customer";
-    const cooking = result.skill === "cooking";
-    const fishingOrder = result.skill === "fishing";
-    const summary = cooking ? result.cooking : fishingOrder ? result.fishing : result.farming;
-    const skill = cooking ? "Cooking" : fishingOrder ? "Fishing" : "Farming";
+    const orderSkill = result.skill === "cooking" || result.skill === "fishing" || result.skill === "husbandry" ? result.skill : "farming";
+    const summary = result[orderSkill];
+    const skill = SKILL_TITLES[orderSkill];
     const levelUp = Number(summary?.level) > Number(summary?.levelBefore) ? ` ${skill} level ${summary.level}!` : "";
     return {
         ok: true,
@@ -665,7 +719,7 @@ window.addEventListener("pageshow", () => { if (entered)
     trading.start(); });
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 function panelOpen() {
-    return inventorySummary.isOpen() || salePanel.isOpen() || seedPanel.isOpen() || dealerPanel.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
+    return inventorySummary.isOpen() || statsPanel.isOpen() || salePanel.isOpen() || seedPanel.isOpen() || dealerPanel.isOpen() || butcherCounter.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
 }
 function workStall(stall) {
     if (!stall.open) {
@@ -687,7 +741,9 @@ function workStall(stall) {
                                 ? "Sign in to buy seeds — they go to your account farm's Inventory."
                                 : stall.id === LIVESTOCK_STALL_ID
                                     ? "Sign in to buy livestock — they are bought with tickets and live on your account farm."
-                                    : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
+                                    : stall.id === BUTCHER_STALL_ID
+                                        ? "Sign in to send livestock to the Butcher — only an account farm's herd can go."
+                                        : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
         return;
     }
     keys.clear();
@@ -707,6 +763,10 @@ function workStall(stall) {
         sawmill.open();
     else if (stall.id === LIVESTOCK_STALL_ID) {
         dealerPanel.open();
+        void loadHerd();
+    }
+    else if (stall.id === BUTCHER_STALL_ID) {
+        butcherCounter.open();
         void loadHerd();
     }
     else if (stall.id === SEED_STALL_ID) {
@@ -823,14 +883,19 @@ window.addEventListener("keydown", (event) => {
         if (event.code === "KeyI" && inventorySummary.isOpen()) {
             inventorySummary.close();
         }
+        else if (event.code === "KeyK" && statsPanel.isOpen()) {
+            statsPanel.close();
+        }
         else if (event.code === "Escape" && trading.isOpen()) {
             trading.escape();
         }
         else if (event.code === "Escape") {
             inventorySummary.close();
+            statsPanel.close();
             salePanel.close();
             seedPanel.close();
             dealerPanel.close();
+            butcherCounter.close();
             exchangePanel.close();
             kitchenPanel.close();
             ordersPanel.close();
@@ -851,6 +916,12 @@ window.addEventListener("keydown", (event) => {
         event.preventDefault();
         keys.clear();
         inventorySummary.toggle();
+        return;
+    }
+    if (entered && !event.repeat && event.code === "KeyK") {
+        event.preventDefault();
+        keys.clear();
+        statsPanel.toggle();
         return;
     }
     if (entered && !event.repeat && event.code === "KeyT" && nearbyVisitor) {
@@ -953,6 +1024,7 @@ globalThis.__market = Object.freeze({
     openDoors: () => [...openDoors],
     saleOpen: () => salePanel.isOpen(),
     seedsOpen: () => seedPanel.isOpen(),
+    butcherOpen: () => butcherCounter.isOpen(),
     exchangeOpen: () => exchangePanel.isOpen(),
     market: () => market,
     ordersOpen: () => ordersPanel.isOpen(),

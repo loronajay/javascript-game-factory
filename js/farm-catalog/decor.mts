@@ -125,7 +125,7 @@ export type FarmDecorDefinition = Readonly<{
   indoors: boolean;
   /** Pet-home identity and the opening its procedural model draws, or null for ordinary decor. */
   dwelling: FarmDwelling | null;
-  /** Rotation step for Q/R, in degrees. */
+  /** Rotation step for Q/E, in degrees. */
   snapDegrees: number;
   /** Two colours for the catalog card's chip when no render is available. */
   swatch: readonly [string, string];

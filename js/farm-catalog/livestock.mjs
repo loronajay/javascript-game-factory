@@ -46,6 +46,7 @@ function species(variant, spec) {
         clips: spec.clips ?? QUATERNIUS_CLIPS,
         coats: Object.freeze(spec.coats.map((coat) => Object.freeze({ ...coat, colors: Object.freeze({ ...coat.colors }) }))),
         products: Object.freeze(spec.products.map((product) => Object.freeze({ ...product }))),
+        meat: Object.freeze({ ...spec.meat }),
         feeds: Object.freeze({ supply: spec.feeds.supply, crops: Object.freeze([...spec.feeds.crops]) }),
         stats: Object.freeze({ ...spec.stats }),
         names: Object.freeze([...spec.names]),
@@ -61,11 +62,12 @@ export const LIVESTOCK_CATALOG = Object.freeze([
             { id: "moorit", title: "Moorit", weight: 15, colors: { White: "#8a5b3c", Black: "#3b2618" } },
             { id: "silver", title: "Silver", weight: 5, colors: { White: "#b9bcc2", Black: "#2e3136" } },
         ],
-        price: 350, adultDays: 2,
+        price: 350, minLevel: 1, adultDays: 2,
         products: [
             { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1, dayValue: 14 },
             { itemId: "wool", title: "Wool", everyDays: 3, dayValue: 12 },
         ],
+        meat: { itemId: "mutton", title: "Mutton", cuts: 4 },
         feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
         names: ["Clover", "Woolly", "Dolly", "Bramble", "Fleecy", "Lambert", "Willow", "Pip", "Nutmeg", "Snowdrop"],
@@ -79,8 +81,9 @@ export const LIVESTOCK_CATALOG = Object.freeze([
             { id: "tamworth", title: "Tamworth", weight: 20, colors: { "Material.003": "#b0602f", Material: "#5b3018" } },
             { id: "spotted", title: "Gloucester Spot", weight: 5, colors: { "Material.003": "#efe2d8", Material: "#2b2424" } },
         ],
-        price: 400, adultDays: 2,
+        price: 400, minLevel: 5, adultDays: 2,
         products: [],
+        meat: { itemId: "pork", title: "Pork", cuts: 6 },
         feeds: { supply: "food.pig-feed", crops: ["potato", "pumpkin", "corn", "beetroot", "watermelon", "apple"] },
         stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(30, 75) },
         names: ["Truffle", "Hamlet", "Porkchop", "Rosie", "Wilbur", "Peony", "Babe", "Mudge", "Oinkers", "Bacon"],
@@ -94,8 +97,9 @@ export const LIVESTOCK_CATALOG = Object.freeze([
             { id: "angus", title: "Angus", weight: 20, colors: { White: "#2b2624", Black: "#171413" } },
             { id: "highland", title: "Highland", weight: 5, colors: { White: "#b8672f", Black: "#7a3d17" } },
         ],
-        price: 750, adultDays: 3,
+        price: 750, minLevel: 10, adultDays: 3,
         products: [{ itemId: "milk", title: "Milk", everyDays: 1, dayValue: 28 }],
+        meat: { itemId: "beef", title: "Beef", cuts: 8 },
         feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
         names: ["Bessie", "Daisy", "Buttercup", "Clementine", "Moolan", "Hazel", "Marigold", "Duchess", "Bluebell", "Caramel"],
@@ -109,8 +113,9 @@ export const LIVESTOCK_CATALOG = Object.freeze([
             { id: "charcoal", title: "Charcoal", weight: 20, colors: { Brown: "#3b3534", White: "#8d8a88" } },
             { id: "appaloosa", title: "Appaloosa", weight: 5, colors: { Brown: "#e6ddd2", White: "#7a4e36", Grey: "#5a5250" } },
         ],
-        price: 650, adultDays: 3,
+        price: 650, minLevel: 15, adultDays: 3,
         products: [{ itemId: "wool-llama", title: "Llama Wool", everyDays: 3, dayValue: 22 }],
+        meat: { itemId: "llama-meat", title: "Llama Meat", cuts: 5 },
         feeds: { supply: "food.hay", crops: ["carrot", "corn", "cabbage"] },
         stats: { yield: range(15, 60), quality: range(20, 65), growth: range(20, 65), hardiness: range(40, 85) },
         names: ["Dolly", "Kuzco", "Paco", "Pisco", "Andes", "Machu", "Tina", "Quinoa", "Chewie", "Fernando"],
@@ -136,4 +141,37 @@ export const AVERAGE_GOODS_PER_COLLECTION = 1.5;
 /** A good's Normal price: its day value over its cycle, per piece. The server derives it the same way. */
 export function livestockGoodPrice(product) {
     return Math.ceil((product.dayValue * product.everyDays) / AVERAGE_GOODS_PER_COLLECTION);
+}
+// ---------------------------------------------------------------- the Butcher's meat
+/** Every meat the Butcher cuts, once each (a basket id). */
+export const LIVESTOCK_MEATS = Object.freeze(LIVESTOCK_CATALOG.map((entry) => entry.meat));
+export function findLivestockMeat(itemId) {
+    return LIVESTOCK_MEATS.find((meat) => meat.itemId === itemId);
+}
+/** The species a meat comes from. */
+export function meatSpecies(itemId) {
+    return LIVESTOCK_CATALOG.find((entry) => entry.meat.itemId === itemId);
+}
+export const LIVESTOCK_BASKET_ITEMS = Object.freeze([
+    ...LIVESTOCK_GOODS.map((good) => Object.freeze({ itemId: good.itemId, title: good.title })),
+    ...LIVESTOCK_MEATS.map((meat) => Object.freeze({ itemId: meat.itemId, title: meat.title })),
+]);
+export function findLivestockBasketItem(itemId) {
+    return LIVESTOCK_BASKET_ITEMS.find((item) => item.itemId === itemId);
+}
+/**
+ * The margin a head of livestock earns for every farm day it is kept to its
+ * prime, when it goes to the Butcher: about what a milking cow's milk is worth
+ * in a day, so raising for meat and keeping for milk are both fair answers.
+ */
+export const MEAT_MARGIN_PER_DAY = 30;
+/** An animal reaches its prime (full cuts) this many times its grown age. */
+export const PRIME_AGE = 2;
+/**
+ * A meat's Normal price per cut: the young one's price, plus the margin for
+ * the days an average one takes to its prime, over its cuts. The server
+ * derives it the same way.
+ */
+export function livestockMeatPrice(species) {
+    return Math.ceil((species.price + MEAT_MARGIN_PER_DAY * PRIME_AGE * species.adultDays) / species.meat.cuts);
 }

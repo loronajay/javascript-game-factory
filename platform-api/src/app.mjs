@@ -353,6 +353,7 @@ export function createApp(options = {}) {
     const moveFarmLivestock = typeof options?.moveFarmLivestock === "function" ? options.moveFarmLivestock : null;
     const renameFarmLivestock = typeof options?.renameFarmLivestock === "function" ? options.renameFarmLivestock : null;
     const careFarmLivestock = typeof options?.careFarmLivestock === "function" ? options.careFarmLivestock : null;
+    const butcherFarmLivestock = typeof options?.butcherFarmLivestock === "function" ? options.butcherFarmLivestock : null;
     const castFarmLine = typeof options?.castFarmLine === "function" ? options.castFarmLine : null;
     const landFarmCast = typeof options?.landFarmCast === "function" ? options.landFarmCast : null;
     const sellFarmFish = typeof options?.sellFarmFish === "function" ? options.sellFarmFish : null;
@@ -698,7 +699,7 @@ export function createApp(options = {}) {
     const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
     const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
     const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };
-    const farmLivestockServices = { getFarmLivestock, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock };
+    const farmLivestockServices = { getFarmLivestock, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock, butcherFarmLivestock };
     const gameResultServices = { submitGameResult, getPetGameCareer };
     const progressionServices = {
         getGameXpProgress,

@@ -20,6 +20,7 @@
       </div>
       <div class="farm-header__actions">
         <button id="openInventory" class="farm-button" type="button" aria-pressed="false" title="See your farm inventory (I)">Inventory <kbd>I</kbd></button>
+        <button id="openStats" class="farm-button" type="button" aria-pressed="false" title="See all farm skills and lifetime stats (K)">Stats <kbd>K</kbd></button>
         <span id="marketTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
         <button id="toggleMarketMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
       </div>
@@ -46,12 +47,20 @@
 
     <div id="marketPrompt" class="farm-prompt" aria-live="polite"></div>
     <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>I</b> Inventory</span><span><b>T</b> Trade</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
+      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>I</b> Inventory</span><span><b>K</b> Stats</span><span><b>T</b> Trade</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
     </div>
 
     <aside id="inventoryPanel" class="inventory-panel sale-panel" aria-label="Farm inventory" hidden>
       <header class="pets-panel__head"><div><span class="eyebrow">YOUR FARM</span><strong>Inventory</strong></div><button id="closeInventory" class="farm-button" type="button">Done <kbd>Esc</kbd></button></header>
       <div id="inventorySummary" class="inventory-panel__body"></div>
+    </aside>
+
+    <aside id="statsPanel" class="inventory-panel stats-panel" aria-label="Farm player stats" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">YOUR FARM LIFE</span><strong>Player stats</strong><small id="statsSummary" class="stats-panel__summary"></small></div>
+        <button id="closeStats" class="farm-button" type="button" title="Back to the square (K)">Done <kbd>K</kbd></button>
+      </header>
+      <div class="stats-panel__body"><div id="statsGrid" class="farm-stats-grid"></div></div>
     </aside>
 
     <aside id="salePanel" class="inventory-panel sale-panel" aria-label="Produce Merchant" hidden>
@@ -90,6 +99,21 @@
       </div>
       <footer class="sale-footer">
         <p id="dealerStatus" class="pets-status" aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <aside id="butcherPanel" class="inventory-panel sale-panel dealer-panel butcher-panel" aria-label="Butcher" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">BUTCHER · OTTO</span><strong>Send livestock for meat</strong></div>
+        <button id="closeButcher" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Otto takes a grown animal and cuts it into meat for your harvest basket. Yield and age decide how many cuts — the most at its prime, twice its grown age — and its Quality, less the time it spent hungry, decides the grade. An animal sent here leaves your farm for good.</p>
+        <p id="butcherRoom" class="sale-turnover"></p>
+        <ol id="butcherList" class="sale-list dealer-list"></ol>
+      </div>
+      <footer class="sale-footer">
+        <p id="butcherStatus" class="pets-status" aria-live="polite"></p>
       </footer>
     </aside>
 
@@ -226,7 +250,7 @@
         <button id="closeOrders" class="farm-button" type="button" title="Step back from the board (Esc)">Done <kbd>Esc</kbd></button>
       </header>
       <div class="inventory-panel__body">
-        <p class="sale-note">Everyone in the square reads the same notices. Each pays once per farmer, better than the counters do, and every delivery earns Farming XP — or Cooking XP, for the kitchen's dish orders. <span id="ordersTurnover" class="orders-turnover"></span></p>
+        <p class="sale-note">Everyone in the square reads the same notices. Each pays once per farmer, better than the counters do, and every delivery earns XP in the skill it asks of: Farming for produce, Cooking for dishes, Fishing for fish, Husbandry for milk and wool. <span id="ordersTurnover" class="orders-turnover"></span></p>
         <ol id="ordersList" class="orders-list"></ol>
       </div>
       <footer class="sale-footer orders-footer">

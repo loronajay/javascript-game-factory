@@ -22,6 +22,14 @@
 // premium on the dishes' two-star Market price, and pay Cooking XP. They are
 // drawn from their own seeded stream after the produce notices, so adding
 // them left every produce order that was ever posted exactly as it was.
+//
+// THE HERD'S ORDERS (livestock Phase 3). Two more, last on the board, ask for
+// the goods livestock give — milk and wool from the basket, any grade, the
+// plainest first — gated on Husbandry and paying Husbandry XP. Their own
+// customers (a creamery wants milk, a mill wants wool) and their own stream,
+// so every notice before them keeps its id and its lines. The kitchen's pool
+// leaves out dishes that need livestock goods for the same reason: adding the
+// dairy recipes changed no kitchen notice that was already up.
 
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { farmDishPrice, farmProducePrice } from "./farm-market-catalog.mjs";
@@ -29,6 +37,7 @@ import { farmHarvestXp } from "./farm-skill-catalog.mjs";
 import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
 import { farmSeedFor as seedFor, farmSeededRandom as mulberry32 } from "./farm-seeded-random.mjs";
 import { farmFishNeedValue, farmFishNeedXp, parseFishNeed } from "./farm-fish-catalog.mjs";
+import { AVERAGE_GOODS_PER_COLLECTION, FARM_LIVESTOCK_BASKET_IDS, farmLivestockGood, livestockCollectXp } from "./farm-livestock-catalog.mjs";
 
 export const FARM_ORDER_DAY_MS = 24 * 60 * 60 * 1000;
 /** An order's XP is this share of what growing its produce earned. */
@@ -118,15 +127,60 @@ export const FARM_FISH_ORDER_TIERS: readonly FarmFishOrderTier[] = Object.freeze
 /** A fish order's Fishing XP is this share of what landing its fish earned. */
 export const FISH_ORDER_XP_SHARE = 0.5;
 
+/**
+ * A herd order's tier: gated on Husbandry, asking for `lines` different goods
+ * out of `goods`, `count` pieces of each. The first asks only for what a
+ * sheep gives, since sheep are what the Dealer sells at Husbandry 1.
+ */
+export type FarmHerdOrderTier = Readonly<{
+  tier: "herd" | "herd-contract";
+  minLevel: number;
+  goods: readonly string[];
+  lines: number;
+  count: readonly [number, number];
+  premium: number;
+}>;
+
+export const FARM_HERD_ORDER_TIERS: readonly FarmHerdOrderTier[] = Object.freeze([
+  Object.freeze({ tier: "herd", minLevel: 1, goods: Object.freeze(["milk-sheep", "wool"]), lines: 1, count: Object.freeze([3, 6]) as readonly [number, number], premium: 1.6 }),
+  Object.freeze({ tier: "herd-contract", minLevel: 10, goods: Object.freeze(["milk", "milk-sheep", "wool", "wool-llama"]), lines: 2, count: Object.freeze([3, 6]) as readonly [number, number], premium: 1.75 }),
+]);
+
+/**
+ * Who pins the herd's notices up: dairies want milk, mills want wool, and a
+ * fair or a farm shop takes both. A notice is written first and then pinned by
+ * someone who would want exactly that, so a cheese cave never asks for fleece.
+ */
+export type FarmHerdCustomer = Readonly<{ name: string; note: string; wants: "milk" | "wool" | "both" }>;
+export const FARM_HERD_ORDER_CUSTOMERS: readonly FarmHerdCustomer[] = Object.freeze(([
+  { name: "Hollow Creek Creamery", note: "The churns are standing idle. Bring it fresh from the pail.", wants: "milk" },
+  { name: "Dunmore Cheese Cave", note: "The wheels won't age themselves.", wants: "milk" },
+  { name: "Granny Pim's Tea Room", note: "Scones without cream are a crime in this town.", wants: "milk" },
+  { name: "The Spinning Wheel", note: "Knitting circle meets Thursday and the baskets are empty.", wants: "wool" },
+  { name: "Fleece & Fiber Mercantile", note: "Winter orders are piling up. Clean fleece only!", wants: "wool" },
+  { name: "Brambleford Woollen Mill", note: "The looms eat faster than the flocks can grow it.", wants: "wool" },
+  { name: "Thornbury Country Fair", note: "The dairy tent and the fleece tent both need filling by Saturday.", wants: "both" },
+  { name: "Old Mill Farmstead Shop", note: "Anything off a farm animal sells out by noon. Bring plenty.", wants: "both" },
+] as const).map((entry) => Object.freeze({ ...entry })));
+
+/** Which customers would want these lines: milk only, wool only, or a mix. */
+function herdWants(lines: Readonly<Record<string, number>>): FarmHerdCustomer["wants"] {
+  const kinds = new Set(Object.keys(lines).map((itemId) => (itemId.startsWith("milk") ? "milk" : "wool")));
+  return kinds.size === 1 ? [...kinds][0] as "milk" | "wool" : "both";
+}
+
+/** A herd order's Husbandry XP is this share of what collecting its goods earned. */
+export const HERD_ORDER_XP_SHARE = 0.5;
+
 export type FarmOrder = Readonly<{
   id: string;
   day: number;
   slot: number;
-  tier: FarmOrderTier["tier"] | FarmKitchenOrderTier["tier"] | FarmFishOrderTier["tier"];
-  /** What the lines name: produce from the basket, cooked dishes (any stars) from the pantry, or fish needs from the creel. */
-  kind: "produce" | "dish" | "fish";
+  tier: FarmOrderTier["tier"] | FarmKitchenOrderTier["tier"] | FarmFishOrderTier["tier"] | FarmHerdOrderTier["tier"];
+  /** What the lines name: produce from the basket, cooked dishes (any stars) from the pantry, fish needs from the creel, or livestock goods from the basket. */
+  kind: "produce" | "dish" | "fish" | "goods";
   /** The skill that gates the order and that its XP goes to. */
-  skill: "farming" | "cooking" | "fishing";
+  skill: "farming" | "cooking" | "fishing" | "husbandry";
   minLevel: number;
   customer: string;
   note: string;
@@ -213,7 +267,11 @@ function farmKitchenOrders(day: number, firstSlot: number, taken: ReadonlySet<st
   const customers = new Set(FARM_ORDER_CUSTOMERS.filter((entry) => taken.has(entry.name)));
   return FARM_KITCHEN_ORDER_TIERS.map((tier, index) => {
     const customer = pick(FARM_ORDER_CUSTOMERS, random, customers);
-    const taught = Object.keys(FARM_RECIPE_RULES).filter((recipeId) => FARM_RECIPE_RULES[recipeId]!.vendorPrice === 0 && FARM_RECIPE_RULES[recipeId]!.minLevel <= tier.minLevel);
+    const taught = Object.keys(FARM_RECIPE_RULES).filter((recipeId) => {
+      const rule = FARM_RECIPE_RULES[recipeId]!;
+      // Dishes made with the herd's milk or meat stay off the kitchen notices, so no posted order changed when livestock came.
+      return rule.vendorPrice === 0 && rule.minLevel <= tier.minLevel && !Object.keys(rule.ingredients).some((itemId) => FARM_LIVESTOCK_BASKET_IDS.includes(itemId));
+    });
     const recipesTaken = new Set<string>();
     const lines: Record<string, number> = {};
     for (let line = 0; line < Math.min(tier.recipes, taught.length); line += 1) {
@@ -287,12 +345,60 @@ function farmFishOrders(day: number, firstSlot: number, taken: ReadonlySet<strin
   });
 }
 
-/** Day `day`'s whole board: the produce notices, then the kitchen's, then the Cove's. */
+/** What a herd order's goods would fetch at the Produce Merchant, at Normal. */
+export function farmHerdOrderValue(lines: Readonly<Record<string, number>>): number {
+  return Object.entries(lines).reduce((sum, [itemId, count]) => sum + farmProducePrice(itemId) * count, 0);
+}
+
+/** A share of the XP collecting the goods earned: an average collection's pieces, at no stress. */
+export function farmHerdOrderXp(lines: Readonly<Record<string, number>>): number {
+  const xp = Object.entries(lines).reduce((sum, [itemId, count]) => {
+    const good = farmLivestockGood(itemId);
+    return sum + (good ? (count / AVERAGE_GOODS_PER_COLLECTION) * livestockCollectXp(good, 0) : 0);
+  }, 0);
+  return Math.max(1, Math.round(xp * HERD_ORDER_XP_SHARE));
+}
+
+/** Day `day`'s herd notices, in the slots after the Cove's. */
+function farmHerdOrders(day: number, firstSlot: number): FarmOrder[] {
+  const random = mulberry32(seedFor(`farm-orders:herd:v1:${day}`));
+  const customers = new Set<FarmHerdCustomer>();
+  return FARM_HERD_ORDER_TIERS.map((tier, index) => {
+    const goodsTaken = new Set<string>();
+    const lines: Record<string, number> = {};
+    for (let line = 0; line < Math.min(tier.lines, tier.goods.length); line += 1) {
+      const itemId = pick(tier.goods, random, goodsTaken);
+      lines[itemId] = tier.count[0] + Math.floor(random() * (tier.count[1] - tier.count[0] + 1));
+    }
+    // Every kind has at least two customers and only two herd notices go up a day, so one is always free.
+    const wants = herdWants(lines);
+    const customer = pick(FARM_HERD_ORDER_CUSTOMERS.filter((entry) => entry.wants === wants), random, customers);
+    const slot = firstSlot + index;
+    return Object.freeze({
+      id: `d${day}-${slot}`,
+      day,
+      slot,
+      tier: tier.tier,
+      kind: "goods" as const,
+      skill: "husbandry" as const,
+      minLevel: tier.minLevel,
+      customer: customer.name,
+      note: customer.note,
+      lines: Object.freeze(lines),
+      tickets: Math.ceil((farmHerdOrderValue(lines) * tier.premium) / 5) * 5,
+      xp: farmHerdOrderXp(lines),
+      endsAt: (day + 1) * FARM_ORDER_DAY_MS,
+    });
+  });
+}
+
+/** Day `day`'s whole board: the produce notices, then the kitchen's, then the Cove's, then the herd's. */
 export function farmFullOrderBoard(day: number): readonly FarmOrder[] {
   const produce = farmOrderBoard(day);
   const kitchen = farmKitchenOrders(day, produce.length, new Set(produce.map((order) => order.customer)));
   const upSoFar = [...produce, ...kitchen];
-  return Object.freeze([...upSoFar, ...farmFishOrders(day, upSoFar.length, new Set(upSoFar.map((order) => order.customer)))]);
+  const withFish = [...upSoFar, ...farmFishOrders(day, upSoFar.length, new Set(upSoFar.map((order) => order.customer)))];
+  return Object.freeze([...withFish, ...farmHerdOrders(day, withFish.length)]);
 }
 
 const ORDER_ID = /^d(\d{1,7})-(\d)$/;

@@ -1,5 +1,59 @@
 # Changelog
 
+## Livestock, fourth slice: the Butcher, meat, and meat recipes (2026-09-28)
+
+Phase 4 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. A grown animal can now be sent to the Butcher in the Market Square for meat, and the meat cooks.
+
+**Otto the Butcher** has a stall in the square's south-east corner, beside Hollis's Livestock Dealer. It shows every cut on a marble slab, a block with a cleaver in it, and a board of per-cut prices read from the catalog. The counter lists the player's herd. For each animal it shows what Otto would make of it: how many cuts, at what grade, roughly what they fetch, and the Husbandry XP. A young one says when it will be grown and cannot be sent. Sending asks twice, because the animal does not come back. The panel is `farm-livestock-butcher-panel.mts`, wired by `farm-market-butcher.mts` so the 1000-line market page only opens it.
+
+**One meat per species**: Mutton (4 cuts), Pork (6), Beef (8) and Llama Meat (5), for an average animal at its prime. Meat is basket produce, graded Poor/Normal/Fine/Perfect like milk, so it sells at the Produce Merchant at the day's price, goes on the barter table and the Exchange Board, and shows in the inventory. `LIVESTOCK_BASKET_ITEMS` (client) and `FARM_LIVESTOCK_BASKET_IDS` (server) are the herd's goods plus its meat. Every place that knew the basket's goods now reads those lists.
+- **Cuts** = the species' cuts × Yield (0.6× at 0 to 1.4× at 100) × age. A young animal gives none. On the day it is grown it gives ¾. At twice its grown age (its prime) it gives the full count.
+- **Grade** is the goods' rule applied over a whole life: the Quality stat less 60 × the share of its life spent hungry. That needed a new care field, `neglect`: lifetime minutes at or below Hungry, at any age. Both copies of `advanceLivestockCare` track it. Rows from before start at 0.
+- **Price per cut is derived**, not picked: (the young one's price + 30 tickets × its days to prime) ÷ its cuts. An average animal kept to its prime pays back what it cost plus about a milking cow's daily worth for each day kept.
+- **Husbandry XP** = the species' days to grown × 60, less the share of its life spent hungry. The Husbandry record gains `butchered` and `meat` (cuts per meat), and the Stats card shows both.
+
+**Server-decided, no migration.** `POST /games/farm/livestock/butcher { animalId }` locks the farm and settles the herd at the farm's stored clock (the square has no running farm clock, and the farm saves itself before the gate lets the player out). A death found there is answered as `died`, with its memorial saved. The route refuses a young animal (`not_grown`) and a basket without room for every cut (`basket_full`), so an animal is never cut into meat that gets thrown away. Otherwise, in one transaction, the row closes as `state = 'butchered'`, `end_cause = 'butcher'`, the meat goes in the basket and Husbandry is paid. The row is kept as the animal's record. The pure rules are in `js/farm-livestock-butcher.mts` and mirrored in `services/farm-livestock-catalog.mts`, and a test holds them equal.
+
+**Eight meat recipes**, level-taught: Pork Sausages (4), Shepherd's Pie (7), Beef Stew (12), Roast Pork & Apples (16), Moussaka (20, with milk), Surf & Turf (23, with a reef fish), Andean Stew (28, llama) and Sunday Pot Roast (33). Each has a dish model. Like the dairy dishes, they stay off the kitchen's Order Board notices, so no posted order changed. Prices and orders are seeded per item, so adding the meat ids moved no existing price.
+
+**Two achievements** are awarded inside the butcher transaction: **Off to the Butcher** (first animal) and **Prime Cut** (Perfect meat).
+
+**Verified:**
+- **API:** 1200 tests pass. New tests cover rule parity on 300 random animals (cuts, grade, XP), prices equal on both sides, the cut curve and the pays-back-at-prime property, `neglect` tracking, meat as basket produce, a prime pig butchered (row closed, 6 Perfect Pork, 120 XP, both achievements, a retry paying nothing, a forged save unable to add meat), the refusals (young, basket full, someone else's animal), lifetime hunger costing grade and XP, a starved animal answered as dead with its memorial, and the route requiring sign-in.
+- **Frontend:** 773 tests; the only failure is the pond-walk test that predates this work. New tests check that the Butcher's stall overlaps no other stall, that walking south from the well reaches its counter where E finds it, and that the page carries and opens its panel. The kitchen test now requires every meat to be wanted by a recipe.
+- **Visual:** headless renders of the four meat models, the eight dishes, the counter panel (prime, partway to prime, young, and the second "for good" press), and the stall in the square, both up close and from the well.
+
+**Not verified:** a signed-in butcher run in a real browser. There is no account on the local harness, and the API needs a deploy.
+
+**Also in the tree:** the market page, the Cove page and the inventory summary gained a Stats (K) panel during this work. That was a parallel edit and is not part of this slice. The inventory summary now titles herd items (`Fine Beef`, not `beef@fine`).
+
+## Livestock, third slice: the Husbandry skill, dairy recipes, and herd orders (2026-09-28)
+
+Phase 3 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. The herd's goods now feed a skill, the kitchen and the Order Board.
+
+**Husbandry is server-owned, like Farming.** `skills.husbandry` (`xp`, `collections`, `orders`, pieces per good) lives on the farm document and the save guard pins it with the other skills, so only the server raises it. It runs on the shared 1–99 curve.
+- **A collection pays** the good's cycle in farm days × 60 XP (the rate a crop pays Farming per growing day), less the share of the cycle the animal spent hungry — the same stress that lowers the good's grade — never below 1. A high-Yield animal's extra bottles don't pay extra XP. `livestockCollectXp` lives in both `services/farm-livestock-catalog.mts` and `js/farm-livestock-care.mts`, and a test holds them equal.
+- **The Dealer sells by level:** sheep at 1, pig at 5, cow at 10, llama at 15 (`minLevel` on both catalogs). A purchase below the gate is `level_too_low` and charges nothing. Animals already owned are never taken back. Hollis's cards show locked species greyed, with the level on the button.
+- The farm HUD has a Husbandry bar (hidden until the first collection), and the Stats panel has a Husbandry card with collections, goods collected and herd orders, broken down by good. A collection's status line reports the XP and any level-up.
+- Four server-awarded achievements: **Fresh from the Pail** (first collection), **Stockkeeper** (100 collections), **Straight from the Herd** (a herd order), **Stockman** (Husbandry 10). They are detected inside the care and order transactions.
+
+**Eight dairy recipes**, level-taught on the Cooking tree, taking milk from the basket like any crop (plainest grade first): Berry Yogurt (3, sheep's milk), Fresh Butter (5), Creamed Corn (9), Feta & Tomato Salad (11, sheep's milk), Strawberries & Cream (14), Farmhouse Cheddar (19), Pumpkin Pie (25), and Aged Pecorino (29, sheep's milk). Each has a dish model. Prices come from their ingredients, as every dish's do. The cookbook now names milk on its cards (`basketItemTitle`).
+
+**Herd notices on the Order Board.** Two more notices go up daily, in slots 7 and 8, on their own seeded stream (`farm-orders:herd:v1`):
+- a **Herd order** (Husbandry 1: sheep's milk or wool, 3–6, ×1.6);
+- a **Herd contract** (Husbandry 10: two of milk, sheep's milk, wool and llama wool, ×1.75).
+
+They are `kind: "goods"`, `skill: "husbandry"`. A fill takes the goods from the basket plainest grade first and pays Husbandry XP: half of what collecting them earned, at the average collection. Their customers are their own (creameries, mills, a country fair). Each is tagged with what it buys, and a notice is pinned by someone who wants exactly its lines. The kitchen's notices now leave out any recipe that needs livestock goods. Checked against HEAD for 730 days: every notice in slots 0–6 is byte-identical, so no posted order changed.
+
+**Barter-table stacks** needed no work: milk and wool have been basket produce since Phase 2, so the trade table and the Exchange Board already carry them.
+
+**Verified:**
+- **API:** 1193 tests pass. New tests cover the gate at 1/5/10/15 with no charge on refusal, XP parity at every stress, a stressed collection paying half with its level-up read back, the record pinned against a forged save, First-Pail awarded once, a year of herd notices (lines, customers matching their lines, premium, no dairy in the kitchen's notices), and the herd fill (plainest first, Husbandry not Farming, once only, contract gate, `not_enough_goods`).
+- **Frontend:** 770 tests pass. The only failure is the pond-walk test that predates this work.
+- **Visual:** a headless render of the eight dairy dishes, Hollis at Husbandry 5, today's real board with both herd notices, and the Stats card.
+
+**Not verified:** a signed-in collection or herd fill in a real browser. There is no account on the local harness, and the API needs a deploy (no migration).
+
 ## Livestock, second slice: hunger, feeding, milk and wool, and death from neglect (2026-09-28)
 
 Phase 2 of `planning-docs/FARM_LIVESTOCK_PLAN.md`. The herd now eats, gives goods and can die.

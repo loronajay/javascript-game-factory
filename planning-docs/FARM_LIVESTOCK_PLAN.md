@@ -1,6 +1,6 @@
 # Farm Livestock Plan
 
-Status: **Phases 0–2 shipped** (2026-09-28): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial. Next: Phase 3 (Husbandry skill, dairy recipes, orders). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
+Status: **Phases 0–4 shipped** (2026-09-28): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes. Next: Phase 5 (breeding). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
 and `FARM_HARVEST_MARKET_SKILLS_PLAN.md`.
 
 Livestock are farm animals that **yield goods** — milk, wool, and meat
@@ -171,10 +171,36 @@ land gets bigger, so it follows the livestock phases.
    the harvest basket at Poor/Normal/Fine/Perfect (Quality stat − 60 × the
    cycle's hungry share) and sell at the Produce Merchant (price derived from a
    per-day value). Yield: 1 + ⌊Yield/40⌋ per collection.
-3. **Husbandry + kitchen** — skill, dairy recipes, Order Board notices,
-   barter-table stacks.
-4. **Butcher** — Market Butcher, meat cuts, meat recipes (and fish/crop
-   combos).
+3. ✅ **Husbandry + kitchen** — `skills.husbandry`, server-owned and pinned
+   by the save guard like Farming. A collection pays 60 XP per farm day of the
+   good's cycle, less its hungry share (`livestockCollectXp`, mirrored). The
+   Dealer gates sheep 1 / pig 5 / cow 10 / llama 15; animals already owned
+   are kept. Eight level-taught dairy recipes use milk from the basket. Two
+   herd notices (slots 7–8, their own stream and customers, `kind: "goods"`)
+   pay Husbandry XP. The kitchen's notices skip dairy dishes, so no posted order
+   changed. Barter stacks were already there: goods are basket produce. Four
+   achievements. Not built: bonus capacity from Husbandry (wait for land),
+   and the breeding gate (Phase 5).
+4. ✅ **Butcher** — Otto's stall in the Market Square's south-east corner
+   (`BUTCHER_STALL_ID`). One meat per species (Mutton 4 / Pork 6 / Beef 8 /
+   Llama Meat 5 cuts at an average one's prime), basket produce graded
+   Poor–Perfect like milk. Cuts = species cuts × Yield (0.6×–1.4×) × age
+   (none while young, ¾ the day it grows, all at twice its grown age); grade =
+   Quality less its lifetime hunger (`care.neglect`, new, tracked at any
+   age). Price per cut is derived: (young price + 30/day × days to prime) ÷
+   cuts, so an average one kept to its prime pays back its price plus a
+   milking cow's day rate. `POST /games/farm/livestock/butcher` settles the
+   herd at the farm's STORED clock (the square has no running one), refuses a
+   young one and a basket without room for every cut, then closes the row as
+   `butchered` in the same transaction as the meat and the Husbandry XP (the
+   species' days to grown × 60, less its hungry share). Pure rules in
+   `js/farm-livestock-butcher.mts` ↔ the server catalog; the counter
+   (`farm-livestock-butcher-panel.mts`, wired by `farm-market-butcher.mts`)
+   quotes each animal and asks twice. Eight level-taught meat recipes
+   (Pork Sausages 4 … Sunday Pot Roast 33, with Moussaka taking milk and Surf
+   & Turf a reef fish), kept off the kitchen's notices like the dairy ones.
+   Two achievements (Off to the Butcher, Prime Cut). No migration. Not built:
+   meat on herd order notices.
 5. **Breeding** — pairing, gestation, inherited stats, lineage.
 6. **Trading** — live animals on the barter table (row changes owner) and
    possibly the Exchange Board.
@@ -185,6 +211,6 @@ Later, outside this plan: **Weaving** (wool → cloth/goods at a loom), pig
 
 ## Open questions
 
-- Can a butchered or sold animal's name/lineage be seen anywhere afterwards?
+- Can a butchered or sold animal's name/lineage be seen anywhere afterwards? (Its row is kept — `state = 'butchered'`, `ended_minute` — so a pedigree view can read it later; nothing shows it yet.)
 - ~~Does a dead animal leave a memorial prop?~~ Yes, like a pet (owner, 2026-09-28).
 - Pet breeding's own plan (hidden compatibility) — when?

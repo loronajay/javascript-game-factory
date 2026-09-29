@@ -13,6 +13,7 @@ import { FRUIT_TREE_IDS, TIMBER_TREE_IDS } from "./farm-tree-catalog.mjs";
 import { COOK_ID, FARM_RECIPE_RULES, FARM_VENDOR_RECIPE_IDS, RECENT_COOK_IDS } from "./farm-recipe-catalog.mjs";
 import { FARM_PIECE_IDS, RECENT_WORKSHOP_IDS, WORKSHOP_ID } from "./farm-carpentry-catalog.mjs";
 import { barteringXp } from "./farm-bartering.mjs";
+import { FARM_LIVESTOCK_GOODS, FARM_LIVESTOCK_MEATS } from "./farm-livestock-catalog.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
 /** A bound on stored XP, comfortably past level 99 (13,034,431). */
@@ -88,6 +89,14 @@ export type CookingRecord = { xp: number; dishes: number; perfect: number; order
  */
 export type CarpentryRecord = { xp: number; milled: number; pieces: number; masterwork: number; patterns: Record<string, number>; recent: string[] };
 export type BarteringRecord = { xp: number; deals: number; bought: number; sold: number; saved: number; bonus: number };
+/**
+ * The Husbandry skill: same curve, earned only by goods the server collected
+ * from livestock, animals it sent to the Butcher and herd orders it filled.
+ * `collections` counts trips to an animal, `goods` the pieces taken home per
+ * good (milk, wool…), `butchered` the animals the Butcher took and `meat` the
+ * cuts he made of them, per meat.
+ */
+export type HusbandryRecord = { xp: number; collections: number; orders: number; goods: Record<string, number>; butchered: number; meat: Record<string, number> };
 
 const COUNT_LIMIT = 100_000_000;
 
@@ -115,6 +124,13 @@ export function emptyCarpentryRecord(): CarpentryRecord {
 export function emptyBarteringRecord(): BarteringRecord {
   return { xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 };
 }
+
+export function emptyHusbandryRecord(): HusbandryRecord {
+  return { xp: 0, collections: 0, orders: 0, goods: {}, butchered: 0, meat: {} };
+}
+
+const LIVESTOCK_GOOD_IDS: readonly string[] = FARM_LIVESTOCK_GOODS.map((good) => good.itemId);
+const LIVESTOCK_MEAT_IDS: readonly string[] = FARM_LIVESTOCK_MEATS.map((meat) => meat.itemId);
 
 /** Positive counts for the known ids only. */
 function counts(value: unknown, ids: readonly string[]): Record<string, number> {
@@ -171,7 +187,15 @@ export function normalizeBarteringRecord(value: unknown): BarteringRecord {
   };
 }
 
-export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord };
+export function normalizeHusbandryRecord(value: unknown): HusbandryRecord {
+  const source: any = value && typeof value === "object" ? value : {};
+  return {
+    xp: count(source.xp, FARMING_MAX_XP), collections: count(source.collections), orders: count(source.orders), goods: counts(source.goods, LIVESTOCK_GOOD_IDS),
+    butchered: count(source.butchered), meat: counts(source.meat, LIVESTOCK_MEAT_IDS),
+  };
+}
+
+export type FarmSkillRecords = { farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord; husbandry: HusbandryRecord };
 
 /** Every server-owned skill record, shape-bounded. */
 export function normalizeFarmSkillRecords(value: unknown): FarmSkillRecords {
@@ -179,11 +203,12 @@ export function normalizeFarmSkillRecords(value: unknown): FarmSkillRecords {
   return {
     farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting),
     cooking: normalizeCookingRecord(source.cooking), carpentry: normalizeCarpentryRecord(source.carpentry), bartering: normalizeBarteringRecord(source.bartering),
+    husbandry: normalizeHusbandryRecord(source.husbandry),
   };
 }
 
 export function emptyFarmSkillRecords(): FarmSkillRecords {
-  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord(), bartering: emptyBarteringRecord() };
+  return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord(), bartering: emptyBarteringRecord(), husbandry: emptyHusbandryRecord() };
 }
 
 /** One completed NPC deal. Player-to-player trades never feed this record. */
@@ -250,6 +275,31 @@ export function recordFarmCraft(record: CarpentryRecord, itemId: string, xp: num
 
 /** A dish order was filled: its Cooking XP and one more dish order. */
 export function recordFarmDishOrder(record: CookingRecord, xp: number): CookingRecord {
+  return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), orders: record.orders + 1 };
+}
+
+/** Goods were collected from an animal: their Husbandry XP, one more collection, and the pieces counted by good. */
+export function recordFarmCollection(record: HusbandryRecord, itemId: string, quantity: number, xp: number): HusbandryRecord {
+  return {
+    ...record,
+    xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)),
+    collections: record.collections + 1,
+    goods: { ...record.goods, [itemId]: (record.goods[itemId] ?? 0) + Math.max(0, Math.floor(quantity)) },
+  };
+}
+
+/** An animal went to the Butcher: its Husbandry XP, one more animal, and the cuts counted by meat. */
+export function recordFarmButcher(record: HusbandryRecord, meatId: string, cuts: number, xp: number): HusbandryRecord {
+  return {
+    ...record,
+    xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)),
+    butchered: record.butchered + 1,
+    meat: { ...record.meat, [meatId]: (record.meat[meatId] ?? 0) + Math.max(0, Math.floor(cuts)) },
+  };
+}
+
+/** A herd order was filled: its Husbandry XP and one more herd order. */
+export function recordFarmHerdOrder(record: HusbandryRecord, xp: number): HusbandryRecord {
   return { ...record, xp: Math.min(FARMING_MAX_XP, record.xp + Math.max(0, xp)), orders: record.orders + 1 };
 }
 

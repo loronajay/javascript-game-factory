@@ -54,7 +54,7 @@ test("the farm is a wide open field bounded by the perimeter fence inset", () =>
   assert.ok(FARM_BOUNDS.wallInset > 0 && FARM_BOUNDS.wallInset < 2);
 });
 
-test("the starter farmhouse has its own gate-facing site with a clear front walk", () => {
+test("the starter farmhouse sits square against the rear fence with a clear gateward walk", () => {
   const layout = createDefaultFarmLayout(() => 0);
   const farmhouse = layout.decor.find((row) => row.instanceId === "cottage-1");
   const range = layout.decor.find((row) => row.instanceId === "kitchen-range-1");
@@ -62,11 +62,12 @@ test("the starter farmhouse has its own gate-facing site with a clear front walk
   const farmhouseDefinition = findFarmDecor(farmhouse.itemId);
   assert.deepEqual(
     { x: farmhouse.x, z: farmhouse.z, rotationY: farmhouse.rotationY },
-    { x: 4.2, z: -9.3, rotationY: 6.1021 },
+    { x: 4.2, z: -9.3, rotationY: 0 },
+    "the farmhouse walls run parallel to the straight rear fence",
   );
   assert.deepEqual(
     { x: range.x, z: range.z, rotationY: range.rotationY },
-    { x: 3.5203, z: -12.2507, rotationY: 6.1021 },
+    { x: 3, z: -12, rotationY: 0 },
     "the range keeps its original local pose against the farmhouse back wall",
   );
   assert.deepEqual(
@@ -84,7 +85,7 @@ test("the starter farmhouse has its own gate-facing site with a clear front walk
   const toGate = { x: gate.x - door.x, z: gate.z - door.z };
   const gateDistance = Math.hypot(toGate.x, toGate.z);
   const facingDot = (door.forward.x * toGate.x + door.forward.z * toGate.z) / gateDistance;
-  assert.ok(facingDot > 0.9999, "the front door points directly toward the front gate");
+  assert.ok(facingDot > 0.97, "the front door points downfield toward the front gate");
 
   const frontWalkLength = gateDistance - 1.5;
   const walkStart = { x: door.x + door.forward.x * 0.5, z: door.z + door.forward.z * 0.5 };
@@ -186,6 +187,20 @@ test("the interim forward farmhouse arrangement migrates back to the rear fence"
     return row;
   });
   const migrated = normalizeFarmLayout({ ...starter, decor: interim });
+  assert.deepEqual(
+    migrated.decor.filter((row) => ["cottage-1", "kitchen-range-1"].includes(row.instanceId)),
+    STARTER_FARM_DECOR.filter((row) => ["cottage-1", "kitchen-range-1"].includes(row.instanceId)),
+  );
+});
+
+test("the previously shipped lopsided rear-fence farmhouse migrates to the square pose", () => {
+  const starter = createDefaultFarmLayout(() => 0);
+  const lopsided = starter.decor.map((row) => {
+    if (row.instanceId === "cottage-1") return { ...row, x: 4.2, z: -9.3, rotationY: 6.1021 };
+    if (row.instanceId === "kitchen-range-1") return { ...row, x: 3.5203, z: -12.2507, rotationY: 6.1021 };
+    return row;
+  });
+  const migrated = normalizeFarmLayout({ ...starter, decor: lopsided });
   assert.deepEqual(
     migrated.decor.filter((row) => ["cottage-1", "kitchen-range-1"].includes(row.instanceId)),
     STARTER_FARM_DECOR.filter((row) => ["cottage-1", "kitchen-range-1"].includes(row.instanceId)),

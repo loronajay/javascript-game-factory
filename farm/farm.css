@@ -150,6 +150,7 @@ button, a { font: inherit; }
 .farming-skill--wood .farming-skill__bar i { background: #c98a4b; }
 .farming-skill--cook .farming-skill__bar i { background: #e0673a; }
 .farming-skill--carpentry .farming-skill__bar i { background: #c9a06a; }
+.farming-skill--husbandry .farming-skill__bar i { background: #e7d3a4; }
 
 /* The felling meter: a marker sweeps the bar; E when it is in the green. */
 .chop-meter { position: fixed; left: 50%; bottom: 200px; z-index: 6; width: min(420px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: rgba(20, 26, 16, .86); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
@@ -346,6 +347,7 @@ button, a { font: inherit; }
 .farm-stat-card--woodcutting { --skill-color: #d79b5b; }
 .farm-stat-card--cooking { --skill-color: #ef7950; }
 .farm-stat-card--carpentry { --skill-color: #dbb37b; }
+.farm-stat-card--husbandry { --skill-color: #eadbb4; }
 .farm-stat-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .farm-stat-card__heading h3 { margin: 3px 0 0; color: #fff6cf; font-size: 20px; }
 .farm-stat-card__level { display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px; border: 1px solid color-mix(in srgb, var(--skill-color) 65%, transparent); border-radius: 50%; color: var(--skill-color); background: color-mix(in srgb, var(--skill-color) 12%, rgba(0,0,0,.2)); font: 900 20px ui-monospace, monospace; }
@@ -388,6 +390,7 @@ button, a { font: inherit; }
 .item-tile .seed-card__image { width: 64px; height: 56px; }
 .item-tile__name { color: #d6e3c8; font-size: 11.5px; line-height: 1.2; }
 .item-tile__count { color: var(--farm-accent); font: 800 12px ui-monospace, monospace; }
+.item-tile__detail { color: #aebca6; font: 700 10px/1.3 ui-monospace, monospace; }
 .item-tile.is-empty { opacity: .38; }
 .item-tile.is-empty .seed-card__image img { filter: grayscale(.8); }
 .item-tile .farm-button { width: 100%; margin-top: 4px; padding: 6px 8px; font-size: 11px; }

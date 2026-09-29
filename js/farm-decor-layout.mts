@@ -244,7 +244,13 @@ export function rotateFarmDecor(layout: FarmLayout, instanceId: string, directio
   const definition = item && definitionOf(item);
   if (!item || !definition) return { valid: false, layout, instanceId, reason: "missing" };
   const turn = Math.PI * 2;
-  const rotationY = ((item.rotationY + direction * definition.snapDegrees * Math.PI / 180) % turn + turn) % turn;
+  const step = definition.snapDegrees * Math.PI / 180;
+  const current = ((item.rotationY % turn) + turn) % turn;
+  const units = current / step;
+  // Move to the next grid line in the requested direction. This also repairs
+  // old/off-grid poses instead of preserving their fractional tilt forever.
+  const snappedUnits = direction > 0 ? Math.floor(units + 1e-9) + 1 : Math.ceil(units - 1e-9) - 1;
+  const rotationY = ((snappedUnits * step) % turn + turn) % turn;
   return tryPlace(layout, item, definition, { x: item.x, z: item.z, rotationY }, bounds);
 }
 

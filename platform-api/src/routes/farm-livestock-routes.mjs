@@ -7,6 +7,7 @@
 //   POST /games/farm/livestock/moves      { animalId, homeId | null }                  to another home
 //   POST /games/farm/livestock/names      { animalId, name }                           rename
 //   POST /games/farm/livestock/care       { layout, action, animalId?, itemId? }       checkup / feed / collect
+//   POST /games/farm/livestock/butcher    { animalId }                                 the Market's Butcher
 import { readJsonBody, writeJson } from "../http-utils.mjs";
 const HERD_PATH = /^\/games\/farm\/livestock\/([^/]+)$/;
 const POSTS = Object.freeze({
@@ -14,9 +15,10 @@ const POSTS = Object.freeze({
     "/games/farm/livestock/moves": "moveFarmLivestock",
     "/games/farm/livestock/names": "renameFarmLivestock",
     "/games/farm/livestock/care": "careFarmLivestock",
+    "/games/farm/livestock/butcher": "butcherFarmLivestock",
 });
 // A refusal about the state of the farm rather than a malformed request.
-const CONFLICTS = new Set(["no_room", "home_full", "herd_full", "insufficient_tickets", "farm_not_initialized", "unknown_home", "full", "no_feed", "not_ready", "basket_full", "died"]);
+const CONFLICTS = new Set(["no_room", "home_full", "herd_full", "insufficient_tickets", "farm_not_initialized", "unknown_home", "full", "no_feed", "not_ready", "basket_full", "died", "not_grown"]);
 export async function handleFarmLivestockRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
     if (!pathname.startsWith("/games/farm/livestock"))
@@ -60,9 +62,11 @@ export async function handleFarmLivestockRoute(context) {
             ? await service({ playerId, purchaseId: value.purchaseId, speciesId: value.speciesId, homeId: value.homeId, name: value.name })
             : postService === "careFarmLivestock"
                 ? await service({ playerId, layout: value.layout, action: value.action, animalId: value.animalId, itemId: value.itemId })
-                : postService === "moveFarmLivestock"
-                    ? await service({ playerId, animalId: value.animalId, homeId: value.homeId })
-                    : await service({ playerId, animalId: value.animalId, name: value.name });
+                : postService === "butcherFarmLivestock"
+                    ? await service({ playerId, animalId: value.animalId })
+                    : postService === "moveFarmLivestock"
+                        ? await service({ playerId, animalId: value.animalId, homeId: value.homeId })
+                        : await service({ playerId, animalId: value.animalId, name: value.name });
         if (!outcome?.ok) {
             const status = outcome?.error === "not_found" ? 404 : CONFLICTS.has(outcome?.error) ? 409 : 400;
             writeJson(res, status, { status: "error", ...outcome, timestamp }, requestOrigin);

@@ -9,19 +9,30 @@ import { PATTERN_CATALOG, PLANK_SPECIES } from "./farm-catalog/carpentry.mjs";
 import { cropCapacityUse, CROP_CAPACITY_BY_FARMING_LEVEL } from "./farm-capacity.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
 import { gradedTitle, parseProduceKey } from "./farm-quality.mjs";
+import { findLivestockBasketItem } from "./farm-catalog/livestock.mjs";
+import { FISHING_LURES, FISHING_RODS } from "./farm-catalog/fish.mjs";
+import { formatWeight, specimenTitle, type SizeClass } from "./farm-fish.mjs";
+import type { Angler, AnglerFish } from "./farm-angler.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 
 type Elements = Readonly<{ root: HTMLElement; openButton: HTMLButtonElement; closeButton: HTMLButtonElement; body: HTMLElement }>;
 
-function line(title: string, count: number): HTMLElement {
+function line(title: string, valueText: number | string): HTMLElement {
   const row = document.createElement("li");
   row.className = "sale-row inventory-summary__row";
   const name = document.createElement("strong");
   name.textContent = title;
   const value = document.createElement("b");
-  value.textContent = `×${count.toLocaleString()}`;
+  value.textContent = typeof valueText === "number" ? `×${valueText.toLocaleString()}` : valueText;
   row.append(name, value);
   return row;
+}
+
+function fishLine(fish: AnglerFish, mounted: boolean): HTMLElement {
+  return line(
+    specimenTitle(fish.speciesId, fish.variant, fish.sizeClass as SizeClass),
+    `${formatWeight(fish.weightG)}${mounted ? " · Mounted" : fish.locked ? " · Locked" : ""}`,
+  );
 }
 
 function section(title: string, rows: readonly HTMLElement[], empty = "Nothing here yet."): HTMLElement {
@@ -51,7 +62,7 @@ export function createFarmInventorySummary(elements: Elements) {
   const open = (): void => { elements.root.hidden = false; elements.openButton.setAttribute("aria-pressed", "true"); document.exitPointerLock?.(); };
   const toggle = (): void => { isOpen() ? close() : open(); };
 
-  function render(next: FarmLayout): void {
+  function render(next: FarmLayout, fishing: Angler | null = null): void {
     layout = next;
     const inventory = next.agriculture.inventory;
     const level = farmingLevelForXp(next.skills.farming.xp);
@@ -66,7 +77,10 @@ export function createFarmInventorySummary(elements: Elements) {
       const parsed = parseProduceKey(key);
       const crop = parsed && CROP_CATALOG.find((entry) => entry.id === parsed.itemId);
       const fruit = FRUIT_TREES.find((entry) => entry.fruitId === key);
-      return line(crop && parsed ? gradedTitle(crop.title, parsed.quality) : fruit?.fruitPlural ?? key, count);
+      // The herd's milk, wool and the Butcher's meat are graded like crops.
+      const herd = parsed && findLivestockBasketItem(parsed.itemId);
+      const graded = crop || herd;
+      return line(graded && parsed ? gradedTitle(graded.title, parsed.quality) : fruit?.fruitPlural ?? key, count);
     });
     const pantry = Object.entries(inventory.dishes).filter(([, count]) => count > 0).map(([key, count]) => line(RECIPE_CATALOG.find((entry) => key.startsWith(`${entry.id}@`))?.title ?? key, count));
     const materials = [
@@ -74,7 +88,24 @@ export function createFarmInventorySummary(elements: Elements) {
       ...PLANK_SPECIES.map((wood) => line(wood.title, inventory.planks[wood.id] ?? 0)),
       ...PATTERN_CATALOG.flatMap((pattern) => Object.entries(inventory.furniture).filter(([key, count]) => key.startsWith(`${pattern.id}@`) && count > 0).map(([, count]) => line(pattern.title, count))),
     ].filter((row) => !row.lastElementChild?.textContent?.endsWith("×0"));
-    elements.body.replaceChildren(capacity, section("Seeds", seeds), section("Harvest basket", produce), section("Pantry", pantry), section("Materials & furniture", materials));
+    const fish = fishing ? [
+      ...fishing.creel.map((entry) => fishLine(entry, false)),
+      ...fishing.mounted.map((entry) => fishLine(entry, true)),
+    ] : [];
+    const tackle = fishing ? [
+      ...FISHING_RODS.filter((rod) => fishing.tackle.rods.includes(rod.id)).map((rod) => line(rod.title, "Owned")),
+      ...(fishing.tackle.worms > 0 ? [line("Worms", fishing.tackle.worms)] : []),
+      ...FISHING_LURES.filter((lure) => (fishing.tackle.lures[lure.id] ?? 0) > 0).map((lure) => line(lure.title, fishing.tackle.lures[lure.id] ?? 0)),
+    ] : [];
+    elements.body.replaceChildren(
+      capacity,
+      section("Seeds", seeds),
+      section("Harvest basket", produce),
+      section("Fish", fish, fishing ? "No fish in your creel or on a trophy mount." : "Fishing inventory is available after signing in."),
+      section("Tackle", tackle, fishing ? "No fishing tackle yet." : "Fishing inventory is available after signing in."),
+      section("Pantry", pantry),
+      section("Materials & furniture", materials),
+    );
   }
 
   elements.openButton.addEventListener("click", toggle);
@@ -82,4 +113,3 @@ export function createFarmInventorySummary(elements: Elements) {
   close();
   return Object.freeze({ open, close, toggle, isOpen, render, layout: () => layout });
 }
-

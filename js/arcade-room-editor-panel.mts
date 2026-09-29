@@ -591,7 +591,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     }
 
     if (definition.spin.enabled) {
-      // Horizontal or vertical is the choice most players want; Q/R steps through the
+      // Horizontal or vertical is the choice most players want; Q/E steps through the
       // slants in between, and the readout under the heading names the exact angle.
       const row = element("div", "inspector__row");
       row.dataset.spinRow = "true";
@@ -680,10 +680,10 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
         (button as HTMLButtonElement).disabled = !onWall;
       }
       refs.spinHint!.textContent = !onWall
-        ? "On the floor or ceiling, Q / R turn it round instead."
+        ? "On the floor or ceiling, Q / E turn it round instead."
         : degrees === 0 || degrees === 90
-          ? "Q / R turn it 15° at a time for a slant."
-          : `Slanted ${degrees}° · Q / R turn it 15° at a time.`;
+          ? "Q / E turn it 15° at a time for a slant."
+          : `Slanted ${degrees}° · Q / E turn it 15° at a time.`;
     }
     refs.picker?.setValue(selected.color || definition.tint.default);
     if (refs.lengthLabel && refs.lengthInput) {
@@ -735,7 +735,7 @@ export function createEditorPanel(elements: PanelElements, actions: PanelActions
     remove.dataset.removeCabinet = placement.instanceId;
     remove.title = "Remove this cabinet (Delete)";
     tools.append(toggle, duplicate, remove);
-    const hint = element("small", "inspector__hint", "Drag it in the room · arrows nudge · Q / R rotate.");
+    const hint = element("small", "inspector__hint", "Drag it in the room · arrows nudge · Q / E rotate.");
     elements.decorInspector.replaceChildren(heading, figure, tools, hint);
   }
 

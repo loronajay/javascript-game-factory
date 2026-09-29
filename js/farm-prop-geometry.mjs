@@ -1,6 +1,25 @@
 // Pure silhouette layouts for the farm's hand-built props. Keeping the shape
 // math out of the Three.js builders makes entrance clearances and distinctive
 // profiles testable without pretending to unit-test renderer calls.
+/** The two plank-filled triangles between the doghouse walls and its pitched roof. */
+export function doghouseGableMesh() {
+    const halfWidth = 0.55;
+    const wallTop = 0.9;
+    const ridgeY = 1.3;
+    const frontZ = 0.65;
+    const backZ = -0.65;
+    return Object.freeze({
+        // Opposite winding keeps each end facing out from the house.
+        positions: Object.freeze([
+            -halfWidth, wallTop, frontZ, halfWidth, wallTop, frontZ, 0, ridgeY, frontZ,
+            -halfWidth, wallTop, backZ, 0, ridgeY, backZ, halfWidth, wallTop, backZ,
+        ]),
+        uvs: Object.freeze([
+            0, 0, halfWidth * 2, 0, halfWidth, ridgeY - wallTop,
+            0, 0, halfWidth, ridgeY - wallTop, halfWidth * 2, 0,
+        ]),
+    });
+}
 /** Five open shell faces for a tray that flares up and widens away from its wheel. */
 export function wheelbarrowTrayShell() {
     const floorHeight = 0.34;

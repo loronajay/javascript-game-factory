@@ -143,3 +143,6 @@
 .dealer-card__grow { color: #9fb294 !important; }
 .dealer-card__buy { white-space: nowrap; }
 .dealer-card__buy:disabled { opacity: .45; cursor: not-allowed; }
+.dealer-card.is-locked .dealer-card__picture { filter: grayscale(.8) brightness(.8); }
+/* The Butcher asks twice: the second press is the one that sends. */
+.butcher-card .farm-button--danger { border-color: #e06a5a; background: rgba(224, 106, 90, .24); color: #ffe3dc; }

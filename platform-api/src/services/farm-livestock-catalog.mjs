@@ -24,6 +24,7 @@ function rule(variant, spec) {
         id: `livestock.${variant}`,
         stats: Object.freeze({ ...spec.stats }),
         products: Object.freeze(spec.products.map((product) => Object.freeze({ ...product }))),
+        meat: Object.freeze({ ...spec.meat }),
         feeds: Object.freeze({ supply: spec.feeds.supply, crops: Object.freeze([...spec.feeds.crops]) }),
         coats: Object.freeze(spec.coats.map((coat) => Object.freeze({ ...coat }))),
         names: Object.freeze([...spec.names]),
@@ -31,32 +32,36 @@ function rule(variant, spec) {
 }
 export const FARM_LIVESTOCK_RULES = Object.freeze([
     rule("sheep", {
-        title: "Sheep", price: 350, adultDays: 2,
+        title: "Sheep", price: 350, minLevel: 1, adultDays: 2,
         products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
+        meat: { itemId: "mutton", cuts: 4 },
         feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
         coats: [{ id: "standard", weight: 60 }, { id: "black", weight: 20 }, { id: "moorit", weight: 15 }, { id: "silver", weight: 5 }],
         names: ["Clover", "Woolly", "Dolly", "Bramble", "Fleecy", "Lambert", "Willow", "Pip", "Nutmeg", "Snowdrop"],
     }),
     rule("pig", {
-        title: "Pig", price: 400, adultDays: 2,
+        title: "Pig", price: 400, minLevel: 5, adultDays: 2,
         products: [],
+        meat: { itemId: "pork", cuts: 6 },
         feeds: { supply: "food.pig-feed", crops: ["potato", "pumpkin", "corn", "beetroot", "watermelon", "apple"] },
         stats: { yield: range(20, 65), quality: range(15, 60), growth: range(30, 75), hardiness: range(30, 75) },
         coats: [{ id: "standard", weight: 55 }, { id: "berkshire", weight: 20 }, { id: "tamworth", weight: 20 }, { id: "spotted", weight: 5 }],
         names: ["Truffle", "Hamlet", "Porkchop", "Rosie", "Wilbur", "Peony", "Babe", "Mudge", "Oinkers", "Bacon"],
     }),
     rule("cow", {
-        title: "Cow", price: 750, adultDays: 3,
+        title: "Cow", price: 750, minLevel: 10, adultDays: 3,
         products: [{ itemId: "milk", everyDays: 1, dayValue: 28 }],
+        meat: { itemId: "beef", cuts: 8 },
         feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
         coats: [{ id: "standard", weight: 50 }, { id: "jersey", weight: 25 }, { id: "angus", weight: 20 }, { id: "highland", weight: 5 }],
         names: ["Bessie", "Daisy", "Buttercup", "Clementine", "Moolan", "Hazel", "Marigold", "Duchess", "Bluebell", "Caramel"],
     }),
     rule("llama", {
-        title: "Llama", price: 650, adultDays: 3,
+        title: "Llama", price: 650, minLevel: 15, adultDays: 3,
         products: [{ itemId: "wool-llama", everyDays: 3, dayValue: 22 }],
+        meat: { itemId: "llama-meat", cuts: 5 },
         feeds: { supply: "food.hay", crops: ["carrot", "corn", "cabbage"] },
         stats: { yield: range(15, 60), quality: range(20, 65), growth: range(20, 65), hardiness: range(40, 85) },
         coats: [{ id: "standard", weight: 50 }, { id: "cream", weight: 25 }, { id: "charcoal", weight: 20 }, { id: "appaloosa", weight: 5 }],
@@ -170,7 +175,7 @@ export const YIELD_STEP = 40;
 export const STRESS_WEIGHT = 60;
 export const GOOD_GRADE_SCORES = Object.freeze({ perfect: 70, fine: 45, normal: 20 });
 export function newLivestockCare(at) {
-    return { hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: {}, stress: {} };
+    return { hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: {}, stress: {}, neglect: 0 };
 }
 function finite(value, fallback = 0) {
     const number = Number(value);
@@ -196,6 +201,7 @@ export function normalizeLivestockCare(value, fallbackAt) {
         starvedAt: source.starvedAt === null || source.starvedAt === undefined ? null : Math.max(0, finite(source.starvedAt)),
         progress: minutes(source.progress),
         stress: minutes(source.stress),
+        neglect: Math.max(0, finite(source.neglect)),
     };
 }
 export function hungerPerMinute(stats) {
@@ -233,7 +239,8 @@ export function advanceLivestockCare(subject, care, now) {
     const hunger = Math.max(0, care.hunger - rate * (end - start));
     const emptyAt = start + care.hunger / rate;
     const starvedAt = hunger > 0 ? null : care.starvedAt ?? Math.min(end, emptyAt);
-    return { hunger, at: end, starvedAt, progress, stress };
+    const neglect = care.neglect + Math.max(0, end - Math.max(start, wellUntil));
+    return { hunger, at: end, starvedAt, progress, stress, neglect };
 }
 export function livestockDeathMinute(subject, care) {
     if (care.hunger > 0 && care.starvedAt === null)
@@ -259,4 +266,58 @@ export function goodQuality(stats, stressMinutes, cycleMinutes) {
     if (score >= GOOD_GRADE_SCORES.normal)
         return "normal";
     return "poor";
+}
+// ---------------------------------------------------------------- Husbandry (js/farm-livestock-care.mts, rule for rule)
+/** Husbandry XP a collection earns per farm day of its good's cycle — the same rate a crop pays Farming per growing day. */
+export const HUSBANDRY_XP_PER_CYCLE_DAY = 60;
+/**
+ * A collection's Husbandry XP: the good's cycle in farm days, less the share
+ * of that cycle the animal spent hungry — the same stress that cut the good's
+ * grade — never below one. How many pieces a high-Yield animal gives does not
+ * change it: XP rewards keeping the animal, not its luck.
+ */
+export function livestockCollectXp(good, stressMinutes) {
+    const cycle = good.everyDays * DAY;
+    const share = Math.min(1, Math.max(0, Number(stressMinutes) || 0) / Math.max(1, cycle));
+    return Math.max(1, Math.round(HUSBANDRY_XP_PER_CYCLE_DAY * good.everyDays * (1 - share)));
+}
+// ---------------------------------------------------------------- the Butcher (js/farm-livestock-butcher.mts, rule for rule)
+/** Every meat the Butcher cuts (basket ids), graded like milk. */
+export const FARM_LIVESTOCK_MEATS = Object.freeze(FARM_LIVESTOCK_RULES.map((entry) => entry.meat));
+/** Everything the herd puts in the basket: its goods and its meat. */
+export const FARM_LIVESTOCK_BASKET_IDS = Object.freeze([...FARM_LIVESTOCK_GOODS.map((good) => good.itemId), ...FARM_LIVESTOCK_MEATS.map((meat) => meat.itemId)]);
+export function farmLivestockMeatRule(itemId) {
+    return FARM_LIVESTOCK_RULES.find((entry) => entry.meat.itemId === itemId) ?? null;
+}
+export const MEAT_MARGIN_PER_DAY = 30;
+export const PRIME_AGE = 2;
+/** Just grown, an animal cuts to this share of its prime. */
+export const GROWN_CUT_SHARE = 0.75;
+/** A meat's Normal price per cut: the young one's price plus the margin for its days to prime, over its cuts. */
+export function farmLivestockMeatPrice(entry) {
+    return Math.ceil((entry.price + MEAT_MARGIN_PER_DAY * PRIME_AGE * entry.adultDays) / entry.meat.cuts);
+}
+/**
+ * How many cuts the Butcher makes of an animal `ageDays` old: none while it
+ * is young; from GROWN_CUT_SHARE of its prime the day it is grown, rising to
+ * all of it at PRIME_AGE times its grown age; and Yield scales the whole, from
+ * 0.6× at Yield 0 to 1.4× at 100. Never fewer than one from a grown one.
+ */
+export function butcherCuts(entry, stats, ageDays) {
+    const grownAt = adultAgeDays(entry, stats);
+    if (!(ageDays >= grownAt))
+        return 0;
+    const toPrime = Math.min(1, (ageDays - grownAt) / (grownAt * (PRIME_AGE - 1)));
+    const age = GROWN_CUT_SHARE + (1 - GROWN_CUT_SHARE) * toPrime;
+    const yieldShare = 0.6 + 0.8 * (stats.yield / STAT_MAX);
+    return Math.max(1, Math.round(entry.meat.cuts * yieldShare * age));
+}
+/** The meat's grade: the Quality stat, less the share of its whole life it spent hungry — the goods' rule over a lifetime. */
+export function butcherQuality(stats, neglectMinutes, lifeMinutes) {
+    return goodQuality(stats, neglectMinutes, lifeMinutes);
+}
+/** Husbandry XP for an animal raised and sent to the Butcher: its species' days to grown, less the share of its life spent hungry. */
+export function livestockButcherXp(entry, neglectMinutes, lifeMinutes) {
+    const share = Math.min(1, Math.max(0, Number(neglectMinutes) || 0) / Math.max(1, lifeMinutes));
+    return Math.max(1, Math.round(HUSBANDRY_XP_PER_CYCLE_DAY * entry.adultDays * (1 - share)));
 }

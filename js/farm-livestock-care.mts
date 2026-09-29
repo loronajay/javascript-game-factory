@@ -16,7 +16,9 @@
 //     goods come along, and only once it is grown;
 //   · how long it was HUNGRY while grown — stress, which costs its goods a grade;
 //   · the minute its hunger reached nothing — `starvedAt`. A whole farm day
-//     starving and it dies, the pets' rule.
+//     starving and it dies, the pets' rule;
+//   · how long it has been hungry over its whole life, at any age —
+//     `neglect`, which grades its meat at the Butcher.
 //
 // The farm clock only runs while the owner plays or naps, so nothing here
 // happens while the farm is away.
@@ -35,6 +37,8 @@ export type LivestockCare = Readonly<{
   progress: Readonly<Record<string, number>>;
   /** Minutes grown and hungry since each good was last collected. */
   stress: Readonly<Record<string, number>>;
+  /** Lifetime minutes spent hungry (at or below `HUNGRY_AT`), at any age: the Butcher grades the meat by it. */
+  neglect: number;
 }>;
 
 export type CareSubject = Readonly<{ speciesId: string; stats: LivestockStats; bornAt: number }>;
@@ -61,7 +65,7 @@ export type GoodQuality = "poor" | "normal" | "fine" | "perfect";
 
 /** A freshly arrived animal: fed, nothing owed, from the minute given. */
 export function newLivestockCare(at: number): LivestockCare {
-  return Object.freeze({ hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: Object.freeze({}), stress: Object.freeze({}) });
+  return Object.freeze({ hunger: FULL, at: Math.max(0, at), starvedAt: null, progress: Object.freeze({}), stress: Object.freeze({}), neglect: 0 });
 }
 
 /** Hunger lost per farm minute for this individual. */
@@ -115,6 +119,7 @@ export function normalizeLivestockCare(value: unknown, fallbackAt: number): Live
     starvedAt: starved,
     progress: Object.freeze(minutes(source.progress)),
     stress: Object.freeze(minutes(source.stress)),
+    neglect: Math.max(0, finite(source.neglect)),
   });
 }
 
@@ -145,7 +150,8 @@ export function advanceLivestockCare(subject: CareSubject, care: LivestockCare, 
   const hunger = Math.max(0, care.hunger - rate * (end - start));
   const emptyAt = start + care.hunger / rate;
   const starvedAt = hunger > 0 ? null : care.starvedAt ?? Math.min(end, emptyAt);
-  return Object.freeze({ hunger, at: end, starvedAt, progress: Object.freeze(progress), stress: Object.freeze(stress) });
+  const neglect = care.neglect + Math.max(0, end - Math.max(start, wellUntil));
+  return Object.freeze({ hunger, at: end, starvedAt, progress: Object.freeze(progress), stress: Object.freeze(stress), neglect });
 }
 
 /** The farm minute it dies of neglect if nobody feeds it, or null while it has food in it. */
@@ -178,6 +184,16 @@ export function goodsPerCollection(stats: LivestockStats): number {
 }
 
 /** A good's grade: the Quality stat, less what hunger took out of this cycle. */
+/** Husbandry XP a collection earns per farm day of its good's cycle — the rate a crop pays Farming per growing day. */
+export const HUSBANDRY_XP_PER_CYCLE_DAY = 60;
+
+/** A collection's Husbandry XP: the cycle in farm days, less the share of it spent hungry, never below one. The server pays it. */
+export function livestockCollectXp(product: Pick<LivestockProduct, "everyDays">, stressMinutes: number): number {
+  const cycle = goodCycleMinutes(product);
+  const share = Math.min(1, Math.max(0, Number(stressMinutes) || 0) / Math.max(1, cycle));
+  return Math.max(1, Math.round(HUSBANDRY_XP_PER_CYCLE_DAY * product.everyDays * (1 - share)));
+}
+
 export function goodQuality(stats: LivestockStats, stressMinutes: number, cycleMinutes: number): GoodQuality {
   const score = stats.quality - STRESS_WEIGHT * Math.min(1, Math.max(0, stressMinutes) / Math.max(1, cycleMinutes));
   if (score >= GOOD_GRADE_SCORES.perfect) return "perfect";

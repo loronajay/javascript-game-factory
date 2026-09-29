@@ -10,7 +10,7 @@ import { parseFarmPieceKey, unplacedFarmPieces } from "../services/farm-carpentr
 import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmBarter, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder } from "../services/farm-skill-catalog.mjs";
 import { barterPurchasePrice, barterSalePrice } from "../services/farm-bartering.mjs";
 import { farmTreeReady, farmTreeRule, farmTreeYield } from "../services/farm-tree-catalog.mjs";
-import { normalizeCookingRecord, recordFarmDishOrder } from "../services/farm-skill-catalog.mjs";
+import { normalizeCookingRecord, normalizeHusbandryRecord, recordFarmDishOrder, recordFarmHerdOrder } from "../services/farm-skill-catalog.mjs";
 import { takeFarmDishes } from "../services/farm-recipe-catalog.mjs";
 import { FARM_ORDER_DAY_MS, farmFullOrderBoard, farmOrderDay, farmOrderTransactionKey, findFarmOrder, isStaleFarmOrderId, } from "../services/farm-order-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
@@ -447,6 +447,7 @@ export async function getFarmOrderBoard(pool, input, now = Date.now()) {
     const layout = stored.rows?.[0] ? normalizeFarmGarage(stored.rows[0].garage) : null;
     const farming = farmingOf(layout);
     const cooking = normalizeCookingRecord(layout?.skills?.cooking);
+    const husbandry = normalizeHusbandryRecord(layout?.skills?.husbandry);
     const filled = await filledOrderIds(pool, playerId, day);
     // The Cove's side of the board: the Fishing level and what is in the creel, so the notices can say what is short.
     const angler = await pool.query(`select fishing from farm_anglers where player_id = $1`, [playerId]);
@@ -461,6 +462,7 @@ export async function getFarmOrderBoard(pool, input, now = Date.now()) {
         orders: farmFullOrderBoard(day).map((order) => presentOrder(order, filled.has(order.id))),
         farming: farmingSummary(farming, farming.xp),
         cooking: farmingSummary(cooking, cooking.xp),
+        husbandry: farmingSummary(husbandry, husbandry.xp),
         produce: layout?.agriculture?.inventory?.produce ?? {},
         dishes: layout?.agriculture?.inventory?.dishes ?? {},
     };
@@ -497,6 +499,8 @@ export async function fillFarmOrder(pool, input, now = Date.now()) {
             return fillDishOrder(client, playerId, order, farm, transactionKey);
         if (order.kind === "fish")
             return fillFishOrder(client, playerId, order, farm, transactionKey);
+        if (order.kind === "goods")
+            return fillHerdOrder(client, playerId, order, farm, transactionKey);
         if (summary.level < order.minLevel)
             return { ok: false, error: "level_too_low", minLevel: order.minLevel, level: summary.level, layout: farm.layout };
         const agriculture = farm.layout.agriculture;
@@ -560,6 +564,40 @@ async function fillFishOrder(client, playerId, order, farm, transactionKey) {
         ok: true, duplicate: false, order: presentOrder(order, true), earned: order.tickets, xp: order.xp, skill: "fishing",
         farming: farmingSummary(farming, farming.xp), fishing: farmingSummary(fishing, angler.fishing.xp), achievements: [], balance: award.balance, layout: farm.layout,
         fishUsed: [...taken].map(presentFish),
+    };
+}
+/** A herd order, inside `fillFarmOrder`'s transaction: the Husbandry level, livestock goods from the basket (plainest grade first), Husbandry XP. */
+async function fillHerdOrder(client, playerId, order, farm, transactionKey) {
+    const before = normalizeHusbandryRecord(farm.layout.skills?.husbandry);
+    const level = farmingLevelForXp(before.xp);
+    const farming = farmingOf(farm.layout);
+    if (level < order.minLevel)
+        return { ok: false, error: "level_too_low", skill: "husbandry", minLevel: order.minLevel, level, layout: farm.layout };
+    const agriculture = farm.layout.agriculture;
+    let produce = { ...(agriculture?.inventory?.produce ?? {}) };
+    for (const [itemId, count] of Object.entries(order.lines)) {
+        const taken = takeFarmProduce(produce, itemId, count);
+        if (!taken)
+            return { ok: false, error: "not_enough_goods", itemId, layout: farm.layout };
+        produce = taken;
+    }
+    const award = await awardTicketsInTransaction(client, {
+        playerId, transactionKey, amount: order.tickets, reason: "farm_order",
+        metadata: { orderId: order.id, customer: order.customer, lines: order.lines, xp: order.xp, skill: "husbandry" },
+    });
+    const husbandry = recordFarmHerdOrder(before, order.xp);
+    const next = normalizeFarmGarage({
+        ...farm.layout,
+        agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce } },
+        skills: { ...farm.layout.skills, husbandry },
+    }, { ownedEntitlementIds: farm.owned });
+    await saveFarm(client, playerId, next);
+    const achievements = await awardServerAchievementsInTransaction(client, {
+        playerId, gameSlug: "farm", facts: { farming, husbandry }, sourceId: `order:${order.id}`,
+    });
+    return {
+        ok: true, duplicate: false, order: presentOrder(order, true), earned: order.tickets, xp: order.xp, skill: "husbandry",
+        farming: farmingSummary(farming, farming.xp), husbandry: farmingSummary(husbandry, before.xp), achievements, balance: award.balance, layout: next,
     };
 }
 /** A dish order, inside `fillFarmOrder`'s transaction: the Cooking level, the pantry (plainest dishes first), Cooking XP. */

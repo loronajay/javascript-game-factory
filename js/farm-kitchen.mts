@@ -11,15 +11,16 @@
 
 import { CROP_CATALOG, type FarmInventory } from "./farm-crops.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
+import { findLivestockBasketItem } from "./farm-catalog/livestock.mjs";
 import { DISH_STARS, KITCHEN_RANGE_ITEM_ID, RECIPE_CATALOG, dishKey, findRecipe, type DishStars, type Recipe } from "./farm-catalog/recipes.mjs";
 import { produceHeld, takeProduce } from "./farm-quality.mjs";
 import { fishHeldForNeed, fishNeedPortraitSpecies, fishNeedTitle, parseFishNeed, type CreelFishLike } from "./farm-fish.mjs";
 
 const MAX_STACK = 99;
 
-/** "Tomato", "Apple": the harvest-basket item's own name. */
+/** "Tomato", "Apple", "Milk": the harvest-basket item's own name. */
 export function basketItemTitle(id: string): string {
-  return CROP_CATALOG.find((crop) => crop.id === id)?.title ?? FRUIT_TREES.find((species) => species.fruitId === id)?.fruitTitle ?? id;
+  return CROP_CATALOG.find((crop) => crop.id === id)?.title ?? FRUIT_TREES.find((species) => species.fruitId === id)?.fruitTitle ?? findLivestockBasketItem(id)?.title ?? id;
 }
 
 /**

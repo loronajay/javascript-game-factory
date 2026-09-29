@@ -13,6 +13,20 @@
 // Only then is the feed or the collection done. Goods land in the harvest
 // basket, graded like crops, and nothing on the page can make one.
 //
+// HUSBANDRY (Phase 3) is earned here too: a collection pays the skill's XP
+// into the farm's server-owned `skills.husbandry` in the same transaction that
+// puts the goods in the basket, and the Dealer sells a species only at its
+// Husbandry level. An animal bought before its gate existed is never taken back.
+//
+// THE BUTCHER (Phase 4) is here too, and it is the one way an animal leaves the
+// farm alive-to-gone by the player's own choice. The Market Square has no
+// running farm clock, so the herd is settled at the farm's STORED clock (the
+// farm saved itself before the gate let the player out); a grown animal's row
+// is closed as `butchered` and its meat — cuts from Yield and age, graded by
+// Quality less its lifetime hunger — lands in the basket in the same
+// transaction, with the Husbandry XP. A basket with no room for every cut
+// refuses: an animal is never cut into meat that is thrown away.
+//
 // Room is checked against the farm's own buildings, read from the saved farm
 // under a row lock, so two tabs cannot squeeze a fifth animal into a pen for
 // four. A home that has since been taken down is simply not a home: its
@@ -23,7 +37,9 @@ import { spendTicketsInTransaction } from "./tickets.mjs";
 import { lockedFarm, saveFarm, transaction, verifiedSubmittedFarm } from "./farm-economy.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { farmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
-import { LIVESTOCK_STATS, MAX_HERD, clampStat, adultAgeDays, advanceLivestockCare, cleanLivestockName, farmLivestockHomes, feedLivestockCare, goodQuality, goodsPerCollection, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
+import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeHusbandryRecord, recordFarmButcher, recordFarmCollection } from "../services/farm-skill-catalog.mjs";
+import { awardServerAchievementsInTransaction } from "./achievements.mjs";
+import { LIVESTOCK_STATS, MAX_HERD, clampStat, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmLivestockHomes, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const ANIMAL_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 const HOME_ID = /^[A-Za-z0-9_-]{1,80}#[a-z0-9-]{1,20}$/;
@@ -81,6 +97,9 @@ export async function buyFarmLivestock(pool, input, random = Math.random) {
         }
         if (herd.length >= MAX_HERD)
             return { ok: false, error: "herd_full" };
+        const level = farmingLevelForXp(normalizeHusbandryRecord(farm.layout.skills?.husbandry).xp);
+        if (level < species.minLevel)
+            return { ok: false, error: "level_too_low", minLevel: species.minLevel, level };
         const home = pickFarmLivestockHome(farmLivestockHomes(farm.layout.decor), herd.map((row) => row.home_id ?? null), input?.homeId);
         if (!home)
             return { ok: false, error: input?.homeId ? "home_full" : "no_room" };
@@ -299,10 +318,82 @@ export async function careFarmLivestock(pool, input, now = Date.now()) {
         const held = Number(produce[key]) || 0;
         if (held >= MAX_STACK)
             return answer({ ok: false, error: "basket_full" });
-        produce[key] = Math.min(MAX_STACK, held + quantity);
+        const collected = Math.min(quantity, MAX_STACK - held);
+        produce[key] = held + collected;
+        // Husbandry: the good's cycle in farm days, less the share of it the animal went hungry.
+        const skills = normalizeFarmSkillRecords(layout.skills);
+        const xp = livestockCollectXp(product, care.stress[product.itemId] ?? 0);
+        const husbandry = recordFarmCollection(skills.husbandry, product.itemId, collected, xp);
         row.care = { ...care, progress: { ...care.progress, [product.itemId]: 0 }, stress: { ...care.stress, [product.itemId]: 0 } };
         await client.query(`update farm_livestock set care = $3::jsonb, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, animalId, JSON.stringify(row.care)]);
-        layout = { ...layout, agriculture: { ...agriculture, inventory: { ...inventory, produce } } };
-        return answer({ ok: true, itemId: product.itemId, quality, quantity: Math.min(quantity, MAX_STACK - held), animal: presentLivestock(row) });
+        layout = { ...layout, agriculture: { ...agriculture, inventory: { ...inventory, produce } }, skills: { ...skills, husbandry } };
+        const achievements = await awardServerAchievementsInTransaction(client, {
+            playerId, gameSlug: "farm", facts: { farming: skills.farming, husbandry }, sourceId: `collect:${animalId}:${Math.round(clock)}`,
+        });
+        return answer({
+            ok: true, itemId: product.itemId, quality, quantity: collected, animal: presentLivestock(row),
+            xp, husbandry: farmingSummary(husbandry, skills.husbandry.xp), achievements,
+        });
+    });
+}
+// ---------------------------------------------------------------- the Butcher
+/**
+ * Send a grown animal to the Butcher in the Market Square. The herd is settled
+ * at the farm's stored clock first (a death is a death, and is answered as
+ * one); a young one is refused, and so is a basket without room for every cut.
+ * Otherwise the row closes as `butchered`, the meat goes in the basket at its
+ * grade and Husbandry is paid — all in one transaction. The animal's row is
+ * kept as its record, like a dead one's.
+ */
+export async function butcherFarmLivestock(pool, input) {
+    const playerId = required(input?.playerId, "playerId");
+    const animalId = required(input?.animalId, "animalId");
+    if (!ANIMAL_ID.test(animalId))
+        return { ok: false, error: "not_found" };
+    return transaction(pool, async (client) => {
+        const farm = await lockedFarm(client, playerId);
+        if (!farm || farm.layout.onboarding?.status !== "complete")
+            return { ok: false, error: "farm_not_initialized" };
+        const clock = Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0);
+        const settled = await settleHerd(client, playerId, farm.layout, await liveHerd(client, playerId, true), clock);
+        let layout = settled.layout;
+        const answer = async (result) => {
+            const saved = normalizeFarmGarage(layout, { ownedEntitlementIds: farm.owned });
+            if (settled.deaths.length || result.ok)
+                await saveFarm(client, playerId, saved);
+            return { ...result, layout: saved, herd: settled.living.filter((row) => row.animal_id !== (result.ok ? animalId : "")).map(presentLivestock), deaths: settled.deaths };
+        };
+        const row = settled.living.find((entry) => entry.animal_id === animalId);
+        if (!row)
+            return answer({ ok: false, error: settled.deaths.some((death) => death.id === animalId) ? "died" : "not_found" });
+        const rule = farmLivestockRule(row.species_id);
+        const subject = subjectOf(row);
+        const care = row.care;
+        const lifeMinutes = Math.max(0, clock - subject.bornAt);
+        const cuts = butcherCuts(rule, subject.stats, lifeMinutes / (24 * 60));
+        if (cuts <= 0)
+            return answer({ ok: false, error: "not_grown" });
+        const quality = butcherQuality(subject.stats, care.neglect, lifeMinutes);
+        const agriculture = layout.agriculture ?? {};
+        const inventory = agriculture.inventory ?? {};
+        const produce = { ...(inventory.produce ?? {}) };
+        const key = farmProduceKey(rule.meat.itemId, quality);
+        const held = Number(produce[key]) || 0;
+        if (held + cuts > MAX_STACK)
+            return answer({ ok: false, error: "basket_full", cuts, quality });
+        produce[key] = held + cuts;
+        const skills = normalizeFarmSkillRecords(layout.skills);
+        const xp = livestockButcherXp(rule, care.neglect, lifeMinutes);
+        const husbandry = recordFarmButcher(skills.husbandry, rule.meat.itemId, cuts, xp);
+        await client.query(`update farm_livestock set state = 'butchered', end_cause = 'butcher', ended_minute = $3, care = $4::jsonb, updated_at = now()
+       where player_id = $1 and animal_id = $2 and state = 'alive'`, [playerId, animalId, clock, JSON.stringify(care)]);
+        layout = { ...layout, agriculture: { ...agriculture, inventory: { ...inventory, produce } }, skills: { ...skills, husbandry } };
+        const achievements = await awardServerAchievementsInTransaction(client, {
+            playerId, gameSlug: "farm", facts: { farming: skills.farming, husbandry, butcher: { quality } }, sourceId: `butcher:${animalId}`,
+        });
+        return answer({
+            ok: true, name: String(row.name), speciesId: rule.id, itemId: rule.meat.itemId, quality, quantity: cuts,
+            xp, husbandry: farmingSummary(husbandry, skills.husbandry.xp), achievements,
+        });
     });
 }

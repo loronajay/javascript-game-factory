@@ -88,6 +88,8 @@ export function createFarmLivestockController(options: Readonly<{
   /** Null for a farm that cannot care (a visitor, a signed-out farm). */
   submit: CareSubmit | null;
   setStatus: (text: string) => void;
+  /** Farm achievements a collection earned (Husbandry is server-awarded). */
+  onAchievements?: (achievements: readonly unknown[]) => void;
 }>): LivestockController {
   let herd: readonly LivestockAnimal[] = [];
   let homes: readonly LivestockHome[] = livestockHomes(options.layout().decor);
@@ -257,7 +259,10 @@ export function createFarmLivestockController(options: Readonly<{
         void care("collect", id).then((result) => {
           if (result?.ok) {
             const good = findLivestockGood(result.itemId);
-            options.setStatus(`${animal!.name} gave ${result.quantity} ${QUALITY_TITLES[result.quality as keyof typeof QUALITY_TITLES] ?? ""} ${good?.title ?? result.itemId}. It is in your basket.`);
+            const xp = Number(result.xp) > 0 ? ` +${Number(result.xp).toLocaleString()} Husbandry XP.` : "";
+            const levelUp = Number(result.husbandry?.level) > Number(result.husbandry?.levelBefore) ? ` Husbandry level ${result.husbandry.level}!` : "";
+            options.setStatus(`${animal!.name} gave ${result.quantity} ${QUALITY_TITLES[result.quality as keyof typeof QUALITY_TITLES] ?? ""} ${good?.title ?? result.itemId}. It is in your basket.${xp}${levelUp}`);
+            if (Array.isArray(result.achievements) && result.achievements.length) options.onAchievements?.(result.achievements);
           } else if (result?.error) options.setStatus(`${animal!.name} ${CARE_ERRORS[result.error] ?? "could not be collected from. Try again."}`);
         });
       }

@@ -6,16 +6,19 @@
 // sacks of feed.
 import { CROP_CATALOG } from "./farm-crops.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
-import { LIVESTOCK_FEEDS, LIVESTOCK_GOODS } from "./farm-catalog/livestock.mjs";
+import { LIVESTOCK_BASKET_ITEMS, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies } from "./farm-catalog/trees.mjs";
 import { pantryLines, starsLabel } from "./farm-kitchen.mjs";
 import { PATTERN_CATALOG, PIECE_STARS, PLANK_SPECIES, pieceKey } from "./farm-catalog/carpentry.mjs";
 import { QUALITIES, gradedTitle, produceKey } from "./farm-quality.mjs";
+import { formatLength, formatWeight, specimenTitle } from "./farm-fish.mjs";
+import { FISHING_LURES, FISHING_RODS } from "./farm-catalog/fish.mjs";
 export function createFarmInventoryPanel(elements, options = {}) {
     let agriculture;
     let selectedCropId = CROP_CATALOG[0].id;
     let selectedSaplingId = TREE_CATALOG[0].id;
     let levels = { farming: 1, woodcutting: 1 };
+    let fishing = null;
     function isOpen() { return !elements.root.hidden; }
     function close() {
         elements.root.hidden = true;
@@ -76,6 +79,14 @@ export function createFarmInventoryPanel(elements, options = {}) {
         tile.replaceChildren(portrait(key), name, total, ...(extra ? [extra] : []));
         return tile;
     }
+    function fishTile(fish, mounted) {
+        const detail = document.createElement("small");
+        detail.className = "item-tile__detail";
+        detail.textContent = `${formatWeight(fish.weightG)} · ${formatLength(fish.lengthMm)}${mounted ? " · Mounted" : fish.locked ? " · Locked" : ""}`;
+        const tile = itemTile(`fish:${fish.speciesId}:${fish.variant}`, specimenTitle(fish.speciesId, fish.variant, fish.sizeClass), 1, detail);
+        tile.dataset.fishId = fish.id;
+        return tile;
+    }
     function saplingCard(species) {
         const held = agriculture.inventory.saplings[species.id] ?? 0;
         const skill = species.kind === "fruit" ? "Farming" : "Woodcutting";
@@ -101,9 +112,10 @@ export function createFarmInventoryPanel(elements, options = {}) {
         card.replaceChildren(pick, buyButton(`sapling.${species.id}`, species.saplingPrice, held, level < species.minLevel ? `Needs ${skill} ${species.minLevel}` : ""));
         return card;
     }
-    function render(next, nextLevels = levels) {
+    function render(next, nextLevels = levels, nextFishing = fishing) {
         agriculture = next;
         levels = nextLevels;
+        fishing = nextFishing;
         if ((agriculture.inventory.saplings[selectedSaplingId] ?? 0) <= 0) {
             selectedSaplingId = TREE_CATALOG.find((entry) => (agriculture.inventory.saplings[entry.id] ?? 0) > 0)?.id ?? selectedSaplingId;
         }
@@ -147,8 +159,8 @@ export function createFarmInventoryPanel(elements, options = {}) {
             tile.dataset.quality = quality;
             return tile;
         })), ...FRUIT_TREES.map((species) => itemTile(`produce:${species.fruitId}`, species.fruitPlural, agriculture.inventory.produce[species.fruitId] ?? 0)), 
-        // Livestock goods: graded like crops, and only shown while held (a farm without animals has none).
-        ...LIVESTOCK_GOODS.flatMap((good) => [...QUALITIES].reverse()
+        // Livestock goods and the Butcher's meat: graded like crops, and only shown while held (a farm without animals has none).
+        ...LIVESTOCK_BASKET_ITEMS.flatMap((good) => [...QUALITIES].reverse()
             .map((quality) => ({ quality, key: produceKey(good.itemId, quality) }))
             .filter(({ key }) => (agriculture.inventory.produce[key] ?? 0) > 0)
             .map(({ quality, key }) => {
@@ -165,6 +177,28 @@ export function createFarmInventoryPanel(elements, options = {}) {
             empty.className = "item-empty";
             empty.textContent = "Nothing cooked yet. Place a Kitchen Range from Build mode (B · Props) and press E at it to cook your harvest.";
             elements.pantryGrid.replaceChildren(empty);
+        }
+        const fish = fishing ? [...fishing.creel.map((entry) => fishTile(entry, false)), ...fishing.mounted.map((entry) => fishTile(entry, true))] : [];
+        if (fish.length)
+            elements.fishGrid.replaceChildren(...fish);
+        else {
+            const empty = document.createElement("p");
+            empty.className = "item-empty";
+            empty.textContent = fishing ? "No fish in your creel or on a trophy mount." : "Sign in to see the fish you keep at the Cove.";
+            elements.fishGrid.replaceChildren(empty);
+        }
+        const tackle = fishing ? [
+            ...FISHING_RODS.filter((rod) => fishing.tackle.rods.includes(rod.id)).map((rod) => itemTile(`tackle:${rod.id}`, rod.title, 1)),
+            itemTile("tackle:bait.worm", "Worms", fishing.tackle.worms),
+            ...FISHING_LURES.map((lure) => itemTile(`tackle:${lure.id}`, lure.title, fishing.tackle.lures[lure.id] ?? 0)),
+        ] : [];
+        if (tackle.length)
+            elements.tackleGrid.replaceChildren(...tackle);
+        else {
+            const empty = document.createElement("p");
+            empty.className = "item-empty";
+            empty.textContent = "Sign in to see the tackle you keep at the Cove.";
+            elements.tackleGrid.replaceChildren(empty);
         }
         elements.saplingGrid.replaceChildren(...TREE_CATALOG.map(saplingCard));
         elements.logsGrid.replaceChildren(...TIMBER_TREES.map((species) => itemTile(`log:${species.id}`, `${species.title} logs`, agriculture.inventory.logs[species.id] ?? 0)));

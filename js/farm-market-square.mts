@@ -141,6 +141,7 @@ export const SAWMILL_STALL_ID = "sawmill";
 export const SEED_STALL_ID = "seeds";
 export const EXCHANGE_BOARD_ID = "exchange";
 export const LIVESTOCK_STALL_ID = "livestock";
+export const BUTCHER_STALL_ID = "butcher";
 
 /**
  * The square's stalls. The Produce Merchant (v1, paying the day's prices), the
@@ -149,7 +150,8 @@ export const LIVESTOCK_STALL_ID = "livestock";
  * the Seed Merchant (every seed, with three on special each day) are open,
  * and the Exchange Board, where players list goods for each other's tickets.
  * The Livestock Dealer sells young stock into the player's stalls, barn and
- * pens (planning-docs/FARM_LIVESTOCK_PLAN.md).
+ * pens, and the Butcher beside the south gate takes grown animals for meat
+ * (planning-docs/FARM_LIVESTOCK_PLAN.md).
  */
 export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   stall({
@@ -186,6 +188,12 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
     id: LIVESTOCK_STALL_ID, kind: "stall", title: "Livestock Dealer", open: true,
     x: 10.9, z: 8.2, rotationY: -QUARTER, colors: ["#6b8a3f", "#f4ecd6"],
     keeper: Object.freeze({ name: "Hollis", avatarId: "avatar.hero-m", greeting: "Lambs, piglets, calves and crias — every one a character. Got room at home?" }),
+    closedNote: "",
+  }),
+  stall({
+    id: BUTCHER_STALL_ID, kind: "stall", title: "Butcher", open: true,
+    x: 8.9, z: 11.3, rotationY: Math.PI, colors: ["#8e2a2a", "#f4ecd6"],
+    keeper: Object.freeze({ name: "Otto", avatarId: "avatar.ogre-heavy", greeting: "Raised one to its prime? I'll make it worth your while — good cuts, graded fair." }),
     closedNote: "",
   }),
   stall({
@@ -262,6 +270,7 @@ export function stallPrompt(entry: MarketStall, signedIn: boolean): string {
   if (entry.kind === "board") return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;
   if (entry.id === SAWMILL_STALL_ID) return signedIn ? `Press E to saw logs and sell furniture to ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to saw logs and sell furniture`;
   if (entry.id === LIVESTOCK_STALL_ID) return signedIn ? `Press E to buy young stock from ${entry.keeper?.name ?? entry.title}` : `${entry.title} · sign in to buy livestock`;
+  if (entry.id === BUTCHER_STALL_ID) return signedIn ? `Press E to send a grown animal to ${entry.keeper?.name ?? entry.title} the ${entry.title}` : `${entry.title} · sign in to send livestock for meat`;
   if (entry.id === SEED_STALL_ID) return signedIn ? `Press E to buy seeds from ${entry.keeper?.name ?? entry.title} · today's specials` : `${entry.title} · sign in to buy seeds`;
   const goods = entry.id === KITCHEN_STALL_ID ? "cooking" : "produce";
   if (!signedIn) return `${entry.title} · sign in to buy and sell ${goods}`;

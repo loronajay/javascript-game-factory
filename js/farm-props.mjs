@@ -18,7 +18,7 @@
 // test asserts every row names a builder.
 import { box, cylinder, sphere, standard } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, scaleUvs, tbox, tcylinder, tsphere } from "./farm-materials.mjs";
-import { wheelbarrowTrayShell } from "./farm-prop-geometry.mjs";
+import { doghouseGableMesh, wheelbarrowTrayShell } from "./farm-prop-geometry.mjs";
 import { farmDecorFootprint } from "./farm-catalog/decor.mjs";
 import { FARM_BUILDING_BUILDERS } from "./farm-props-buildings.mjs";
 import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
@@ -698,6 +698,15 @@ export function createDoghouse(THREE) {
     const roof = farmMaterial(THREE, "shingles", { metresPerTile: 0.7 });
     const trim = painted(THREE, BARN_TRIM);
     tbox(THREE, group, [1.1, 0.9, 1.3], [0, 0.45, 0], wall);
+    const gables = doghouseGableMesh();
+    const gableGeometry = new THREE.BufferGeometry();
+    gableGeometry.setAttribute("position", new THREE.Float32BufferAttribute(gables.positions, 3));
+    gableGeometry.setAttribute("uv", new THREE.Float32BufferAttribute(gables.uvs, 2));
+    gableGeometry.computeVertexNormals();
+    const gable = new THREE.Mesh(gableGeometry, wall);
+    gable.castShadow = true;
+    gable.receiveShadow = true;
+    group.add(gable);
     tbox(THREE, group, [1.2, 0.06, 1.4], [0, 0.03, 0], timber(THREE, WOOD_DARK), false);
     box(THREE, group, [0.5, 0.5, 0.04], [0, 0.27, 0.66], standard(THREE, "#1b1f24", 1, 0), false);
     cylinder(THREE, group, 0.25, 0.25, 0.04, [0, 0.52, 0.66], standard(THREE, "#1b1f24", 1, 0), 12, false).rotation.x = Math.PI / 2;

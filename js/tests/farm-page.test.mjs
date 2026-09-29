@@ -32,10 +32,11 @@ test("the player stats view includes every farm skill and its lifetime records",
     cooking: { xp: 2_000, dishes: 5, perfect: 2, orders: 1, recipes: { "farm-stew": 5 }, learned: [] },
     carpentry: { xp: 500, milled: 7, pieces: 3, masterwork: 1, patterns: { "decor.furniture.crate": 3 } },
     bartering: { xp: 750, deals: 8, bought: 200, sold: 500, saved: 14, bonus: 26 },
+    husbandry: { xp: 400, collections: 6, orders: 1, goods: { "milk-sheep": 5, wool: 3 }, butchered: 2, meat: { pork: 9 } },
   }, { fishing: { xp: 250, catches: 4, dex: { "fish.koi": { caught: 3, bestG: 4000 }, "fish.tetra": { caught: 1, bestG: 40 } } } });
 
-  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry", "Fishing", "Bartering"]);
-  assert.equal(view.totalXp, 4_500);
+  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry", "Fishing", "Husbandry", "Bartering"]);
+  assert.equal(view.totalXp, 4_900);
   assert.equal(view.totalLevel, view.skills.reduce((total, skill) => total + skill.level, 0));
   assert.deepEqual(view.skills[0].stats, [
     { label: "Crop harvests", value: 12 },
@@ -53,23 +54,45 @@ test("the player stats view includes every farm skill and its lifetime records",
     { label: "Masterworks", value: 1 },
   ]);
   assert.deepEqual(view.skills[4].stats, [{ label: "Fish landed", value: 4 }, { label: "Species caught", value: 2 }]);
-  assert.deepEqual(view.skills[5].stats, [{ label: "Deals made", value: 8 }, { label: "Tickets spent", value: 200 }, { label: "Tickets earned", value: 500 }, { label: "Tickets saved", value: 14 }, { label: "Bonus earned", value: 26 }]);
+  assert.deepEqual(view.skills[5].stats, [{ label: "Collections", value: 6 }, { label: "Goods collected", value: 8 }, { label: "Herd orders filled", value: 1 }, { label: "Sent to the Butcher", value: 2 }]);
+  assert.deepEqual(view.skills[5].breakdown, [{ label: "Sheep's Milk", value: 5 }, { label: "Wool", value: 3 }, { label: "Pork", value: 9 }]);
+  assert.deepEqual(view.skills[6].stats, [{ label: "Deals made", value: 8 }, { label: "Tickets spent", value: 200 }, { label: "Tickets earned", value: 500 }, { label: "Tickets saved", value: 14 }, { label: "Bonus earned", value: 26 }]);
   assert.deepEqual(view.skills[0].breakdown.map((line) => line.label), ["Bean", "Carrot", "Apple Tree"]);
   assert.deepEqual(view.skills[2].breakdown, [{ label: "Farm Stew", value: 5 }]);
   assert.deepEqual(view.skills[3].breakdown, [{ label: "Wooden Crate", value: 3 }]);
 });
 
-test("inventory is reachable from both shared farm spaces with I", () => {
+test("inventory and stats are reachable from every farm-game screen", () => {
+  const farmHtml = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
   const marketHtml = readFileSync(resolve(repoRoot, "farm", "market", "index.html"), "utf8");
   const coveHtml = readFileSync(resolve(repoRoot, "farm", "cove", "index.html"), "utf8");
   const marketSource = readFileSync(resolve(repoRoot, "js", "farm-market.mts"), "utf8");
   const coveSource = readFileSync(resolve(repoRoot, "js", "farm-cove-page.mts"), "utf8");
-  for (const page of [marketHtml, coveHtml]) {
+  for (const page of [farmHtml, marketHtml, coveHtml]) {
     assert.match(page, /id="openInventory"/);
     assert.match(page, /id="inventoryPanel"/);
+    assert.match(page, /id="openStats"/);
+    assert.match(page, /id="statsPanel"/);
+    assert.match(page, /id="statsSummary"/);
+    assert.match(page, /id="statsGrid"/);
   }
   assert.match(marketSource, /event\.code === "KeyI"/);
   assert.match(coveSource, /event\.code === "KeyI"/);
+  assert.match(marketSource, /event\.code === "KeyK"/);
+  assert.match(coveSource, /event\.code === "KeyK"/);
+  assert.match(marketSource, /createFarmStatsPanel\(/);
+  assert.match(coveSource, /createFarmStatsPanel\(/);
+});
+
+test("the farm inventory includes the Cove's fish and tackle", () => {
+  assert.match(html, /id="fishGrid"/);
+  assert.match(html, /id="tackleGrid"/);
+  assert.match(source, /fishGrid: requiredElement<HTMLElement>\("#fishGrid"\)/);
+  assert.match(source, /tackleGrid: requiredElement<HTMLElement>\("#tackleGrid"\)/);
+  assert.match(source, /inventoryPanel\.render\(layout\.agriculture, skillLevels\(\), anglerLink\.stats\(\)\)/);
+  const panel = readFileSync(resolve(repoRoot, "js", "farm-inventory-panel.mts"), "utf8");
+  assert.match(panel, /\.\.\.fishing\.creel/);
+  assert.match(panel, /\.\.\.fishing\.mounted/);
 });
 
 test("the farm page exposes an owner stats panel and keyboard shortcut", () => {

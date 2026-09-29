@@ -6,13 +6,14 @@
 //
 // An open stall's stock is the real goods (farm-item-models.mts): the Produce
 // Merchant's crates are heaped with the crops and fruit she buys, the
-// Kitchen's counter is set with the dishes Basil buys, and the Sawmill's with
-// stacked planks and the furniture Bram buys.
+// Kitchen's counter is set with the dishes Basil buys, the Sawmill's with
+// stacked planks and the furniture Bram buys, and the Butcher's with the cuts
+// Otto makes.
 
 import { canvasPlane } from "./arcade-room-decor-primitives.mjs";
 import { farmMaterial, tbox, tcylinder, tsphere, type ThreeNamespace } from "./farm-materials.mjs";
-import { KITCHEN_STALL_ID, LIVESTOCK_STALL_ID, SAWMILL_STALL_ID, type MarketStall } from "./farm-market-square.mjs";
-import { LIVESTOCK_CATALOG } from "./farm-catalog/livestock.mjs";
+import { BUTCHER_STALL_ID, KITCHEN_STALL_ID, LIVESTOCK_STALL_ID, SAWMILL_STALL_ID, type MarketStall } from "./farm-market-square.mjs";
+import { LIVESTOCK_CATALOG, livestockMeatPrice } from "./farm-catalog/livestock.mjs";
 import { createPlankModel } from "./farm-item-models.mjs";
 import { createFurniturePiece } from "./farm-props-furniture.mjs";
 import { createProduceModel } from "./farm-produce-models.mjs";
@@ -196,6 +197,52 @@ function setLivestock(THREE: ThreeNamespace, group: any, width: number, front: n
   void width;
 }
 
+/** The Butcher's counter: every meat on a marble slab, a block with a cleaver in it, and the cuts' prices chalked on a board. */
+function setButcher(THREE: ThreeNamespace, group: any, width: number, front: number, back: number): void {
+  const y = COUNTER_HEIGHT + 0.06;
+  const marble = new THREE.MeshStandardMaterial({ color: "#e8e6e1", roughness: 0.3, metalness: 0.05 });
+  tbox(THREE, group, [2.1, 0.04, 0.5], [-0.35, y + 0.02, front - 0.32], marble, false);
+  LIVESTOCK_CATALOG.forEach((species, index) => {
+    const cut = createProduceModel(THREE, species.meat.itemId);
+    if (!cut) return;
+    cut.position.set(-1.1 + index * 0.5, y + 0.04, front - 0.32);
+    cut.rotation.y = index % 2 ? 0.3 : -0.25;
+    cut.scale.setScalar(1.7);
+    group.add(cut);
+  });
+  // The chopping block at the end of the counter, a cleaver bitten into it.
+  const endGrain = farmMaterial(THREE, "wood", { colors: ["#b08050", "#7a5534"] });
+  tcylinder(THREE, group, 0.22, 0.24, 0.2, [width / 2 - 0.42, y + 0.1, front - 0.32], endGrain, 16);
+  const steel = new THREE.MeshStandardMaterial({ color: "#c3c9ce", roughness: 0.25, metalness: 0.85 });
+  const blade = tbox(THREE, group, [0.2, 0.12, 0.012], [width / 2 - 0.42, y + 0.25, front - 0.32], steel, false);
+  blade.rotation.y = 0.5;
+  const handle = tcylinder(THREE, group, 0.018, 0.018, 0.14, [width / 2 - 0.3, y + 0.28, front - 0.39], farmMaterial(THREE, "wood"), 8, false);
+  handle.rotation.set(0, 0.5, Math.PI / 2);
+  // Hooks along the back beam, and the price board under them.
+  const iron = new THREE.MeshStandardMaterial({ color: "#4a4a4a", roughness: 0.4, metalness: 0.7 });
+  tbox(THREE, group, [width - 0.3, 0.04, 0.04], [0, 2.18, back + 0.16], iron, false);
+  for (let hook = 0; hook < 5; hook += 1) tcylinder(THREE, group, 0.008, 0.008, 0.16, [-1.2 + hook * 0.6, 2.08, back + 0.16], iron, 6, false);
+  canvasPlane(THREE, group, 1.9, 0.78, [560, 230], (context, w, h) => {
+    context.fillStyle = "#23302a";
+    context.fillRect(0, 0, w, h);
+    context.strokeStyle = "#8a6440";
+    context.lineWidth = 14;
+    context.strokeRect(7, 7, w - 14, h - 14);
+    context.fillStyle = "#f2efe4";
+    context.textAlign = "center";
+    context.font = "700 32px Georgia, serif";
+    context.fillText("Cuts · per piece", w / 2, 46);
+    context.font = "26px Georgia, serif";
+    LIVESTOCK_CATALOG.forEach((species, index) => {
+      const row = 84 + index * 36;
+      context.textAlign = "left";
+      context.fillText(species.meat.title, 60, row, w * 0.42);
+      context.textAlign = "right";
+      context.fillText(`${livestockMeatPrice(species)} tickets`, w - 60, row, w * 0.36);
+    });
+  }, [0, 1.62, back + 0.09], false);
+}
+
 function buildStall(THREE: ThreeNamespace, group: any, stall: MarketStall, stock?: StallStock): void {
   const { width, depth } = stall.footprint;
   const wood = farmMaterial(THREE, "wood", { colors: ["#8a6440", "#5f4128"] });
@@ -245,6 +292,10 @@ function buildStall(THREE: ThreeNamespace, group: any, stall: MarketStall, stock
   }
   if (stall.open && stall.id === LIVESTOCK_STALL_ID) {
     setLivestock(THREE, group, width, front, back);
+    return;
+  }
+  if (stall.open && stall.id === BUTCHER_STALL_ID) {
+    setButcher(THREE, group, width, front, back);
     return;
   }
   if (stall.open && stall.id === KITCHEN_STALL_ID) {

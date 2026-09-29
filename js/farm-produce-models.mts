@@ -6,7 +6,8 @@
 // basket is a shelf of them.
 //
 // `PRODUCE_BUILDERS` is keyed by harvest-basket id (farm-crops.mts,
-// farm-catalog/trees.mts); a test asserts every basket id has one.
+// farm-catalog/trees.mts, and the herd's goods and meat in
+// farm-catalog/livestock.mts); a test asserts every basket id has one.
 
 import { calyx, lathe, leaf, place, stem, surface, tint, type ThreeNamespace } from "./farm-item-geometry.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
@@ -290,11 +291,71 @@ function fleece(color: string): Builder {
   };
 }
 
+// ---------------------------------------------------------------- the Butcher's meat
+
+type CutSpec = Readonly<{ flesh: string; fat: string; width: number; depth: number; thickness: number; bone: "none" | "t" | "rib" }>;
+
+/**
+ * A raw cut on a square of butcher's paper: a marbled slab with a rind of fat
+ * round one side and, for a chop or a T-bone, the bone. The flesh colour says
+ * whose meat it is.
+ */
+function meatCut(spec: CutSpec): Builder {
+  return (THREE, group) => {
+    const paper = spec.width * 1.35;
+    place(THREE, group, new THREE.BoxGeometry(paper, 0.003, paper), surface(THREE, "#eadfc8", { roughness: 0.95 }), [0, 0.0015, 0], [0, 0.35, 0]);
+    // Marbling on the cut face only: wandering veins of fat and a few flecks, the same on every cut of a kind.
+    const marbled = paintedTexture(THREE, 128, 128, (context, w, h) => {
+      context.fillStyle = spec.flesh;
+      context.fillRect(0, 0, w, h);
+      let seed = 7;
+      const next = (): number => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      context.strokeStyle = "rgba(250,236,226,.5)";
+      context.lineCap = "round";
+      for (let vein = 0; vein < 7; vein += 1) {
+        context.lineWidth = 1 + next() * 2.5;
+        context.beginPath();
+        let x = next() * w;
+        let y = next() * h;
+        context.moveTo(x, y);
+        for (let step = 0; step < 4; step += 1) {
+          x += (next() - 0.5) * 50;
+          y += (next() - 0.5) * 50;
+          context.lineTo(x, y);
+        }
+        context.stroke();
+      }
+      context.fillStyle = "rgba(250,236,226,.55)";
+      for (let fleck = 0; fleck < 26; fleck += 1) {
+        context.beginPath();
+        context.ellipse(next() * w, next() * h, 1 + next() * 3, 1 + next() * 2, next() * Math.PI, 0, Math.PI * 2);
+        context.fill();
+      }
+    });
+    const y = 0.003 + spec.thickness / 2;
+    const side = surface(THREE, tint(spec.flesh, -0.18), { roughness: 0.6, flat: false });
+    place(THREE, group, new THREE.CylinderGeometry(0.5, 0.5, spec.thickness, 20), [side, paintedSurface(THREE, spec.flesh, marbled, { roughness: 0.55 }), side], [0, y, 0], [0, 0, 0], [spec.width, 1, spec.depth]);
+    // The rind of fat along the far side.
+    place(THREE, group, new THREE.CylinderGeometry(0.5, 0.5, spec.thickness * 0.96, 20, 1, false, Math.PI * 0.55, Math.PI * 0.9), surface(THREE, spec.fat, { roughness: 0.6 }), [0, y, 0], [0, 0, 0], [spec.width * 1.08, 1, spec.depth * 1.12]);
+    if (spec.bone === "t") {
+      const bone = surface(THREE, "#efe6d2", { roughness: 0.7 });
+      place(THREE, group, new THREE.BoxGeometry(spec.width * 0.08, spec.thickness * 1.05, spec.depth * 0.9), bone, [spec.width * 0.08, y, 0]);
+      place(THREE, group, new THREE.BoxGeometry(spec.width * 0.45, spec.thickness * 1.05, spec.depth * 0.08), bone, [-spec.width * 0.12, y, -spec.depth * 0.2]);
+    } else if (spec.bone === "rib") {
+      place(THREE, group, new THREE.CylinderGeometry(spec.thickness * 0.28, spec.thickness * 0.34, spec.width * 0.75, 8), surface(THREE, "#efe6d2", { roughness: 0.7 }), [spec.width * 0.62, y, 0], [0, 0, Math.PI / 2]);
+    }
+  };
+}
+
 export const PRODUCE_BUILDERS: Readonly<Record<string, Builder>> = Object.freeze({
   bean, beetroot, blueberry, cabbage, carrot, cauliflower, corn, eggplant, garlic, potato, pumpkin, radish, strawberry, sunflower, tomato, watermelon,
   apple, pear, cherry, peach, orange,
   milk: milkBottle("#3a7fc2", "MILK"), "milk-sheep": milkBottle("#6aa84f", "EWE"),
   wool: fleece("#f2ede2"), "wool-llama": fleece("#b98a5e"),
+  beef: meatCut({ flesh: "#a3262a", fat: "#f2e6d0", width: 0.16, depth: 0.12, thickness: 0.03, bone: "t" }),
+  pork: meatCut({ flesh: "#e59a8e", fat: "#faf1e4", width: 0.13, depth: 0.1, thickness: 0.025, bone: "rib" }),
+  mutton: meatCut({ flesh: "#9c3a36", fat: "#f4ead6", width: 0.1, depth: 0.08, thickness: 0.028, bone: "rib" }),
+  "llama-meat": meatCut({ flesh: "#7e2626", fat: "#efe2cc", width: 0.14, depth: 0.1, thickness: 0.03, bone: "none" }),
 });
 
 /** A harvest-basket item as a model, or null for an id the basket does not hold. */

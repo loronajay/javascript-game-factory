@@ -51,6 +51,7 @@ import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
+import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
     const element = document.querySelector(selector);
@@ -81,7 +82,17 @@ const inventorySummary = createFarmInventorySummary({
     closeButton: requiredElement("#closeInventory"),
     body: requiredElement("#inventorySummary"),
 });
-inventorySummary.render(inventoryFarm.layout);
+const statsPanel = createFarmStatsPanel({
+    root: requiredElement("#statsPanel"),
+    openButton: requiredElement("#openStats"),
+    closeButton: requiredElement("#closeStats"),
+    summary: requiredElement("#statsSummary"),
+    grid: requiredElement("#statsGrid"),
+}, {
+    beforeOpen: () => inventorySummary.close(),
+    onClose: () => canvas.focus(),
+});
+requiredElement("#openInventory").addEventListener("click", () => statsPanel.close());
 // ---------------------------------------------------------------- the angler
 const api = createPlatformApiClient();
 const signedIn = readFactoryAccountSession().authenticated && api.isConfigured !== false;
@@ -454,6 +465,9 @@ const recordsPanel = createRecordsPanel(requiredElement("#recordsPanel"), {
     onClose: () => canvas.focus(),
 });
 function repaintPanels() {
+    const fishing = accountLoaded ? angler : null;
+    inventorySummary.render(inventoryFarm.layout, fishing);
+    statsPanel.render(inventoryFarm.layout.skills, fishing);
     creelPanel.repaint();
     fishmongerPanel.repaint();
     tacklePanel.repaint();
@@ -461,10 +475,11 @@ function repaintPanels() {
     renderTackleBar();
 }
 function panelOpen() {
-    return inventorySummary.isOpen() || creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
+    return inventorySummary.isOpen() || statsPanel.isOpen() || creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
 }
 function closePanels() {
     inventorySummary.close();
+    statsPanel.close();
     creelPanel.close();
     fishmongerPanel.close();
     tacklePanel.close();
@@ -606,7 +621,7 @@ function steerFromKeys() {
 }
 window.addEventListener("keydown", (event) => {
     if (panelOpen()) {
-        if (event.code === "Escape" || (event.code === "KeyI" && inventorySummary.isOpen()))
+        if (event.code === "Escape" || (event.code === "KeyI" && inventorySummary.isOpen()) || (event.code === "KeyK" && statsPanel.isOpen()))
             closePanels();
         keys.clear();
         return;
@@ -621,6 +636,12 @@ window.addEventListener("keydown", (event) => {
         event.preventDefault();
         keys.clear();
         inventorySummary.toggle();
+        return;
+    }
+    if (event.code === "KeyK" && !event.repeat && !fishing.busy()) {
+        event.preventDefault();
+        keys.clear();
+        statsPanel.toggle();
         return;
     }
     if (event.code === "Space") {
@@ -756,6 +777,7 @@ function publishPresence() {
 publishPresence();
 presence.connect();
 void loadShadows();
+repaintPanels();
 void loadAngler();
 const TICK_SECONDS = 1 / 60;
 let previous = performance.now();

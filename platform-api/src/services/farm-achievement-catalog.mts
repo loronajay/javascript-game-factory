@@ -16,7 +16,7 @@
 
 import type { AchievementDefinition, AchievementGame } from "./achievement-catalog.mjs";
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
-import { farmingLevelForXp, normalizeCarpentryRecord, normalizeCookingRecord, normalizeWoodcuttingRecord, type CarpentryRecord, type CookingRecord, type FarmingRecord, type WoodcuttingRecord } from "./farm-skill-catalog.mjs";
+import { farmingLevelForXp, normalizeCarpentryRecord, normalizeCookingRecord, normalizeHusbandryRecord, normalizeWoodcuttingRecord, type CarpentryRecord, type CookingRecord, type FarmingRecord, type HusbandryRecord, type WoodcuttingRecord } from "./farm-skill-catalog.mjs";
 import { FARM_PIECE_IDS } from "./farm-carpentry-catalog.mjs";
 import { FARM_RECIPE_RULES } from "./farm-recipe-catalog.mjs";
 import { FARM_FISH_RULES } from "./farm-fish-catalog.mjs";
@@ -30,12 +30,16 @@ export type FarmAchievementFacts = Readonly<{
   cooking?: CookingRecord | null;
   /** The Carpentry record; absent where the transaction did not read it. */
   carpentry?: CarpentryRecord | null;
+  /** The Husbandry record, when the change was a collection or a herd order. */
+  husbandry?: HusbandryRecord | null;
   /** The Fishing record (db/farm-fishing.mts), when the change was a catch. */
   fishing?: Readonly<{ xp: number; catches: number; species: Readonly<Record<string, number>>; shiny: number; golden: number; trophies: number }> | null;
   /** The fish just landed, when the change was a catch. */
   catch?: Readonly<{ rarity: string; sizeClass: string; variant: string }> | null;
   /** A filled order's level gate, when the change was an order. */
   order?: Readonly<{ minLevel: number }> | null;
+  /** The meat just cut, when the change was an animal sent to the Butcher. */
+  butcher?: Readonly<{ quality: string }> | null;
 }>;
 
 function def(id: string, name: string, description: string, category: AchievementDefinition["category"], extra: Partial<AchievementDefinition> = {}): AchievementDefinition {
@@ -84,6 +88,13 @@ export const FARM_ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = Ob
   def("farm_legend_of_the_deep", "Legend of the Deep", "Land a Legendary fish.", "challenge", { points: 40 }),
   def("farm_reel_talent", "Reel Talent", "Reach Fishing level 10.", "progression", { points: 20 }),
   def("farm_full_fishdex", "Full Fishdex", "Land every kind of fish in the Cove at least once.", "mastery", { parentId: "farm_reel_talent", tier: 2, points: 50 }),
+  // Livestock: Husbandry.
+  def("farm_fresh_from_the_pail", "Fresh from the Pail", "Collect milk or wool from your livestock.", "progression"),
+  def("farm_stockkeeper", "Stockkeeper", "Collect from your livestock 100 times.", "progression", { parentId: "farm_fresh_from_the_pail", tier: 2, points: 30 }),
+  def("farm_straight_from_the_herd", "Straight from the Herd", "Fill a herd order from the Order Board.", "progression", { parentId: "farm_fresh_from_the_pail", tier: 2, points: 20 }),
+  def("farm_stockman", "Stockman", "Reach Husbandry level 10.", "progression", { points: 20 }),
+  def("farm_off_to_the_butcher", "Off to the Butcher", "Send a grown animal to the Butcher in the Market Square.", "progression"),
+  def("farm_prime_cut", "Prime Cut", "Have the Butcher cut Perfect meat.", "challenge", { parentId: "farm_off_to_the_butcher", tier: 2, points: 30 }),
 ]);
 
 export function detectFarmAchievements(facts: FarmAchievementFacts): string[] {
@@ -120,6 +131,13 @@ export function detectFarmAchievements(facts: FarmAchievementFacts): string[] {
   if (carpentry.pieces >= 50) earned.push("farm_cabinetmaker");
   if (farmingLevelForXp(carpentry.xp) >= 10) earned.push("farm_journeyman");
   if (FARM_PIECE_IDS.every((itemId) => (carpentry.patterns[itemId] ?? 0) > 0)) earned.push("farm_pattern_book");
+  const husbandry = normalizeHusbandryRecord(facts.husbandry);
+  if (husbandry.collections >= 1) earned.push("farm_fresh_from_the_pail");
+  if (husbandry.collections >= 100) earned.push("farm_stockkeeper");
+  if (husbandry.orders >= 1) earned.push("farm_straight_from_the_herd");
+  if (farmingLevelForXp(husbandry.xp) >= 10) earned.push("farm_stockman");
+  if (husbandry.butchered >= 1) earned.push("farm_off_to_the_butcher");
+  if (facts.butcher?.quality === "perfect") earned.push("farm_prime_cut");
   const fishing = facts.fishing;
   if (fishing) {
     if (fishing.catches >= 1) earned.push("farm_first_catch");

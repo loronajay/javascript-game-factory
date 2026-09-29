@@ -27,6 +27,7 @@ import { createDecorThumbnails } from "./arcade-room-decor-thumbnails.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
 import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import { createEditorPanel, type EditPhase, type EditorSelection, type EditorTab, type PanelElements } from "./arcade-room-editor-panel.mjs";
+import { editorRotationDirection } from "./space-editor/editor-shortcuts.mjs";
 import {
   ROOM_BOUNDS_DEFAULTS,
   addCabinetItem,
@@ -489,7 +490,7 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     const title = cabinetEntry(item.cabinetId)?.cabinet.title ?? "Cabinet";
     setStatus(item.hidden
       ? `${title} is hidden · press H or Show to put it back on the floor.`
-      : `${title} selected · drag it, nudge with arrows, Q/R to rotate, H to hide.`);
+      : `${title} selected · drag it, nudge with arrows, Q/E to rotate, H to hide.`);
   }
 
   function selectDecor(instanceId: string): void {
@@ -502,9 +503,9 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
     const definition = findDecor(item.itemId);
     const hint = item.mount === "wall"
       ? definition?.spin.enabled
-        ? "drag it along the wall, arrows to slide and raise, Q/R to turn it on the wall"
+        ? "drag it along the wall, arrows to slide and raise, Q/E to turn it on the wall"
         : "drag it along the wall, arrows to slide and raise"
-      : "drag it, arrows to nudge, Q/R to rotate";
+      : "drag it, arrows to nudge, Q/E to rotate";
     const size = definition?.scale.enabled ? " · drag a corner to resize" : definition?.length.enabled ? " · drag an end arrow to stretch" : "";
     setStatus(`${definition?.title ?? "Item"} selected · ${hint}${size} · hold Alt to skip snapping · Delete to remove.`);
   }
@@ -1107,11 +1108,15 @@ export function createRoomEditor(options: RoomEditorOptions): RoomEditor {
       else if (item) duplicateDecor(item.instanceId);
       return;
     }
+    const rotationDirection = editorRotationDirection(event.code);
+    if (rotationDirection !== null) {
+      event.preventDefault();
+      rotate(rotationDirection);
+      return;
+    }
     const bindings: Record<string, () => void> = {
       // Escape backs out one level: a selection first, then build mode itself.
       Escape: () => { if (selection) clearSelection(); else finish(); },
-      KeyQ: () => rotate(-1),
-      KeyR: () => rotate(1),
       KeyH: () => toggleHidden(),
       KeyF: () => view.setView("front"),
       KeyT: () => view.setView("top"),

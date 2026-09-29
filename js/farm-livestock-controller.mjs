@@ -207,7 +207,11 @@ export function createFarmLivestockController(options) {
                 void care("collect", id).then((result) => {
                     if (result?.ok) {
                         const good = findLivestockGood(result.itemId);
-                        options.setStatus(`${animal.name} gave ${result.quantity} ${QUALITY_TITLES[result.quality] ?? ""} ${good?.title ?? result.itemId}. It is in your basket.`);
+                        const xp = Number(result.xp) > 0 ? ` +${Number(result.xp).toLocaleString()} Husbandry XP.` : "";
+                        const levelUp = Number(result.husbandry?.level) > Number(result.husbandry?.levelBefore) ? ` Husbandry level ${result.husbandry.level}!` : "";
+                        options.setStatus(`${animal.name} gave ${result.quantity} ${QUALITY_TITLES[result.quality] ?? ""} ${good?.title ?? result.itemId}. It is in your basket.${xp}${levelUp}`);
+                        if (Array.isArray(result.achievements) && result.achievements.length)
+                            options.onAchievements?.(result.achievements);
                     }
                     else if (result?.error)
                         options.setStatus(`${animal.name} ${CARE_ERRORS[result.error] ?? "could not be collected from. Try again."}`);

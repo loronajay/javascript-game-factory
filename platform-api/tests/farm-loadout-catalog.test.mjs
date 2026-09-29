@@ -128,6 +128,7 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
       cooking: { xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: {}, learned: [], recent: [] },
       carpentry: { xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: {}, recent: [] },
       bartering: { xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 },
+      husbandry: { xp: 0, collections: 0, orders: 0, goods: {}, butchered: 0, meat: {} },
     },
   });
   // A pre-build-mode document keeps its version so the client can migrate it (seed the starter field).

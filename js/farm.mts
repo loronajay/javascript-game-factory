@@ -104,6 +104,7 @@ const skillsHud = createFarmSkillsHud({
   woodcutting: { root: requiredElement<HTMLElement>("#woodcuttingSkill"), label: requiredElement<HTMLElement>("#woodcuttingSkillLabel"), bar: requiredElement<HTMLElement>("#woodcuttingSkillBar") },
   cooking: { root: requiredElement<HTMLElement>("#cookingSkill"), label: requiredElement<HTMLElement>("#cookingSkillLabel"), bar: requiredElement<HTMLElement>("#cookingSkillBar") },
   carpentry: { root: requiredElement<HTMLElement>("#carpentrySkill"), label: requiredElement<HTMLElement>("#carpentrySkillLabel"), bar: requiredElement<HTMLElement>("#carpentrySkillBar") },
+  husbandry: { root: requiredElement<HTMLElement>("#husbandrySkill"), label: requiredElement<HTMLElement>("#husbandrySkillLabel"), bar: requiredElement<HTMLElement>("#husbandrySkillBar") },
 });
 const farmClockPhase = requiredElement<HTMLElement>("#farmClockPhase");
 const napDialog = requiredElement<HTMLDialogElement>("#napDialog");
@@ -753,7 +754,7 @@ function applyLayout(next: FarmLayout): void {
   if (body.mode === "climbing" && !ladders.some((ladder) => ladder.id === body.fixtureId)) applyBodyStep(releaseLadder(player, body));
   petSim.sync(layout);
   petsPanel.render(layout);
-  inventoryPanel.render(layout.agriculture, skillLevels());
+  inventoryPanel.render(layout.agriculture, skillLevels(), anglerLink.stats());
   kitchenSync();
   workshopSync();
   livestockSync();
@@ -1127,9 +1128,11 @@ const anglerLink = createAnglerLink({
   ownerId: layoutStore.ownerPlayerId,
   isOwner: !visiting && layoutStore.accountBacked,
   modelFor: (instanceId) => world.modelFor(instanceId),
-  onChange: () => statsPanel.render(layout.skills, anglerLink.stats()),
+  onChange: () => {
+    statsPanel.render(layout.skills, anglerLink.stats());
+    inventoryPanel.render(layout.agriculture, skillLevels(), anglerLink.stats());
+  },
 });
-void anglerLink.refresh();
 
 // Livestock (planning-docs/FARM_LIVESTOCK_PLAN.md): the server's herd, kept in the farm's stalls, barn and pens.
 const livestockPanel = createLivestockPanel({
@@ -1161,6 +1164,7 @@ const livestock = createFarmLivestockController({
   // Care goes through the harvest seam: the farm is sent, the server settles the herd and answers with the farm.
   submit: canManageFarm && serverHarvests ? submitServerHarvest : null,
   setStatus: (text) => { status.textContent = text; livestockPanel.setStatus(text); },
+  onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements as any[]),
 });
 livestockSync = () => livestock.sync();
 void livestock.refresh();
@@ -1178,10 +1182,12 @@ const inventoryPanel = createFarmInventoryPanel({
   planksGrid: requiredElement<HTMLElement>("#planksGrid"),
   furnitureGrid: requiredElement<HTMLElement>("#furnitureGrid"),
   pantryGrid: requiredElement<HTMLElement>("#pantryGrid"),
+  fishGrid: requiredElement<HTMLElement>("#fishGrid"),
+  tackleGrid: requiredElement<HTMLElement>("#tackleGrid"),
   selected: requiredElement<HTMLElement>("#selectedSeed"),
 }, {
   thumbnail: cropThumbnails.get,
-  itemThumbnail: itemThumbnails.get,
+  itemThumbnail: portraits,
   purchaseSupply: layoutStore.accountBacked ? async (itemId, quantity) => {
     const result = await ticketClient.purchaseFarmSupply(itemId, quantity, farmPurchaseId("supply"));
     if (!result?.ok) return result?.error === "insufficient_tickets" ? "Not enough tickets." : result?.error === "inventory_full" ? "That supply stack is full." : "Purchase failed. Try again.";
@@ -1192,7 +1198,7 @@ const inventoryPanel = createFarmInventoryPanel({
     return `Purchased · ${Number(result.balance).toLocaleString()} tickets remain.`;
   } : null,
 });
-inventoryPanel.render(layout.agriculture, skillLevels());
+inventoryPanel.render(layout.agriculture, skillLevels(), anglerLink.stats());
 renderFieldCapacity();
 if (visiting) openInventoryButton.hidden = true;
 
@@ -1209,6 +1215,11 @@ statsPanel.render(layout.skills, anglerLink.stats());
 openInventoryButton.addEventListener("click", () => statsPanel.close());
 openPetsButton.addEventListener("click", () => statsPanel.close());
 if (visiting) openStatsButton.hidden = true;
+if (!visiting) {
+  openInventoryButton.addEventListener("click", () => { void anglerLink.refresh(); });
+  openStatsButton.addEventListener("click", () => { void anglerLink.refresh(); });
+  void anglerLink.refresh();
+}
 
 // The field's producers. Growing plots (farm-crops-controller.mts) and the orchard and forestry
 // (farm-trees-controller.mts); an account farm's harvests, picks and fellings are the server's.

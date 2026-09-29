@@ -5,7 +5,7 @@ import { hangingLightChain, gazeboCanopy, gableRoofHeightAt, gambrelRoofHeightAt
 import { SCENERY } from "../farm-scenery.mjs";
 import { FARM_BOUNDS } from "../farm-layout.mjs";
 import { TREE_ARCHETYPES } from "../farm-props-plants.mjs";
-import { aquaticArchStones, lagoonRimStones, wheelbarrowTrayShell } from "../farm-prop-geometry.mjs";
+import { aquaticArchStones, doghouseGableMesh, lagoonRimStones, wheelbarrowTrayShell } from "../farm-prop-geometry.mjs";
 
 test("the nearest possible hill stays beyond the whole farm instead of clipping the property", () => {
   const propertyRadius = Math.hypot(FARM_BOUNDS.width / 2, FARM_BOUNDS.depth / 2);
@@ -87,6 +87,23 @@ test("the wheelbarrow tray is an open, tapered shell instead of a solid box", ()
   assert.ok(shell.front.bottomWidth < shell.front.topWidth, "the front wall flares outward toward its rim");
   assert.ok(shell.rear.bottomWidth < shell.rear.topWidth, "the rear wall flares outward toward its rim");
   assert.ok(shell.rimHeight > shell.floorHeight, "the tray has a useful carrying depth");
+});
+
+test("the doghouse closes the triangular wall area beneath both roof ends", () => {
+  const gables = doghouseGableMesh();
+  assert.equal(gables.positions.length, 18, "one triangle closes each end of the roof");
+  assert.equal(gables.uvs.length, 12, "both gables receive plank texture coordinates");
+
+  const front = gables.positions.slice(0, 9);
+  const back = gables.positions.slice(9, 18);
+  assert.deepEqual(front.filter((_value, index) => index % 3 === 2), [0.65, 0.65, 0.65]);
+  assert.deepEqual(back.filter((_value, index) => index % 3 === 2), [-0.65, -0.65, -0.65]);
+  for (const triangle of [front, back]) {
+    const xs = triangle.filter((_value, index) => index % 3 === 0);
+    const ys = triangle.filter((_value, index) => index % 3 === 1);
+    assert.deepEqual([...xs].sort((a, b) => a - b), [-0.55, 0, 0.55]);
+    assert.deepEqual([...ys].sort((a, b) => a - b), [0.9, 0.9, 1.3]);
+  }
 });
 
 test("aquatic cave stones form an irregular arch without plugging the promised entrance", () => {

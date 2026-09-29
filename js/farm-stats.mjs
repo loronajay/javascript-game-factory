@@ -6,6 +6,7 @@ import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { RECIPE_CATALOG } from "./farm-catalog/recipes.mjs";
 import { PATTERN_CATALOG } from "./farm-catalog/carpentry.mjs";
 import { FISH_CATALOG } from "./farm-catalog/fish.mjs";
+import { LIVESTOCK_GOODS, LIVESTOCK_MEATS } from "./farm-catalog/livestock.mjs";
 import { barteringBenefits } from "./farm-bartering.mjs";
 import { farmingProgress } from "./farm-skills.mjs";
 function sumCounts(values) {
@@ -59,6 +60,12 @@ export function buildFarmStats(skills, extras = {}) {
             { label: "Species caught", value: Object.values(extras.fishing.dex).filter((entry) => entry.caught > 0).length },
         ], "Fish landed", breakdown(FISH_CATALOG, Object.fromEntries(Object.entries(extras.fishing.dex).map(([id, entry]) => [id, entry.caught])))));
     }
+    rows.push(skill("husbandry", "Husbandry", "Keep livestock fed, collect their milk and wool, and raise them for the Butcher. Levels open new animals at the Livestock Dealer.", skills.husbandry.xp, [
+        { label: "Collections", value: skills.husbandry.collections },
+        { label: "Goods collected", value: sumCounts(skills.husbandry.goods) },
+        { label: "Herd orders filled", value: skills.husbandry.orders },
+        { label: "Sent to the Butcher", value: skills.husbandry.butchered },
+    ], "Goods collected and meat cut", breakdown([...LIVESTOCK_GOODS, ...LIVESTOCK_MEATS].map((item) => ({ id: item.itemId, title: item.title })), { ...skills.husbandry.goods, ...skills.husbandry.meat })));
     const benefits = barteringBenefits(farmingProgress(skills.bartering.xp).level);
     rows.push(skill("bartering", "Bartering", `Negotiate NPC prices: ${Math.round(benefits.purchaseDiscount * 1000) / 10}% off purchases and ${Math.round(benefits.saleBonus * 1000) / 10}% extra on sales.`, skills.bartering.xp, [
         { label: "Deals made", value: skills.bartering.deals },

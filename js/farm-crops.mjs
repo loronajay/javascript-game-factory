@@ -2,7 +2,7 @@
 // the page, server normalizer and headless tests all use the same farming contract.
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
-import { LIVESTOCK_FEEDS, LIVESTOCK_GOODS } from "./farm-catalog/livestock.mjs";
+import { LIVESTOCK_BASKET_ITEMS, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
 import { PIECE_KEYS } from "./farm-catalog/carpentry.mjs";
 import { QUALITIES, cropQuality, produceKey } from "./farm-quality.mjs";
@@ -64,13 +64,14 @@ export function deadCropModel(stage) {
 export const PRODUCE_IDS = Object.freeze([...CROP_CATALOG.map((entry) => entry.id), ...FRUIT_IDS]);
 /**
  * Every basket stack: each crop at every grade (Normal is the bare id), then the
- * fruit, which has no grades, then the livestock's goods (milk, wool), graded
- * like crops by the care the animal had (farm-livestock-care.mts).
+ * fruit, which has no grades, then the livestock's goods (milk, wool) and the
+ * Butcher's meat, graded like crops by the care the animal had
+ * (farm-livestock-care.mts, farm-livestock-butcher.mts).
  */
 export const PRODUCE_KEYS = Object.freeze([
     ...CROP_CATALOG.flatMap((entry) => QUALITIES.map((quality) => produceKey(entry.id, quality))),
     ...FRUIT_IDS,
-    ...LIVESTOCK_GOODS.flatMap((good) => QUALITIES.map((quality) => produceKey(good.itemId, quality))),
+    ...LIVESTOCK_BASKET_ITEMS.flatMap((item) => QUALITIES.map((quality) => produceKey(item.itemId, quality))),
 ]);
 export function findCrop(id) {
     return typeof id === "string" ? CROP_CATALOG.find((entry) => entry.id === id) : undefined;

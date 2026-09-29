@@ -353,7 +353,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
                                 ? "Drag or rotate this memorial like any prop. Removing it is permanent, though its history remains in farm records."
                                 : row.stars
                                     ? "You made this at the Workbench. Removing it puts it back on the shelf, to place again or sell at the Market Square's Sawmill."
-                                    : "Drag it in the field, arrows to nudge, Q/R to turn.");
+                                    : "Drag it in the field, arrows to nudge, Q/E to turn.");
         nodes.push(tools, removeRow, removeHint, hint);
         elements.inspector.replaceChildren(...nodes);
         return { instanceId: row.instanceId, where, lengthInput, remove, removeHint };

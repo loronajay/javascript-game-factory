@@ -6,6 +6,8 @@
 // the server call; the SERVER rolls the animal, checks the room and charges
 // the price, and the panel redraws from what comes back. The Dealer only
 // sells young ones — the stats are the animal's own, seen once it is home.
+// A species past the player's Husbandry level shows what it takes and cannot
+// be bought (the server refuses it too).
 import { LIVESTOCK_CATALOG } from "./farm-catalog/livestock.mjs";
 import { homesWithRoom, totalLivestockSlots } from "./farm-livestock-housing.mjs";
 function element(tag, className, text = "") {
@@ -62,6 +64,7 @@ export function createLivestockDealerPanel(elements, options) {
             return sum + (home.slots - taken);
         }, 0);
         const total = totalLivestockSlots(farm.homes);
+        const level = options.husbandryLevel?.() ?? 1;
         elements.room.textContent = total
             ? `Room at home: ${free} of ${total} ${total === 1 ? "place" : "places"} free · ${farm.herd.length} head on the farm`
             : "Your farm has nowhere to keep livestock yet — build a pen, or use the barn floor or a stable's stalls.";
@@ -69,13 +72,19 @@ export function createLivestockDealerPanel(elements, options) {
         for (const species of LIVESTOCK_CATALOG) {
             const card = element("li", "dealer-card");
             card.dataset.speciesId = species.id;
+            const locked = level < species.minLevel;
+            card.classList.toggle("is-locked", locked);
             const words = element("div", "dealer-card__words");
             words.append(element("strong", "", `${species.youngTitle} · grows into a ${species.title}`), element("small", "", livestockGoods(species)), element("small", "dealer-card__grow", `${species.price.toLocaleString()} tickets · grown in about ${species.adultDays} farm days`));
             const button = element("button", "farm-button farm-button--accent dealer-card__buy", `Buy · ${species.price.toLocaleString()}`);
             button.type = "button";
             button.setAttribute("aria-label", `Buy a ${species.youngTitle.toLowerCase()} for ${species.price.toLocaleString()} tickets`);
-            button.disabled = busy || free <= 0;
-            button.title = free <= 0 ? "No room at home" : `Buy a ${species.youngTitle.toLowerCase()} for ${species.price.toLocaleString()} tickets`;
+            if (locked)
+                button.textContent = `Husbandry ${species.minLevel}`;
+            button.disabled = busy || free <= 0 || locked;
+            button.title = locked
+                ? `Hollis sells ${species.title.toLowerCase()}s from Husbandry ${species.minLevel}. You are Husbandry ${level}.`
+                : free <= 0 ? "No room at home" : `Buy a ${species.youngTitle.toLowerCase()} for ${species.price.toLocaleString()} tickets`;
             button.addEventListener("click", () => void buy(species.id));
             card.append(picture(species), words, button);
             elements.list.append(card);

@@ -17,7 +17,7 @@
 // WHERE IT MATTERS. The Produce Merchant pays by grade (QUALITY_PRICE). An
 // order and a recipe ask for the crop, and take the plainest first.
 
-import { FARM_LIVESTOCK_GOODS } from "./farm-livestock-catalog.mjs";
+import { FARM_LIVESTOCK_BASKET_IDS } from "./farm-livestock-catalog.mjs";
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
 
@@ -48,8 +48,8 @@ export function farmCropQuality(row: any): FarmQuality {
   return row?.fertilized === true ? bump[cared] : cared;
 }
 
-// Livestock goods (services/farm-livestock-catalog): milk and wool, graded by the animal's care like a crop.
-const LIVESTOCK_GOOD_IDS: ReadonlySet<string> = new Set(FARM_LIVESTOCK_GOODS.map((good) => good.itemId));
+// Livestock goods and meat (services/farm-livestock-catalog): milk, wool and the Butcher's cuts, graded by the animal's care like a crop.
+const LIVESTOCK_GOOD_IDS: ReadonlySet<string> = new Set(FARM_LIVESTOCK_BASKET_IDS);
 const FRUIT_IDS: ReadonlySet<string> = new Set(Object.entries(FARM_TREE_RULES).filter(([, rule]) => rule.kind === "fruit").map(([id]) => id));
 const has = (table: object, id: string): boolean => Object.prototype.hasOwnProperty.call(table, id);
 

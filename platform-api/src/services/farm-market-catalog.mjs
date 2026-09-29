@@ -11,7 +11,7 @@
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { FARM_TREE_RULES } from "./farm-tree-catalog.mjs";
-import { FARM_LIVESTOCK_GOODS, farmLivestockGoodPrice } from "./farm-livestock-catalog.mjs";
+import { FARM_LIVESTOCK_GOODS, FARM_LIVESTOCK_RULES, farmLivestockGoodPrice, farmLivestockMeatPrice } from "./farm-livestock-catalog.mjs";
 import { FARM_RECIPE_RULES, farmRecipeRule, parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { farmPiecePrice, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
 import { QUALITY_PRICE, parseFarmProduceKey } from "./farm-quality-catalog.mjs";
@@ -42,6 +42,8 @@ export const FARM_PRODUCE_PRICES = Object.freeze(Object.fromEntries([
     }),
     ...Object.entries(FARM_TREE_RULES).filter(([, rule]) => rule.kind === "fruit").map(([fruitId, rule]) => [fruitId, derivedFruitPrice(rule)]),
     ...FARM_LIVESTOCK_GOODS.map((good) => [good.itemId, farmLivestockGoodPrice(good)]),
+    // The Butcher's meat: the young one's price plus a margin for its days to prime, over its cuts.
+    ...FARM_LIVESTOCK_RULES.map((entry) => [entry.meat.itemId, farmLivestockMeatPrice(entry)]),
 ]));
 export function farmProducePrice(cropId) {
     return typeof cropId === "string" && Object.prototype.hasOwnProperty.call(FARM_PRODUCE_PRICES, cropId)

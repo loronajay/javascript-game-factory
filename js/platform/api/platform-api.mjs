@@ -659,6 +659,10 @@ export function createPlatformApiClient(options = {}) {
         careFarmLivestock({ layout, action, animalId, itemId }) {
             return post("/games/farm/livestock/care", { layout, action, animalId, itemId }, "result", {}, true);
         },
+        /** The Market's Butcher: a grown animal leaves the farm for meat in the basket (at the farm's stored clock). */
+        butcherFarmLivestock({ animalId }) {
+            return post("/games/farm/livestock/butcher", { animalId }, "result", {}, true);
+        },
         /** Mount a fish from the creel (Old Pike's fee), or take one down back into the creel. */
         mountFarmFish({ fishId, mounted, purchaseId }) {
             return post("/games/farm/fishing/mounts", { fishId, mounted, purchaseId }, "result", {}, true);

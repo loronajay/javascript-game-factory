@@ -26,6 +26,7 @@ import { createEditorGizmos } from "./arcade-room-editor-gizmos.mjs";
 import type { DecorHandle } from "./arcade-room-decor-resize.mjs";
 import { createEditorCameraController } from "./space-editor/editor-camera-controller.mjs";
 import { createEditHistory } from "./space-editor/editor-history.mjs";
+import { editorRotationDirection } from "./space-editor/editor-shortcuts.mjs";
 import type { FarmWorld } from "./farm-world.mjs";
 import type { FloorObstacle } from "./arcade-room-layout.mjs";
 
@@ -347,7 +348,7 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
     renderPanel();
     if (quiet) return;
     const size = definition.length.enabled ? " · drag an end arrow to stretch it" : "";
-    setStatus(`${definition.title} selected · drag it, arrows to nudge, Q/R to turn${size} · hold Alt to skip snapping · Delete to remove.`);
+    setStatus(`${definition.title} selected · drag it, arrows to nudge, Q/E to turn${size} · hold Alt to skip snapping · Delete to remove.`);
   }
 
   function clearSelection(): void {
@@ -780,10 +781,14 @@ export function createFarmEditor(options: FarmEditorOptions): FarmEditor {
       if (selection) duplicate(selection);
       return;
     }
+    const rotationDirection = editorRotationDirection(event.code);
+    if (rotationDirection !== null) {
+      event.preventDefault();
+      rotate(rotationDirection);
+      return;
+    }
     const bindings: Record<string, () => void> = {
       Escape: () => { if (relocating) cancelRelocate(); else if (selection) clearSelection(); else finish(); },
-      KeyQ: () => rotate(-1),
-      KeyR: () => rotate(1),
       KeyF: () => view.setView("front"),
       KeyT: () => view.setView("top"),
       KeyO: () => view.setView("overview"),

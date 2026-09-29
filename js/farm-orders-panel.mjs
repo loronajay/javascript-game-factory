@@ -26,7 +26,7 @@ export function createOrderBoardPanel(elements, options) {
             return `Needs ${SKILL_TITLES[view.order.skill]} ${view.order.minLevel}`;
         if (view.state === "short") {
             const missing = view.lines.filter((line) => line.short > 0);
-            return missing.length === 1 ? `Need ${missing[0].short} more ${missing[0].title}` : view.order.kind === "dish" ? "Missing dishes" : "Missing produce";
+            return missing.length === 1 ? `Need ${missing[0].short} more ${missing[0].title}` : view.order.kind === "dish" ? "Missing dishes" : view.order.kind === "goods" ? "Missing goods" : "Missing produce";
         }
         return `Deliver for ${view.order.tickets.toLocaleString()} tickets`;
     }
@@ -98,6 +98,8 @@ export function createOrderBoardPanel(elements, options) {
             skills.push(`Cooking ${board.levels.cooking}`);
         if (board.orders.some((order) => order.kind === "fish"))
             skills.push(`Fishing ${board.levels.fishing}`);
+        if (board.orders.some((order) => order.kind === "goods"))
+            skills.push(`Husbandry ${board.levels.husbandry}`);
         elements.level.textContent = skills.join(" · ");
         elements.turnover.textContent = boardTurnoverLabel(board.endsAt, now());
         const views = board.orders.map((order) => orderView(order, board));

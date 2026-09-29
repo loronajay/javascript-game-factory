@@ -77,8 +77,8 @@ export const STARTER_FARM_DECOR = Object.freeze([
     row("soil-1", "decor.plant.soil-patch", 4.5, 6.5),
     // The farmhouse backs onto the rear fence, leaving the field open in front of it. The range's
     // local pose remains against the back wall so it travels with the house as interior furniture.
-    row("cottage-1", "decor.building.cottage", 4.2, -9.3, 6.1021),
-    row("kitchen-range-1", "decor.prop.kitchen-range", 3.5203, -12.2507, 6.1021),
+    row("cottage-1", "decor.building.cottage", 4.2, -9.3, 0),
+    row("kitchen-range-1", "decor.prop.kitchen-range", 3, -12, 0),
     // Two Tree Plots for the new farm's first sapling of each kind.
     row("tree-plot-1", "decor.plant.tree-plot", -9.5, 10.5),
     row("tree-plot-2", "decor.plant.tree-plot", -6.2, 11.2),
@@ -120,6 +120,17 @@ const FORWARD_STARTER_HOMESITE = Object.freeze({
     "oak-3": pose("decor.plant.oak", -11, 4),
     "oak-4": pose("decor.plant.oak", 9.5, 10.5),
 });
+const LOPSIDED_REAR_STARTER_HOMESITE = Object.freeze({
+    "cottage-1": pose("decor.building.cottage", 4.2, -9.3, 6.1021),
+    "kitchen-range-1": pose("decor.prop.kitchen-range", 3.5203, -12.2507, 6.1021),
+    "hay-bale-1": pose("decor.prop.hay-bale", -8, -2.5, 0.4),
+    "hay-bale-2": pose("decor.prop.hay-bale", -6.5, -2, -0.2),
+    "trough-1": pose("decor.prop.trough", -4, -4, Math.PI / 2),
+    "oak-1": pose("decor.plant.oak", 11.5, -10.5),
+    "oak-2": pose("decor.plant.oak", 11, 5.5),
+    "oak-3": pose("decor.plant.oak", -11, 4),
+    "oak-4": pose("decor.plant.oak", 9.5, 10.5),
+});
 function matchesStarterHomesite(decor, signature) {
     return STARTER_HOMESITE_IDS.every((instanceId) => {
         const row = decor.find((candidate) => candidate.instanceId === instanceId);
@@ -131,7 +142,8 @@ function matchesStarterHomesite(decor, signature) {
 function migrateStarterHomesite(decor) {
     if (!matchesStarterHomesite(decor, LEGACY_STARTER_HOMESITE)
         && !matchesStarterHomesite(decor, CROWDED_STARTER_HOMESITE)
-        && !matchesStarterHomesite(decor, FORWARD_STARTER_HOMESITE))
+        && !matchesStarterHomesite(decor, FORWARD_STARTER_HOMESITE)
+        && !matchesStarterHomesite(decor, LOPSIDED_REAR_STARTER_HOMESITE))
         return [...decor];
     const replacements = new Map(STARTER_FARM_DECOR.filter((row) => STARTER_HOMESITE_IDS.includes(row.instanceId)).map((row) => [row.instanceId, row]));
     return decor.map((row) => replacements.get(row.instanceId) ?? row);

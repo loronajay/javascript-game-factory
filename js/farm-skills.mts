@@ -14,6 +14,7 @@ import { CROP_CATALOG, FARM_DAY_MINUTES, findCrop } from "./farm-crops.mjs";
 import { FRUIT_TREES, TIMBER_TREES } from "./farm-catalog/trees.mjs";
 import { RECIPE_CATALOG } from "./farm-catalog/recipes.mjs";
 import { PATTERN_CATALOG } from "./farm-catalog/carpentry.mjs";
+import { LIVESTOCK_GOODS, LIVESTOCK_MEATS } from "./farm-catalog/livestock.mjs";
 
 export const FARMING_MAX_LEVEL = 99;
 export const FARMING_MAX_XP = 200_000_000;
@@ -101,7 +102,19 @@ export type BarteringRecord = Readonly<{
   bonus: number;
 }>;
 
-export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord }>;
+export type HusbandryRecord = Readonly<{
+  xp: number;
+  /** Lifetime trips to an animal that brought goods home, and herd orders filled. */
+  collections: number;
+  orders: number;
+  /** Lifetime pieces collected per good (milk, wool…). */
+  goods: Readonly<Record<string, number>>;
+  /** Animals sent to the Butcher, and the cuts he made of them per meat. */
+  butchered: number;
+  meat: Readonly<Record<string, number>>;
+}>;
+
+export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord; husbandry: HusbandryRecord }>;
 
 export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
@@ -109,6 +122,7 @@ export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   cooking: Object.freeze({ xp: 0, dishes: 0, perfect: 0, orders: 0, recipes: Object.freeze({}), learned: Object.freeze([]) }),
   carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
   bartering: Object.freeze({ xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 }),
+  husbandry: Object.freeze({ xp: 0, collections: 0, orders: 0, goods: Object.freeze({}), butchered: 0, meat: Object.freeze({}) }),
 });
 
 function count(value: unknown, limit = 100_000_000): number {
@@ -138,7 +152,8 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
   const cooking: any = source.cooking && typeof source.cooking === "object" ? source.cooking : null;
   const carpentry: any = source.carpentry && typeof source.carpentry === "object" ? source.carpentry : null;
   const bartering: any = source.bartering && typeof source.bartering === "object" ? source.bartering : null;
-  if (!farming && !woodcutting && !cooking && !carpentry && !bartering) return EMPTY_FARM_SKILLS;
+  const husbandry: any = source.husbandry && typeof source.husbandry === "object" ? source.husbandry : null;
+  if (!farming && !woodcutting && !cooking && !carpentry && !bartering && !husbandry) return EMPTY_FARM_SKILLS;
   return Object.freeze({
     farming: farming ? Object.freeze({
       xp: count(farming.xp, FARMING_MAX_XP),
@@ -171,6 +186,12 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
       xp: count(bartering.xp, FARMING_MAX_XP), deals: count(bartering.deals),
       bought: count(bartering.bought), sold: count(bartering.sold), saved: count(bartering.saved), bonus: count(bartering.bonus),
     }) : EMPTY_FARM_SKILLS.bartering,
+    husbandry: husbandry ? Object.freeze({
+      xp: count(husbandry.xp, FARMING_MAX_XP), collections: count(husbandry.collections), orders: count(husbandry.orders),
+      goods: counts(husbandry.goods, LIVESTOCK_GOODS.map((good) => good.itemId)),
+      butchered: count(husbandry.butchered),
+      meat: counts(husbandry.meat, LIVESTOCK_MEATS.map((meat) => meat.itemId)),
+    }) : EMPTY_FARM_SKILLS.husbandry,
   });
 }
 
