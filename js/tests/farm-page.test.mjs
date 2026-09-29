@@ -7,6 +7,7 @@ import { PET_INTERACTIONS, getPetInteraction, getPetInteractionPrompt } from "..
 import { buildFarmStats } from "../farm-stats.mjs";
 import { DEFAULT_GROUND_ID, findGround } from "../farm-catalog/ground.mjs";
 import { COVE_GROUND_STYLES, coveGroundSurfaceAt } from "../farm-cove-ground.mjs";
+import { farmLightProfile, resolveFarmSceneTime } from "../farm-time.mjs";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..");
 const html = readFileSync(resolve(repoRoot, "farm", "index.html"), "utf8");
@@ -82,6 +83,21 @@ test("inventory and stats are reachable from every farm-game screen", () => {
   assert.match(coveSource, /event\.code === "KeyK"/);
   assert.match(marketSource, /createFarmStatsPanel\(/);
   assert.match(coveSource, /createFarmStatsPanel\(/);
+});
+
+test("the Market Square and Cove light each player's view from that player's farm clock", () => {
+  const marketSource = readFileSync(resolve(repoRoot, "js", "farm-market.mts"), "utf8");
+  const coveSource = readFileSync(resolve(repoRoot, "js", "farm-cove-page.mts"), "utf8");
+  assert.match(marketSource, /resolveFarmSceneTime\(farm\.clock\.farmMinutes, new URLSearchParams\(location\.search\)\.get\("time"\)\)/);
+  assert.match(coveSource, /resolveFarmSceneTime\(inventoryFarm\.layout\.clock\.farmMinutes, new URLSearchParams\(location\.search\)\.get\("time"\)\)/);
+  assert.doesNotMatch(marketSource, /world\.setTime\([^\n]*15 \* 60/);
+  assert.doesNotMatch(coveSource, /world\.setTime\([^\n]*16 \* 60/);
+  const morningPlayer = resolveFarmSceneTime(9 * 60, null);
+  const nightPlayer = resolveFarmSceneTime(22 * 60, null);
+  assert.equal(farmLightProfile(morningPlayer).phase, "day");
+  assert.equal(farmLightProfile(nightPlayer).phase, "night");
+  assert.equal(resolveFarmSceneTime(nightPlayer, "0"), 0, "the QA seam can preview midnight");
+  assert.equal(resolveFarmSceneTime(morningPlayer, "not-a-minute"), morningPlayer, "a bad override cannot replace the farm clock");
 });
 
 test("the farm inventory includes the Cove's fish and tackle", () => {
@@ -265,6 +281,7 @@ test("every building's door is worked with E, at its own reach, and the door is 
   assert.match(source, /obstacles = farmObstacles\(layout, \{ openDoors \}\)/);
   assert.match(source, /if \(doorInReach\) \{\s*toggleDoors\(\);\s*return true;/);
   assert.match(source, /if \(event\.code === "KeyE" && !event\.repeat && farmEntered\) \{\s*if \(interact\(\)\) event\.preventDefault\(\);/);
+  assert.match(source, /if \(event\.code === "KeyX" && !event\.repeat && farmEntered && crops\.inReach\(\)\) \{\s*if \(crops\.clear\(\)\) event\.preventDefault\(\);\s*return;/, "X clears only the targeted planting cell");
   // Doors are per building AND per door fixture, found from the layout with the catalog's reach — the nearest in reach wins, so a
   // stall door beside the stable's own is the one E works — and a building that leaves takes its open doors with it.
   assert.match(source, /nearestDoor\(doorRows\(layout\), pose, \(entry\) => canWorkDoor\(pose, entry\.door, entry\.reach\)\)/);

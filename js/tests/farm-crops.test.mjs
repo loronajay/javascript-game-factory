@@ -14,6 +14,7 @@ import {
   WILT_PENALTY,
   WILT_UNTENDED_MINUTES,
   advanceAgricultureBy,
+  clearFarmCrop,
   clearDeadFarmCrop,
   cropHarvestYield,
   deadCropModel,
@@ -36,6 +37,8 @@ import { PET_CARE } from "../farm-pet-care.mjs";
 import { INGREDIENT_STOCK, RECIPE_STOCK } from "../farm-vendor-stock.mjs";
 import { LEVEL_RECIPE_CATALOG, VENDOR_RECIPE_CATALOG } from "../farm-catalog/recipes.mjs";
 import { producePrice } from "../farm-market-prices.mjs";
+import { createFarmCropsController } from "../farm-crops-controller.mjs";
+import { normalizeFarmLayout } from "../farm-layout.mjs";
 
 const carrot = CROP_CATALOG.find((crop) => crop.id === "carrot");
 const cropAssets = resolve(import.meta.dirname, "..", "..", "farm", "assets", "crops");
@@ -317,6 +320,53 @@ test("three farm days dry kills a crop: it cannot be watered, tended or harveste
 test("a living crop cannot be cleared", () => {
   assert.equal(clearDeadFarmCrop(plant(), "soil-1", "cell-0", 10).reason, "alive");
   assert.equal(clearDeadFarmCrop(plant(), "soil-1", "cell-5", 10).reason, "empty");
+});
+
+test("discarding a plant clears only its cell without refunding the seed or making compost", () => {
+  let agriculture = seeded();
+  agriculture = plantFarmCrop(agriculture, "soil-1", "cell-0", "carrot", 0).agriculture;
+  agriculture = plantFarmCrop(agriculture, "soil-1", "cell-1", "pumpkin", 0).agriculture;
+  const seedsBefore = agriculture.inventory.seeds.carrot;
+  const compostBefore = agriculture.inventory.compost;
+
+  const cleared = clearFarmCrop(agriculture, "soil-1", "cell-0", 10);
+
+  assert.equal(cleared.ok, true);
+  assert.deepEqual(cleared.agriculture.crops.map(({ cellId, cropId }) => ({ cellId, cropId })), [
+    { cellId: "cell-1", cropId: "pumpkin" },
+  ]);
+  assert.equal(cleared.agriculture.inventory.seeds.carrot, seedsBefore, "discarding does not refund the spent seed");
+  assert.equal(cleared.agriculture.inventory.compost, compostBefore, "only a dead crop makes compost");
+  assert.equal(clearFarmCrop(cleared.agriculture, "soil-1", "cell-0", 10).reason, "empty");
+});
+
+test("the plot controller advertises X and persists removal of the one targeted living plant", async () => {
+  let layout = normalizeFarmLayout({
+    version: 3,
+    decor: [{ instanceId: "soil-1", itemId: "decor.plant.soil-patch", x: 0, z: 0, rotationY: 0 }],
+    agriculture: {
+      inventory: { seeds: { carrot: 1 } },
+      crops: [{ plotId: "soil-1", cellId: "cell-3", cropId: "carrot", growthMinutes: 300, moistureMinutes: 900, tended: false, lastFarmMinute: 600 }],
+    },
+    clock: { farmMinutes: 600 },
+  });
+  const controller = createFarmCropsController({
+    layout: () => layout,
+    clockMinutes: () => 600,
+    selectedCropId: () => "carrot",
+    farmingLevel: () => 1,
+    persist: async (next) => { layout = next; return ""; },
+    submitHarvest: null,
+    setStatus: () => undefined,
+    onAchievements: () => undefined,
+  });
+  controller.update({ x: -1, z: 0.6, forward: { x: 0, z: -1 } }, true);
+
+  assert.match(controller.prompt(), /Press X to clear this spot$/);
+  assert.equal(controller.clear(), true);
+  await new Promise((done) => setImmediate(done));
+  assert.equal(layout.agriculture.crops.length, 0);
+  assert.match(controller.prompt(), /Press E to plant 1 Carrot here/);
 });
 
 /** Keep the one crop watered every 10 farm hours so only the untended clock can matter. */

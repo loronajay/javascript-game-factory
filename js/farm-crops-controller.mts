@@ -12,7 +12,7 @@
 // is the server's (the page injects `submitHarvest`); a signed-out farm
 // harvests here.
 
-import { canFertilizeCrop, clearDeadFarmCrop, cropStatus, fertilizeFarmCrop, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type CropPlayerPose, type SoilCellTarget } from "./farm-crops.mjs";
+import { canFertilizeCrop, clearDeadFarmCrop, clearFarmCrop, cropStatus, fertilizeFarmCrop, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type CropPlayerPose, type SoilCellTarget } from "./farm-crops.mjs";
 import { QUALITY_TITLES, gradedTitle, type Quality } from "./farm-quality.mjs";
 import { cropCapacity, cropCapacityUse } from "./farm-capacity.mjs";
 import { withFarmAgriculture, withFarmClock, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
@@ -37,6 +37,8 @@ export type FarmCropsController = Readonly<{
   inReach: () => boolean;
   prompt: () => string;
   interact: () => boolean;
+  /** X uproots the living plant in the targeted cell without refunding its seed. */
+  clear: () => boolean;
 }>;
 
 export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsController {
@@ -62,14 +64,15 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     const definition = findCrop(planted.cropId)!;
     const crop = cropStatus(planted, deps.clockMinutes());
     const wilting = crop.wilted ? "wilting " : "";
+    const clearHint = " · Press X to clear this spot";
     if (crop.dead) return `The ${definition.title} died ${planted.diedOf === "thirst" ? "of thirst" : "untended"} · Press E to clear it onto the compost heap`;
-    if (crop.mature) return `Press E to harvest ${definition.title} · ${crop.harvestYield} ${QUALITY_TITLES[crop.quality]} to collect`;
-    if (crop.needsCare) return `Press E to tend the ${wilting}${definition.title}`;
-    if (crop.thirsty) return `Press E to water the ${wilting}${definition.title}`;
+    if (crop.mature) return `Press E to harvest ${definition.title} · ${crop.harvestYield} ${QUALITY_TITLES[crop.quality]} to collect${clearHint}`;
+    if (crop.needsCare) return `Press E to tend the ${wilting}${definition.title}${clearHint}`;
+    if (crop.thirsty) return `Press E to water the ${wilting}${definition.title}${clearHint}`;
     const course = `on course for ${QUALITY_TITLES[crop.quality]}${planted.fertilized ? " · composted" : ""}`;
     const compost = layout.agriculture.inventory.compost;
-    if (canFertilizeCrop(layout.agriculture, planted, deps.clockMinutes())) return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · ${course} · Press E to work in compost (${compost})`;
-    return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist · ${course}`;
+    if (canFertilizeCrop(layout.agriculture, planted, deps.clockMinutes())) return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · ${course} · Press E to work in compost (${compost})${clearHint}`;
+    return `${definition.title} growing · ${Math.round(crop.progress * 100)}% · soil is moist · ${course}${clearHint}`;
   }
 
   /** What a harvest's answer says about the skill: the XP, and a level (and any new field room) if one was reached. */
@@ -132,6 +135,19 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     return true;
   }
 
+  /** X is intentionally a separate, explicit action so ordinary crop care on E can never uproot by accident. */
+  function clear(): boolean {
+    if (!target) return false;
+    const layout = deps.layout();
+    const planted = plantedAt(layout);
+    if (!planted || cropStatus(planted, deps.clockMinutes()).dead) return false;
+    const action = clearFarmCrop(layout.agriculture, target.plot.instanceId, target.cellId, deps.clockMinutes());
+    if (!action.ok) return false;
+    deps.setStatus(`Cleared the ${findCrop(planted.cropId)!.title} from this spot. The seed was not returned.`);
+    void deps.persist(withFarmClock(withFarmAgriculture(layout, action.agriculture), deps.clockMinutes(), Date.now()));
+    return true;
+  }
+
   return Object.freeze({
     update(pose, allowed) {
       target = allowed ? findSoilCellInReach(deps.layout().decor, pose) : null;
@@ -139,5 +155,6 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     inReach: () => Boolean(target),
     prompt,
     interact,
+    clear,
   });
 }

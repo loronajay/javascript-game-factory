@@ -44,6 +44,18 @@ export function formatFarmTime(minutes: number): string {
   return `${hour12}:${String(minute).padStart(2, "0")} ${hour24 < 12 ? "AM" : "PM"}`;
 }
 
+/**
+ * Pick the light minute for a farm-owned shared place. Each client uses its
+ * own paused farm clock, so people standing together can see different skies.
+ * `?time=` remains a rendering QA seam and deliberately accepts midnight.
+ */
+export function resolveFarmSceneTime(farmMinutes: number, preview: string | null): number {
+  const saved = Number.isFinite(farmMinutes) ? Math.max(0, farmMinutes) : 8 * 60;
+  if (preview === null || preview.trim() === "") return saved;
+  const requested = Number(preview);
+  return Number.isFinite(requested) ? wrapMinutes(requested) : saved;
+}
+
 export type FarmDayPhase = "night" | "dawn" | "day" | "dusk";
 export type FarmLightProfile = Readonly<{
   phase: FarmDayPhase;

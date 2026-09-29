@@ -35,6 +35,18 @@ export function formatFarmTime(minutes) {
     const hour12 = hour24 % 12 || 12;
     return `${hour12}:${String(minute).padStart(2, "0")} ${hour24 < 12 ? "AM" : "PM"}`;
 }
+/**
+ * Pick the light minute for a farm-owned shared place. Each client uses its
+ * own paused farm clock, so people standing together can see different skies.
+ * `?time=` remains a rendering QA seam and deliberately accepts midnight.
+ */
+export function resolveFarmSceneTime(farmMinutes, preview) {
+    const saved = Number.isFinite(farmMinutes) ? Math.max(0, farmMinutes) : 8 * 60;
+    if (preview === null || preview.trim() === "")
+        return saved;
+    const requested = Number(preview);
+    return Number.isFinite(requested) ? wrapMinutes(requested) : saved;
+}
 const KEYFRAMES = Object.freeze([
     { minute: 0, horizon: 0x10182c, zenith: 0x030711, fog: 0x10182c, sunColor: 0xffd7ad, moonColor: 0xbfd8ff, sun: 0, moon: 0.8, hemisphere: 0.2, stars: 1 },
     { minute: 300, horizon: 0x18243c, zenith: 0x081226, fog: 0x18243c, sunColor: 0xffb56b, moonColor: 0xbfd8ff, sun: 0, moon: 0.7, hemisphere: 0.22, stars: 0.95 },

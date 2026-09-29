@@ -927,6 +927,11 @@ window.addEventListener("keydown", (event) => {
         event.preventDefault();
         return;
     }
+    if (event.code === "KeyX" && !event.repeat && farmEntered && crops.inReach()) {
+        if (crops.clear())
+            event.preventDefault();
+        return;
+    }
     if (event.code === "KeyE" && !event.repeat && farmEntered) {
         if (interact())
             event.preventDefault();

@@ -105,6 +105,7 @@ import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
 import { normalizeAngler, type Angler } from "./farm-angler.mjs";
+import { resolveFarmSceneTime } from "./farm-time.mjs";
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -259,10 +260,9 @@ const layout = marketSquareLayout();
 const world = createFarmWorld(THREE, scene, { groundCover: false });
 world.applyGroundStyle(MARKET_PAVING);
 world.sync(layout);
-// The square keeps market hours: a bright mid-afternoon for everyone in it
-// (`?time=<minute>` checks another light, the farm page's QA seam).
-const previewMinute = Number(new URLSearchParams(location.search).get("time"));
-world.setTime(Number.isFinite(previewMinute) && previewMinute > 0 ? previewMinute : 15 * 60);
+// The shared square has no canonical sky: each client sees the minute on their
+// own paused farm clock. `?time=<minute>` remains the farm page's visual-QA seam.
+world.setTime(resolveFarmSceneTime(farm.clock.farmMinutes, new URLSearchParams(location.search).get("time")));
 for (const stall of MARKET_STALLS) scene.add(createMarketStallModel(THREE, stall));
 
 // The keepers stand behind their counters: arcade avatars on the room's visitor

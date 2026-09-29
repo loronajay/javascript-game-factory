@@ -400,6 +400,20 @@ export function clearDeadFarmCrop(value, plotId, cellId, now) {
     const inventory = Object.freeze({ ...agriculture.inventory, compost: Math.min(MAX_STACK, agriculture.inventory.compost + 1) });
     return result(freezeAgriculture({ inventory, crops: agriculture.crops.filter((entry) => entry !== row) }), true);
 }
+/**
+ * Uproot one living plant from one planting cell. The spent seed is deliberately
+ * lost and no compost is made; dead crops keep their separate rewarded clearing
+ * path above.
+ */
+export function clearFarmCrop(value, plotId, cellId, now) {
+    const agriculture = advanceAgriculture(value, now);
+    const row = agriculture.crops.find((entry) => entry.plotId === plotId && entry.cellId === cellId);
+    if (!row)
+        return result(agriculture, false, "empty");
+    if (row.diedOf)
+        return result(agriculture, false, "dead");
+    return result(freezeAgriculture({ inventory: agriculture.inventory, crops: agriculture.crops.filter((entry) => entry !== row) }), true);
+}
 /** Whether E on this crop would work compost into it: alive, unripe, not yet fertilized, and compost on the heap. */
 export function canFertilizeCrop(agriculture, row, now) {
     const state = cropStatus(row, now);

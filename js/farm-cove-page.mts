@@ -69,6 +69,7 @@ import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
+import { resolveFarmSceneTime } from "./farm-time.mjs";
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -189,9 +190,9 @@ scene.add(camera);
 const layout = coveLayout();
 const world = createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => coveWaterDistance({ x, z }) > -4 });
 world.sync(layout);
-// The Cove keeps the late afternoon, when the fish bite (`?time=<minute>` checks another light).
-const previewMinute = Number(new URLSearchParams(location.search).get("time"));
-world.setTime(Number.isFinite(previewMinute) && previewMinute > 0 ? previewMinute : 16 * 60 + 30);
+// Like the farm and square, the Cove uses this client's paused farm clock;
+// people fishing together can therefore see different skies. `?time=` is QA.
+world.setTime(resolveFarmSceneTime(inventoryFarm.layout.clock.farmMinutes, new URLSearchParams(location.search).get("time")));
 const terrain = createCoveTerrain(THREE, scene);
 const STOCK = { [FISHMONGER_STALL_ID]: fishmongerStock(THREE), [TACKLE_STALL_ID]: tackleStock(THREE) } as const;
 for (const stall of COVE_STALLS) scene.add(createMarketStallModel(THREE, stall, STOCK[stall.id as keyof typeof STOCK]));
