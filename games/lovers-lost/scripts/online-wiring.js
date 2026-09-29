@@ -11,7 +11,7 @@ import {
 } from './online-identity.js';
 
 function wireOnlineClient(onlineClient, host) {
-  onlineClient.cb.onConnected   = () => { onlineClient.requestQueueStatus('lovers-lost'); };
+  onlineClient.cb.onConnected   = () => { onlineClient.requestQueueStatus(host.onlineGameId); };
   onlineClient.cb.onQueueCounts = (counts) => { host.onlineQueueCounts = counts; };
 
   onlineClient.cb.onRemoteProfile = (profile) => {
@@ -48,6 +48,10 @@ function wireOnlineClient(onlineClient, host) {
   };
 
   onlineClient.cb.onPartnerLeft = () => {
+    if (host.onlineActivity === 'puzzle' && (host.gs.phase === 'puzzle_playing' || host.gs.phase === 'puzzle_complete')) {
+      host.openPuzzleMenu();
+      return;
+    }
     if (host.gs.phase === 'online_countdown') {
       host.onlineRemoteSide = null; host.onlineRemoteIdentity = null; host.onlineCountdown = null;
       host.onlineRoomCode = ''; host.onlineQueueCounts = null; host.onlineLobbyPhase = 'main';
@@ -72,6 +76,10 @@ function wireOnlineClient(onlineClient, host) {
       host.renderer, host.onlineRemoteSide, snapshot
     );
     if (result) { host.gs = result.gs; host.boyAnim = result.boyAnim; host.girlAnim = result.girlAnim; }
+  };
+
+  onlineClient.cb.onRemotePuzzleSnapshot = (snapshot) => {
+    host.applyRemotePuzzleSnapshot(snapshot);
   };
 }
 

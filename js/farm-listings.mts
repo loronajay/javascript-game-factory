@@ -1,26 +1,39 @@
 // The Market Square's Exchange Board, for display. PURE — no DOM, no THREE, no
 // storage, no fetch.
 //
-// Players list server-minted goods for tickets and anyone else buys them
-// outright. Nothing here decides a listing: the server
+// Players list server-minted goods — and live animals and fish, one to a
+// listing — for tickets at a price THEY set, and anyone else buys outright.
+// Nothing here decides a listing: the server
 // (platform-api/src/services/farm-listing-policy.mts) holds the goods in escrow,
-// enforces the price band, keeps the Market's fee and the day's caps, and moves
-// goods and tickets together. This module mirrors the band and the fee so the
-// page can show them before asking (platform-api/tests/farm-listings.test.mjs
-// holds the two equal), and shapes the server's board for the panel.
+// keeps the Market's fee and the day's caps, and moves goods and tickets
+// together. This module mirrors the fee, the price ceiling and the seller's
+// price GUIDE (what the Market's counters pay; for an animal, the Dealer's
+// price) so the page can show them before asking
+// (platform-api/tests/farm-listings.test.mjs holds the two equal), and shapes
+// the server's board for the panel.
 
 import { PLANKS_PER_LOG } from "./farm-catalog/carpentry.mjs";
 import { plankValue, salePrice } from "./farm-market-prices.mjs";
-import { TRADE_STACKS, findTradeGood, type TradeGood, type TradeStack } from "./farm-trade.mjs";
+import { animalTradeGood, fishTradeGood, findTradeGood, normalizeTradeAnimal, type TradeAnimal, type TradeFish, type TradeGood, type TradeStack } from "./farm-trade.mjs";
+import { findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 
 export const LISTING_FEE_RATE = 0.1;
-export const LISTING_PRICE_FLOOR = 0.5;
-export const LISTING_PRICE_CEILING = 1.5;
 export const MAX_LISTING_QUANTITY = 99;
+/** The most one unit may ask (a day's spending cap on the board). */
+export const MAX_LISTING_UNIT_PRICE = 10_000;
+/** The stacks the board takes, and those listed one row at a time. */
+export const LISTING_STACKS: readonly TradeStack[] = Object.freeze(["produce", "dishes", "logs", "planks", "furniture", "fish", "livestock"]);
+export const SINGLE_ROW_LISTING_STACKS: readonly TradeStack[] = Object.freeze(["fish", "livestock"]);
 
-/** What the Market's own counters would pay for one on a Normal day (logs and planks: the wood's worth). */
-export function listingStandingValue(stack: TradeStack, itemId: string): number {
-  if (!findTradeGood(stack, itemId)) return 0;
+/**
+ * A GUIDE for the seller, never a limit: what the Market's own counters would
+ * pay for one on a Normal day (logs and planks: the wood's worth); for an
+ * animal, what the Livestock Dealer asks for a young one of its species. 0
+ * where there is none (a fish's worth comes from the creel's own read).
+ */
+export function listingStandingValue(stack: TradeStack, itemId: string, speciesId = ""): number {
+  if (stack === "livestock") return findLivestockSpecies(speciesId)?.price ?? 0;
+  if (stack === "fish" || !findTradeGood(stack, itemId)) return 0;
   switch (stack) {
     case "logs": return plankValue(itemId) * PLANKS_PER_LOG;
     case "planks": return plankValue(itemId);
@@ -28,12 +41,9 @@ export function listingStandingValue(stack: TradeStack, itemId: string): number 
   }
 }
 
-export function listingPriceBand(stack: TradeStack, itemId: string): Readonly<{ min: number; max: number; value: number }> | null {
-  const value = listingStandingValue(stack, itemId);
-  if (!(value > 0)) return null;
-  const min = Math.max(1, Math.floor(value * LISTING_PRICE_FLOOR));
-  const max = Math.max(min + 1, Math.ceil(value * LISTING_PRICE_CEILING));
-  return Object.freeze({ min, max, value });
+/** A price made listable: a whole number of tickets from 1 to the ceiling. */
+export function clampListingPrice(value: number): number {
+  return Math.max(1, Math.min(MAX_LISTING_UNIT_PRICE, Math.floor(Number(value)) || 1));
 }
 
 export function listingFee(total: number): number {
@@ -49,6 +59,9 @@ export function listingProceeds(unitPrice: number, quantity: number): number {
 export type ListingStatus = "open" | "sold" | "withdrawn" | "expired";
 
 export type ListingView = TradeGood & Readonly<{
+  /** The animal or fish itself, for a single-row listing. */
+  animal?: TradeAnimal;
+  fish?: TradeFish;
   id: string;
   sellerName: string;
   mine: boolean;
@@ -79,13 +92,21 @@ export function normalizeListing(value: unknown): ListingView | null {
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, unknown>;
   const stack = source.stack as TradeStack;
-  if (!(TRADE_STACKS as readonly string[]).includes(stack)) return null;
-  const good = findTradeGood(stack, String(source.itemId ?? ""));
+  if (!LISTING_STACKS.includes(stack)) return null;
+  // An animal or a fish is drawn from the card the listing carries.
+  const animal = stack === "livestock" ? normalizeTradeAnimal(source.animal) : null;
+  const rawFish = stack === "fish" && source.fish && typeof source.fish === "object" ? source.fish as Record<string, unknown> : null;
+  const fish: TradeFish | null = rawFish && typeof rawFish.id === "string"
+    ? Object.freeze({ id: rawFish.id, speciesId: String(rawFish.speciesId), weightG: Number(rawFish.weightG) || 0, sizeClass: String(rawFish.sizeClass ?? "average"), variant: String(rawFish.variant ?? "normal") })
+    : null;
+  const good = animal ? animalTradeGood(animal) : fish ? fishTradeGood(fish) : findTradeGood(stack, String(source.itemId ?? ""));
   const id = typeof source.id === "string" && /^listing-[A-Za-z0-9-]{8,64}$/.test(source.id) ? source.id : "";
   if (!good || !id) return null;
   const status = (["open", "sold", "withdrawn", "expired"] as const).find((entry) => entry === source.status) ?? "withdrawn";
   return Object.freeze({
     ...good,
+    ...(animal ? { animal } : {}),
+    ...(fish ? { fish } : {}),
     id,
     sellerName: typeof source.sellerName === "string" ? source.sellerName.slice(0, 40) : "A farmer",
     mine: source.mine === true,
@@ -128,7 +149,13 @@ export const LISTING_MESSAGES: Readonly<Record<string, string>> = Object.freeze(
   daily_listing_limit: "You have put up as many listings as the board takes in a day. Come back tomorrow.",
   farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
   not_enough: "Your farm no longer holds that many. Nothing was listed.",
-  price_out_of_band: "That price is outside what the board accepts for those goods.",
+  invalid_price: "Ask a whole number of tickets, from 1 to 10,000 each.",
+  invalid_quantity: "An animal or a fish is listed one at a time.",
+  died: "That animal has died — it cannot be listed.",
+  husbandry_too_low: "Your Husbandry is too low to keep that animal (Hollis's levels: sheep 1, pig 5, cow 10, llama 15). Nothing was bought.",
+  herd_full: "Your herd is as big as a farm can keep. Nothing was bought.",
+  no_room: "You have no free stall, pen, barn floor or coop place for it. Make room first — nothing was bought.",
+  creel_full: "Your creel is full. Sell or let some fish go first — nothing was bought.",
   not_listable: "The board does not take those goods.",
   listing_expired: "That listing has run out. Nothing was bought.",
   listing_closed: "That listing has already come down.",

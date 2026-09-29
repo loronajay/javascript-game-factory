@@ -33,6 +33,7 @@ import { skillLevelForXp } from "./farm-skills.mjs";
 import { QUALITY_TITLES, produceHeld } from "./farm-quality.mjs";
 import { findCrop } from "./farm-crops.mjs";
 import { findFruit } from "./farm-catalog/trees.mjs";
+import { wantsServing } from "./farm-livestock-panel.mjs";
 const MOVE_ERRORS = Object.freeze({
     home_full: "There is no room there.",
     unknown_home: "That home is not on the farm any more.",
@@ -83,6 +84,8 @@ export function createFarmLivestockController(options) {
             husbandryLevel: skillLevelForXp(options.layout().skills.husbandry.xp),
             canManage: options.canManage && Boolean(options.api),
             canBreed: options.canManage && Boolean(options.api) && Boolean(options.submit),
+            supplies: options.layout().agriculture.inventory.supplies,
+            feedWords,
             note: options.api && options.ownerId ? "" : "Livestock are bought with tickets, so they live on an account farm. Sign in to keep them.",
         });
     }
@@ -105,7 +108,7 @@ export function createFarmLivestockController(options) {
     }
     const CARE_ERRORS = Object.freeze({
         full: "is full — nothing was used.",
-        no_feed: "has nothing to eat here. Buy its feed in the Inventory's supply shop, or bring a crop it likes.",
+        no_feed: "has nothing to eat here. Buy its feed in the Herd panel's Feed bin (L), or bring a crop it likes.",
         not_ready: "has nothing ready yet.",
         basket_full: "— your basket stack for that is full (99). Sell some at the Market.",
         died: "is gone.",
@@ -144,6 +147,25 @@ export function createFarmLivestockController(options) {
         finally {
             caring = false;
         }
+    }
+    /** One serving for one animal: the G key's and the Herd panel's feed alike. Answers in words ("" when care cannot run). */
+    async function feedAnimal(id) {
+        if (!options.submit || !options.api)
+            return "Sign in to keep livestock.";
+        const animal = current().find((entry) => entry.id === id);
+        if (!animal)
+            return "That animal is not on this farm.";
+        if (!wantsFood(animal.care))
+            return `${animal.name} ${CARE_ERRORS.full}`;
+        const result = await care("feed", id);
+        if (result?.ok) {
+            checkedDue.delete(id);
+            const used = LIVESTOCK_FEEDS.find((feed) => feed.itemId === result.used)?.title ?? findCrop(result.used)?.title ?? findFruit(result.used)?.fruitTitle ?? "a serving";
+            return `${animal.name} ate ${used}.`;
+        }
+        if (result?.error)
+            return `${animal.name} ${CARE_ERRORS[result.error] ?? "could not be fed. Try again."}`;
+        return result === null ? "" : `${animal.name} could not be fed. Try again.`;
     }
     /** Replace one animal with the server's answer, or the whole herd when it sent one. */
     function absorb(result) {
@@ -271,17 +293,33 @@ export function createFarmLivestockController(options) {
                 options.setStatus(`${animal.name} ${CARE_ERRORS.full}`);
                 return true;
             }
-            void care("feed", id).then((result) => {
-                if (result?.ok) {
-                    const used = LIVESTOCK_FEEDS.find((feed) => feed.itemId === result.used)?.title ?? findCrop(result.used)?.title ?? findFruit(result.used)?.fruitTitle ?? "a serving";
-                    options.setStatus(`${animal.name} ate ${used}.`);
-                    checkedDue.delete(id);
-                }
-                else if (result?.error)
-                    options.setStatus(`${animal.name} ${CARE_ERRORS[result.error] ?? "could not be fed. Try again."}`);
-            });
+            void feedAnimal(id).then((words) => { if (words)
+                options.setStatus(words); });
             sim.attention(id);
             return true;
+        },
+        feedAnimal,
+        async feedHerd() {
+            if (!options.submit || !options.api)
+                return "Sign in to keep livestock.";
+            const hungry = current().filter((animal) => wantsServing(animal.care.hunger)).map((animal) => animal.id);
+            if (!hungry.length)
+                return "Nobody has room for a whole serving yet.";
+            const fed = [];
+            const unfed = [];
+            // One at a time: each serving is a settle at the verified clock, and the next reads the farm the last one left.
+            for (const id of hungry) {
+                const name = herd.find((entry) => entry.id === id)?.name ?? "One";
+                const result = await care("feed", id);
+                if (result?.ok) {
+                    fed.push(name);
+                    checkedDue.delete(id);
+                }
+                else
+                    unfed.push(`${name} ${CARE_ERRORS[result?.error] ?? "could not be fed."}`);
+            }
+            const words = fed.length ? `Fed ${fed.join(", ")}.` : "Nobody was fed.";
+            return unfed.length ? `${words} ${unfed.join(" ")}` : words;
         },
         herd: () => herd,
         homes: () => homes,

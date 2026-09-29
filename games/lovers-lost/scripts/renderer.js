@@ -6,6 +6,7 @@ import { createCharacterRenderer } from './renderer-characters.js';
 import { createDebugRenderer } from './renderer-debug.js';
 import { createMenuRenderer } from './renderer-menu.js';
 import { createResultsRenderer } from './renderer-results.js';
+import { createPuzzleRenderer } from './renderer-puzzle.js';
 import {
   HALF_W, PPU,
   FRAME_W, FRAME_H, SPRITE_W, SPRITE_H,
@@ -102,6 +103,17 @@ function createRenderer(canvas, images, emoteImages = {}) {
     drawSpaceBackground: _drawSpaceBackground,
     drawRedButton: _drawRedButton,
   } = createMenuRenderer(ctx, images, { characterRenderer, obstacleRenderer, debugRenderer });
+
+  const {
+    renderPuzzleMenu,
+    renderPuzzleLocalSelect,
+    renderPuzzlePlay,
+    renderPuzzleComplete,
+  } = createPuzzleRenderer(ctx, images, {
+    blit: characterRenderer.blit,
+    drawSpaceBackground: _drawSpaceBackground,
+    drawRedButton: _drawRedButton,
+  });
 
   const boyAnim  = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
   const girlAnim = { frame: WALK_FRAMES[0], tick: 0, walkIdx: 0 };
@@ -381,6 +393,10 @@ default:          return GROUND_TOP - 28;
     renderSoloCountdown,
     renderLocalCountdown,
     renderMenuHelp,
+    renderPuzzleMenu,
+    renderPuzzleLocalSelect,
+    renderPuzzlePlay,
+    renderPuzzleComplete,
     renderGameOver,
     renderScore,
     renderReunion,

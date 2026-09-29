@@ -18,6 +18,16 @@ const SOUND_FILES = [
 const MUSIC_FILES = ['bg-music-menu', 'bg-music-game'];
 const DEFAULT_SFX_POOL_SIZE = 4;
 
+function musicTrackForPhase(phase) {
+  if (['menu', 'menu_help', 'solo_side_select', 'solo_countdown', 'local_countdown',
+    'puzzle_campaign_menu', 'puzzle_local_select', 'online_side_select',
+    'online_name_entry', 'online_lobby', 'online_countdown'].includes(phase)) {
+    return 'bg-music-menu';
+  }
+  if (phase === 'playing' || phase === 'puzzle_playing') return 'bg-music-game';
+  return null;
+}
+
 function createSounds(options = {}) {
   if (typeof Audio === 'undefined') {
     return { play() {}, stop() {}, stopAll() {}, playMusic() {}, stopMusic() {}, retryPendingMusic() {} };
@@ -161,4 +171,4 @@ function createSounds(options = {}) {
   return { play, stop, stopAll, playMusic, stopMusic, retryPendingMusic };
 }
 
-export { createSounds };
+export { createSounds, musicTrackForPhase };

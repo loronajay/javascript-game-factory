@@ -57,7 +57,7 @@ import {
 import { createPlayer, distPerFrame, SPEED_FLOOR, STARTING_SPEED, RUN_DISTANCE } from '../scripts/player.js';
 import { createObstacle, generateWarmup, WAVE_COUNTS } from '../scripts/obstacles.js';
 import { OUTCOMES } from '../scripts/scoring.js';
-import { createSounds } from '../scripts/sounds.js';
+import { createSounds, musicTrackForPhase } from '../scripts/sounds.js';
 import { createInput } from '../scripts/input.js';
 import {
   createRenderer,
@@ -1515,6 +1515,12 @@ test('buildFindMatchPayload includes the selected side for side-aware queueing',
   assertEq(payload.displayName, 'Maya');
 });
 
+test('puzzle matchmaking uses its own public queue', () => {
+  const payload = buildFindMatchPayload('boy', 'lovers-lost-puzzle', { displayName: 'Leo' });
+  assertEq(payload.gameId, 'lovers-lost-puzzle');
+  assertEq(payload.side, 'boy');
+});
+
 test('buildCreateRoomPayload includes the selected side for server-owned countdown setup', () => {
   const payload = buildCreateRoomPayload('boy', { playerId: 'player-2', displayName: 'Leo' });
 
@@ -1569,11 +1575,61 @@ test('initGame routes local multiplayer through a visible countdown before gamep
     harness.stepFrame(1000);
     harness.texts.length = 0;
 
-    harness.canvasListeners.click({ clientX: 480, clientY: 244 });
+    harness.canvasListeners.click({ clientX: 480, clientY: 181 });
     harness.stepFrame(1017);
 
     assert(harness.texts.includes('LOCAL MULTIPLAYER'), 'expected a local multiplayer countdown banner');
     assert(harness.texts.includes('3'), 'expected the countdown to begin at 3');
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('puzzle campaign separates local play from online matchmaking', () => {
+  const harness = bootInitGameHarness();
+
+  try {
+    harness.stepFrame(1000);
+    harness.texts.length = 0;
+
+    harness.canvasListeners.click({ clientX: 480, clientY: 289 });
+    harness.stepFrame(1017);
+    assert(harness.texts.includes('PUZZLE CAMPAIGN'), 'expected puzzle campaign stage menu');
+    assert(harness.texts.includes('STAGE 1: THE HANDOFF'), 'expected the first authored stage');
+    assert(harness.texts.includes('LOCAL'), 'expected local play as a top-level mode');
+    assert(harness.texts.includes('ONLINE'), 'expected online play as a top-level mode');
+    assert(!harness.texts.includes('1 PLAYER'), 'player-count choice belongs inside local play');
+
+    harness.texts.length = 0;
+    harness.canvasListeners.click({ clientX: 360, clientY: 355 });
+    harness.stepFrame(1034);
+    assert(harness.texts.includes('LOCAL PLAY'), 'expected local player-count selection');
+    assert(harness.texts.includes('1 PLAYER'), 'expected one-player local option');
+    assert(harness.texts.includes('2 PLAYERS'), 'expected two-player local option');
+
+    harness.texts.length = 0;
+    harness.canvasListeners.click({ clientX: 360, clientY: 355 });
+    harness.stepFrame(1051);
+    assert(harness.texts.some(text => text.includes('STAGE 1 · THE HANDOFF')), 'expected puzzle gameplay HUD');
+    assert(harness.texts.includes('BOY · W A D'), 'expected platformer controls in the puzzle HUD');
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('puzzle online mode enters the normal side-select lobby flow', () => {
+  const harness = bootInitGameHarness();
+
+  try {
+    harness.stepFrame(1000);
+    harness.canvasListeners.click({ clientX: 480, clientY: 289 });
+    harness.stepFrame(1017);
+    harness.texts.length = 0;
+
+    harness.canvasListeners.click({ clientX: 600, clientY: 355 });
+    harness.stepFrame(1034);
+    assert(harness.texts.includes('CHOOSE YOUR SIDE'), 'expected shared online side-select flow');
+    assert(harness.texts.includes('PUZZLE CAMPAIGN ONLINE'), 'expected the online flow to retain puzzle context');
   } finally {
     harness.cleanup();
   }
@@ -2080,6 +2136,12 @@ test('normalizeQueueCounts accepts nested queueCounts payloads', () => {
 });
 
 console.log('\nsounds');
+
+test('puzzle results stop background music so the success cue plays alone', () => {
+  assertEq(musicTrackForPhase('puzzle_complete'), null);
+  assertEq(musicTrackForPhase('puzzle_playing'), 'bg-music-game');
+  assertEq(musicTrackForPhase('puzzle_campaign_menu'), 'bg-music-menu');
+});
 
 test('createSounds lazily creates audio elements only when a sound is used', () => {
   const originalAudio = globalThis.Audio;

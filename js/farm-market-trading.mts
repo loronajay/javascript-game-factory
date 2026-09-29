@@ -10,7 +10,7 @@
 
 import { createTradeSession, type TradeApi } from "./farm-trade-session.mjs";
 import { createTradePanel } from "./farm-trade-panel.mjs";
-import { isLive, type TradeFish } from "./farm-trade.mjs";
+import { isLive, normalizeTradeAnimal, type TradeAnimal, type TradeFish } from "./farm-trade.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 
 type Thumbnail = (key: string, onReady: (url: string) => void) => string | null;
@@ -25,6 +25,11 @@ export type MarketTradingDeps = Readonly<{
   onClose: () => void;
   /** The Cove's reads, so fish can go on the table: the player's creel and any fish by id. */
   fishApi?: Readonly<{ fetchFarmFishing: () => Promise<any>; fetchFarmFishDetails: (ids: readonly string[]) => Promise<any> }> | null;
+  /** The player's own herd as cards (the square already reads it for the Dealer and the Butcher), and any animal's card by id. */
+  herd?: () => readonly TradeAnimal[];
+  fetchAnimalCards?: (ids: readonly string[]) => Promise<any>;
+  /** A trade that landed moved animals: the square reads the herd again. */
+  onHerdChanged?: () => void;
 }>;
 
 export type MarketTrading = Readonly<{
@@ -39,6 +44,10 @@ export type MarketTrading = Readonly<{
   answer: (yes: boolean) => boolean;
   /** What the player is doing, for the presence line. */
   activity: () => string;
+  /** The player's creel as last read (the Exchange Board lists from it too), with each fish's worth. */
+  creel: () => readonly TradeFish[];
+  /** Read the creel again (a fish went onto or came off the Exchange Board). */
+  reloadCreel: () => Promise<void>;
 }>;
 
 function required<T extends Element>(selector: string): T {
@@ -55,7 +64,7 @@ export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
   const asking = new Set<string>();
   const remember = (fish: any): TradeFish | null => {
     if (!fish || typeof fish.id !== "string") return null;
-    const entry = Object.freeze({ id: fish.id, speciesId: String(fish.speciesId), weightG: Number(fish.weightG) || 0, sizeClass: String(fish.sizeClass ?? "average"), variant: String(fish.variant ?? "normal"), locked: fish.locked === true });
+    const entry = Object.freeze({ id: fish.id, speciesId: String(fish.speciesId), weightG: Number(fish.weightG) || 0, sizeClass: String(fish.sizeClass ?? "average"), variant: String(fish.variant ?? "normal"), locked: fish.locked === true, value: Number(fish.value) || 0 });
     known.set(entry.id, entry);
     return entry;
   };
@@ -65,8 +74,26 @@ export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
     creel = answer.creel.map(remember).filter((fish: TradeFish | null): fish is TradeFish => Boolean(fish));
     panel?.render();
   }
+  // Animals on the partner's side: their public cards, read once each.
+  const animals = new Map<string, TradeAnimal>();
+  const askingAnimals = new Set<string>();
+  const animalDetail = (id: string): TradeAnimal | null => deps.herd?.().find((animal) => animal.id === id) ?? animals.get(id) ?? null;
+  function lookUpTheirAnimals(): void {
+    const view = session.snapshot().view;
+    const unknown = Object.keys(view?.them.offer.livestock ?? {}).filter((id) => !animalDetail(id) && !askingAnimals.has(id));
+    if (!unknown.length || !deps.fetchAnimalCards) return;
+    for (const id of unknown) askingAnimals.add(id);
+    void deps.fetchAnimalCards(unknown).then((answer: any) => {
+      for (const raw of Array.isArray(answer?.animals) ? answer.animals : []) {
+        const animal = normalizeTradeAnimal(raw);
+        if (animal) animals.set(animal.id, animal);
+      }
+      panel?.render();
+    }).catch(() => undefined);
+  }
   /** Fish on the partner's side the page has not seen yet: read them once, then draw them. */
   function lookUpTheirs(): void {
+    lookUpTheirAnimals();
     const view = session.snapshot().view;
     const unknown = Object.keys(view?.them.offer.fish ?? {}).filter((id) => !known.has(id) && !asking.has(id));
     if (!unknown.length || !deps.fishApi) return;
@@ -81,9 +108,10 @@ export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
     timers: { set: (run, ms) => setTimeout(run, ms), clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>) },
     farm: deps.farm,
     // A trade that landed moved fish too: read the creel again.
-    onLayout: (layout) => { deps.takeStock(layout); void loadCreel(); },
+    onLayout: (layout) => { deps.takeStock(layout); void loadCreel(); deps.onHerdChanged?.(); },
     onChange: () => { lookUpTheirs(); panel?.render(); },
     creel: () => creel,
+    herd: () => deps.herd?.() ?? [],
   });
   panel = createTradePanel({
     invite: required<HTMLElement>("#tradeInvite"),
@@ -102,7 +130,7 @@ export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
     status: required<HTMLElement>("#tradeStatus"),
     lockButton: required<HTMLButtonElement>("#lockTrade"),
     confirmButton: required<HTMLButtonElement>("#confirmTrade"),
-  }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose, creel: () => creel, fishDetail: (id) => known.get(id) ?? null });
+  }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose, creel: () => creel, fishDetail: (id) => known.get(id) ?? null, herd: () => deps.herd?.() ?? [], animalDetail });
 
   return Object.freeze({
     start: () => {
@@ -124,5 +152,7 @@ export function createMarketTrading(deps: MarketTradingDeps): MarketTrading {
       const view = session.snapshot().view;
       return view && isLive(view) ? "trading" : "";
     },
+    creel: () => creel,
+    reloadCreel: () => loadCreel(),
   });
 }

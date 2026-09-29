@@ -1138,6 +1138,17 @@ const anglerLink = createAnglerLink({
   },
 });
 
+/** Tickets for a supply (pet food, livestock feed) into the farm's stacks: the Inventory's shop and the Herd panel's Feed bin both buy here. */
+async function buyFarmSupply(itemId: string, quantity: number): Promise<string> {
+  const result = await ticketClient.purchaseFarmSupply(itemId, quantity, farmPurchaseId("supply"));
+  if (!result?.ok) return result?.error === "insufficient_tickets" ? "Not enough tickets." : result?.error === "inventory_full" ? "That supply stack is full." : "Purchase failed. Try again.";
+  const next = normalizeFarmLayout(result.layout);
+  applyLayout(next);
+  farmEditor.replaceLayout(next);
+  if (Number.isSafeInteger(result.balance)) publishTicketBalance(result.balance);
+  return `Purchased · ${Number(result.balance).toLocaleString()} tickets remain.`;
+}
+
 // Livestock (planning-docs/FARM_LIVESTOCK_PLAN.md): the server's herd, kept in the farm's stalls, barn and pens.
 const livestockPanel = createLivestockPanel({
   root: requiredElement<HTMLElement>("#livestockPanel"),
@@ -1150,6 +1161,14 @@ const livestockPanel = createLivestockPanel({
   move: (animalId, homeId) => livestock.move(animalId, homeId),
   rename: (animalId, name) => livestock.rename(animalId, name),
   breed: (motherId, sireId) => livestock.breed(motherId, sireId),
+  feed: (animalId) => livestock.feedAnimal(animalId),
+  feedHerd: () => livestock.feedHerd(),
+  buyFeed: async (itemId, quantity) => {
+    if (!layoutStore.accountBacked) return "Sign in to keep livestock.";
+    const words = await buyFarmSupply(itemId, quantity);
+    livestock.sync();
+    return words;
+  },
 }, {
   beforeOpen: () => { petsPanel.close(); inventoryPanel.close(); statsPanel.close(); },
   onClose: () => canvas.focus(),
@@ -1193,15 +1212,7 @@ const inventoryPanel = createFarmInventoryPanel({
 }, {
   thumbnail: cropThumbnails.get,
   itemThumbnail: portraits,
-  purchaseSupply: layoutStore.accountBacked ? async (itemId, quantity) => {
-    const result = await ticketClient.purchaseFarmSupply(itemId, quantity, farmPurchaseId("supply"));
-    if (!result?.ok) return result?.error === "insufficient_tickets" ? "Not enough tickets." : result?.error === "inventory_full" ? "That supply stack is full." : "Purchase failed. Try again.";
-    const next = normalizeFarmLayout(result.layout);
-    applyLayout(next);
-    farmEditor.replaceLayout(next);
-    if (Number.isSafeInteger(result.balance)) publishTicketBalance(result.balance);
-    return `Purchased · ${Number(result.balance).toLocaleString()} tickets remain.`;
-  } : null,
+  purchaseSupply: layoutStore.accountBacked ? buyFarmSupply : null,
 });
 inventoryPanel.render(layout.agriculture, skillLevels(), anglerLink.stats());
 renderFieldCapacity();

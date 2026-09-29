@@ -349,6 +349,7 @@ export function createApp(options = {}) {
     const getFarmFishRecords = typeof options?.getFarmFishRecords === "function" ? options.getFarmFishRecords : null;
     const getFarmFishing = typeof options?.getFarmFishing === "function" ? options.getFarmFishing : null;
     const getFarmLivestock = typeof options?.getFarmLivestock === "function" ? options.getFarmLivestock : null;
+    const getFarmLivestockCards = typeof options?.getFarmLivestockCards === "function" ? options.getFarmLivestockCards : null;
     const buyFarmLivestock = typeof options?.buyFarmLivestock === "function" ? options.buyFarmLivestock : null;
     const moveFarmLivestock = typeof options?.moveFarmLivestock === "function" ? options.moveFarmLivestock : null;
     const renameFarmLivestock = typeof options?.renameFarmLivestock === "function" ? options.renameFarmLivestock : null;
@@ -699,7 +700,7 @@ export function createApp(options = {}) {
     const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
     const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
     const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };
-    const farmLivestockServices = { getFarmLivestock, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock, butcherFarmLivestock };
+    const farmLivestockServices = { getFarmLivestock, getFarmLivestockCards, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock, butcherFarmLivestock };
     const gameResultServices = { submitGameResult, getPetGameCareer };
     const progressionServices = {
         getGameXpProgress,

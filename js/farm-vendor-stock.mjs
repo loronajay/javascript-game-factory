@@ -1,12 +1,14 @@
-// The two NPC shelves in the Market Square. PURE — prices and ids only.
+// The NPC shelves in the Market Square. PURE — prices and ids only.
 //
 // Marigold sells Normal-grade produce at a deliberate retail margin above the
 // highest price she can pay on any market day. Basil sells permanent recipe
-// cards that do not belong to the automatic Cooking level tree.
+// cards that do not belong to the automatic Cooking level tree. Hollis sells
+// livestock feed at the supply shop's own price (the server's copy is the price).
 import { CROP_CATALOG, PRODUCE_IDS } from "./farm-crops.mjs";
 import { FRUIT_TREES } from "./farm-catalog/trees.mjs";
 import { VENDOR_RECIPE_CATALOG } from "./farm-catalog/recipes.mjs";
 import { producePrice } from "./farm-market-prices.mjs";
+import { LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 function produceTitle(id) {
     return CROP_CATALOG.find((crop) => crop.id === id)?.title
         ?? FRUIT_TREES.find((tree) => tree.fruitId === id)?.fruitTitle
@@ -23,6 +25,13 @@ export const INGREDIENT_STOCK = Object.freeze(PRODUCE_IDS.map((id) => Object.fre
     title: produceTitle(id),
     price: ingredientPrice(id),
     itemKey: `produce:${id}`,
+})));
+export const FEED_STOCK = Object.freeze(LIVESTOCK_FEEDS.map((feed) => Object.freeze({
+    feedId: feed.itemId,
+    itemId: feed.itemId,
+    title: feed.title,
+    price: feed.price,
+    itemKey: `supply:${feed.itemId}`,
 })));
 export const RECIPE_STOCK = Object.freeze(VENDOR_RECIPE_CATALOG.map((recipe) => Object.freeze({
     recipeId: recipe.id,

@@ -662,6 +662,10 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     fetchFarmLivestock(playerId: string) {
       return get(`/games/farm/livestock/${encodeURIComponent(playerId)}`, "herd");
     },
+    /** Living animals by id as public cards (a trading table's other side). */
+    fetchFarmLivestockCards(ids: readonly string[]) {
+      return get(`/games/farm/livestock/cards?ids=${encodeURIComponent(ids.join(","))}`);
+    },
     /** The Livestock Dealer: a young one for tickets, into a home with room. */
     buyFarmLivestock({ purchaseId, speciesId, homeId, name }: { purchaseId: string; speciesId: string; homeId?: string; name?: string }) {
       return post("/games/farm/livestock/purchases", { purchaseId, speciesId, homeId, name }, "result", {}, true);

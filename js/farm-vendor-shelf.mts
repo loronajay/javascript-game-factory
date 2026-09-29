@@ -1,9 +1,9 @@
 // A Market NPC's buy shelf. The page supplies server-backed purchase actions;
 // this module only renders stock and reflects the canonical farm it is handed.
 
-import type { IngredientStockLine, RecipeStockLine } from "./farm-vendor-stock.mjs";
+import type { FeedStockLine, IngredientStockLine, RecipeStockLine } from "./farm-vendor-stock.mjs";
 
-type StockLine = IngredientStockLine | RecipeStockLine;
+type StockLine = IngredientStockLine | RecipeStockLine | FeedStockLine;
 type Elements = Readonly<{ list: HTMLElement; status: HTMLElement }>;
 type Outcome = Readonly<{ ok: boolean; message: string }>;
 
@@ -54,7 +54,7 @@ export function createVendorShelf(elements: Elements, options: Options): VendorS
     const meta = document.createElement("small");
     meta.textContent = "recipeId" in line
       ? held ? "Learned · permanent cookbook recipe" : `${unitPrice} tickets · permanent cookbook recipe`
-      : `${unitPrice} tickets each · ${held} in your basket`;
+      : `${unitPrice} tickets each · ${held} in your ${"feedId" in line ? "supplies" : "basket"}`;
     label.append(title, meta);
     const actions = document.createElement("div");
     actions.className = "sale-footer__actions vendor-shelf__actions";

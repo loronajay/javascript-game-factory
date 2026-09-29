@@ -1,5 +1,30 @@
 # Changelog
 
+## Livestock: feed, names, and trading (Phase 6) (2026-09-29)
+
+**Feed you can find.** The feeds were only sold as a buy button deep in Inventory → Supplies. The Herd panel (L) now opens on a **Feed bin**: each feed the herd eats, how many are held (orange at zero), Buy 5 / Buy 10, and **Feed the herd**, which gives one serving to every animal with room for a whole one. Each animal's row says what it would eat and has a Feed button. Hollis sells the same feeds at his stall (`FEED_STOCK` on the shared vendor shelf). The "nothing to eat" message points at the Feed bin.
+
+**Names you can find.** The rename field was an input with no border. It now has a dashed underline and a ✎ Rename pill; Enter keeps the name, Escape puts it back. Hollis's counter has a "Name the next one" box (the server already took a `name` at purchase).
+
+**Trading live animals** (Phase 6 of `FARM_LIVESTOCK_PLAN.md`). An animal is a `livestock` line on the barter table (one per row id, like a fish) and a listing on the Exchange Board. `db/farm-livestock-transfer.mts` is the one seam:
+- The animal leaves alive at the sender's stored clock.
+- It lands only where the receiver can keep it: the Dealer's Husbandry level, room under the herd ceiling, and a free home.
+- Every farm-minute stamp is re-based onto the receiver's clock (`rebaseLivestockCare`). The normalizers on both sides no longer clamp stamps at zero.
+
+A pregnancy travels with its mother. A listed animal is `state = 'listed'` on clock zero. The table shows the other side's animals as public cards (`GET /games/farm/livestock/cards`).
+
+**The Exchange Board prices are the players'** (owner's call). The ½–1½× band is gone: a unit asks 1–10,000 tickets, and the Market's value (for an animal, the Dealer's price) is shown only as a guide. The daily earn and spend caps went from 3,000 to 10,000; they and the burned 10% fee are now the laundering fence. **Fish list too** (`db/farm-fish-listing.mts`): out of the creel (never a locked fish), into the buyer's if it has room, and back when taken down.
+
+No migration. Tests:
+- the trade re-base across two clocks with a travelling pregnancy
+- no room, the Husbandry gate, a dead animal and an animal you don't own
+- listing, buying, the refusal before payment, and taking down for animals and fish
+- the free-price rules on both sides
+- the pure re-base, placement and card rules
+- feed coverage for every species
+
+A shared test fake `platform-api/tests/farm-rows-fake.mjs` answers the `farm_livestock`/`farm_fish` queries.
+
 ## Livestock: the chicken (2026-09-29)
 
 A fifth species, from a rigged chicken the owner added (`farm/assets/yield-animals/chicken.glb`, Maf'j Alvarez on Sketchfab, **CC-BY-4.0** — credited in that folder's `CREDITS.md`, which the licence requires). The file came in as `chicken_-_rigged.glb` and was renamed to match the others.

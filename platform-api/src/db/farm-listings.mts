@@ -10,6 +10,13 @@
 //     and records the sale, all or nothing, once per purchase id;
 //   - WITHDRAWING (open or expired) puts what is left back on the seller's farm.
 //
+// A LIVE ANIMAL (livestock plan Phase 6) is escrowed as its own row: listing it
+// turns it `listed` (off the farm, on clock zero), buying lands it on the
+// buyer's farm only where they can keep it — checked BEFORE a ticket moves —
+// and taking it down brings it home (db/farm-livestock-transfer.mts). A FISH
+// works the same way out of the creel (db/farm-fish-listing.mts): a buyer needs
+// room in theirs.
+//
 // Locks: every move that touches two players takes both players' advisory
 // locks in player-id order first, so two farmers buying from each other at the
 // same moment queue rather than deadlock; the listing row is then locked FOR
@@ -26,9 +33,8 @@ import {
   DAILY_LISTING_SPEND_LIMIT,
   LISTING_FEE_RATE,
   LISTING_ID,
-  LISTING_PRICE_CEILING,
-  LISTING_PRICE_FLOOR,
   LISTING_PURCHASE_ID,
+  MAX_LISTING_UNIT_PRICE,
   LISTING_TTL_MS,
   MAX_OPEN_LISTINGS,
   addListedGoods,
@@ -42,6 +48,8 @@ import {
 } from "../services/farm-listing-policy.mjs";
 import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.mjs";
 import { lockedFarm, saveFarm, transaction } from "./farm-economy.mjs";
+import { consignLivestock, listedLivestockCards, planListedLanding, writeListedLanding } from "./farm-livestock-transfer.mjs";
+import { checkListedFishLanding, consignFish, landListedFish, listedFishCards } from "./farm-fish-listing.mjs";
 
 function required(value: unknown, field: string): string {
   const text = typeof value === "string" ? value.trim() : "";
@@ -91,8 +99,7 @@ async function dailyTotals(client: any, playerId: string, now: number) {
 function limits(totals: Awaited<ReturnType<typeof dailyTotals>>) {
   return {
     feeRate: LISTING_FEE_RATE,
-    priceFloor: LISTING_PRICE_FLOOR,
-    priceCeiling: LISTING_PRICE_CEILING,
+    maxUnitPrice: MAX_LISTING_UNIT_PRICE,
     maxOpen: MAX_OPEN_LISTINGS,
     listingsLeftToday: Math.max(0, DAILY_LISTINGS_CREATED - totals.created),
     purchasesLeftToday: Math.max(0, DAILY_LISTING_PURCHASES - totals.purchases),
@@ -121,10 +128,20 @@ export async function getFarmListings(pool: any, input: any, now: number = Date.
     `select * from farm_market_listings where seller_id = $1 and status = 'open' order by created_at desc`,
     [playerId],
   );
-  const view = (rows: any[]) => rows.map((row) => normalizeListingRow(row, now)).filter((row): row is FarmListing => Boolean(row)).map((row) => listingView(row, playerId));
+  const parse = (rows: any[]) => rows.map((row) => normalizeListingRow(row, now)).filter((row): row is FarmListing => Boolean(row));
+  const listings = parse(open.rows ?? []);
+  const mine = parse(own.rows ?? []);
+  // Animals and fish are shown as themselves: their card, read from the waiting rows.
+  const waiting = (stack: string) => [...listings, ...mine].filter((row) => row.stack === stack && row.quantity > 0).map((row) => row.itemId);
+  const animals = await listedLivestockCards(pool, waiting("livestock"));
+  const fish = await listedFishCards(pool, waiting("fish"));
+  const cardOf = (row: FarmListing) => (row.stack === "livestock" ? animals.get(row.itemId) : row.stack === "fish" ? fish.get(row.itemId) : null) ?? null;
+  const view = (rows: FarmListing[]) => rows
+    .filter((row) => (row.stack !== "livestock" && row.stack !== "fish") || row.quantity <= 0 || cardOf(row))
+    .map((row) => listingView(row, playerId, cardOf(row)));
   return {
-    listings: view(open.rows ?? []),
-    mine: view(own.rows ?? []),
+    listings: view(listings),
+    mine: view(mine),
     limits: limits(await dailyTotals(pool, playerId, now)),
   };
 }
@@ -151,12 +168,25 @@ export async function createFarmListing(pool: any, input: any, now: number = Dat
     if (totals.created >= DAILY_LISTINGS_CREATED) return { ok: false, error: "daily_listing_limit" };
     const farm = await lockedFarm(client, playerId);
     if (!farm || farm.layout.onboarding?.status !== "complete") return { ok: false, error: "farm_not_initialized" };
-    const inventory = farm.layout.agriculture.inventory;
-    const shelf = unplacedFarmPieces(inventory.furniture ?? {}, farm.layout.decor ?? []);
-    const taken = takeListedGoods(inventory, shelf, request.stack, request.itemId, request.quantity);
-    if (!taken) return { ok: false, error: "not_enough", layout: farm.layout };
-    const layout = normalizeFarmGarage({ ...farm.layout, agriculture: { ...farm.layout.agriculture, inventory: taken } }, { ownedEntitlementIds: farm.owned });
-    await saveFarm(client, playerId, layout);
+    let layout = farm.layout;
+    let animal: unknown = null;
+    if (request.stack === "livestock") {
+      // The animal leaves the farm as a row of its own; the farm document does not change.
+      const consigned = await consignLivestock(client, playerId, farm.layout, request.itemId);
+      if (!consigned.ok) return { ok: false, error: consigned.error, layout: farm.layout };
+      animal = consigned.card;
+    } else if (request.stack === "fish") {
+      const consigned = await consignFish(client, playerId, request.itemId);
+      if (!consigned.ok) return { ok: false, error: consigned.error, layout: farm.layout };
+      animal = consigned.card;
+    } else {
+      const inventory = farm.layout.agriculture.inventory;
+      const shelf = unplacedFarmPieces(inventory.furniture ?? {}, farm.layout.decor ?? []);
+      const taken = takeListedGoods(inventory, shelf, request.stack, request.itemId, request.quantity);
+      if (!taken) return { ok: false, error: "not_enough", layout: farm.layout };
+      layout = normalizeFarmGarage({ ...farm.layout, agriculture: { ...farm.layout.agriculture, inventory: taken } }, { ownedEntitlementIds: farm.owned });
+      await saveFarm(client, playerId, layout);
+    }
     const name = await sellerName(client, playerId);
     await client.query(
       `insert into farm_market_listings (listing_id, seller_id, seller_name, stack, item_id, quantity, listed_quantity, unit_price, status, created_at, expires_at)
@@ -168,7 +198,7 @@ export async function createFarmListing(pool: any, input: any, now: number = Dat
       quantity: request.quantity, listed_quantity: request.quantity, unit_price: request.unitPrice, status: "open",
       created_at: now, expires_at: now + LISTING_TTL_MS,
     }, now)!;
-    return { ok: true, duplicate: false, listing: listingView(listing, playerId), layout };
+    return { ok: true, duplicate: false, listing: listingView(listing, playerId, animal), layout };
   });
 }
 
@@ -203,7 +233,12 @@ export async function buyFarmListing(pool: any, input: any, now: number = Date.n
     if (!check.ok) return { ok: false, error: check.error, listing: view };
     const farm = await lockedFarm(client, playerId);
     if (!farm || farm.layout.onboarding?.status !== "complete") return { ok: false, error: "farm_not_initialized", listing: view };
-    const received = addListedGoods(farm.layout.agriculture.inventory, listing.stack, listing.itemId, quantity);
+    // An animal must be able to live on the buyer's farm before a ticket moves; goods must fit a stack.
+    const landing = listing.stack === "livestock" ? await planListedLanding(client, listing.itemId, { playerId, layout: farm.layout }, true) : null;
+    if (landing && !landing.ok) return { ok: false, error: landing.error === "not_found" ? "listing_closed" : landing.error, listing: view };
+    const fishLanding = listing.stack === "fish" ? await checkListedFishLanding(client, listing.itemId, playerId, true) : null;
+    if (fishLanding && !fishLanding.ok) return { ok: false, error: fishLanding.error === "not_found" ? "listing_closed" : fishLanding.error, listing: view };
+    const received = landing || fishLanding ? farm.layout.agriculture.inventory : addListedGoods(farm.layout.agriculture.inventory, listing.stack, listing.itemId, quantity);
     if (!received) return { ok: false, error: "inventory_full", listing: view };
     const { total, fee, proceeds } = check.terms;
     const metadata = { listingId, stack: listing.stack, itemId: listing.itemId, quantity, unitPrice: listing.unitPrice, total, fee };
@@ -216,8 +251,13 @@ export async function buyFarmListing(pool: any, input: any, now: number = Date.n
       playerId: listing.sellerId, transactionKey: `farm:listing:sale:${listingId}:${playerId}:${purchaseId}`, amount: proceeds, reason: "farm_listing_sale",
       metadata: { ...metadata, buyerId: playerId, proceeds },
     });
-    const layout = normalizeFarmGarage({ ...farm.layout, agriculture: { ...farm.layout.agriculture, inventory: received } }, { ownedEntitlementIds: farm.owned });
-    await saveFarm(client, playerId, layout);
+    let layout = farm.layout;
+    if (landing?.ok) await writeListedLanding(client, landing.landing);
+    else if (fishLanding?.ok) await landListedFish(client, listing.itemId, playerId);
+    else {
+      layout = normalizeFarmGarage({ ...farm.layout, agriculture: { ...farm.layout.agriculture, inventory: received } }, { ownedEntitlementIds: farm.owned });
+      await saveFarm(client, playerId, layout);
+    }
     const remaining = listing.quantity - quantity;
     const next: FarmListing = Object.freeze({ ...listing, quantity: remaining, status: remaining > 0 ? "open" : "sold" });
     await writeListing(client, next, now);
@@ -226,7 +266,7 @@ export async function buyFarmListing(pool: any, input: any, now: number = Date.n
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [playerId, purchaseId, listingId, listing.sellerId, listing.stack, listing.itemId, quantity, listing.unitPrice, total, fee, proceeds, new Date(now)],
     );
-    return { ok: true, duplicate: false, quantity, total, fee, balance: spend.balance, listing: listingView(next, playerId), layout };
+    return { ok: true, duplicate: false, quantity, total, fee, balance: spend.balance, listing: listingView(next, playerId), layout, ...(landing?.ok ? { animal: landing.landing.card, homeId: landing.landing.homeId } : {}), ...(fishLanding?.ok ? { fish: fishLanding.card } : {}) };
   });
 }
 
@@ -243,10 +283,20 @@ export async function withdrawFarmListing(pool: any, input: any, now: number = D
     if ((listing.status !== "open" && listing.status !== "expired") || listing.quantity <= 0) return { ok: false, error: "listing_closed", listing: listingView(listing, playerId) };
     const farm = await lockedFarm(client, playerId);
     if (!farm) return { ok: false, error: "farm_not_initialized" };
-    const home = addListedGoods(farm.layout.agriculture.inventory, listing.stack, listing.itemId, listing.quantity);
-    if (!home) return { ok: false, error: "inventory_full", listing: listingView(listing, playerId) };
-    const layout = normalizeFarmGarage({ ...farm.layout, agriculture: { ...farm.layout.agriculture, inventory: home } }, { ownedEntitlementIds: farm.owned });
-    await saveFarm(client, playerId, layout);
+    let layout = farm.layout;
+    if (listing.stack === "livestock") {
+      // Home is never refused: to the first place with room, else onto the field to wait for one.
+      const landing = await planListedLanding(client, listing.itemId, { playerId, layout: farm.layout }, false);
+      if (landing.ok) await writeListedLanding(client, landing.landing);
+    } else if (listing.stack === "fish") {
+      // Back into the creel, never refused (even past its capacity: it was the seller's already).
+      if ((await checkListedFishLanding(client, listing.itemId, playerId, false)).ok) await landListedFish(client, listing.itemId, playerId);
+    } else {
+      const home = addListedGoods(farm.layout.agriculture.inventory, listing.stack, listing.itemId, listing.quantity);
+      if (!home) return { ok: false, error: "inventory_full", listing: listingView(listing, playerId) };
+      layout = normalizeFarmGarage({ ...farm.layout, agriculture: { ...farm.layout.agriculture, inventory: home } }, { ownedEntitlementIds: farm.owned });
+      await saveFarm(client, playerId, layout);
+    }
     const closed: FarmListing = Object.freeze({ ...listing, quantity: 0, status: "withdrawn" });
     await writeListing(client, closed, now);
     return { ok: true, returned: listing.quantity, listing: listingView(closed, playerId), layout };

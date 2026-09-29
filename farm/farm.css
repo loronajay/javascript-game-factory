@@ -316,8 +316,33 @@ button, a { font: inherit; }
 .livestock-row { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(255,255,255,.04); }
 .livestock-row--young { border-color: rgba(158,226,122,.28); }
 .livestock-row__head { display: flex; align-items: center; gap: 10px; }
-.livestock-row__name { flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: 8px; color: #fff6cf; background: transparent; font: 800 15px system-ui, sans-serif; }
-.livestock-row__name:hover:not(:disabled), .livestock-row__name:focus { border-color: var(--farm-line); background: rgba(0,0,0,.25); outline: none; }
+/* The name is a field that looks like one: a dashed underline and a pencil, so renaming is found, not guessed. */
+.livestock-row__naming { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: text; }
+.livestock-row__name { flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-bottom: 1px dashed rgba(255,246,207,.35); border-radius: 8px 8px 0 0; color: #fff6cf; background: transparent; font: 800 15px system-ui, sans-serif; }
+.livestock-row__name:disabled { border-bottom-color: transparent; }
+.livestock-row__name:hover:not(:disabled), .livestock-row__name:focus { border-color: var(--farm-line); border-radius: 8px; background: rgba(0,0,0,.25); outline: none; }
+.livestock-row__rename { flex: 0 0 auto; padding: 3px 8px; border: 1px solid var(--farm-line); border-radius: 999px; color: #d6e3c8; font: 700 11px system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+.livestock-row__naming:hover .livestock-row__rename, .livestock-row__naming:focus-within .livestock-row__rename { color: #1d2a16; background: #9ee27a; border-color: #9ee27a; }
+.livestock-row__naming:focus-within .livestock-row__rename { display: none; }
+/* The Feed bin heads the list: what the herd eats, how much is held, Buy, and Feed the herd. */
+.livestock-panel__status { margin: 0 0 10px; }
+.livestock-panel__status:empty { display: none; }
+.livestock-feed { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid rgba(242,193,78,.35); border-radius: 14px; background: rgba(242,193,78,.06); }
+.livestock-feed__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.livestock-feed__title { color: #f2c14e; font: 900 11px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.livestock-feed__all { padding: 6px 12px; font-size: 12px; }
+.livestock-feed__list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.livestock-feed__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.livestock-feed__words { flex: 1 1 140px; display: grid; min-width: 0; }
+.livestock-feed__words strong { color: #fff6cf; font: 800 13px system-ui, sans-serif; }
+.livestock-feed__words small { color: #b9c9ad; font-size: 11.5px; }
+.livestock-feed__row.is-empty .livestock-feed__words strong { color: #ff9a6b; }
+.livestock-feed__buy { padding: 5px 9px; font-size: 11px; white-space: nowrap; }
+.livestock-feed__hint { margin: 0; color: #9fb294; font-size: 11.5px; line-height: 1.4; }
+.livestock-row__feed { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.livestock-row__eats { color: #c9d7bd; font: 700 12px system-ui, sans-serif; }
+.livestock-row__eats.is-empty { color: #ff9a6b; }
+.livestock-row__feed-go { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; }
 .livestock-row__grade { flex: 0 0 auto; color: #f2c14e; font-size: 15px; letter-spacing: 1px; }
 .livestock-row__line { margin: 0; color: #c9d7bd; font-size: 12.5px; }
 .livestock-row__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
@@ -515,3 +540,4 @@ button, a { font: inherit; }
   .mill-row { grid-template-columns: 40px minmax(0, 1fr) 40px; }
   .mill-row .seed-card__image { width: 40px; height: 36px; }
 }
+.livestock-panel .farm-button:disabled { opacity: .45; cursor: not-allowed; }

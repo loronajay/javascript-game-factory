@@ -282,9 +282,10 @@ export function normalizeLivestockPregnancy(value: unknown): LivestockPregnancy 
     sireName: typeof source.sireName === "string" ? source.sireName.slice(0, 40) : "",
     sireStats: Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, clampStat(stats[key])])) as LivestockStats,
     sireCoatId: typeof source.sireCoatId === "string" ? source.sireCoatId.slice(0, 40) : "",
-    conceivedAt: Math.max(0, finite(source.conceivedAt)),
+    // Farm minutes may be below zero: an animal that changed farms keeps its age on a younger farm's clock.
+    conceivedAt: finite(source.conceivedAt),
     progress: Math.max(0, finite(source.progress)),
-    dueAt: source.dueAt === null || source.dueAt === undefined ? null : Math.max(0, finite(source.dueAt)),
+    dueAt: source.dueAt === null || source.dueAt === undefined ? null : finite(source.dueAt),
   };
 }
 
@@ -302,13 +303,14 @@ export function normalizeLivestockCare(value: unknown, fallbackAt: number): Live
   };
   return {
     hunger: Math.min(FULL, Math.max(0, finite(source.hunger, FULL))),
-    at: Math.max(0, finite(source.at, fallbackAt)),
-    starvedAt: source.starvedAt === null || source.starvedAt === undefined ? null : Math.max(0, finite(source.starvedAt)),
+    // Stamps are farm minutes and may be below zero (see `rebaseLivestockCare`); amounts below stay clamped.
+    at: finite(source.at, fallbackAt),
+    starvedAt: source.starvedAt === null || source.starvedAt === undefined ? null : finite(source.starvedAt),
     progress: minutes(source.progress),
     stress: minutes(source.stress),
     neglect: Math.max(0, finite(source.neglect)),
     pregnancy: normalizeLivestockPregnancy(source.pregnancy),
-    restUntil: Math.max(0, finite(source.restUntil)),
+    restUntil: finite(source.restUntil),
   };
 }
 
@@ -528,4 +530,93 @@ export function inheritLivestock(
   const stats = Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, inheritStat(mother.stats[key], sire.stats[key], random)])) as LivestockStats;
   const name = entry.names[Math.floor(unit(random) * entry.names.length)]!;
   return { gender, coatId, stats, name };
+}
+
+// ---------------------------------------------------------------- changing hands (Phase 6)
+//
+// An animal can leave one farm for another: across the barter table, or through
+// the Exchange Board (where it waits, listed, between two owners). Every stamp
+// on its row — born, the care checkpoint, when it starved, when it rests until,
+// when it was conceived and came due — is a minute of its OWNER'S farm clock,
+// and no two farms' clocks agree. So an animal changes hands in two steps: its
+// care is carried to the minute it leaves (the sender's clock), and then every
+// stamp moves by the difference to the receiver's clock. Durations (goods
+// progress, stress, lifetime neglect, a pregnancy's well-fed progress) do not
+// move. A LISTED animal waits on clock zero: it is rebased to 0 when it goes
+// up and onto whichever farm's clock it lands on, so nothing happens to it on
+// the board — it neither eats nor grows, like every farm while its owner is away.
+//
+// Its stamps can go below zero on a younger farm (a ten-day-old cow arriving on
+// a farm that is five days old was born on day -5), which is why the
+// normalizers above no longer clamp stamps at zero.
+
+/** Every farm-minute stamp on a care record moved by `delta` minutes. */
+export function rebaseLivestockCare(care: LivestockCare, delta: number): LivestockCare {
+  const shift = Number.isFinite(delta) ? delta : 0;
+  return {
+    ...care,
+    at: care.at + shift,
+    starvedAt: care.starvedAt === null ? null : care.starvedAt + shift,
+    restUntil: care.restUntil + shift,
+    pregnancy: care.pregnancy
+      ? { ...care.pregnancy, conceivedAt: care.pregnancy.conceivedAt + shift, dueAt: care.pregnancy.dueAt === null ? null : care.pregnancy.dueAt + shift }
+      : null,
+  };
+}
+
+/** Why a farm cannot take an animal: its Husbandry is below the species' (the Dealer's gate), its herd is at the ceiling, or no home has room. */
+export type LivestockArrivalRefusal = "husbandry_too_low" | "herd_full" | "no_room";
+
+/**
+ * Where each arriving animal will live, in order, or why the farm cannot take
+ * them all. `herdHomes` is the home of every animal staying on the farm (those
+ * leaving in the same exchange already left out). All or nothing: one animal
+ * without a place refuses the lot.
+ */
+export function placeArrivingLivestock(input: Readonly<{
+  homes: readonly FarmLivestockHome[];
+  herdHomes: readonly (string | null)[];
+  level: number;
+  arriving: readonly Readonly<{ speciesId: string }>[];
+}>): { ok: true; homeIds: string[] } | { ok: false; error: LivestockArrivalRefusal; speciesId: string } {
+  if (input.herdHomes.length + input.arriving.length > MAX_HERD) return { ok: false, error: "herd_full", speciesId: input.arriving[0]?.speciesId ?? "" };
+  const occupied = [...input.herdHomes];
+  const homeIds: string[] = [];
+  for (const animal of input.arriving) {
+    const rule = farmLivestockRule(animal.speciesId);
+    if (!rule) return { ok: false, error: "no_room", speciesId: animal.speciesId };
+    if (input.level < rule.minLevel) return { ok: false, error: "husbandry_too_low", speciesId: rule.id };
+    const home = pickFarmLivestockHome(input.homes, occupied, undefined, rule.id);
+    if (!home) return { ok: false, error: "no_room", speciesId: rule.id };
+    occupied.push(home.id);
+    homeIds.push(home.id);
+  }
+  return { ok: true, homeIds };
+}
+
+/**
+ * An animal as anyone may see it on a table or the board: what it is, its
+ * grade and stats, and its age on the clock it lives by (its farm's, or zero
+ * while listed). Never whose farm it is on, and never its care beyond whether
+ * it is expecting.
+ */
+export function livestockCard(animal: Readonly<{ id: string; speciesId: string; name: string; gender: string; coatId: string; stats: LivestockStats; bornAt: number; care: LivestockCare; origin?: string }>, clock: number) {
+  const rule = farmLivestockRule(animal.speciesId);
+  const ageDays = Math.max(0, (clock - animal.bornAt) / DAY);
+  const grownAt = rule ? adultAgeDays(rule, animal.stats) : 0;
+  const grown = !rule || ageDays >= grownAt;
+  return {
+    id: animal.id,
+    speciesId: animal.speciesId,
+    name: animal.name,
+    gender: animal.gender === "male" ? "male" : "female",
+    coatId: animal.coatId,
+    stats: { ...animal.stats },
+    grade: livestockGrade(animal.stats),
+    ageDays: Math.round(ageDays * 10) / 10,
+    grown,
+    grownPercent: grown ? 100 : Math.floor((ageDays / grownAt) * 100),
+    expecting: Boolean(animal.care.pregnancy),
+    bred: animal.origin === "bred",
+  };
 }

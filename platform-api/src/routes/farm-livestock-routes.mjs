@@ -3,6 +3,7 @@
 // the Livestock Dealer's sale, leading an animal to another home, a new name.
 //
 //   GET  /games/farm/livestock/:playerId                          that farm's herd
+//   GET  /games/farm/livestock/cards?ids=a,b                      living animals by id, as cards (a trading table's other side)
 //   POST /games/farm/livestock/purchases  { purchaseId, speciesId, homeId?, name? }   the Livestock Dealer
 //   POST /games/farm/livestock/moves      { animalId, homeId | null }                  to another home
 //   POST /games/farm/livestock/names      { animalId, name }                           rename
@@ -28,9 +29,25 @@ export async function handleFarmLivestockRoute(context) {
     if (!pathname.startsWith("/games/farm/livestock"))
         return false;
     const postService = method === "POST" ? POSTS[pathname] : undefined;
-    const herd = method === "GET" ? HERD_PATH.exec(pathname) : null;
-    if (!postService && !herd)
+    const cards = method === "GET" && pathname === "/games/farm/livestock/cards";
+    const herd = method === "GET" && !cards ? HERD_PATH.exec(pathname) : null;
+    if (!postService && !herd && !cards)
         return false;
+    if (cards) {
+        const service = services?.getFarmLivestockCards;
+        if (typeof service !== "function") {
+            writeJson(res, 503, { status: "error", error: "farm_livestock_not_configured", timestamp }, requestOrigin);
+            return true;
+        }
+        try {
+            const ids = (new URL(req?.url || "/", "http://localhost").searchParams.get("ids") ?? "").split(",").filter(Boolean);
+            writeJson(res, 200, await service({ ids }), requestOrigin);
+        }
+        catch {
+            writeJson(res, 500, { status: "error", error: "farm_livestock_unavailable", timestamp }, requestOrigin);
+        }
+        return true;
+    }
     if (herd) {
         const service = services?.getFarmLivestock;
         if (typeof service !== "function") {

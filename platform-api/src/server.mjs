@@ -26,6 +26,7 @@ import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
 import { butcherFarmLivestock, buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
+import { getFarmLivestockCards } from "./db/farm-livestock-transfer.mjs";
 import { buyFarmTackle, castFarmLine, getFarmFishDetails, getFarmFishRecords, getFarmFishShadows, getFarmFishing, landFarmCast, lockFarmFish, mountFarmFish, releaseFarmFish, sellFarmFish } from "./db/farm-fishing.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
 import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
@@ -313,6 +314,7 @@ async function bootstrap() {
         getFarmFishDetails: (params) => getFarmFishDetails(pool, params),
         mountFarmFish: (params) => mountFarmFish(pool, params),
         getFarmLivestock: (params) => getFarmLivestock(pool, params),
+        getFarmLivestockCards: (params) => getFarmLivestockCards(pool, params),
         buyFarmLivestock: (params) => buyFarmLivestock(pool, params),
         moveFarmLivestock: (params) => moveFarmLivestock(pool, params),
         renameFarmLivestock: (params) => renameFarmLivestock(pool, params),

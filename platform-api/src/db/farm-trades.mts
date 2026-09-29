@@ -12,6 +12,9 @@
 // against the STORED inventories (furniture against the shelf), the goods cross
 // over, and both farms are saved. If anything is no longer true, nothing moves
 // and the table goes back to open with the reason. Tickets are never touched.
+// Live animals (Phase 6) are planned before anything is written — each must
+// still be alive on its farm and each receiver able to keep what it is handed
+// (db/farm-livestock-transfer.mts) — and their rows change owner last.
 //
 // Clients poll: `current` finds the one trade a player is in, `get` follows it
 // to its end (and hands back the farm as it stands once it completed).
@@ -42,6 +45,7 @@ import {
 import { lockedFarm, saveFarm, transaction } from "./farm-economy.mjs";
 import { lockedCreel } from "./farm-fishing.mjs";
 import { CREEL_CAPACITY } from "../services/farm-fish-catalog.mjs";
+import { applyLivestockMoves, planLivestockTrade, tradeableLivestockIds } from "./farm-livestock-transfer.mjs";
 
 /** The fish ids a player could put on a table: in their creel, not locked. */
 async function tradeableFishIds(client: any, playerId: string): Promise<string[]> {
@@ -188,7 +192,7 @@ export async function actOnFarmTrade(pool: any, input: any, now: number = Date.n
     if (action.type === "offer") {
       const farm = await storedFarm(client, playerId);
       if (!farm) return refuse("farm_not_initialized");
-      const short = tradeShortfall(action.offer, tradeableStock(farm, await tradeableFishIds(client, playerId)));
+      const short = tradeShortfall(action.offer, tradeableStock(farm, await tradeableFishIds(client, playerId), await tradeableLivestockIds(client, playerId)));
       if (short) return refuse("not_enough", { stack: short.stack, itemId: short.id, held: short.held });
     }
     const step = applyTradeAction(current, playerId, action, now);
@@ -238,8 +242,13 @@ async function settle(client: any, state: TradeState, now: number): Promise<{ st
   const creels = new Map<string, any[]>();
   for (const id of [state.a.playerId, state.b.playerId].sort()) creels.set(id, await lockedCreel(client, id));
   const unlocked = (id: string) => (creels.get(id) ?? []).filter((row) => !row.locked).map((row) => String(row.fish_id));
-  const exchange = settleFarmTrade(farmA.layout, farmB.layout, state.a.offer, state.b.offer, unlocked(state.a.playerId), unlocked(state.b.playerId));
+  const animalsA = Object.keys(state.a.offer.livestock ?? {});
+  const animalsB = Object.keys(state.b.offer.livestock ?? {});
+  // The animals are checked by the livestock plan below (alive on their farm, keepable by the receiver), not by the goods maths.
+  const exchange = settleFarmTrade(farmA.layout, farmB.layout, state.a.offer, state.b.offer, unlocked(state.a.playerId), unlocked(state.b.playerId), animalsA, animalsB);
   if (!exchange.ok) return { state: reopenFarmTrade(state, exchange.error === "offer_gone" ? `offer_gone_${exchange.side}` : `inventory_full_${exchange.side}`, now) };
+  const livestock = await planLivestockTrade(client, { playerId: state.a.playerId, layout: farmA.layout }, { playerId: state.b.playerId, layout: farmB.layout }, animalsA, animalsB);
+  if (!livestock.ok) return { state: reopenFarmTrade(state, `${livestock.error}_${livestock.side}`, now) };
   const fishA = Object.keys(state.a.offer.fish ?? {});
   const fishB = Object.keys(state.b.offer.fish ?? {});
   // Nobody's creel may overflow with what they are handed.
@@ -252,6 +261,7 @@ async function settle(client: any, state: TradeState, now: number): Promise<{ st
     if (!ids.length) continue;
     await client.query(`update farm_fish set player_id = $2, locked = false, shadow_id = null where fish_id = any($1::text[]) and state = 'creel'`, [ids, to]);
   }
+  await applyLivestockMoves(client, livestock.moves);
   const layouts = new Map<string, any>();
   for (const [id, farm, inventory] of [[state.a.playerId, farmA, exchange.a], [state.b.playerId, farmB, exchange.b]] as const) {
     const next = normalizeFarmGarage({

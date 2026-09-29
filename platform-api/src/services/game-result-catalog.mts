@@ -12,6 +12,7 @@
 // id) and `durationMs` (the play time it claims, which the settlement's
 // time-budget fence checks against the wall clock).
 
+import { normalizeLoversLostCampaignResult } from "./lovers-lost-campaign-ticket-rewards.mjs";
 import { normalizeBarnyardDashResult } from "./barnyard-dash-ticket-rewards.mjs";
 import { normalizeBattleshitsResult } from "./battleshits-ticket-rewards.mjs";
 import { normalizeBirdDutyResult } from "./bird-duty-ticket-rewards.mjs";
@@ -31,6 +32,7 @@ export interface GameResultBase {
 }
 
 const NORMALIZERS: Readonly<Record<string, (raw: unknown) => NormalizedResult<GameResultBase>>> = Object.freeze({
+  "lovers-lost-campaign": normalizeLoversLostCampaignResult,
   battleshits: normalizeBattleshitsResult,
   sumorai: normalizeSumoraiResult,
   "mini-tactics": normalizeMiniTacticsResult,

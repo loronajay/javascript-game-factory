@@ -7,7 +7,9 @@
 // the price, and the panel redraws from what comes back. The Dealer only
 // sells young ones — the stats are the animal's own, seen once it is home.
 // A species past the player's Husbandry level shows what it takes and cannot
-// be bought (the server refuses it too).
+// be bought (the server refuses it too). The name box above the cards names
+// the next one bought (the server cleans it; blank, Hollis names it), and is
+// cleared by a sale so two animals are never given one name by accident.
 
 import { LIVESTOCK_CATALOG, type LivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { homesWithRoom, totalLivestockSlots, type LivestockHome } from "./farm-livestock-housing.mjs";
@@ -19,12 +21,14 @@ type Elements = Readonly<{
   room: HTMLElement;
   list: HTMLElement;
   status: HTMLElement;
+  /** Optional: what the next one is to be called. */
+  name?: HTMLInputElement;
 }>;
 
 export type LivestockPurchaseOutcome = Readonly<{ ok: boolean; message: string }>;
 
 type Options = Readonly<{
-  buy: (speciesId: string) => Promise<LivestockPurchaseOutcome>;
+  buy: (speciesId: string, name: string) => Promise<LivestockPurchaseOutcome>;
   /** The farm as the Dealer sees it: its homes and the animals already in them. */
   farm: () => Readonly<{ homes: readonly LivestockHome[]; herd: readonly LivestockAnimal[] }>;
   /** The player's Husbandry level: the Dealer sells each species from its own level up. */
@@ -68,8 +72,10 @@ export function createLivestockDealerPanel(elements: Elements, options: Options)
     if (busy) return;
     busy = true;
     render();
-    const outcome = await options.buy(speciesId).catch((): LivestockPurchaseOutcome => ({ ok: false, message: "The Dealer could not be reached. Nothing was bought." }));
+    const name = elements.name?.value.trim() ?? "";
+    const outcome = await options.buy(speciesId, name).catch((): LivestockPurchaseOutcome => ({ ok: false, message: "The Dealer could not be reached. Nothing was bought." }));
     busy = false;
+    if (outcome.ok && elements.name) elements.name.value = "";
     elements.status.textContent = outcome.message;
     render();
   }
@@ -131,6 +137,11 @@ export function createLivestockDealerPanel(elements: Elements, options: Options)
   }
 
   elements.closeButton.addEventListener("click", close);
+  // Letters typed into the name are the name's, never the square's movement keys.
+  elements.name?.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === "Escape") elements.name!.blur();
+  });
 
   return Object.freeze({
     open() {

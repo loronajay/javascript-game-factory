@@ -4,6 +4,7 @@ import { calculateBirdDutyTicketReward } from "./bird-duty-ticket-rewards.mjs";
 import { calculateCreatureBattlerTicketReward } from "./creature-battler-ticket-rewards.mjs";
 import { calculateIlluminautsTicketReward } from "./illuminauts-ticket-rewards.mjs";
 import { calculateLoversLostTicketReward } from "./lovers-lost-ticket-rewards.mjs";
+import { calculateLoversLostCampaignTicketReward } from "./lovers-lost-campaign-ticket-rewards.mjs";
 import { calculateMiniHoopsTicketReward } from "./mini-hoops-ticket-rewards.mjs";
 import { calculateMiniTacticsTicketReward } from "./mini-tactics-ticket-rewards.mjs";
 import { calculatePondsidePushTicketReward } from "./pondside-push-ticket-rewards.mjs";
@@ -21,6 +22,7 @@ const ZERO_REWARD = Object.freeze({
 // inserted achievement ids; no client-provided ticket amount reaches them.
 const REWARD_EVALUATORS = Object.freeze({
     "lovers-lost": calculateLoversLostTicketReward,
+    "lovers-lost-campaign": calculateLoversLostCampaignTicketReward,
     battleshits: calculateBattleshitsTicketReward,
     sumorai: calculateSumoraiTicketReward,
     "mini-tactics": calculateMiniTacticsTicketReward,

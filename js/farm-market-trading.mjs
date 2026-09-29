@@ -9,7 +9,7 @@
 // signed-out visitor never polls and T on a person says why.
 import { createTradeSession } from "./farm-trade-session.mjs";
 import { createTradePanel } from "./farm-trade-panel.mjs";
-import { isLive } from "./farm-trade.mjs";
+import { isLive, normalizeTradeAnimal } from "./farm-trade.mjs";
 function required(selector) {
     const element = document.querySelector(selector);
     if (!element)
@@ -25,7 +25,7 @@ export function createMarketTrading(deps) {
     const remember = (fish) => {
         if (!fish || typeof fish.id !== "string")
             return null;
-        const entry = Object.freeze({ id: fish.id, speciesId: String(fish.speciesId), weightG: Number(fish.weightG) || 0, sizeClass: String(fish.sizeClass ?? "average"), variant: String(fish.variant ?? "normal"), locked: fish.locked === true });
+        const entry = Object.freeze({ id: fish.id, speciesId: String(fish.speciesId), weightG: Number(fish.weightG) || 0, sizeClass: String(fish.sizeClass ?? "average"), variant: String(fish.variant ?? "normal"), locked: fish.locked === true, value: Number(fish.value) || 0 });
         known.set(entry.id, entry);
         return entry;
     };
@@ -36,8 +36,29 @@ export function createMarketTrading(deps) {
         creel = answer.creel.map(remember).filter((fish) => Boolean(fish));
         panel?.render();
     }
+    // Animals on the partner's side: their public cards, read once each.
+    const animals = new Map();
+    const askingAnimals = new Set();
+    const animalDetail = (id) => deps.herd?.().find((animal) => animal.id === id) ?? animals.get(id) ?? null;
+    function lookUpTheirAnimals() {
+        const view = session.snapshot().view;
+        const unknown = Object.keys(view?.them.offer.livestock ?? {}).filter((id) => !animalDetail(id) && !askingAnimals.has(id));
+        if (!unknown.length || !deps.fetchAnimalCards)
+            return;
+        for (const id of unknown)
+            askingAnimals.add(id);
+        void deps.fetchAnimalCards(unknown).then((answer) => {
+            for (const raw of Array.isArray(answer?.animals) ? answer.animals : []) {
+                const animal = normalizeTradeAnimal(raw);
+                if (animal)
+                    animals.set(animal.id, animal);
+            }
+            panel?.render();
+        }).catch(() => undefined);
+    }
     /** Fish on the partner's side the page has not seen yet: read them once, then draw them. */
     function lookUpTheirs() {
+        lookUpTheirAnimals();
         const view = session.snapshot().view;
         const unknown = Object.keys(view?.them.offer.fish ?? {}).filter((id) => !known.has(id) && !asking.has(id));
         if (!unknown.length || !deps.fishApi)
@@ -55,9 +76,10 @@ export function createMarketTrading(deps) {
         timers: { set: (run, ms) => setTimeout(run, ms), clear: (handle) => clearTimeout(handle) },
         farm: deps.farm,
         // A trade that landed moved fish too: read the creel again.
-        onLayout: (layout) => { deps.takeStock(layout); void loadCreel(); },
+        onLayout: (layout) => { deps.takeStock(layout); void loadCreel(); deps.onHerdChanged?.(); },
         onChange: () => { lookUpTheirs(); panel?.render(); },
         creel: () => creel,
+        herd: () => deps.herd?.() ?? [],
     });
     panel = createTradePanel({
         invite: required("#tradeInvite"),
@@ -76,7 +98,7 @@ export function createMarketTrading(deps) {
         status: required("#tradeStatus"),
         lockButton: required("#lockTrade"),
         confirmButton: required("#confirmTrade"),
-    }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose, creel: () => creel, fishDetail: (id) => known.get(id) ?? null });
+    }, { session, farm: deps.farm, thumbnail: deps.thumbnail, onClose: deps.onClose, creel: () => creel, fishDetail: (id) => known.get(id) ?? null, herd: () => deps.herd?.() ?? [], animalDetail });
     return Object.freeze({
         start: () => {
             if (!deps.canTrade)
@@ -100,5 +122,7 @@ export function createMarketTrading(deps) {
             const view = session.snapshot().view;
             return view && isLive(view) ? "trading" : "";
         },
+        creel: () => creel,
+        reloadCreel: () => loadCreel(),
     });
 }

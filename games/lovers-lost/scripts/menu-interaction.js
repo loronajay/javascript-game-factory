@@ -7,12 +7,14 @@
 import {
   getOnlineSideSelectRects, getOnlineNameEntryButtonRects, getOnlineLobbyButtonRects,
 } from './lobby-ui.js';
-
-// Main-menu button bounds (canvas space).
-const MENU_BTN0 = { x: 300, y: 148, w: 360, h: 56 }; // SINGLE PLAYER
-const MENU_BTN1 = { x: 300, y: 216, w: 360, h: 56 }; // LOCAL MULTIPLAYER
-const MENU_BTN2 = { x: 300, y: 284, w: 360, h: 56 }; // ONLINE MULTIPLAYER
-const MENU_BTN3 = { x: 360, y: 360, w: 240, h: 44 }; // HOW TO PLAY
+import {
+  MAIN_MENU_RECTS,
+  PUZZLE_MENU_RECTS,
+  PUZZLE_LOCAL_RECTS,
+  PUZZLE_PLAY_RECTS,
+  PUZZLE_COMPLETE_RECTS,
+  pointInRect,
+} from './puzzle-ui.js';
 
 function inBtn(cx, cy, b) { return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h; }
 function inRect(cx, cy, rect) { return !!rect && inBtn(cx, cy, rect); }
@@ -31,11 +33,34 @@ function createMenuInteraction(canvas, host) {
     const hover = host.hover;
 
     if (host.gs.phase === 'menu') {
-      hover.menu0 = inBtn(cx, cy, MENU_BTN0);
-      hover.menu1 = inBtn(cx, cy, MENU_BTN1);
-      hover.menu2 = inBtn(cx, cy, MENU_BTN2);
-      hover.menu3 = inBtn(cx, cy, MENU_BTN3);
-    } else { hover.menu0 = hover.menu1 = hover.menu2 = hover.menu3 = false; }
+      hover.menu0 = pointInRect(cx, cy, MAIN_MENU_RECTS.solo);
+      hover.menu1 = pointInRect(cx, cy, MAIN_MENU_RECTS.local);
+      hover.menu2 = pointInRect(cx, cy, MAIN_MENU_RECTS.online);
+      hover.menu3 = pointInRect(cx, cy, MAIN_MENU_RECTS.puzzle);
+      hover.menu4 = pointInRect(cx, cy, MAIN_MENU_RECTS.help);
+    } else { hover.menu0 = hover.menu1 = hover.menu2 = hover.menu3 = hover.menu4 = false; }
+
+    if (host.gs.phase === 'puzzle_campaign_menu') {
+      hover.puzzleLocal = pointInRect(cx, cy, PUZZLE_MENU_RECTS.local);
+      hover.puzzleOnline = pointInRect(cx, cy, PUZZLE_MENU_RECTS.online);
+      hover.puzzleBack = pointInRect(cx, cy, PUZZLE_MENU_RECTS.back);
+    } else { hover.puzzleLocal = hover.puzzleOnline = hover.puzzleBack = false; }
+
+    if (host.gs.phase === 'puzzle_local_select') {
+      hover.puzzleSolo = pointInRect(cx, cy, PUZZLE_LOCAL_RECTS.solo);
+      hover.puzzleLocalTwo = pointInRect(cx, cy, PUZZLE_LOCAL_RECTS.local);
+      hover.puzzleLocalBack = pointInRect(cx, cy, PUZZLE_LOCAL_RECTS.back);
+    } else { hover.puzzleSolo = hover.puzzleLocalTwo = hover.puzzleLocalBack = false; }
+
+    if (host.gs.phase === 'puzzle_playing') {
+      hover.puzzlePlayMenu = pointInRect(cx, cy, PUZZLE_PLAY_RECTS.menu);
+      hover.puzzleReset = pointInRect(cx, cy, PUZZLE_PLAY_RECTS.reset);
+    } else { hover.puzzlePlayMenu = hover.puzzleReset = false; }
+
+    if (host.gs.phase === 'puzzle_complete') {
+      hover.puzzleRetry = pointInRect(cx, cy, PUZZLE_COMPLETE_RECTS.retry);
+      hover.puzzleCompleteMenu = pointInRect(cx, cy, PUZZLE_COMPLETE_RECTS.menu);
+    } else { hover.puzzleRetry = hover.puzzleCompleteMenu = false; }
 
     if (host.gs.phase === 'solo_side_select') {
       const r = getOnlineSideSelectRects();
@@ -73,10 +98,33 @@ function createMenuInteraction(canvas, host) {
     const { cx, cy } = toCanvasCoords(e);
 
     if (host.gs.phase === 'menu') {
-      if      (inBtn(cx, cy, MENU_BTN0)) { host.soloCountdownTick = 0; host.gs = { ...host.gs, phase: 'solo_side_select' }; }
-      else if (inBtn(cx, cy, MENU_BTN1)) { host.localCountdownTick = 0; host.gs = { ...host.gs, phase: 'local_countdown' }; }
-      else if (inBtn(cx, cy, MENU_BTN2)) { host.onlineSide = 'boy'; host.onlineLobbyPhase = 'main'; host.gs = { ...host.gs, phase: 'online_side_select' }; }
-      else if (inBtn(cx, cy, MENU_BTN3)) host.gs = { ...host.gs, phase: 'menu_help' };
+      if      (pointInRect(cx, cy, MAIN_MENU_RECTS.solo)) { host.soloCountdownTick = 0; host.gs = { ...host.gs, phase: 'solo_side_select' }; }
+      else if (pointInRect(cx, cy, MAIN_MENU_RECTS.local)) { host.localCountdownTick = 0; host.gs = { ...host.gs, phase: 'local_countdown' }; }
+      else if (pointInRect(cx, cy, MAIN_MENU_RECTS.online)) host.startRunnerOnlineFlow();
+      else if (pointInRect(cx, cy, MAIN_MENU_RECTS.puzzle)) host.openPuzzleMenu();
+      else if (pointInRect(cx, cy, MAIN_MENU_RECTS.help)) host.gs = { ...host.gs, phase: 'menu_help' };
+      return;
+    }
+    if (host.gs.phase === 'puzzle_campaign_menu') {
+      if (pointInRect(cx, cy, PUZZLE_MENU_RECTS.local)) host.gs = { ...host.gs, phase: 'puzzle_local_select' };
+      else if (pointInRect(cx, cy, PUZZLE_MENU_RECTS.online)) host.startPuzzleOnlineFlow();
+      else if (pointInRect(cx, cy, PUZZLE_MENU_RECTS.back)) host.returnToMenu();
+      return;
+    }
+    if (host.gs.phase === 'puzzle_local_select') {
+      if (pointInRect(cx, cy, PUZZLE_LOCAL_RECTS.solo)) host.startPuzzle('solo');
+      else if (pointInRect(cx, cy, PUZZLE_LOCAL_RECTS.local)) host.startPuzzle('local');
+      else if (pointInRect(cx, cy, PUZZLE_LOCAL_RECTS.back)) host.openPuzzleMenu();
+      return;
+    }
+    if (host.gs.phase === 'puzzle_playing') {
+      if (pointInRect(cx, cy, PUZZLE_PLAY_RECTS.menu)) host.openPuzzleMenu();
+      else if (pointInRect(cx, cy, PUZZLE_PLAY_RECTS.reset)) host.resetPuzzle();
+      return;
+    }
+    if (host.gs.phase === 'puzzle_complete') {
+      if (pointInRect(cx, cy, PUZZLE_COMPLETE_RECTS.retry)) host.retryPuzzle();
+      else if (pointInRect(cx, cy, PUZZLE_COMPLETE_RECTS.menu)) host.openPuzzleMenu();
       return;
     }
     if (host.gs.phase === 'solo_side_select') {
@@ -99,12 +147,12 @@ function createMenuInteraction(canvas, host) {
     if (host.gs.phase === 'online_lobby') {
       const r = getOnlineLobbyButtonRects(host.onlineLobbyPhase);
       if (host.onlineLobbyPhase === 'main') {
-        if (inRect(cx, cy, r.findMatch))  { host.onlineLobbyPhase = 'searching'; host.onlineSearchTick = 0; host.onlineClient.findMatch(host.onlineSide); }
+        if (inRect(cx, cy, r.findMatch))  { host.onlineLobbyPhase = 'searching'; host.onlineSearchTick = 0; host.onlineClient.findMatch(host.onlineSide, host.onlineGameId); }
         if (inRect(cx, cy, r.playFriend)) { host.onlineLobbyPhase = 'friend_options'; }
       } else if (host.onlineLobbyPhase === 'searching') {
         if (inRect(cx, cy, r.cancel)) { host.cancelSearch(); host.onlineLobbyPhase = 'main'; }
       } else if (host.onlineLobbyPhase === 'friend_options') {
-        if (inRect(cx, cy, r.create)) { host.onlineLobbyPhase = 'create'; host.onlineSearchTick = 0; host.onlineClient.createRoom(host.onlineSide); }
+        if (inRect(cx, cy, r.create)) { host.onlineLobbyPhase = 'create'; host.onlineSearchTick = 0; host.onlineClient.createRoom(host.onlineSide, host.onlineGameId); }
         if (inRect(cx, cy, r.join))   { host.onlineLobbyPhase = 'join'; host.onlineCodeInput = ''; }
       } else if (host.onlineLobbyPhase === 'create') {
         if (inRect(cx, cy, r.cancel)) { host.cancelRoom(); host.onlineLobbyPhase = 'friend_options'; }

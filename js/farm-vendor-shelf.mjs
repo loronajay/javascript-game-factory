@@ -36,7 +36,7 @@ export function createVendorShelf(elements, options) {
         const meta = document.createElement("small");
         meta.textContent = "recipeId" in line
             ? held ? "Learned · permanent cookbook recipe" : `${unitPrice} tickets · permanent cookbook recipe`
-            : `${unitPrice} tickets each · ${held} in your basket`;
+            : `${unitPrice} tickets each · ${held} in your ${"feedId" in line ? "supplies" : "basket"}`;
         label.append(title, meta);
         const actions = document.createElement("div");
         actions.className = "sale-footer__actions vendor-shelf__actions";

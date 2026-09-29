@@ -21,6 +21,7 @@ function node(tag, className = "", text = "") {
 export function createTradePanel(elements, options) {
     const { session } = options;
     const fishDetail = (fishId) => options.fishDetail?.(fishId) ?? null;
+    const animalDetail = (animalId) => options.animalDetail?.(animalId) ?? null;
     const isOpen = () => !elements.root.hidden;
     let shownTable = "";
     // The lists are rebuilt only when what they show changes, not on every poll, so a hover or focus survives.
@@ -85,25 +86,25 @@ export function createTradePanel(elements, options) {
         stateChip(elements.theirState, view.them.locked, view.them.confirmed);
         elements.root.dataset.status = view.status;
         if (live) {
-            const entries = stockEntries(options.farm(), options.creel?.() ?? []);
+            const entries = stockEntries(options.farm(), options.creel?.() ?? [], options.herd?.() ?? []);
             const nextStockKey = JSON.stringify([editable, entries.map((entry) => [entry.stack, entry.id, entry.held, offerCount(snapshot.draft, entry.stack, entry.id)])]);
             if (nextStockKey !== stockKey) {
                 stockKey = nextStockKey;
                 elements.stock.replaceChildren(...(entries.length
                     ? entries.map((entry) => stockRow(entry, snapshot, editable))
-                    : [node("li", "sale-empty", "Nothing to trade yet — produce, dishes, logs, planks, furniture on your shelf and fish from your creel can all go on the table.")]));
+                    : [node("li", "sale-empty", "Nothing to trade yet — produce, dishes, logs, planks, furniture on your shelf, fish from your creel and animals from your herd can all go on the table.")]));
             }
         }
         else {
             // The table has ended: the basket has moved on, so show what this side put up, not steppers against the new counts.
-            const mine = offerLines(view.you.offer, fishDetail);
+            const mine = offerLines(view.you.offer, fishDetail, animalDetail);
             const nextStockKey = JSON.stringify([view.status, mine.map((line) => [line.stack, line.id, line.count])]);
             if (nextStockKey !== stockKey) {
                 stockKey = nextStockKey;
                 elements.stock.replaceChildren(...(mine.length ? mine.map(lineRow) : [node("li", "sale-empty", "Nothing.")]));
             }
         }
-        const theirs = offerLines(view.them.offer, fishDetail);
+        const theirs = offerLines(view.them.offer, fishDetail, animalDetail);
         const nextTheirsKey = JSON.stringify([view.status, theirs.map((line) => [line.stack, line.id, line.count])]);
         if (nextTheirsKey !== theirsKey) {
             theirsKey = nextTheirsKey;

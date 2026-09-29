@@ -85,13 +85,14 @@ export function normalizeLivestockPregnancy(value) {
     if (!sireId)
         return null;
     const stats = source.sireStats && typeof source.sireStats === "object" ? source.sireStats : {};
-    const due = source.dueAt === null || source.dueAt === undefined ? null : Math.max(0, finite(source.dueAt));
+    // Stamps are farm minutes and may be below zero: an animal that changed farms keeps its age on a younger farm's clock.
+    const due = source.dueAt === null || source.dueAt === undefined ? null : finite(source.dueAt);
     return Object.freeze({
         sireId,
         sireName: typeof source.sireName === "string" ? source.sireName.slice(0, 40) : "",
         sireStats: Object.freeze(Object.fromEntries(LIVESTOCK_STATS.map((key) => [key, statOf(stats[key])]))),
         sireCoatId: typeof source.sireCoatId === "string" ? source.sireCoatId.slice(0, 40) : "",
-        conceivedAt: Math.max(0, finite(source.conceivedAt)),
+        conceivedAt: finite(source.conceivedAt),
         progress: Math.max(0, finite(source.progress)),
         dueAt: due,
     });
@@ -111,16 +112,16 @@ export function normalizeLivestockCare(value, fallbackAt) {
         }
         return out;
     };
-    const starved = source.starvedAt === null || source.starvedAt === undefined ? null : Math.max(0, finite(source.starvedAt));
+    const starved = source.starvedAt === null || source.starvedAt === undefined ? null : finite(source.starvedAt);
     return Object.freeze({
         hunger: Math.min(FULL, Math.max(0, finite(source.hunger, FULL))),
-        at: Math.max(0, finite(source.at, fallbackAt)),
+        at: finite(source.at, fallbackAt),
         starvedAt: starved,
         progress: Object.freeze(minutes(source.progress)),
         stress: Object.freeze(minutes(source.stress)),
         neglect: Math.max(0, finite(source.neglect)),
         pregnancy: normalizeLivestockPregnancy(source.pregnancy),
-        restUntil: Math.max(0, finite(source.restUntil)),
+        restUntil: finite(source.restUntil),
     });
 }
 /**

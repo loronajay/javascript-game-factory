@@ -16,6 +16,9 @@ const CONFLICTS = new Set([
     "farm_not_initialized", "not_enough", "not_invited", "not_open", "not_locked", "stale_revision", "empty_offer",
     "too_many_changes", "trade_expired", "trade_completed", "trade_declined", "trade_cancelled",
     "offer_gone_you", "offer_gone_them", "inventory_full_you", "inventory_full_them",
+    "creel_full_you", "creel_full_them",
+    // Live animals: the receiver cannot keep what they are handed.
+    "husbandry_too_low_you", "husbandry_too_low_them", "herd_full_you", "herd_full_them", "no_room_you", "no_room_them",
 ]);
 export async function handleFarmTradeRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;

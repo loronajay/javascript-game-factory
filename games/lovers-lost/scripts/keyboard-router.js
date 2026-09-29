@@ -26,6 +26,37 @@ function createKeyboardRouter(host) {
     if (host.gs.phase === 'menu_help') {
       host.gs = { ...host.gs, phase: 'menu' }; host.inp.tick(); return;
     }
+    if (host.gs.phase === 'menu' && e.key.toLowerCase() === 'p') {
+      host.openPuzzleMenu();
+      return;
+    }
+    if (host.gs.phase === 'puzzle_campaign_menu') {
+      if (e.key === 'Escape') host.returnToMenu();
+      else if (e.key.toLowerCase() === 'l') host.gs = { ...host.gs, phase: 'puzzle_local_select' };
+      else if (e.key.toLowerCase() === 'o') host.startPuzzleOnlineFlow();
+      return;
+    }
+    if (host.gs.phase === 'puzzle_local_select') {
+      if (e.key === 'Escape') host.openPuzzleMenu();
+      else if (e.key === '1') host.startPuzzle('solo');
+      else if (e.key === '2') host.startPuzzle('local');
+      return;
+    }
+    if (host.gs.phase === 'puzzle_complete') {
+      if (e.key === 'Escape') host.openPuzzleMenu();
+      else if (e.key === 'Enter' || e.key.toLowerCase() === 'r') host.retryPuzzle();
+      return;
+    }
+    if (host.gs.phase === 'puzzle_playing') {
+      if (e.key === 'Escape') { host.openPuzzleMenu(); return; }
+      if (e.key.toLowerCase() === 'r') { host.resetPuzzle(); return; }
+      const puzzleMapped = keyToAction(e.key);
+      if (puzzleMapped && (host.onlineActivity !== 'puzzle' || puzzleMapped.side === host.onlineSide)) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        host.inp.keydown(e.key);
+      }
+      return;
+    }
     if (host.gs.phase === 'solo_side_select') {
       if (e.key === 'Escape') { host.gs = { ...host.gs, phase: 'menu' }; }
       return;
@@ -39,7 +70,11 @@ function createKeyboardRouter(host) {
       return;
     }
     if (host.gs.phase === 'online_side_select') {
-      if (e.key === 'Escape') { host.onlineClient.disconnect(); host.onlineQueueCounts = null; host.gs = { ...host.gs, phase: 'menu' }; }
+      if (e.key === 'Escape') {
+        host.onlineClient.disconnect(); host.onlineQueueCounts = null;
+        if (host.onlineActivity === 'puzzle') host.openPuzzleMenu();
+        else host.gs = { ...host.gs, phase: 'menu' };
+      }
       return;
     }
     if (host.gs.phase === 'online_name_entry') {
@@ -54,7 +89,8 @@ function createKeyboardRouter(host) {
         host.onlineClient.disconnect(); host.onlineClient.reset();
         host.onlineRemoteSide = null; host.onlineRemoteIdentity = null; host.onlineCountdown = null;
         host.onlineRoomCode = ''; host.onlineQueueCounts = null; host.onlineLobbyPhase = 'main';
-        host.gs = { ...host.gs, phase: 'menu' };
+        if (host.onlineActivity === 'puzzle') host.openPuzzleMenu();
+        else host.gs = { ...host.gs, phase: 'menu' };
       }
       return;
     }

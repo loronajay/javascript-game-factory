@@ -1,6 +1,6 @@
 # Lovers Lost
 
-`lovers-lost/` is an implemented runner cabinet where two mirrored runners try to survive hazards and reunite before the round timer expires.
+`lovers-lost/` is a two-mode co-op cabinet. The original mirrored runner asks two lovers to survive hazards and reunite before the timer expires; Puzzle Campaign asks them to solve split-lane platforming stages by opening the way for each other.
 
 ## What is here
 
@@ -25,3 +25,11 @@ The package runs the complete cabinet suite and also exposes focused scripts for
 
 - Obstacle rules, scoring, runner state, and cabinet presentation live here.
 - Shared player identity and durable profile behavior remain platform-owned.
+- Puzzle stages are authored as expandable packs in `scripts/puzzle-stage-packs.js`; simulation, progress, rendering, and platform ticket reporting stay behind separate modules.
+
+## Puzzle Campaign controls
+
+- Boy: `W` jump, `A/D` move
+- Girl: `ArrowUp` jump, `ArrowLeft/ArrowRight` move
+- One-player mode uses both control sets; two-player mode splits them between local players.
+- Press `R` to reset a stage or `Esc` to return to the campaign menu.

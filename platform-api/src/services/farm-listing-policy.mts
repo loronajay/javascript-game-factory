@@ -7,14 +7,17 @@
 // square may buy some or all of them outright. The plan (§7.1) held this back
 // behind barter because tickets crossing between players invite laundering
 // (an alt "sells" a turnip for a thousand tickets), alt-account farming and
-// exploit amplification. These are the guards, and each answers one of those:
+// exploit amplification.
 //
-//   - A PRICE BAND around the good's standing value (what the Market's own
-//     counters would pay for it on a Normal day). A listing may ask between
-//     half and one and a half times that value, so the most tickets one
-//     listing can carry beyond the goods' worth is half their worth — moving
-//     a wallet between accounts costs the goods to carry it, and the buyer
-//     gets goods the merchant would take back for less than they paid.
+// PLAYERS SET THE PRICE (owner, 2026-09-29): between people, the market decides
+// what a thing is worth — a prize-bred cow is not a Dealer calf — so a listing
+// asks any whole number of tickets from 1 up to MAX_LISTING_UNIT_PRICE. What
+// the Market's own counters would pay (`listingStandingValue`) is offered to the
+// seller as a guide and never enforced; NPC prices are untouched. The 0.5–1.5×
+// band that used to stand here was the laundering guard; with it gone, the
+// daily caps below ARE that guard — at most one day's cap, less the burned
+// tenth, can move between two accounts. These are the guards that remain:
+//
 //   - A FEE: a tenth of every sale (rounded up) is kept by the Market — burned,
 //     never paid to anyone — so churning tickets through listings shrinks them.
 //   - ESCROW: listed goods leave the seller's farm when the listing goes up
@@ -25,19 +28,27 @@
 //     purchases made, and listings put up; and a cap on listings open at once.
 //   - Nobody buys their own listing.
 //
-// Only what the server mints can be listed — the same stacks that can be
-// traded (services/farm-trade-policy): produce at any grade, dishes, logs,
-// planks and furniture off the shelf.
+// Only what the server mints can be listed — the stacks that can be traded
+// (services/farm-trade-policy): produce at any grade, dishes, logs, planks,
+// furniture off the shelf, and the single-row goods — a live animal (Phase 6
+// of the livestock plan) or a fish from the Cove's creel — one to a listing,
+// each waiting on the board as its own `listed` row
+// (db/farm-livestock-transfer.mts, db/farm-fish-listing.mts).
 
 import { farmSalePrice } from "./farm-market-catalog.mjs";
 import { farmLogValue, farmPlankValue } from "./farm-carpentry-catalog.mjs";
-import { TRADE_STACKS, tradeableItem, type TradeStack } from "./farm-trade-policy.mjs";
+import { tradeableItem, type TradeStack } from "./farm-trade-policy.mjs";
+import { farmLivestockRule } from "./farm-livestock-catalog.mjs";
+
+/** The stacks the board takes: every stack the table takes. */
+export const LISTING_STACKS: readonly TradeStack[] = Object.freeze(["produce", "dishes", "logs", "planks", "furniture", "fish", "livestock"]);
+/** The stacks whose listings are one row each, escrowed as the row itself rather than a count off the farm document. */
+export const SINGLE_ROW_LISTING_STACKS: readonly TradeStack[] = Object.freeze(["fish", "livestock"]);
 
 /** What the Market keeps of every sale, rounded up to a whole ticket. */
 export const LISTING_FEE_RATE = 0.1;
-/** The price band around a good's standing value. */
-export const LISTING_PRICE_FLOOR = 0.5;
-export const LISTING_PRICE_CEILING = 1.5;
+/** The highest price one unit may ask: a day's spending cap, so nothing is listed that no one could buy. */
+export const MAX_LISTING_UNIT_PRICE = 10_000;
 /** A listing comes down (and its goods go home) after three days. */
 export const LISTING_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 export const MAX_LISTING_QUANTITY = 99;
@@ -46,8 +57,9 @@ export const MAX_OPEN_LISTINGS = 8;
 /** Per UTC day. */
 export const DAILY_LISTINGS_CREATED = 20;
 export const DAILY_LISTING_PURCHASES = 30;
-export const DAILY_LISTING_EARN_LIMIT = 3000;
-export const DAILY_LISTING_SPEND_LIMIT = 3000;
+/** Big enough for a top-grade animal in one sale; still the bound on what moves between two accounts in a day. */
+export const DAILY_LISTING_EARN_LIMIT = 10_000;
+export const DAILY_LISTING_SPEND_LIMIT = 10_000;
 /** The newest open listings the board shows. */
 export const BOARD_PAGE = 60;
 
@@ -78,26 +90,21 @@ export function listingDayStart(now: number): number {
 }
 
 /**
- * A good's standing value in tickets: what the Market's counters pay for one
- * on a Normal day (the Produce Merchant by grade, the Kitchen, the Sawmill),
- * and for logs and planks the wood's derived worth. 0 for what cannot be listed.
+ * A good's standing value in tickets, as a GUIDE for the seller: what the
+ * Market's counters pay for one on a Normal day (the Produce Merchant by
+ * grade, the Kitchen, the Sawmill), and for logs and planks the wood's derived
+ * worth. An animal's guide is what the Livestock Dealer asks for a young one
+ * of its species (`speciesId`). 0 where there is no guide. Never a limit.
  */
-export function listingStandingValue(stack: TradeStack, itemId: string): number {
+export function listingStandingValue(stack: TradeStack, itemId: string, speciesId = ""): number {
   if (!tradeableItem(stack, itemId)) return 0;
   switch (stack) {
     case "logs": return farmLogValue(itemId);
     case "planks": return farmPlankValue(itemId);
+    case "livestock": return farmLivestockRule(speciesId)?.price ?? 0;
+    case "fish": return 0;
     default: return farmSalePrice(itemId);
   }
-}
-
-/** The whole-ticket price range a unit of this good may be listed at; null when it cannot be listed. */
-export function listingPriceBand(stack: TradeStack, itemId: string): Readonly<{ min: number; max: number; value: number }> | null {
-  const value = listingStandingValue(stack, itemId);
-  if (!(value > 0)) return null;
-  const min = Math.max(1, Math.floor(value * LISTING_PRICE_FLOOR));
-  const max = Math.max(min + 1, Math.ceil(value * LISTING_PRICE_CEILING));
-  return Object.freeze({ min, max, value });
 }
 
 /** What the Market keeps of a sale of `total` tickets. */
@@ -113,13 +120,13 @@ export function normalizeListingRequest(value: unknown): { ok: true; request: Li
   const input = value as Record<string, unknown>;
   const stack = input.stack as TradeStack;
   const itemId = typeof input.itemId === "string" ? input.itemId : "";
-  if (!(TRADE_STACKS as readonly string[]).includes(stack) || !tradeableItem(stack, itemId)) return { ok: false, error: "not_listable" };
+  if (!LISTING_STACKS.includes(stack) || !tradeableItem(stack, itemId)) return { ok: false, error: "not_listable" };
   const quantity = Number(input.quantity);
   const unitPrice = Number(input.unitPrice);
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_LISTING_QUANTITY) return { ok: false, error: "invalid_quantity" };
-  if (!Number.isSafeInteger(unitPrice)) return { ok: false, error: "invalid_price" };
-  const band = listingPriceBand(stack, itemId)!;
-  if (unitPrice < band.min || unitPrice > band.max) return { ok: false, error: "price_out_of_band" };
+  // An animal or a fish is one of its kind: one to a listing.
+  if (SINGLE_ROW_LISTING_STACKS.includes(stack) && quantity !== 1) return { ok: false, error: "invalid_quantity" };
+  if (!Number.isSafeInteger(unitPrice) || unitPrice < 1 || unitPrice > MAX_LISTING_UNIT_PRICE) return { ok: false, error: "invalid_price" };
   return { ok: true, request: Object.freeze({ stack, itemId, quantity, unitPrice }) };
 }
 
@@ -128,7 +135,7 @@ export function normalizeListingRow(row: any, now: number): FarmListing | null {
   if (!row || typeof row !== "object") return null;
   const stack = row.stack as TradeStack;
   const id = String(row.listing_id ?? row.id ?? "");
-  if (!LISTING_ID.test(id) || !(TRADE_STACKS as readonly string[]).includes(stack)) return null;
+  if (!LISTING_ID.test(id) || !LISTING_STACKS.includes(stack)) return null;
   const status = (["open", "sold", "withdrawn", "expired"] as const).find((entry) => entry === row.status) ?? "withdrawn";
   const expiresAt = new Date(row.expires_at ?? row.expiresAt ?? 0).getTime();
   return Object.freeze({
@@ -146,9 +153,11 @@ export function normalizeListingRow(row: any, now: number): FarmListing | null {
   });
 }
 
-/** A listing as any viewer sees it: never who the seller is by id, only by name, plus whether it is the viewer's own. */
-export function listingView(listing: FarmListing, viewerId: string) {
+/** A listing as any viewer sees it: never who the seller is by id, only by name, plus whether it is the viewer's own. An animal's or a fish's listing carries its card. */
+export function listingView(listing: FarmListing, viewerId: string, card: unknown = null) {
   return Object.freeze({
+    ...(listing.stack === "livestock" && card ? { animal: card } : {}),
+    ...(listing.stack === "fish" && card ? { fish: card } : {}),
     id: listing.id,
     sellerName: listing.sellerName,
     mine: listing.sellerId === viewerId,

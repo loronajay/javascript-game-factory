@@ -49,6 +49,8 @@
 .exchange-tabs button[aria-selected="true"] { border-color: var(--farm-accent); background: rgba(242, 196, 90, .14); color: #fff6cf; }
 .exchange-row { grid-template-columns: 54px minmax(0, 1fr) auto auto; }
 .exchange-row--mine { grid-template-columns: 54px minmax(0, 1fr) auto; }
+/* An animal or a fish: one of its kind, so no count to pick — picture, words, price. */
+.exchange-row--single { grid-template-columns: 54px minmax(0, 1fr) auto; }
 .exchange-row > .farm-button { padding: 6px 10px; font-size: 11.5px; white-space: nowrap; }
 .exchange-form { display: grid; gap: 10px; margin-bottom: 18px; }
 .exchange-form__good { padding: 8px 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; background: rgba(0,0,0,.25); color: #fff; font: 700 13px system-ui, sans-serif; }
@@ -147,3 +149,8 @@
 /* The Butcher asks twice: the second press is the one that sends. */
 .butcher-card .farm-button--danger { border-color: #e06a5a; background: rgba(224, 106, 90, .24); color: #ffe3dc; }
 .butcher-card__warning { color: #f5b8d8 !important; font-weight: 700; }
+/* Hollis's name box: what the next animal bought is called. */
+.dealer-name { display: grid; gap: 5px; margin: 0 0 10px; color: #d6e3c8; font: 700 12px system-ui, sans-serif; }
+.dealer-name small { color: #9fb294; font-weight: 600; }
+.dealer-name input { min-width: 0; padding: 8px 11px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(0,0,0,.25); color: #fff; font: 700 14px system-ui, sans-serif; }
+.dealer-name input:focus { outline: 0; border-color: var(--farm-accent); }

@@ -52,12 +52,12 @@ function buildFindMatchPayload(side, gameId = 'lovers-lost', identity = null) {
   return { type: 'find_match', gameId, side, ...sanitizeIdentityPayload(identity) };
 }
 
-function buildCreateRoomPayload(side, identity = null) {
-  return { type: 'create_room', side, ...sanitizeIdentityPayload(identity) };
+function buildCreateRoomPayload(side, identity = null, gameId = null) {
+  return { type: 'create_room', ...(gameId ? { gameId } : {}), side, ...sanitizeIdentityPayload(identity) };
 }
 
-function buildJoinRoomPayload(side, code, identity = null) {
-  return { type: 'join_room', roomCode: code.trim().toUpperCase(), side, ...sanitizeIdentityPayload(identity) };
+function buildJoinRoomPayload(side, code, identity = null, gameId = null) {
+  return { type: 'join_room', ...(gameId ? { gameId } : {}), roomCode: code.trim().toUpperCase(), side, ...sanitizeIdentityPayload(identity) };
 }
 
 function buildQueueStatusPayload(gameId = 'lovers-lost') {
@@ -180,6 +180,7 @@ export function createOnlineClient() {
     onMatchReady:      null,  // ({ seed, remoteSide, serverNow, startAt })
     onRemoteAction:    null,  // ({ action, phase })
     onRemoteSnapshot:  null,  // (snapshot)
+    onRemotePuzzleSnapshot: null, // (snapshot)
     onRemoteProfile:   null,  // ({ displayName, side })
     onRemoteEmote:     null,  // (type: string)
     onSideConflict:    null,  // () — both players picked same side
@@ -220,6 +221,12 @@ export function createOnlineClient() {
     if (messageType === 'snapshot') {
       const snapshot = parseSnapshotMessage(value);
       if (snapshot) cb.onRemoteSnapshot?.(snapshot);
+      return;
+    }
+
+    if (messageType === 'puzzle_snapshot') {
+      const snapshot = parseSnapshotMessage(value);
+      if (snapshot) cb.onRemotePuzzleSnapshot?.(snapshot);
       return;
     }
 
@@ -346,19 +353,19 @@ export function createOnlineClient() {
     });
   }
 
-  function findMatch(side) {
+  function findMatch(side, gameId = 'lovers-lost') {
     _mySide = side; _coordinator = false;
-    _send(buildFindMatchPayload(side, 'lovers-lost', _identity));
+    _send(buildFindMatchPayload(side, gameId, _identity));
   }
 
-  function createRoom(side) {
+  function createRoom(side, gameId = null) {
     _mySide = side; _coordinator = true;
-    _send(buildCreateRoomPayload(side, _identity));
+    _send(buildCreateRoomPayload(side, _identity, gameId));
   }
 
-  function joinRoom(side, code) {
+  function joinRoom(side, code, gameId = null) {
     _mySide = side; _coordinator = false;
-    _send(buildJoinRoomPayload(side, code, _identity));
+    _send(buildJoinRoomPayload(side, code, _identity, gameId));
   }
 
   function setIdentity(identity) {
@@ -392,6 +399,10 @@ export function createOnlineClient() {
     _roomMsg('snapshot', serializeSnapshotMessage(snapshot));
   }
 
+  function sendPuzzleSnapshot(snapshot) {
+    _roomMsg('puzzle_snapshot', serializeSnapshotMessage(snapshot));
+  }
+
   function sendEmote(type) {
     _roomMsg('emote', type);
   }
@@ -407,7 +418,7 @@ export function createOnlineClient() {
     _inRoom = false; _coordinator = false;
   }
 
-  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, sendEmote, setIdentity, disconnect, reset, cb };
+  return { connect, findMatch, createRoom, joinRoom, requestQueueStatus, cancelSearch, cancelRoom, sendAction, sendSnapshot, sendPuzzleSnapshot, sendEmote, setIdentity, disconnect, reset, cb };
 }
 
 export {

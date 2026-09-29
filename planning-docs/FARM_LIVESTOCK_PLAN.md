@@ -1,6 +1,6 @@
 # Farm Livestock Plan
 
-Status: **Phases 0–5 shipped** (2026-09-28), **plus the chicken** (2026-09-29): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes; then breeding. Next: Phase 6 (trading live animals). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
+Status: **Phases 0–5 shipped** (2026-09-28), **plus the chicken** (2026-09-29): assets, the herd as server rows, homes, the Livestock Dealer, the herd sim and panel; then hunger, feeding, milk and wool, and death from neglect with a memorial; then the Husbandry skill, dairy recipes and herd orders; then the Butcher, meat and meat recipes; then breeding; then **trading** (Phase 6, 2026-09-29). Next: Phase 7 (the horse). Sibling of `FARM_PETS_AND_CARE_PLAN.md`
 and `FARM_HARVEST_MARKET_SKILLS_PLAN.md`.
 
 Livestock are farm animals that **yield goods** — milk, wool, and meat
@@ -219,9 +219,27 @@ land gets bigger, so it follows the livestock phases.
    day (`husbandry.births`). Achievements: New Arrival, Best of Breed. A
    pregnancy is lost with its mother (death or Butcher). No migration.
    Not built: a pedigree view.
-6. **Trading** — live animals on the barter table (row changes owner) and
-   possibly the Exchange Board.
-7. **Horse** — ridable pet.
+6. ✅ **Trading** — decided with the owner 2026-09-29: an animal goes on the
+   barter table (one line per animal, by row id, like a fish) and on the
+   Exchange Board, one to a listing, at a price the SELLER sets. The receiver
+   must be able to keep it — the Dealer's Husbandry level for the species, room
+   under `MAX_HERD`, and a free home — or the table reopens (`no_room_*`,
+   `husbandry_too_low_*`, `herd_full_*`) and a board purchase is refused before
+   any ticket moves. A pregnancy travels; the young one is born on the new farm.
+   The one seam is `db/farm-livestock-transfer.mts`: the animal is carried to
+   the sender's STORED clock (one found dead there is `offer_gone`/`died`; its
+   own farm marks it at its next settle), then every farm-minute stamp moves by
+   the difference to the receiver's clock (`rebaseLivestockCare`; durations do
+   not move, and stamps may now be negative — a ten-day-old cow on a five-day
+   farm was born on day −5). A listed animal is `state = 'listed'` on clock
+   zero: it neither eats nor grows on the board, and comes home (to a free
+   home, or the field) when taken down. Other side's animals are read as public
+   cards (`GET /games/farm/livestock/cards?ids=`). No migration. Alongside it:
+   the Exchange Board dropped its ½–1½× band for player-set prices (1–10,000)
+   with the daily caps raised to 10,000, and fish list on it too
+   (`db/farm-fish-listing.mts`, same `listed` escrow, buyer needs creel room).
+   Not built: pedigree view, trading pets.
+7. **Horse** — ridable pet. Scoped in its own plan: `FARM_RIDING_PLAN.md` (the horse as a pet, cosmetic riding everywhere, piloted riding in Windrush Downs off the Market Square).
 
 Later, outside this plan: **Weaving** (wool → cloth/goods at a loom), pig
 **truffle hunting**, pet breeding.

@@ -141,9 +141,10 @@ export function normalizeLivestockAnimal(value: unknown): LivestockAnimal | null
     gender: source.gender === "male" ? "male" : "female",
     coatId: findLivestockCoat(species.id, source.coatId)!.id,
     stats,
-    bornAt: Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0,
+    // May be below zero: an animal traded onto a younger farm keeps its age (the server's `rebaseLivestockCare`).
+    bornAt: Number.isFinite(bornAt) ? bornAt : 0,
     homeId: typeof source.homeId === "string" && source.homeId ? source.homeId : null,
-    care: normalizeLivestockCare(source.care, Number.isFinite(bornAt) ? Math.max(0, bornAt) : 0),
+    care: normalizeLivestockCare(source.care, Number.isFinite(bornAt) ? bornAt : 0),
     origin: source.origin === "bred" ? "bred" : "dealer",
     parents: normalizeParents(source.parents),
   });

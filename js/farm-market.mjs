@@ -57,8 +57,8 @@ import { livestockAssetUrl, livestockClips } from "./farm-livestock-bodies.mjs";
 import { dayPrice, normalizeMarketDay, trendNote, turnoverNote } from "./farm-market-day.mjs";
 import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
 import { createExchangePanel } from "./farm-exchange-panel.mjs";
-import { LISTING_MESSAGES, normalizeListingBoard } from "./farm-listings.mjs";
-import { stockEntries } from "./farm-trade.mjs";
+import { LISTING_MESSAGES, listingStandingValue, normalizeListingBoard } from "./farm-listings.mjs";
+import { stockEntries, tradeAnimalOf } from "./farm-trade.mjs";
 import { findCrop } from "./farm-crops.mjs";
 import { createOrderBoardPanel } from "./farm-orders-panel.mjs";
 import { createMarketSawmill } from "./farm-market-sawmill.mjs";
@@ -72,7 +72,7 @@ import { createAchievementToaster } from "./platform/achievements/achievements.m
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createFishPortraits } from "./farm-fish-portraits.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
-import { INGREDIENT_STOCK, RECIPE_STOCK } from "./farm-vendor-stock.mjs";
+import { FEED_STOCK, INGREDIENT_STOCK, RECIPE_STOCK } from "./farm-vendor-stock.mjs";
 import { createVendorShelf } from "./farm-vendor-shelf.mjs";
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
@@ -483,9 +483,9 @@ const livestockMessages = Object.freeze({
     level_too_low: "Hollis won't sell you that one yet — raise your Husbandry by caring for the animals you have.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
 });
-async function buyLivestock(speciesId) {
+async function buyLivestock(speciesId, name) {
     const purchaseId = `stock-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-    const result = await livestockApi.buyFarmLivestock({ purchaseId, speciesId }).catch(() => null);
+    const result = await livestockApi.buyFarmLivestock({ purchaseId, speciesId, ...(name ? { name } : {}) }).catch(() => null);
     if (!result?.ok)
         return { ok: false, message: livestockMessages[result?.error] ?? "The sale did not go through. Nothing was bought — try again in a moment." };
     if (Array.isArray(result.herd))
@@ -498,8 +498,23 @@ async function buyLivestock(speciesId) {
     keeperSays(findMarketStall(LIVESTOCK_STALL_ID), `${animal.name}'s a good one. Look after ${animal.gender === "male" ? "him" : "her"}.`);
     return {
         ok: true,
-        message: `${animal.name} the ${livestockKind(animal, farm.clock.farmMinutes).toLowerCase()} is on the way to ${home?.title ?? "your farm"} — ${Number(result.price).toLocaleString()} tickets. Press L on the farm to see its stats.`,
+        message: `${animal.name} the ${livestockKind(animal, farm.clock.farmMinutes).toLowerCase()} is on the way to ${home?.title ?? "your farm"} — ${Number(result.price).toLocaleString()} tickets. Press L on the farm to see its stats or rename it.`,
     };
+}
+/** Hollis's feed: into the farm's supplies at the supply shop's price (a Market purchase names its day, like Marigold's). */
+async function buyFeed(line, quantity) {
+    if (!market)
+        await loadMarketDay();
+    if (!market)
+        return { ok: false, message: "Hollis is still opening up. Try again in a moment." };
+    const purchaseId = `feed-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+    const result = await ticketClient.purchaseFarmSupply(line.itemId, quantity, purchaseId, { venue: "market", day: market.day });
+    takeStock(result?.layout);
+    if (!result?.ok)
+        return { ok: false, message: vendorPurchaseMessages[result?.error] ?? "The purchase did not go through. Nothing was bought." };
+    takeBalance(result.balance);
+    keeperSays(findMarketStall(LIVESTOCK_STALL_ID), "I'll send it up to your feed store.");
+    return { ok: true, message: `Bought ${quantity} ${line.title} for ${Number(result.price).toLocaleString()} tickets. Feed it from the Herd panel (L) or with G at an animal.` };
 }
 // The Dealer's cards show the real animal, from the room's offscreen portrait renderer.
 const livestockPortraits = createAvatarThumbnails(THREE, {
@@ -514,12 +529,24 @@ const dealerPanel = createLivestockDealerPanel({
     room: requiredElement("#dealerRoom"),
     list: requiredElement("#dealerList"),
     status: requiredElement("#dealerStatus"),
+    name: requiredElement("#dealerName"),
 }, {
     buy: buyLivestock,
     farm: () => ({ homes: livestockHomes(farm.decor), herd }),
     husbandryLevel: () => farmingLevelForXp(farm.skills.husbandry.xp),
     thumbnail: livestockPortraits.get,
     onClose: () => canvas.focus(),
+});
+// Hollis's feed shelf, under his young stock: hay, pig feed, chicken feed, into the farm's supplies.
+const feedShelf = createVendorShelf({
+    list: requiredElement("#feedShelf"),
+    status: requiredElement("#feedStatus"),
+}, {
+    stock: FEED_STOCK,
+    buy: (line, quantity) => buyFeed(line, quantity),
+    held: (line) => Number(farm.agriculture.inventory.supplies[line.feedId]) || 0,
+    price: (base) => barterPurchasePrice(base, barteringLevel()),
+    thumbnail: itemThumbnails.get,
 });
 // The Butcher (farm-market-butcher.mts): Otto takes a grown animal from the herd for meat in the basket.
 const butcherCounter = createMarketButcher({
@@ -666,10 +693,14 @@ const sawmill = createMarketSawmill({
 // ---------------------------------------------------------------- the Exchange Board
 const listingApi = createPlatformApiClient();
 const newId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`}`;
-/** Adopt the farm and balance a listing move answered with, and word the refusal if it was one. */
-function exchangeOutcome(result, success) {
+/** Adopt the farm and balance a listing move answered with, and word the refusal if it was one. An animal or a fish moved as a row: read the herd and the creel again. */
+function exchangeOutcome(result, success, stack = "") {
     takeStock(result?.layout);
     takeBalance(result?.balance);
+    if (result?.ok && stack === "livestock")
+        void loadHerd();
+    if (result?.ok && stack === "fish")
+        void trading.reloadCreel();
     if (result?.ok)
         return { ok: true, message: success };
     return { ok: false, message: LISTING_MESSAGES[result?.error] ?? "That did not go through. Nothing moved — try again in a moment." };
@@ -687,31 +718,48 @@ const exchangePanel = createExchangePanel({
     load: async () => normalizeListingBoard(await listingApi.fetchFarmListings()),
     buy: async (listing, quantity) => {
         const result = await listingApi.buyFarmListing({ listingId: listing.id, quantity, purchaseId: newId("buy") });
-        return exchangeOutcome(result, `Bought ${quantity} ${listing.title} from ${listing.sellerName} for ${(quantity * listing.unitPrice).toLocaleString()} tickets. They are on your farm.`);
+        const landed = listing.stack === "livestock" ? `${listing.animal?.name ?? "It"} is on its way to your farm — press L there to see it.`
+            : listing.stack === "fish" ? "It is in your creel." : "They are on your farm.";
+        return exchangeOutcome(result, `Bought ${listing.stack === "livestock" || listing.stack === "fish" ? "" : `${quantity} `}${listing.title} from ${listing.sellerName} for ${(quantity * listing.unitPrice).toLocaleString()} tickets. ${landed}`, listing.stack);
     },
     list: async (draft) => {
         const result = await listingApi.createFarmListing({ listingId: newId("listing"), ...draft });
-        return exchangeOutcome(result, `Listed ${draft.quantity} at ${draft.unitPrice} tickets each. They are held on the board until they sell or you take them down.`);
+        const single = draft.stack === "livestock" || draft.stack === "fish";
+        return exchangeOutcome(result, single
+            ? `Listed for ${draft.unitPrice.toLocaleString()} tickets. It waits on the board until it sells or you take it down.`
+            : `Listed ${draft.quantity} at ${draft.unitPrice} tickets each. They are held on the board until they sell or you take them down.`, draft.stack);
     },
     withdraw: async (listing) => {
         const result = await listingApi.withdrawFarmListing({ listingId: listing.id });
-        return exchangeOutcome(result, `Took the ${listing.title} down. ${Number(result?.returned) || 0} went back to your farm.`);
+        const home = listing.stack === "livestock" ? "It is back on your farm (in the first place with room, or out on the field if there is none)."
+            : listing.stack === "fish" ? "It is back in your creel." : `${Number(result?.returned) || 0} went back to your farm.`;
+        return exchangeOutcome(result, `Took the ${listing.title} down. ${home}`, listing.stack);
     },
-    stock: () => stockEntries(farm),
-    thumbnail: itemThumbnails.get,
+    stock: () => stockEntries(farm, trading.creel(), herdCards()),
+    guide: (entry) => entry.stack === "fish"
+        ? trading.creel().find((fish) => fish.id === entry.id)?.value ?? 0
+        : listingStandingValue(entry.stack, entry.id, entry.stack === "livestock" ? herd.find((animal) => animal.id === entry.id)?.speciesId : ""),
+    thumbnail: (key, onReady) => tradePortraits(key, onReady),
     onClose: () => canvas.focus(),
 });
 // Trading with the others in the square (farm-market-trading.mts): T on a person, Y/N on an invitation.
 // Fish can be traded too (the Cove's creel): portraits for them, and the Cove's reads.
 const portraits = createFishPortraits(THREE, itemThumbnails.get);
+/** A table's and the board's pictures: an animal by its species' portrait, everything else as the fish/item portraits draw it. */
+const tradePortraits = (key, onReady) => key.startsWith("livestock:") ? livestockPortraits.get(key.slice("livestock:".length), onReady) : portraits(key, onReady);
+/** The player's own herd as table and board cards, on the farm's stored clock. */
+const herdCards = () => herd.map((animal) => tradeAnimalOf(animal, farm.clock.farmMinutes));
 const tradeApi = createPlatformApiClient();
 const trading = createMarketTrading({
     api: tradeApi,
     canTrade: canSell,
     farm: () => farm,
     takeStock,
-    thumbnail: portraits,
+    thumbnail: tradePortraits,
     fishApi: tradeApi,
+    herd: herdCards,
+    fetchAnimalCards: (ids) => tradeApi.fetchFarmLivestockCards(ids),
+    onHerdChanged: () => void loadHerd(),
     onClose: () => canvas.focus(),
 });
 window.addEventListener("pagehide", () => trading.stop());
@@ -763,6 +811,9 @@ function workStall(stall) {
         sawmill.open();
     else if (stall.id === LIVESTOCK_STALL_ID) {
         dealerPanel.open();
+        feedShelf.render();
+        if (!market)
+            void loadMarketDay();
         void loadHerd();
     }
     else if (stall.id === BUTCHER_STALL_ID) {

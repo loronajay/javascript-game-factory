@@ -11,6 +11,9 @@
 // trade that lands cannot be undone or inflated by the client's next save.
 // Seeds, saplings and supplies are ticket purchases the save guard lets fall
 // freely; a traded seed would be lost to the first save from a stale page.
+// LIVE ANIMALS (planning-docs/FARM_LIVESTOCK_PLAN.md Phase 6) go on the table
+// like fish: one line per animal, by its row id, and the row changes owner
+// (db/farm-livestock-transfer.mts decides whether the receiver can keep it).
 //
 // A trade is two sides, `a` (who invited) and `b`. The table moves through:
 //   invited → open        (b accepts)
@@ -28,13 +31,17 @@ import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "./farm-carpentry-catalog.mjs";
 import { FISH_ID } from "./farm-fish-catalog.mjs";
 /**
- * The stacks a table can carry. `fish` is different from the rest: its lines
- * are single specimens from the Cove's creel, keyed by fish id with a count of
- * one, and they live in `farm_fish` rather than on the farm document — so the
+ * The stacks a table can carry. `fish` and `livestock` are different from the
+ * rest: their lines are single rows — a specimen from the Cove's creel, an
+ * animal from the herd — keyed by id with a count of one, and they live in
+ * `farm_fish` / `farm_livestock` rather than on the farm document — so the
  * farm-inventory maths below skips them, and the database layer checks and
  * moves them (db/farm-trades.mts).
  */
-export const TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture", "fish"]);
+export const TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture", "fish", "livestock"]);
+/** The stacks whose lines are single rows by id, never more than one of each. */
+export const SINGLE_ROW_STACKS = Object.freeze(["fish", "livestock"]);
+const LIVESTOCK_ROW_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 /** The stacks that live on the farm document. */
 export const FARM_TRADE_STACKS = Object.freeze(["produce", "dishes", "logs", "planks", "furniture"]);
 /** Distinct lines one side may put on the table. */
@@ -67,10 +74,11 @@ export function tradeableItem(stack, id) {
         case "planks": return TIMBER_IDS.has(id);
         case "furniture": return Boolean(parseFarmPieceKey(id));
         case "fish": return FISH_ID.test(id);
+        case "livestock": return LIVESTOCK_ROW_ID.test(id);
     }
 }
 export function emptyTradeOffer() {
-    return Object.freeze({ produce: {}, dishes: {}, logs: {}, planks: {}, furniture: {}, fish: {} });
+    return Object.freeze({ produce: {}, dishes: {}, logs: {}, planks: {}, furniture: {}, fish: {}, livestock: {} });
 }
 /**
  * An offer made safe: known items only, whole counts 1..99 (a 0 drops the
@@ -101,8 +109,8 @@ export function normalizeTradeOffer(value) {
                 return null;
             if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0 || count > MAX_TRADE_QUANTITY)
                 return null;
-            // A fish is one specimen: it is on the table or it is not.
-            if (stack === "fish" && count > 1)
+            // A fish or an animal is one row: it is on the table or it is not.
+            if (SINGLE_ROW_STACKS.includes(stack) && count > 1)
                 return null;
             if (count === 0)
                 continue;
@@ -122,10 +130,11 @@ export function tradeOfferIsEmpty(offer) {
 }
 /**
  * What a farm can put on the table right now: its server-minted stacks,
- * furniture as the SHELF (owned minus placed), and the fish ids in its creel
- * that are not locked (the database layer reads those and passes them in).
+ * furniture as the SHELF (owned minus placed), the fish ids in its creel
+ * that are not locked and the animals alive in its herd (the database layer
+ * reads those and passes them in).
  */
-export function tradeableStock(layout, creelFishIds = []) {
+export function tradeableStock(layout, creelFishIds = [], herdIds = []) {
     const inventory = layout?.agriculture?.inventory ?? {};
     const counts = (value) => Object.fromEntries(Object.entries(value ?? {}).filter(([, count]) => Number(count) > 0).map(([id, count]) => [id, Number(count)]));
     return Object.freeze({
@@ -135,6 +144,7 @@ export function tradeableStock(layout, creelFishIds = []) {
         planks: counts(inventory.planks),
         furniture: counts(unplacedFarmPieces(inventory.furniture ?? {}, layout?.decor ?? [])),
         fish: Object.fromEntries(creelFishIds.map((id) => [id, 1])),
+        livestock: Object.fromEntries(herdIds.map((id) => [id, 1])),
     });
 }
 /** The first line of `offer` the stock cannot cover, or null when it covers all of it. */
@@ -155,9 +165,9 @@ export function tradeShortfall(offer, stock) {
  * either farm. Returns both inventories as they now stand, or why nothing moved.
  * Nothing is minted: the sum of every stack across the two farms is unchanged.
  */
-export function settleFarmTrade(layoutA, layoutB, offerA, offerB, creelA = [], creelB = []) {
-    const stockA = tradeableStock(layoutA, creelA);
-    const stockB = tradeableStock(layoutB, creelB);
+export function settleFarmTrade(layoutA, layoutB, offerA, offerB, creelA = [], creelB = [], herdA = [], herdB = []) {
+    const stockA = tradeableStock(layoutA, creelA, herdA);
+    const stockB = tradeableStock(layoutB, creelB, herdB);
     const shortA = tradeShortfall(offerA, stockA);
     if (shortA)
         return { ok: false, error: "offer_gone", side: "a", stack: shortA.stack, id: shortA.id };
@@ -166,7 +176,7 @@ export function settleFarmTrade(layoutA, layoutB, offerA, offerB, creelA = [], c
         return { ok: false, error: "offer_gone", side: "b", stack: shortB.stack, id: shortB.id };
     const inventoryA = copyInventory(layoutA);
     const inventoryB = copyInventory(layoutB);
-    // Fish cross in the database, not here: only the farm's own stacks move on the documents.
+    // Fish and animals cross in the database, not here: only the farm's own stacks move on the documents.
     for (const stack of FARM_TRADE_STACKS) {
         for (const [id, count] of Object.entries(offerA[stack])) {
             inventoryA[stack][id] = (Number(inventoryA[stack][id]) || 0) - count;

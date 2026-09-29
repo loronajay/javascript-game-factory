@@ -8,6 +8,7 @@ import {
   BOY_LOCAL_X, BOY_CONTACT_X,
   shieldActionStep,
 } from './renderer-geometry.js';
+import { MAIN_MENU_RECTS } from './puzzle-ui.js';
 
 const CANVAS_H  = 540;
 const WALK_FRAMES = [2, 3];
@@ -90,25 +91,25 @@ export function createMenuRenderer(ctx, images, { characterRenderer, obstacleRen
     ctx.restore();
   }
 
-  function renderMenu(debugState, btn0Hovered, btnHovered, btn2Hovered, btn3Hovered) {
+  function renderMenu(debugState, btn0Hovered, btnHovered, btn2Hovered, btn3Hovered, btn4Hovered) {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
 
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = 'bold 72px "Cinzel Decorative", serif';
+    ctx.font = 'bold 56px "Cinzel Decorative", serif';
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = 'rgba(160,190,255,0.55)';
     ctx.shadowBlur = 28;
-    ctx.fillText('LOVERS LOST', CANVAS_W / 2, 105);
+    ctx.fillText('LOVERS LOST', CANVAS_W / 2, 72);
     ctx.restore();
 
-    const btnW = 360, btnH = 56;
-    drawRedButton(CANVAS_W / 2 - btnW / 2, 148, btnW, btnH, 'SINGLE PLAYER',      btn0Hovered, 20);
-    drawRedButton(CANVAS_W / 2 - btnW / 2, 216, btnW, btnH, 'LOCAL MULTIPLAYER',   btnHovered,  20);
-    drawRedButton(CANVAS_W / 2 - btnW / 2, 284, btnW, btnH, 'ONLINE MULTIPLAYER',  btn2Hovered, 20);
-    const btn3W = 240, btn3H = 44;
-    drawRedButton(CANVAS_W / 2 - btn3W / 2, 360, btn3W, btn3H, 'HOW TO PLAY', btn3Hovered, 16);
+    const r = MAIN_MENU_RECTS;
+    drawRedButton(r.solo.x,   r.solo.y,   r.solo.w,   r.solo.h,   'SOLO RUN',       btn0Hovered, 18);
+    drawRedButton(r.local.x,  r.local.y,  r.local.w,  r.local.h,  'LOCAL CO-OP RUN', btnHovered,  18);
+    drawRedButton(r.online.x, r.online.y, r.online.w, r.online.h, 'ONLINE CO-OP RUN', btn2Hovered, 18);
+    drawRedButton(r.puzzle.x, r.puzzle.y, r.puzzle.w, r.puzzle.h, 'PUZZLE CAMPAIGN', btn3Hovered, 18);
+    drawRedButton(r.help.x,   r.help.y,   r.help.w,   r.help.h,   'HOW TO PLAY',     btn4Hovered, 15);
 
     characterRenderer.blit(images.boy,  menuWalkFrame(), FRAME_W, FRAME_H, 90,                       PLAYER_Y, SPRITE_W, SPRITE_H, false, 1);
     characterRenderer.blit(images.girl, menuWalkFrame(), FRAME_W, FRAME_H, CANVAS_W - 90 - SPRITE_W, PLAYER_Y, SPRITE_W, SPRITE_H, true,  1);

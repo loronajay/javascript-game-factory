@@ -15,7 +15,7 @@ import { loadGameAssets } from './game-assets.js';
 import { createRenderer } from './renderer.js';
 import { createInput } from './input.js';
 import { createMobileNameInputBridge } from './mobile-name-input.js';
-import { createSounds } from './sounds.js';
+import { createSounds, musicTrackForPhase } from './sounds.js';
 import { createOnlineClient, getCountdownSecondsRemaining, hasCountdownStarted } from './online.js';
 import { updatePersonalBest } from './personal-best.js';
 import { buildRunResult, createRunId, GAME_SLUG } from './run-telemetry.js';
@@ -27,14 +27,28 @@ import { updateScoreOverlay } from './score-overlay.js';
 import { wireOnlineClient } from './online-wiring.js';
 import { createKeyboardRouter } from './keyboard-router.js';
 import { createMenuInteraction } from './menu-interaction.js';
+import { getPuzzleStage, getPuzzlePack } from './puzzle-stage-packs.js';
+import {
+  createPuzzleState,
+  tickPuzzleState,
+  resetPuzzleState,
+  applyPuzzlePlayerSnapshot,
+  buildPuzzleTicketResult,
+  TICKET_GAME_SLUG,
+  TICKET_RESULT_PREFIX,
+} from './puzzle-campaign.js';
+import { normalizePuzzleProgress, completePuzzleStage, stageKey } from './puzzle-progress.js';
+import { createGameResultId, createGameResultReporter } from '../../../js/platform/api/game-results-api.mjs';
 import {
   getDefaultPlatformStorage,
   getPlatformStorageKey,
   readStorageText,
   removeStorageText,
+  writeStorageText,
 } from '../../../js/platform/storage/storage.mjs';
 
 const LEGACY_ONLINE_NAME_STORAGE_KEY = getPlatformStorageKey('loversLostLegacyOnlineName');
+const PUZZLE_PROGRESS_STORAGE_KEY = getPlatformStorageKey('loversLostPuzzleProgress');
 
 function initGame() {
   loadGameAssets((images, emoteImages) => _initWithAssets(images, emoteImages));
@@ -51,6 +65,7 @@ function _initWithAssets(images, emoteImages) {
   // and the platform toast shows whatever the server says was earned. The
   // cabinet keeps no unlock state; signed-out play files nothing.
   const achievements = createAchievementReporter();
+  const ticketReporter = createGameResultReporter();
   let   currentRunId = '';
 
   const search   = window.location && window.location.search;
@@ -90,19 +105,29 @@ function _initWithAssets(images, emoteImages) {
   let onlineCodeInput       = '';
   let onlineRoomCode        = '';
   let onlineSearchTick      = 0;
+  let onlineActivity        = 'runner';
 
   // Pointer hover flags (written by menu-interaction, read by the renderer dispatch).
   const hover = {
-    menu0: false, menu1: false, menu2: false, menu3: false,
+    menu0: false, menu1: false, menu2: false, menu3: false, menu4: false,
     soloBoy: false, soloGirl: false,
     onlineBoy: false, onlineGirl: false,
     nameContinue: false,
     findMatch: false, playFriend: false, cancel: false,
     create: false, join: false, joinSubmit: false,
+    puzzleSolo: false, puzzleLocal: false, puzzleOnline: false, puzzleBack: false,
+    puzzleLocalTwo: false, puzzleLocalBack: false,
+    puzzlePlayMenu: false, puzzleReset: false,
+    puzzleRetry: false, puzzleCompleteMenu: false,
   };
 
   // ── Game state ───────────────────────────────────────────────────────────────
   let gs = createGameState('single', Date.now() >>> 0, { debugObstacleType });
+  const puzzlePack = getPuzzlePack('first-steps');
+  const puzzleStage = getPuzzleStage('first-steps', 'the-handoff');
+  let puzzleState = null;
+  let puzzleProgress = normalizePuzzleProgress(readStorageText(storage, PUZZLE_PROGRESS_STORAGE_KEY));
+  let puzzleTicketStatus = '';
   let prevPhase      = gs.phase;
   let lastMusicPhase = null;
 
@@ -115,7 +140,8 @@ function _initWithAssets(images, emoteImages) {
   const handleSideInput = createLaneInputHandler(inp, renderer, sounds);
 
   // ── Online lobby actions ───────────────────────────────────────────────────────
-  function _tryJoinRoom()  { if (onlineCodeInput.length > 0) onlineClient.joinRoom(onlineSide, onlineCodeInput); }
+  function onlineGameId() { return onlineActivity === 'puzzle' ? 'lovers-lost-puzzle' : 'lovers-lost'; }
+  function _tryJoinRoom()  { if (onlineCodeInput.length > 0) onlineClient.joinRoom(onlineSide, onlineCodeInput, onlineGameId()); }
   function _cancelSearch() { onlineClient.cancelSearch(); }
   function _cancelRoom()   { onlineRoomCode = ''; onlineClient.cancelRoom(); }
   function _cancelNameEntry() { onlineNameError = ''; gs = { ...gs, phase: 'online_side_select' }; }
@@ -137,6 +163,15 @@ function _initWithAssets(images, emoteImages) {
     onlineClient.connect();
     onlineLobbyPhase = 'main';
     gs = { ...gs, phase: 'online_lobby' };
+  }
+
+  function startOnlineFlow(activity) {
+    onlineActivity = activity;
+    onlineSide = 'boy';
+    onlineLobbyPhase = 'main';
+    onlineQueueCounts = null;
+    onlineRemoteIdentity = null;
+    gs = { ...gs, phase: 'online_side_select' };
   }
 
   const mobileNameInput = createMobileNameInputBridge({
@@ -184,6 +219,15 @@ function _initWithAssets(images, emoteImages) {
     sounds.stop('run-success'); sounds.stop('run-failed');
     onlineCountdown = null; onlineSnapshotSeq = 0;
     remoteLaneSeq.boy = -1; remoteLaneSeq.girl = -1;
+    if (onlineActivity === 'puzzle') {
+      puzzleTicketStatus = '';
+      puzzleState = createPuzzleState(puzzleStage, 'online', {
+        resultId: createGameResultId(TICKET_RESULT_PREFIX),
+      });
+      gs = { ...gs, mode: 'online', phase: 'puzzle_playing', seed };
+      inp.tick();
+      return;
+    }
     gs = { ...createGameState('online', seed, { debugObstacleType }), phase: 'playing' };
     currentRunId = createRunId(gs.seed, Date.now());
     boyAnim = { state: 'running', actionTick: 0 };
@@ -207,6 +251,63 @@ function _initWithAssets(images, emoteImages) {
     inp.tick();
   }
 
+  function openPuzzleMenu() {
+    if (onlineActivity === 'puzzle' && ['online_side_select', 'online_name_entry', 'online_lobby', 'online_countdown', 'puzzle_playing', 'puzzle_complete'].includes(gs.phase)) {
+      onlineClient.disconnect(); onlineClient.reset();
+      onlineRemoteSide = null; onlineRemoteIdentity = null; onlineCountdown = null;
+      onlineQueueCounts = null; onlineRoomCode = ''; onlineSnapshotSeq = 0;
+    }
+    puzzleState = null;
+    puzzleTicketStatus = '';
+    gs = { ...gs, phase: 'puzzle_campaign_menu' };
+    inp.tick();
+  }
+
+  function startPuzzle(mode) {
+    onlineActivity = 'runner';
+    puzzleTicketStatus = '';
+    puzzleState = createPuzzleState(puzzleStage, mode, {
+      resultId: createGameResultId(TICKET_RESULT_PREFIX),
+    });
+    gs = { ...gs, phase: 'puzzle_playing' };
+    inp.tick();
+  }
+
+  function applyRemotePuzzleSnapshot(snapshot) {
+    if (onlineActivity !== 'puzzle' || !puzzleState || !onlineRemoteSide) return;
+    puzzleState = applyPuzzlePlayerSnapshot(puzzleState, onlineRemoteSide, snapshot);
+  }
+
+  function resetPuzzle() {
+    if (!puzzleState) return;
+    puzzleState = resetPuzzleState(puzzleStage, puzzleState);
+    puzzleTicketStatus = '';
+    gs = { ...gs, phase: 'puzzle_playing' };
+    inp.tick();
+  }
+
+  function retryPuzzle() {
+    if (puzzleState?.mode === 'online') { openPuzzleMenu(); return; }
+    startPuzzle(puzzleState?.mode || 'solo');
+  }
+
+  function finishPuzzleClear() {
+    puzzleProgress = completePuzzleStage(puzzleProgress, puzzleStage, puzzleState.elapsedFrames);
+    writeStorageText(storage, PUZZLE_PROGRESS_STORAGE_KEY, JSON.stringify(puzzleProgress));
+    const result = buildPuzzleTicketResult(puzzleStage, puzzleState);
+    if (!result || !ticketReporter.canReport()) {
+      puzzleTicketStatus = 'CLEAR SAVED · SIGN IN TO EARN TICKETS';
+      return;
+    }
+    puzzleTicketStatus = 'CLEAR SAVED · CHECKING TICKET PAYOUT…';
+    ticketReporter.report(TICKET_GAME_SLUG, result).then(response => {
+      const awarded = Number(response?.tickets?.awarded);
+      puzzleTicketStatus = Number.isSafeInteger(awarded) && awarded > 0
+        ? `+${awarded} TICKETS AWARDED`
+        : response ? 'CLEAR SAVED · NO TICKETS THIS RUN' : 'CLEAR SAVED · TICKETS UNAVAILABLE';
+    });
+  }
+
   // ── Shared accessor bridge for the extracted input/wiring modules ──────────────
   // The main loop below keeps using the local variables directly; the extracted
   // modules read and write the same state through these accessors so the hot
@@ -214,6 +315,13 @@ function _initWithAssets(images, emoteImages) {
   const host = {
     inp, renderer, sounds, onlineClient, mobileNameInput, remoteLaneSeq, hover,
     returnToMenu,
+    openPuzzleMenu,
+    startPuzzle,
+    startPuzzleOnlineFlow: () => startOnlineFlow('puzzle'),
+    startRunnerOnlineFlow: () => startOnlineFlow('runner'),
+    applyRemotePuzzleSnapshot,
+    resetPuzzle,
+    retryPuzzle,
     cancelNameEntry:      _cancelNameEntry,
     tryContinueNameEntry: _tryContinueNameEntry,
     tryJoinRoom:          _tryJoinRoom,
@@ -241,6 +349,8 @@ function _initWithAssets(images, emoteImages) {
     get onlineNameInput() { return onlineNameInput; }, set onlineNameInput(v) { onlineNameInput = v; },
     get onlineNameError() { return onlineNameError; }, set onlineNameError(v) { onlineNameError = v; },
     get onlineSearchTick() { return onlineSearchTick; }, set onlineSearchTick(v) { onlineSearchTick = v; },
+    get onlineActivity() { return onlineActivity; },
+    get onlineGameId() { return onlineGameId(); },
   };
 
   // ── Wire inputs and the online client through the shared bridge ────────────────
@@ -263,12 +373,11 @@ function _initWithAssets(images, emoteImages) {
     while (loopAccumulator >= TICK_MS) {
       loopAccumulator -= TICK_MS;
 
-      const musicPhase = (gs.phase === 'menu_help' || gs.phase === 'solo_side_select' || gs.phase === 'solo_countdown' || gs.phase === 'local_countdown') ? 'menu' : gs.phase;
-      if (musicPhase !== lastMusicPhase) {
-        if (musicPhase === 'menu')                                    sounds.playMusic('bg-music-menu');
-        else if (musicPhase === 'playing')                            sounds.playMusic('bg-music-game');
-        else if (musicPhase === 'reunion' || musicPhase === 'gameover') sounds.stopMusic();
-        lastMusicPhase = musicPhase;
+      const musicTrack = musicTrackForPhase(gs.phase);
+      if (musicTrack !== lastMusicPhase) {
+        if (musicTrack) sounds.playMusic(musicTrack);
+        else sounds.stopMusic();
+        lastMusicPhase = musicTrack;
       }
 
       if (gs.phase === 'solo_countdown') {
@@ -352,6 +461,35 @@ function _initWithAssets(images, emoteImages) {
             gs.elapsed, ++onlineSnapshotSeq
           ));
         }
+      } else if (gs.phase === 'puzzle_playing' && puzzleState) {
+        const phaseBefore = puzzleState.phase;
+        puzzleState = tickPuzzleState(puzzleStage, puzzleState, {
+          boy: {
+            left: inp.isHeld('boy', 'block'),
+            right: inp.isHeld('boy', 'attack'),
+            jump: inp.isPressed('boy', 'jump'),
+          },
+          girl: {
+            left: inp.isHeld('girl', 'attack'),
+            right: inp.isHeld('girl', 'block'),
+            jump: inp.isPressed('girl', 'jump'),
+          },
+        }, puzzleState.mode === 'online' ? { activeSides: [onlineSide] } : undefined);
+        if (puzzleState.mode === 'online') {
+          onlineClient.sendPuzzleSnapshot({
+            seq: ++onlineSnapshotSeq,
+            side: onlineSide,
+            player: puzzleState.players[onlineSide],
+            elapsedFrames: puzzleState.elapsedFrames,
+          });
+        }
+        if (phaseBefore !== 'complete' && puzzleState.phase === 'complete') {
+          gs = { ...gs, phase: 'puzzle_complete' };
+          sounds.stopMusic();
+          lastMusicPhase = null;
+          sounds.play('run-success');
+          finishPuzzleClear();
+        }
       } else if (gs.phase === 'reunion' || gs.phase === 'gameover') {
         gs = advancePhaseState(gs);
       }
@@ -377,24 +515,46 @@ function _initWithAssets(images, emoteImages) {
       value: onlineNameInput,
     });
 
-    if      (gs.phase === 'menu')              renderer.renderMenu(debugState, hover.menu0, hover.menu1, hover.menu2, hover.menu3);
+    if      (gs.phase === 'menu')              renderer.renderMenu(debugState, hover.menu0, hover.menu1, hover.menu2, hover.menu3, hover.menu4);
     else if (gs.phase === 'solo_side_select')  renderer.renderSoloSideSelect(hover.soloBoy, hover.soloGirl);
     else if (gs.phase === 'solo_countdown')    renderer.renderSoloCountdown(soloSide, Math.ceil((SOLO_COUNTDOWN_TICKS - soloCountdownTick) / 60));
     else if (gs.phase === 'local_countdown')   renderer.renderLocalCountdown(Math.ceil((LOCAL_COUNTDOWN_TICKS - localCountdownTick) / 60));
-    else if (gs.phase === 'online_side_select') renderer.renderOnlineSideSelect(hover.onlineBoy, hover.onlineGirl, onlineSide);
+    else if (gs.phase === 'online_side_select') renderer.renderOnlineSideSelect(hover.onlineBoy, hover.onlineGirl, onlineSide, onlineActivity);
     else if (gs.phase === 'online_name_entry')  renderer.renderOnlineNameEntry(onlineSide, onlineNameInput, onlineNameError, { continue: hover.nameContinue });
     else if (gs.phase === 'online_lobby') {
       onlineSearchTick++;
       renderer.renderOnlineLobby(onlineSide, onlineLobbyPhase, onlineRoomCode, onlineCodeInput, onlineSearchTick,
         { findMatch: hover.findMatch, playFriend: hover.playFriend, cancel: hover.cancel, create: hover.create, join: hover.join, joinSubmit: hover.joinSubmit },
-        onlineQueueCounts, onlineIdentity, onlineRemoteIdentity);
+        onlineQueueCounts, onlineIdentity, onlineRemoteIdentity, onlineActivity);
     }
     else if (gs.phase === 'online_countdown') {
       const secondsRemaining = onlineCountdown
         ? getCountdownSecondsRemaining(onlineCountdown.startAt, onlineCountdown.clockOffsetMs) : 0;
-      renderer.renderOnlineCountdown(onlineSide, onlineRemoteSide, secondsRemaining, onlineIdentity, onlineRemoteIdentity);
+      renderer.renderOnlineCountdown(onlineSide, onlineRemoteSide, secondsRemaining, onlineIdentity, onlineRemoteIdentity, onlineActivity);
     }
     else if (gs.phase === 'menu_help')    renderer.renderMenuHelp(debugState);
+    else if (gs.phase === 'puzzle_campaign_menu') renderer.renderPuzzleMenu(
+      puzzlePack,
+      puzzleStage,
+      puzzleProgress.completed[stageKey(puzzlePack.id, puzzleStage.id)] || null,
+      { local: hover.puzzleLocal, online: hover.puzzleOnline, back: hover.puzzleBack },
+    );
+    else if (gs.phase === 'puzzle_local_select') renderer.renderPuzzleLocalSelect(
+      puzzlePack,
+      puzzleStage,
+      { solo: hover.puzzleSolo, local: hover.puzzleLocalTwo, back: hover.puzzleLocalBack },
+    );
+    else if (gs.phase === 'puzzle_playing' && puzzleState) renderer.renderPuzzlePlay(
+      puzzleStage,
+      puzzleState,
+      { menu: hover.puzzlePlayMenu, reset: hover.puzzleReset },
+    );
+    else if (gs.phase === 'puzzle_complete' && puzzleState) renderer.renderPuzzleComplete(
+      puzzleStage,
+      puzzleState,
+      puzzleTicketStatus,
+      { retry: hover.puzzleRetry, menu: hover.puzzleCompleteMenu },
+    );
     else if (gs.phase === 'playing') {
       renderer.renderPlay(boyPlayer, girlPlayer, gs.boyObstacles, gs.girlObstacles,
         gs.boyBoosts, gs.girlBoosts, elapsed, debugState,

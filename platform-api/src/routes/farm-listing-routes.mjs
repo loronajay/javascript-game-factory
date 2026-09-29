@@ -15,6 +15,8 @@ const CONFLICTS = new Set([
     "too_many_listings", "daily_listing_limit", "farm_not_initialized", "not_enough", "price_out_of_band",
     "listing_expired", "listing_closed", "own_listing", "not_enough_listed", "daily_purchase_limit",
     "daily_spend_limit", "seller_daily_limit", "inventory_full", "insufficient_tickets",
+    // A live animal or a fish: gone from the farm, or the buyer cannot keep it.
+    "died", "husbandry_too_low", "herd_full", "no_room", "creel_full",
 ]);
 export async function handleFarmListingRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;

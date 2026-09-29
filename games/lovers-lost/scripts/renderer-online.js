@@ -116,11 +116,11 @@ export function createOnlineRenderer(ctx, images, {
     return `${rounded} ${noun} in the yard`;
   }
 
-  function renderOnlineSideSelect(boyHovered, girlHovered, selectedSide = null) {
+  function renderOnlineSideSelect(boyHovered, girlHovered, selectedSide = null, activity = 'runner') {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
     void selectedSide;
-    drawOnlineLabel('ONLINE MATCHMAKING', CANVAS_W / 2, 26, {
+    drawOnlineLabel(activity === 'puzzle' ? 'PUZZLE CAMPAIGN ONLINE' : 'ONLINE MATCHMAKING', CANVAS_W / 2, 26, {
       bg:        'rgba(18,28,56,0.86)',
       stroke:    'rgba(120,165,255,0.50)',
       textColor: 'rgba(220,232,255,0.95)',
@@ -200,7 +200,7 @@ export function createOnlineRenderer(ctx, images, {
     _onlineEscHint('ESC · BACK');
   }
 
-  function renderOnlineLobby(side, lobbyPhase, roomCode, codeInput, searchTick, hov, queueCounts = null, localIdentity = null, remoteIdentity = null) {
+  function renderOnlineLobby(side, lobbyPhase, roomCode, codeInput, searchTick, hov, queueCounts = null, localIdentity = null, remoteIdentity = null, activity = 'runner') {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
 
@@ -215,7 +215,7 @@ export function createOnlineRenderer(ctx, images, {
     ctx.fillStyle   = '#ffffff';
     ctx.shadowColor = 'rgba(160,190,255,0.50)';
     ctx.shadowBlur  = 18;
-    ctx.fillText('ONLINE MULTIPLAYER', CANVAS_W / 2, 72);
+    ctx.fillText(activity === 'puzzle' ? 'PUZZLE CAMPAIGN ONLINE' : 'ONLINE MULTIPLAYER', CANVAS_W / 2, 72);
     ctx.shadowBlur  = 0;
     ctx.font        = 'bold 12px monospace';
     ctx.fillStyle   = 'rgba(255,210,120,0.92)';
@@ -247,7 +247,7 @@ export function createOnlineRenderer(ctx, images, {
     _onlineEscHint('ESC · BACK');
   }
 
-  function renderOnlineCountdown(side, remoteSide, secondsRemaining, localIdentity = null, remoteIdentity = null) {
+  function renderOnlineCountdown(side, remoteSide, secondsRemaining, localIdentity = null, remoteIdentity = null, activity = 'runner') {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     drawSpaceBackground();
 
@@ -288,7 +288,7 @@ export function createOnlineRenderer(ctx, images, {
     ctx.shadowBlur  = 0;
     ctx.font        = '15px "Cinzel Decorative", serif';
     ctx.fillStyle   = 'rgba(190,205,255,0.70)';
-    ctx.fillText('Get ready to run', CANVAS_W / 2, 420);
+    ctx.fillText(activity === 'puzzle' ? 'Get ready to solve together' : 'Get ready to run', CANVAS_W / 2, 420);
     ctx.restore();
 
     _onlineEscHint('ESC · CANCEL MATCH');
