@@ -29,6 +29,7 @@ const STAT_CEILING = 100;
 export const FARM_PET_LIFESPANS = Object.freeze({
     "pet.corgi": 100, "pet.duck": 80, "pet.red-panda": 90, "pet.platypus": 100, "pet.hippo": 140,
     "pet.rhino": 130, "pet.bat": 90, "pet.shark": 150, "pet.anglerfish": 110, "pet.jellyfish": 70,
+    "pet.horse": 160,
 });
 const unit = (value) => Number.isFinite(value) ? Math.min(0.999999, Math.max(0, value)) : 0;
 const round = (value, places) => Number(value.toFixed(places));

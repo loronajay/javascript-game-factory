@@ -28,7 +28,7 @@ const prices = Object.freeze({
     "decor.plant.birch": 125, "decor.plant.apple": 175, "decor.plant.willow": 200,
     "decor.water.pond-round": 800, "decor.water.pond-long": 1000, "decor.water.pond-lily": 1200,
     "decor.prop.barrel": 25, "decor.prop.crates": 50, "decor.prop.log-pile": 50,
-    "decor.prop.signpost": 50, "decor.prop.wheelbarrow": 75, "decor.prop.mailbox": 75,
+    "decor.prop.signpost": 50, "decor.prop.hitching-rail": 90, "decor.prop.wheelbarrow": 75, "decor.prop.mailbox": 75,
     "decor.prop.bench": 100, "decor.prop.scarecrow": 100, "decor.prop.birdbath": 125,
     "decor.prop.lamp-post": 125, "decor.prop.water-pump": 150, "decor.prop.well": 200,
     "decor.prop.campfire": 200, "decor.prop.bed": 250, "decor.prop.wagon": 250,
@@ -50,6 +50,8 @@ const prices = Object.freeze({
     "decor.prop.chew-ring": 140, "decor.prop.sunken-chest": 140, "decor.prop.kelp-garden": 140,
     "decor.prop.beach-ball": 150, "decor.prop.scratching-post": 150, "decor.prop.watermelon": 150,
     "decor.prop.tractor-tire": 160, "decor.prop.scratch-boulder": 160, "decor.prop.pushing-log": 160,
+    // The horse's (FARM_RIDING_PLAN.md).
+    "decor.prop.salt-lick": 120, "decor.prop.hanging-ball": 140, "decor.prop.jump-pole": 180,
 });
 export const FARM_TICKET_ITEMS = Object.freeze(Object.entries(prices).map(([id, price]) => Object.freeze({ id, price })));
 // Pet Games trophies are catalog items owned by entitlement like a purchase — but

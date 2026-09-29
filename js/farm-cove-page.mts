@@ -30,6 +30,13 @@ import { EYE_HEIGHT, doorRows, farmObstacles, farmSeats, nearestDoor, type DoorR
 import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt, type SeatInReach } from "./farm-interaction.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
+import { createAwayRiding } from "./farm-riding-away.mjs";
+import { cosmeticRideProfile } from "./farm-ride-profile.mjs";
+import { getRidingPrompt } from "./farm-interaction.mjs";
+import { obstacleBlocks } from "./arcade-room-walker.mjs";
+import { bodyObstacles, obstaclesForSpan } from "./farm-body.mjs";
+import { horseTravelQuery, ridingHorseFrom } from "./farm-riding-travel.mjs";
+import { riderReach } from "./farm-ride.mjs";
 import { findStallInReach, keeperPose, stallObstacles, type MarketStall } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import {
@@ -37,7 +44,10 @@ import {
   COVE_MARKET_GATE,
   COVE_PRESENCE_ROOM,
   COVE_SPAWN,
+  COVE_RAIL_ID,
   COVE_STALLS,
+  coveGroundAt,
+  coveWaterDepthAt,
   FISHMONGER_STALL_ID,
   RECORDS_BOARD_ID,
   TACKLE_STALL_ID,
@@ -255,6 +265,18 @@ const solidStalls = stallObstacles(COVE_STALLS);
 let obstacles = [...farmObstacles(layout, { openDoors }), ...solidStalls, ...water];
 const seats = farmSeats(layout);
 const doors = doorRows(layout);
+// A rider who came on horseback rides the shore (cosmetic riding) and ties up at the rail to fish.
+const away = createAwayRiding(THREE, scene, {
+  horse: ridingHorseFrom(inventoryFarm.layout, new URLSearchParams(location.search).get("horse")),
+  mode: "cosmetic",
+  profile: () => cosmeticRideProfile(),
+  world: () => ({ bounds: walkerBounds, solids: obstaclesForSpan(obstacles, 0.3, 2.4), ground: coveGroundAt, water: coveWaterDepthAt }),
+  canStand: (point) => !bodyObstacles(obstacles, 0).some((solid) => obstacleBlocks(point, solid)),
+  rails: layout.decor.filter((row) => row.instanceId === COVE_RAIL_ID),
+  canTie: true,
+});
+if (away.hasHorse() && away.arrive({ x: player.x, z: player.z, heading: player.yaw })) player.pitch = -0.32;
+let riderClock = 0;
 const keys = new Set<string>();
 let entered = false;
 let leaving = false;
@@ -267,7 +289,12 @@ let atWater = false;
 let noticeUntil = 0;
 
 function applyCamera(): void {
-  camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
+  if (away.mounted()) {
+    const eye = away.eye(riderClock);
+    camera.position.set(eye.x, eye.y, eye.z);
+  } else {
+    camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
+  }
   camera.rotation.set(player.pitch, player.yaw, 0);
 }
 
@@ -283,7 +310,7 @@ function notice(text: string, seconds = 5): void {
 
 // ---------------------------------------------------------------- the others at the Cove
 
-const visitors = createRoomVisitors(THREE, scene);
+const visitors = createRoomVisitors(THREE, scene, { mountSeat: (mount) => away.seatFor(mount) });
 const factoryProfile = loadFactoryProfile();
 const presenceName = factoryProfile.profileName || "Player";
 const presence = createRoomPresence({
@@ -558,7 +585,35 @@ function workStall(stall: MarketStall): void {
 function updateInteraction(): void {
   const pose = { x: player.x, z: player.z, y: body.y, yaw: player.yaw, forward: forwardOf(player.yaw) };
   const free = entered && !leaving && !panelOpen() && body.mode === "walking" && !fishing.busy();
-  doorInReach = free ? nearestDoor(doors, pose, (entry) => canWorkDoor(pose, entry.door, entry.reach)) : null;
+  const ride = away.state();
+  const reachFrom = ride ? riderReach(ride) : pose;
+  doorInReach = free ? nearestDoor(doors, reachFrom, (entry) => canWorkDoor(reachFrom, entry.door, entry.reach)) : null;
+  // In the saddle: the gate and the hitching rail — tie up to fish or visit the shops.
+  if (away.mounted()) {
+    stallInReach = null;
+    seatInReach = null;
+    nearbyVisitor = null;
+    atWater = false;
+    if (!entered || panelOpen() || leaving) {
+      if (!leaving) setPrompt("");
+      return;
+    }
+    if (performance.now() < noticeUntil) return;
+    if (doorInReach) {
+      const back = doorInReach.doorId === COVE_MARKET_GATE;
+      return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (back ? " · ride back up to the Market Square" : ""));
+    }
+    const tie = away.action(pose);
+    return setPrompt(tie ? tie.prompt : getRidingPrompt(away.horseName(), "away"));
+  }
+  const untie = free ? away.action(pose) : null;
+  if (untie && !doorInReach && entered && !panelOpen() && performance.now() >= noticeUntil) {
+    stallInReach = null;
+    seatInReach = null;
+    nearbyVisitor = null;
+    atWater = false;
+    return setPrompt(untie.prompt);
+  }
   stallInReach = free && !doorInReach ? findStallInReach(pose, COVE_STALLS) : null;
   seatInReach = free && !doorInReach && !stallInReach ? findSeatInReach(seats, pose) : null;
   nearbyVisitor = free && !doorInReach && !stallInReach && !seatInReach ? visitors.nearest(pose) : null;
@@ -588,6 +643,18 @@ function updateInteraction(): void {
 }
 
 function interact(): void {
+  if (!doorInReach && (away.mounted() || away.action(player)?.kind === "mount")) {
+    const wasMounted = away.mounted();
+    const spot = away.act(player);
+    if (spot) {
+      player.x = spot.x;
+      player.z = spot.z;
+      if (!wasMounted) player.pitch = -0.32;
+      keys.clear();
+      if (wasMounted) notice(`${away.horseName()} is tied up. Walk back to the rail and press E to ride again.`, 4);
+    }
+    return;
+  }
   if (body.mode === "seated") {
     const step = standUp(player, body);
     Object.assign(player, step.pose);
@@ -620,6 +687,15 @@ function interact(): void {
 
 function updatePlayer(dt: number): void {
   if (!entered || leaving || panelOpen() || fishing.busy()) return;
+  if (away.mounted()) {
+    away.step(dt, keys);
+    const ride = away.state();
+    if (ride) {
+      player.x = ride.x;
+      player.z = ride.z;
+    }
+    return;
+  }
   const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms: docks, ladders: [] });
   if (!step.moved) return;
   player.x = step.pose.x;
@@ -633,10 +709,12 @@ function checkGateway(): void {
   leaving = true;
   keys.clear();
   document.exitPointerLock?.();
-  setPrompt("Back up the path to the Market Square…");
-  status.textContent = "Back up the path to the Market Square…";
+  const horse = away.mounted() ? away.horseId() : "";
+  const words = horse ? "Riding back up the path to the Market Square…" : "Back up the path to the Market Square…";
+  setPrompt(words);
+  status.textContent = words;
   presence.disconnect();
-  location.href = marketUrl;
+  location.href = `../market/index.html?from=cove&${horseTravelQuery(fromFarm, horse)}`.replace(/&$/, "");
 }
 
 function fishingPose() {
@@ -782,6 +860,7 @@ function publishPresence(): void {
     z: player.z,
     yaw: player.yaw,
     moving: keys.size > 0 && body.mode === "walking" && !fishing.busy(),
+    ...(away.presenceMount() ? { mount: away.presenceMount()! } : {}),
     activity: ACTIVITY[phase] ?? (fishmongerPanel.isOpen() ? "at the Fishmonger" : tacklePanel.isOpen() ? "at Bait & Tackle" : recordsPanel.isOpen() ? "reading the Cove Records" : ""),
   });
 }
@@ -823,6 +902,8 @@ function frame(now: number): void {
   terrain.update(frameSeconds, seconds);
   keepers.update(frameSeconds, now, keeperMembers);
   visitors.update(frameSeconds, now, presence.members());
+  riderClock += frameSeconds;
+  away.draw(frameSeconds, riderClock, visitors.placements());
   chatView.tick();
   applyCamera();
   resize();
@@ -833,6 +914,7 @@ function frame(now: number): void {
 // Read-only handle for headless verification. Nothing in the page uses it.
 (globalThis as any).__cove = Object.freeze({
   pose: () => ({ ...player, y: body.y }),
+  mounted: () => away.mounted(),
   fishing: () => fishing.state(),
   angler: () => angler,
   accountLoaded: () => accountLoaded,

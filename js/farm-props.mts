@@ -27,6 +27,7 @@ import { FARM_DWELLING_BUILDERS } from "./farm-props-dwellings.mjs";
 import { FARM_TOY_BUILDERS } from "./farm-props-toys.mjs";
 import { FARM_TROPHY_BUILDERS } from "./farm-props-trophies.mjs";
 import { FARM_FISH_PROP_BUILDERS } from "./farm-props-fish.mjs";
+import { FARM_RIDING_PROP_BUILDERS } from "./farm-props-riding.mjs";
 import { createKitchenRange } from "./farm-props-kitchen.mjs";
 import { createFurniturePiece, createSawmill, createWorkbench, furnitureModelNames } from "./farm-props-furniture.mjs";
 import { WATERLINE_RADIUS, WATER_LEVEL, pondProfile } from "./farm-pond.mjs";
@@ -1178,6 +1179,8 @@ export const FARM_PROP_BUILDERS: Readonly<Record<string, (THREE: ThreeNamespace,
   ...Object.fromEntries(furnitureModelNames().map((name) => [name, (THREE: ThreeNamespace, definition: FarmDecorDefinition, row: FarmDecorRow, seed: number) => still(createFurniturePiece(THREE, name, definition.id, row.stars ?? 1, seed))])),
   birdbath: (THREE) => still(createBirdbath(THREE)),
   signpost: (THREE) => still(createSignpost(THREE)),
+  // Riding (farm-props-riding.mts): the hitching rail.
+  ...Object.fromEntries(Object.entries(FARM_RIDING_PROP_BUILDERS).map(([name, build]) => [name, (THREE: ThreeNamespace) => still(build(THREE))])),
   mailbox: (THREE) => still(createMailbox(THREE)),
   "water-pump": (THREE) => still(createWaterPump(THREE)),
   beehive: (THREE) => still(createBeehive(THREE)),

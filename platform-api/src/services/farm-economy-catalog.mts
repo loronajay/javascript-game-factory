@@ -1,4 +1,5 @@
 import { paletteTier, rollFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
+import { FARM_HORSE_SPECIES_ID, rollFarmHorseRiding } from "./farm-horse-catalog.mjs";
 import { farmTreeRule } from "./farm-tree-catalog.mjs";
 import { farmRecipeRule } from "./farm-recipe-catalog.mjs";
 
@@ -17,6 +18,7 @@ const paletteIds: Readonly<Record<string, readonly [string, string, string, stri
   "pet.hippo": ["rosy", "mauve", "river", "slate", "nebula"], "pet.rhino": ["ochre", "sand", "mossback", "frost", "crystal"],
   "pet.bat": ["ember", "cocoa", "dusky", "ghost", "eclipse"], "pet.shark": ["tiger", "blue", "reef", "albino", "voidfin"],
   "pet.anglerfish": ["ember", "scarlet", "deepsea", "abyss", "biolume"], "pet.jellyfish": ["sunset", "lagoon", "peach", "aurora", "starborn"],
+  "pet.horse": ["chestnut", "grey", "black", "palomino", "starlight"],
 });
 
 function palettes(id: string) {
@@ -47,13 +49,20 @@ export const FARM_SPECIES: readonly Species[] = Object.freeze([
   species("shark", "Shark", "water", "shark-feed", { min: 48, max: 82 }, { min: 60, max: 90 }),
   species("anglerfish", "Anglerfish", "water", "deep-sea-feed", { min: 20, max: 45 }, { min: 18, max: 40 }),
   species("jellyfish", "Jellyfish", "water", "plankton-blend", { min: 12, max: 35 }, { min: 8, max: 25 }),
+  // Sold by Hollis, never adopted (services/farm-horse-catalog; the adoption route refuses it).
+  species("horse", "Horse", "ground", "oats", { min: 45, max: 80 }, { min: 40, max: 75 }),
 ]);
+
+/** Species the Pets panel may adopt: every one but the Dealer's horse. */
+export function isAdoptableFarmSpecies(id: string): boolean {
+  return id !== "pet.horse";
+}
 
 const supplyPrices: Readonly<Record<string, number>> = Object.freeze({
   "food.waterfowl-feed": 12, "food.dog-food": 15, "food.fruit-mix": 18,
   "food.river-grubs": 20, "food.bamboo-bites": 24, "food.plankton-blend": 28,
   "food.river-hay": 30, "food.browse-bundle": 35, "food.deep-sea-feed": 40,
-  "food.shark-feed": 45,
+  "food.shark-feed": 45, "food.oats": 20,
   // Livestock feed (services/farm-livestock-catalog FARM_LIVESTOCK_FEED_PRICES holds the same three).
   "food.hay": 8, "food.pig-feed": 8, "food.chicken-feed": 6,
 });
@@ -156,11 +165,14 @@ export function createFarmPetProfile(speciesId: unknown, random: () => number = 
   // Potential is rolled last, in the client's order, so the stat progression is pinned from adoption.
   const growth = rollFarmPetGrowth(row, { speed, strength }, paletteTier(row, palette.id), random);
   const stat = (base: number) => round(Math.min(100, base * (1 + palette.statBoost)), 1);
+  // A horse's Stamina/Agility come after everything else, on the same potential (js/farm-pet-care.mts).
+  const riding = row.id === FARM_HORSE_SPECIES_ID && growth ? rollFarmHorseRiding(growth.grade, random) : null;
   return {
     gender, ageDays: 0, affection: 50, hunger: 100, starvingMinutes: 0, happiness: 100,
     size: { current, max: maxSize, growthPerDay: round((maxSize - current) / 70, 4) },
     stats: { speed: stat(growth?.base.speed ?? speed), strength: stat(growth?.base.strength ?? strength) },
     traits, milestones: [], paletteId: palette.id, paletteBonus: palette.statBoost,
     ...(growth ? { growth } : {}),
+    ...(riding ? { riding } : {}),
   };
 }

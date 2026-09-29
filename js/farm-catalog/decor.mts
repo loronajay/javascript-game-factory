@@ -332,6 +332,10 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("tractor-tire", { title: "Tractor Tire", category: "prop", footprint: { width: 1.2, depth: 1.2 }, snapDegrees: 45, swatch: ["#2b2b2b", "#555555"], model: "toy-tractor-tire" }),
   item("scratch-boulder", { title: "Scratch Boulder", category: "prop", footprint: { width: 1, depth: 0.9 }, swatch: ["#928671", "#6e6555"], model: "toy-scratch-boulder" }),
   item("pushing-log", { title: "Pushing Log", category: "prop", footprint: { width: 1.6, depth: 0.45 }, snapDegrees: 45, swatch: ["#7a5534", "#c9a06a"], model: "toy-pushing-log" }),
+  // The horse's (FARM_RIDING_PLAN.md).
+  item("salt-lick", { title: "Salt Lick", category: "prop", footprint: { width: 0.4, depth: 0.4 }, snapDegrees: 45, swatch: ["#e9ddd0", "#8a5a34"], model: "toy-salt-lick" }),
+  item("hanging-ball", { title: "Hanging Ball", category: "prop", footprint: { width: 1.2, depth: 0.5 }, swatch: ["#e8453c", "#5d3a1f"], model: "toy-hanging-ball" }),
+  item("jump-pole", { title: "Jump Pole", category: "prop", footprint: { width: 2.4, depth: 0.5 }, snapDegrees: 45, swatch: ["#f2f2ee", "#d83c3c"], model: "toy-jump-pole" }),
   item("fruit-mobile", { title: "Fruit Mobile", category: "prop", footprint: { width: 0.4, depth: 0.4 }, swatch: ["#b8457a", "#f0a030"], model: "toy-fruit-mobile" }),
   item("moth-lantern", { title: "Moth Lantern", category: "prop", footprint: { width: 0.35, depth: 0.35 }, swatch: ["#2b2b2b", "#ffd9a0"], model: "toy-moth-lantern" }),
   item("swing-perch", { title: "Swing Perch", category: "prop", footprint: { width: 1.1, depth: 0.45 }, swatch: ["#5d3a1f", "#c9a06a"], model: "toy-swing-perch" }),
@@ -364,6 +368,7 @@ export const FARM_DECOR_CATALOG: readonly FarmDecorDefinition[] = Object.freeze(
   item("log-pile", { title: "Log Pile", category: "prop", footprint: { width: 1.6, depth: 0.9 }, indoors: true, swatch: ["#9a7248", "#5d3a1f"], model: "log-pile" }),
   item("campfire", { title: "Campfire", category: "prop", footprint: { width: 1.2, depth: 1.2 }, swatch: ["#ff8a2b", "#4a3a33"], model: "campfire" }),
   item("birdbath", { title: "Birdbath", category: "prop", footprint: { width: 0.7, depth: 0.7 }, swatch: ["#b9bec4", "#3f7fb8"], model: "birdbath" }),
+  item("hitching-rail", { title: "Hitching Rail", category: "prop", footprint: { width: 2.4, depth: 0.3 }, snapDegrees: 45, swatch: ["#7a5534", "#3b3b3b"], model: "hitching-rail" }),
   item("signpost", { title: "Signpost", category: "prop", footprint: { width: 0.3, depth: 0.3 }, swatch: ["#8a5a34", "#f1e6d2"], model: "signpost" }),
   item("mailbox", { title: "Mailbox", category: "prop", footprint: { width: 0.3, depth: 0.5 }, swatch: ["#2b4a8a", "#8a5a34"], model: "mailbox" }),
   item("water-pump", { title: "Water Pump", category: "prop", footprint: { width: 0.5, depth: 0.8 }, swatch: ["#2b2b2b", "#8e8b82"], model: "water-pump" }),

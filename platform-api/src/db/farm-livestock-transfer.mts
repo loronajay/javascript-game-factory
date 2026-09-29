@@ -23,6 +23,7 @@
 import {
   advanceLivestockCare,
   clampStat,
+  farmHerdHomes,
   farmLivestockHomes,
   farmLivestockRule,
   livestockCard,
@@ -125,7 +126,7 @@ export async function planLivestockTrade(client: any, a: TradeSideFarm, b: Trade
     const farm = sides[receiver].farm;
     const staying = herds.get(farm.playerId)!.filter((row) => !sides[receiver].out.includes(row.animal_id));
     const placed = placeArrivingLivestock({
-      homes: farmLivestockHomes(farm.layout.decor),
+      homes: farmHerdHomes(farm.layout),
       herdHomes: staying.map((row) => (row.home_id ? String(row.home_id) : null)),
       level: husbandryLevel(farm.layout),
       arriving: arriving.map((entry) => ({ speciesId: String(entry.row.species_id) })),
@@ -198,7 +199,7 @@ export async function planListedLanding(client: any, animalId: string, owner: Tr
   const row = await lockedListedAnimal(client, animalId);
   if (!row) return { ok: false, error: "not_found" };
   const herdHomes = herd.map((entry) => (entry.home_id ? String(entry.home_id) : null));
-  const homes = farmLivestockHomes(owner.layout.decor);
+  const homes = farmHerdHomes(owner.layout);
   let homeId: string | null;
   if (strict) {
     const placed = placeArrivingLivestock({ homes, herdHomes, level: husbandryLevel(owner.layout), arriving: [{ speciesId: String(row.species_id) }] });

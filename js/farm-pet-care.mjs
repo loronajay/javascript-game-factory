@@ -5,6 +5,8 @@
 // ordinary placeable farm decor so care never owns a second asset registry.
 import { findAnimalPalette, pickAnimalPalette } from "./farm-catalog/animals.mjs";
 import { applyPetTreatment, findGrowthGrade, growthStage, legacyPetGrowth, normalizePetGrowth, petGrowthOutlook, rollPetGrowth, statsFromGrowth, HUNGRY_GROWTH_WEIGHT, } from "./farm-pet-growth.mjs";
+import { HORSE_LIFE_DAYS, HORSE_SPECIES_ID, normalizeHorseRiding, rollHorseRiding } from "./farm-horse-riding.mjs";
+import { rideTraitsFor } from "./farm-ride-profile.mjs";
 /** Adoption draw weight per rarity: a common trait is six times as likely as a rare one. */
 export const PET_TRAIT_RARITY_WEIGHTS = Object.freeze({ common: 6, uncommon: 3, rare: 1 });
 export const DEFAULT_SNAP_AT = 10;
@@ -66,6 +68,10 @@ export function findPetTrait(id) {
 export function petTraitMultiplier(profile, key) {
     return (profile?.traits ?? []).reduce((product, id) => product * (findPetTrait(id)?.multipliers[key] ?? 1), 1);
 }
+/** A horse's riding effects from its traits (`farm-ride-profile.mts`), each the product over its traits. */
+export function petRideTraits(profile) {
+    return rideTraitsFor(profile?.traits ?? []);
+}
 export function petHasTrait(profile, predicate) {
     return (profile?.traits ?? []).some((id) => { const entry = findPetTrait(id); return entry ? predicate(entry) : false; });
 }
@@ -92,7 +98,7 @@ function care(spec) {
         adoptionPrice: 1200,
         food: Object.freeze({ itemId: `food.${spec.food.id}`, title: spec.food.title, price: spec.food.price, starterQuantity: spec.food.starter ?? 0 }),
         needs: Object.freeze({ hungerPerDay: 25, hungerPerServing: 35 }),
-        dwelling: Object.freeze({ itemId: `decor.prop.${spec.dwelling.id}`, title: spec.dwelling.title }),
+        dwelling: Object.freeze({ itemId: spec.dwelling.itemId ?? `decor.prop.${spec.dwelling.id}`, title: spec.dwelling.title }),
         toys: Object.freeze([...(spec.toys ?? [])].map((toy) => Object.freeze({ ...toy }))),
         // Relative multipliers: the catalog's world-space height remains the species' base size.
         size: COMMON_SIZE,
@@ -135,6 +141,10 @@ export const PET_CARE = Object.freeze([
         ] }),
     care({ speciesId: "pet.jellyfish", maxLifeDays: 70, food: { id: "plankton-blend", title: "Plankton Blend", price: 28 }, dwelling: { id: "jellyfish-lagoon", title: "Jellyfish Lagoon" }, speed: { min: 12, max: 35 }, strength: { min: 8, max: 25 }, toys: [
             toy("glass-float", "Glass Float"), toy("coral-fan", "Coral Fan"), toy("current-spinner", "Current Spinner"),
+        ] }),
+    // The horse (FARM_RIDING_PLAN.md): bought from Hollis, lives in a Stable stall, eats oats.
+    care({ speciesId: HORSE_SPECIES_ID, maxLifeDays: HORSE_LIFE_DAYS, food: { id: "oats", title: "Oats", price: 20 }, dwelling: { id: "stable", title: "Stable", itemId: "decor.building.stable" }, speed: { min: 45, max: 80 }, strength: { min: 40, max: 75 }, toys: [
+            toy("salt-lick", "Salt Lick"), toy("hanging-ball", "Hanging Ball"), toy("jump-pole", "Jump Pole"),
         ] }),
 ]);
 /** Complete starting-profile rows, named separately so care and identity remain clear at call sites. */
@@ -226,6 +236,8 @@ export function createPetProfile(speciesId, random) {
     const paletteBonus = palette?.statBoost ?? 0;
     // Rolled last so every earlier draw (and every existing seeded test) is unchanged.
     const growth = rollPetGrowth(care, { speed: baseSpeed, strength: baseStrength }, palette?.tier ?? "classic", random);
+    // A horse's riding stats come after everything else, on the same potential.
+    const riding = speciesId === HORSE_SPECIES_ID ? rollHorseRiding(growth.grade, random) : null;
     return Object.freeze({
         gender,
         ageDays: 0,
@@ -240,6 +252,7 @@ export function createPetProfile(speciesId, random) {
         paletteId: palette?.id ?? "standard",
         paletteBonus,
         growth,
+        ...(riding ? { riding } : {}),
     });
 }
 export function normalizePetProfile(speciesId, value) {
@@ -295,6 +308,7 @@ export function normalizePetProfile(speciesId, value) {
         paletteId: palette?.id ?? "standard",
         paletteBonus,
         growth,
+        ...(speciesId === HORSE_SPECIES_ID ? { riding: normalizeHorseRiding(source.riding, rollHorseRiding(growth.grade, seededRandom(`${speciesId}:riding:${gender}:${round(growth.base.speed, 3)}`))) } : {}),
     });
 }
 /** Stable entropy for migrating pre-progression profiles without rerolling on every load. */

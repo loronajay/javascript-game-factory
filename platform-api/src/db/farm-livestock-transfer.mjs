@@ -19,7 +19,7 @@
 //
 // Herds are locked (FOR UPDATE, alive rows) in player-id order, after the farms,
 // the same order every caller takes its other locks in.
-import { advanceLivestockCare, clampStat, farmLivestockHomes, farmLivestockRule, livestockCard, livestockDeathMinute, normalizeLivestockCare, pickFarmLivestockHome, placeArrivingLivestock, rebaseLivestockCare, LIVESTOCK_STATS, } from "../services/farm-livestock-catalog.mjs";
+import { advanceLivestockCare, clampStat, farmHerdHomes, farmLivestockRule, livestockCard, livestockDeathMinute, normalizeLivestockCare, pickFarmLivestockHome, placeArrivingLivestock, rebaseLivestockCare, LIVESTOCK_STATS, } from "../services/farm-livestock-catalog.mjs";
 import { farmingLevelForXp, normalizeHusbandryRecord } from "../services/farm-skill-catalog.mjs";
 export const LIVESTOCK_ANIMAL_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 const COLUMNS = `animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, state`;
@@ -96,7 +96,7 @@ export async function planLivestockTrade(client, a, b, fromA, fromB) {
         const farm = sides[receiver].farm;
         const staying = herds.get(farm.playerId).filter((row) => !sides[receiver].out.includes(row.animal_id));
         const placed = placeArrivingLivestock({
-            homes: farmLivestockHomes(farm.layout.decor),
+            homes: farmHerdHomes(farm.layout),
             herdHomes: staying.map((row) => (row.home_id ? String(row.home_id) : null)),
             level: husbandryLevel(farm.layout),
             arriving: arriving.map((entry) => ({ speciesId: String(entry.row.species_id) })),
@@ -161,7 +161,7 @@ export async function planListedLanding(client, animalId, owner, strict) {
     if (!row)
         return { ok: false, error: "not_found" };
     const herdHomes = herd.map((entry) => (entry.home_id ? String(entry.home_id) : null));
-    const homes = farmLivestockHomes(owner.layout.decor);
+    const homes = farmHerdHomes(owner.layout);
     let homeId;
     if (strict) {
         const placed = placeArrivingLivestock({ homes, herdHomes, level: husbandryLevel(owner.layout), arriving: [{ speciesId: String(row.species_id) }] });

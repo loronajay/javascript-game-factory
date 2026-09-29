@@ -26,6 +26,9 @@ import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
 import { butcherFarmLivestock, buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
+import { buyFarmHorse } from "./db/farm-horses.mjs";
+import { submitFarmRidingRun } from "./db/farm-riding.mjs";
+import { betFarmRace, enterFarmRace, leaveFarmRace, listFarmRaces, postFarmRace, settleFarmRace, startFarmRace } from "./db/farm-races.mjs";
 import { getFarmLivestockCards } from "./db/farm-livestock-transfer.mjs";
 import { buyFarmTackle, castFarmLine, getFarmFishDetails, getFarmFishRecords, getFarmFishShadows, getFarmFishing, landFarmCast, lockFarmFish, mountFarmFish, releaseFarmFish, sellFarmFish } from "./db/farm-fishing.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
@@ -316,6 +319,16 @@ async function bootstrap() {
         getFarmLivestock: (params) => getFarmLivestock(pool, params),
         getFarmLivestockCards: (params) => getFarmLivestockCards(pool, params),
         buyFarmLivestock: (params) => buyFarmLivestock(pool, params),
+        buyFarmHorse: (params) => buyFarmHorse(pool, params),
+        // Windrush Downs (FARM_RIDING_PLAN.md). FARM_RACE_SECRET is shared with factory-network-server's race room; unset, races cannot be posted.
+        submitFarmRidingRun: (params) => submitFarmRidingRun(pool, params),
+        listFarmRaces: (params) => listFarmRaces(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
+        postFarmRace: (params) => postFarmRace(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
+        enterFarmRace: (params) => enterFarmRace(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
+        leaveFarmRace: (params) => leaveFarmRace(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
+        startFarmRace: (params) => startFarmRace(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
+        betFarmRace: (params) => betFarmRace(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
+        settleFarmRace: (params) => settleFarmRace(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),
         moveFarmLivestock: (params) => moveFarmLivestock(pool, params),
         renameFarmLivestock: (params) => renameFarmLivestock(pool, params),
         careFarmLivestock: (params) => careFarmLivestock(pool, params),

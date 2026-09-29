@@ -5,8 +5,8 @@ import { ANIMAL_CATALOG } from "../../../js/farm-catalog/animals.mjs";
 import { RIVALS, SPECIES_IDS, SPECIES_PALETTES, findRival, noise, pickRivals, rivalAsPet, sanitizePet } from "../shared/sim/rivals.js";
 import { CPU_LEVEL_IDS, cpuLevelFromIndex, cpuLevelIndex, normalizeCpuLevel } from "../shared/sim/levels.js";
 
-test("the rival pool's species and coats are exactly the farm's", () => {
-  const farm = Object.fromEntries(ANIMAL_CATALOG.map((animal) => [animal.id, animal.palettes.map((palette) => palette.id)]));
+test("the rival pool's species and coats are exactly the farm's Pet Games animals (never the horse)", () => {
+  const farm = Object.fromEntries(ANIMAL_CATALOG.filter((animal) => animal.petGames).map((animal) => [animal.id, animal.palettes.map((palette) => palette.id)]));
   assert.deepEqual([...SPECIES_IDS].sort(), Object.keys(farm).sort());
   for (const species of SPECIES_IDS) assert.deepEqual([...SPECIES_PALETTES[species]].sort(), [...farm[species]].sort(), species);
 });

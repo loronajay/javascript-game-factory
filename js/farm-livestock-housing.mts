@@ -133,6 +133,24 @@ export function homesWithRoom(homes: readonly LivestockHome[], herd: readonly Pi
   return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
 }
 
+/**
+ * The homes the HERD can use (FARM_RIDING_PLAN.md): every home, less the
+ * Stable stalls the farm's horses live in. A horse is a pet in the farm
+ * document, not a herd row, but its stall's one place is gone, so the herd,
+ * the Dealer and the Herd panel never see that stall at all. The server's
+ * `farmHerdHomes` takes the same stalls away.
+ */
+export function herdHomes(decor: readonly FarmDecorRow[], pets: readonly Readonly<{ stall?: string }>[]): readonly LivestockHome[] {
+  const taken = new Set(pets.map((pet) => pet.stall).filter((stall): stall is string => typeof stall === "string" && stall.length > 0));
+  return taken.size ? Object.freeze(livestockHomes(decor).filter((entry) => !taken.has(entry.id))) : livestockHomes(decor);
+}
+
+/** The Stable stalls free for a horse: no livestock in them and no horse. */
+export function freeHorseStalls(decor: readonly FarmDecorRow[], pets: readonly Readonly<{ stall?: string }>[], herd: readonly Pick<LivestockAnimal, "homeId">[]): readonly LivestockHome[] {
+  const counts = homeOccupancy(herdHomes(decor, pets), herd);
+  return herdHomes(decor, pets).filter((entry) => entry.kind === "stall" && (counts.get(entry.id) ?? 0) < entry.slots);
+}
+
 /** A field point in the home's own frame. */
 export function homeLocal(entry: LivestockHome, point: Readonly<{ x: number; z: number }>): Readonly<{ x: number; z: number }> {
   const dx = point.x - entry.x;

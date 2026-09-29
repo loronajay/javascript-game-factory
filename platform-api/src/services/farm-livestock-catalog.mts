@@ -201,6 +201,17 @@ export function farmLivestockHomes(decor: unknown): FarmLivestockHome[] {
 }
 
 /**
+ * The homes the HERD can use: every home less the Stable stalls the farm's
+ * horses live in (planning-docs/FARM_RIDING_PLAN.md). A horse is a pet in the
+ * farm document with a `stall`, never a herd row, so its stall simply is not a
+ * home to the herd. Mirrors `herdHomes` in js/farm-livestock-housing.mts.
+ */
+export function farmHerdHomes(layout: any): FarmLivestockHome[] {
+  const taken = new Set((Array.isArray(layout?.pets) ? layout.pets : []).map((pet: any) => pet?.stall).filter((stall: any) => typeof stall === "string" && stall));
+  return farmLivestockHomes(layout?.decor).filter((entry) => !taken.has(entry.id));
+}
+
+/**
  * The first home with room for one of `speciesId`, or `wanted` if it has room
  * and takes that species; null when the farm is full for it. `herdHomes` are
  * the homes the live herd names.

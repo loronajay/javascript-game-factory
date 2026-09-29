@@ -61,6 +61,7 @@ test("every species has its own sensible food and data-only dwelling", () => {
     { speciesId: "pet.shark", food: "Shark Feed", dwelling: "Reef Grotto" },
     { speciesId: "pet.anglerfish", food: "Deep-Sea Feed", dwelling: "Darkwater Cave" },
     { speciesId: "pet.jellyfish", food: "Plankton Blend", dwelling: "Jellyfish Lagoon" },
+    { speciesId: "pet.horse", food: "Oats", dwelling: "Stable" },
   ]);
   assert.equal(new Set(PET_CARE.map((care) => care.food.itemId)).size, PET_CARE.length);
   assert.equal(new Set(PET_CARE.map((care) => care.dwelling.itemId)).size, PET_CARE.length);
@@ -68,7 +69,7 @@ test("every species has its own sensible food and data-only dwelling", () => {
 });
 
 test("every pet has a complete weighted visual palette set", () => {
-  assert.equal(ANIMAL_CATALOG.length, 10);
+  assert.equal(ANIMAL_CATALOG.length, 11);
   for (const species of ANIMAL_CATALOG) {
     assert.equal(species.palettes.length, 6, `${species.id} has classic, three uncommon, rare and super-rare looks`);
     assert.equal(species.palettes[0].id, "standard", `${species.id} keeps the source art as its common look`);
@@ -86,9 +87,12 @@ test("every pet has a complete weighted visual palette set", () => {
       assert.match(palette.tint, /^#[0-9a-f]{6}$/i);
       assert.ok(palette.weight > 0);
       assert.equal(findAnimalPalette(species.id, palette.id), palette);
-      if (palette.id !== "standard") {
+      if (palette.id !== "standard" && species.model.kind === "gobkit") {
         assert.equal(palette.colors.length, 3, `${species.id} ${palette.id} uses a deliberate three-color ramp`);
         palette.colors.forEach((color) => assert.match(color, /^#[0-9a-f]{6}$/i));
+      }
+      if (palette.id !== "standard" && species.model.kind === "named") {
+        Object.values(palette.materials).forEach((color) => assert.match(color, /^#[0-9a-f]{6}$/i));
       }
     }
     assert.equal(pickAnimalPalette(species.id, () => 0)?.id, "standard");
@@ -121,6 +125,11 @@ test("every pet dwelling is placeable, identifies its resident, and has a usable
   for (const care of PET_CARE) {
     const species = ANIMAL_CATALOG.find((entry) => entry.id === care.speciesId);
     const dwelling = findFarmDecor(care.dwelling.itemId);
+    // The horse lives in a Stable stall (a building with its own fixtures), not a dwelling prop.
+    if (species.ridable) {
+      assert.equal(dwelling?.id, "decor.building.stable");
+      continue;
+    }
     assert.ok(dwelling, `${care.dwelling.title} is in the farm catalog`);
     assert.equal(dwelling.category, "prop");
     assert.equal(dwelling.dwelling?.speciesId, care.speciesId);
@@ -129,7 +138,7 @@ test("every pet dwelling is placeable, identifies its resident, and has a usable
     assert.ok(dwelling.dwelling.entrance.width >= species.radius * 1.6, `${care.dwelling.title} entrance fits ${species.title}`);
     assert.ok(dwelling.dwelling.entrance.height >= species.height * 0.9, `${care.dwelling.title} entrance is tall enough for ${species.title}`);
   }
-  assert.equal(new Set(models).size, PET_CARE.length, "every species gets a distinct dwelling model");
+  assert.equal(new Set(models).size, PET_CARE.length - 1, "every species but the horse gets a distinct dwelling model");
 });
 
 test("a newly adopted dog receives bounded individual identity, needs, growth and compatible traits", () => {

@@ -24,7 +24,7 @@ import { FARM_BOUNDS } from "./farm-layout.mjs";
 import { findPetInReach } from "./farm-interaction.mjs";
 import { createLivestockBodies, livestockPaletteId } from "./farm-livestock-bodies.mjs";
 import { createHerdSim } from "./farm-livestock-sim.mjs";
-import { livestockHomes } from "./farm-livestock-housing.mjs";
+import { herdHomes } from "./farm-livestock-housing.mjs";
 import { gradeStars, livestockSize, livestockSummary, normalizeLivestockAnimal, normalizeLivestockHerd } from "./farm-livestock.mjs";
 import { advanceLivestockCare, goodsState, livestockDueToDie, livestockNeed, wantsFood } from "./farm-livestock-care.mjs";
 import { findLivestockSpecies, findLivestockGood, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
@@ -43,7 +43,7 @@ const MOVE_ERRORS = Object.freeze({
 const GROWTH_REFRESH_SECONDS = 2;
 export function createFarmLivestockController(options) {
     let herd = [];
-    let homes = livestockHomes(options.layout().decor);
+    let homes = herdHomes(options.layout().decor, options.layout().pets);
     let nearby = null;
     let growthTimer = 0;
     let caring = false;
@@ -187,7 +187,7 @@ export function createFarmLivestockController(options) {
                 apply(normalizeLivestockHerd(answer));
         },
         sync() {
-            homes = livestockHomes(options.layout().decor);
+            homes = herdHomes(options.layout().decor, options.layout().pets);
             askedBirth.clear();
             sim.sync(entries());
             render();

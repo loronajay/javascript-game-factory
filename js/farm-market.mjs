@@ -43,16 +43,28 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, MARKET_DOWNS_GATE, MARKET_DOWNS_SPAWN, MARKET_RAIL_IDS, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
 import { createLivestockDealerPanel } from "./farm-livestock-dealer-panel.mjs";
 import { createMarketButcher } from "./farm-market-butcher.mjs";
-import { livestockHomes } from "./farm-livestock-housing.mjs";
+import { freeHorseStalls, herdHomes, livestockHomes } from "./farm-livestock-housing.mjs";
+import { createHorsePaddock, horseLineTitle } from "./farm-horse-paddock.mjs";
+import { horseStockLine } from "./farm-horse-stock.mjs";
+import { MAX_PETS } from "./farm-layout.mjs";
 import { livestockKind, normalizeLivestockAnimal, normalizeLivestockHerd } from "./farm-livestock.mjs";
 import { findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
+import { findAnimal } from "./farm-catalog/animals.mjs";
+import { createAwayRiding } from "./farm-riding-away.mjs";
+import { cosmeticRideProfile } from "./farm-ride-profile.mjs";
+import { getRidingPrompt } from "./farm-interaction.mjs";
+import { obstacleBlocks } from "./arcade-room-walker.mjs";
+import { bodyObstacles, obstaclesForSpan } from "./farm-body.mjs";
+import { horseTravelQuery, ridingHorseFrom } from "./farm-riding-travel.mjs";
+import { riderReach } from "./farm-ride.mjs";
+import { assetUrlFor, petClips } from "./farm-pet-bodies.mjs";
 import { livestockAssetUrl, livestockClips } from "./farm-livestock-bodies.mjs";
 import { dayPrice, normalizeMarketDay, trendNote, turnoverNote } from "./farm-market-day.mjs";
 import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
@@ -104,6 +116,9 @@ const homeUrl = fromFarm ? `../index.html?id=${encodeURIComponent(fromFarm)}` : 
 // Down the north gate to the Cove, carrying the farm to come home to.
 const coveUrl = fromFarm ? `../cove/index.html?farm=${encodeURIComponent(fromFarm)}` : "../cove/index.html";
 const cameFromCove = new URLSearchParams(location.search).get("from") === "cove";
+const cameFromDowns = new URLSearchParams(location.search).get("from") === "downs";
+// Out the west gate to Windrush Downs — on horseback only (FARM_RIDING_PLAN.md).
+const downsUrl = (horseId) => `../downs/index.html?${horseTravelQuery(fromFarm, horseId)}`;
 homeLink.href = homeUrl;
 if (fromFarm)
     homeLink.textContent = "← Back to their farm";
@@ -258,7 +273,7 @@ function keeperSays(stall, text, now = performance.now()) {
     keeperSaidAt.set(stall.id, now);
     keepers.say(`keeper-${stall.id}`, text, now);
 }
-const arrival = cameFromCove ? MARKET_COVE_SPAWN : MARKET_SPAWN;
+const arrival = cameFromCove ? MARKET_COVE_SPAWN : cameFromDowns ? MARKET_DOWNS_SPAWN : MARKET_SPAWN;
 const player = { x: arrival.x, z: arrival.z, yaw: arrival.yaw, pitch: -0.03 };
 // `?at=<stall id>` stands the player at that counter, facing it — a QA seam like `?time=`.
 const startStall = findMarketStall(new URLSearchParams(location.search).get("at") ?? "");
@@ -273,6 +288,19 @@ const solidStalls = stallObstacles();
 let obstacles = [...farmObstacles(layout, { openDoors }), ...solidStalls];
 const seats = farmSeats(layout);
 const doors = doorRows(layout);
+// A rider who came on horseback rides on here (cosmetic riding: their own pace), and ties up at a rail to walk.
+const away = createAwayRiding(THREE, scene, {
+    horse: ridingHorseFrom(farm, new URLSearchParams(location.search).get("horse")),
+    mode: "cosmetic",
+    profile: () => cosmeticRideProfile(),
+    world: () => ({ bounds: walkerBounds, solids: obstaclesForSpan(obstacles, 0.3, 2.4) }),
+    canStand: (point) => !bodyObstacles(obstacles, 0).some((solid) => obstacleBlocks(point, solid)),
+    rails: layout.decor.filter((row) => MARKET_RAIL_IDS.includes(row.instanceId)),
+    canTie: true,
+});
+if (away.hasHorse() && away.arrive({ x: arrival.x, z: arrival.z, heading: arrival.yaw }))
+    player.pitch = -0.32;
+let riderClock = 0;
 const keys = new Set();
 let entered = false;
 let leaving = false;
@@ -284,7 +312,13 @@ let nearbyVisitor = null;
 /** A notice E put up (a shut stall's, a wave) holds the prompt until this time. */
 let noticeUntil = 0;
 function applyCamera() {
-    camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
+    if (away.mounted()) {
+        const eye = away.eye(riderClock);
+        camera.position.set(eye.x, eye.y, eye.z);
+    }
+    else {
+        camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
+    }
     camera.rotation.set(player.pitch, player.yaw, 0);
 }
 function setPrompt(text) {
@@ -296,7 +330,7 @@ function notice(text, seconds = 6) {
     setPrompt(text);
 }
 // ---------------------------------------------------------------- the others in the square
-const visitors = createRoomVisitors(THREE, scene);
+const visitors = createRoomVisitors(THREE, scene, { mountSeat: (mount) => away.seatFor(mount) });
 const factoryProfile = loadFactoryProfile();
 const presenceName = factoryProfile.profileName || "Player";
 const presence = createRoomPresence({
@@ -345,6 +379,7 @@ function publishPresence() {
         z: player.z,
         yaw: player.yaw,
         moving: keys.size > 0 && body.mode === "walking",
+        ...(away.presenceMount() ? { mount: away.presenceMount() } : {}),
         activity: trading.activity() || (salePanel.isOpen() ? "at the Produce Merchant" : seedPanel.isOpen() ? "buying seeds" : dealerPanel.isOpen() ? "at the Livestock Dealer" : butcherCounter.isOpen() ? "at the Butcher" : exchangePanel.isOpen() ? "at the Exchange Board" : kitchenPanel.isOpen() ? "at the Kitchen" : ordersPanel.isOpen() ? "reading the Order Board" : sawmill.activity()),
     });
 }
@@ -474,6 +509,8 @@ async function loadHerd() {
         herd = normalizeLivestockHerd(answer);
     dealerPanel.repaint();
     butcherCounter.repaint();
+    if (dealerPanel.isOpen())
+        horsePaddock.render();
 }
 const livestockMessages = Object.freeze({
     insufficient_tickets: "Not enough tickets for that one yet.",
@@ -501,6 +538,27 @@ async function buyLivestock(speciesId, name) {
         message: `${animal.name} the ${livestockKind(animal, farm.clock.farmMinutes).toLowerCase()} is on the way to ${home?.title ?? "your farm"} — ${Number(result.price).toLocaleString()} tickets. Press L on the farm to see its stats or rename it.`,
     };
 }
+const horseMessages = Object.freeze({
+    insufficient_tickets: "Not enough tickets for that horse yet.",
+    no_stall: "Every Stable stall at home is taken. Build another Stable, or free a stall, first.",
+    farm_full: `Your farm has as many pets as it can keep (${MAX_PETS}).`,
+    level_too_low: "Hollis keeps that one for a better rider — raise your Riding at Windrush Downs.",
+    already_bought: "You already bought that horse today.",
+    stock_changed: "Hollis has brought in new horses since you looked. Take another look.",
+    farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
+});
+/** One of Hollis's horses: the server rolls it from the day's seed and stables it (the pet lands in the farm document). */
+async function buyHorse(day, slot, name) {
+    const result = await livestockApi.buyFarmHorse({ day, slot, ...(name ? { name } : {}) }).catch(() => null);
+    takeStock(result?.layout);
+    if (!result?.ok)
+        return { ok: false, bought: result?.error === "already_bought", message: horseMessages[result?.error] ?? "The sale did not go through. Nothing was bought — try again in a moment." };
+    takeBalance(result.balance);
+    const line = horseStockLine(day, slot);
+    const pet = result.pet;
+    keeperSays(findMarketStall(LIVESTOCK_STALL_ID), `${pet?.name ?? "That one"}'s a fine horse. Ride ${pet?.profile?.gender === "male" ? "him" : "her"} well.`);
+    return { ok: true, message: `${pet?.name ?? "Your horse"}${line ? `, the ${horseLineTitle(line).split(" · ")[0].toLowerCase()},` : ""} is on the way to your Stable — ${Number(result.price).toLocaleString()} tickets. Press P on the farm to see it, and E beside it to ride.` };
+}
 /** Hollis's feed: into the farm's supplies at the supply shop's price (a Market purchase names its day, like Marigold's). */
 async function buyFeed(line, quantity) {
     if (!market)
@@ -523,6 +581,13 @@ const livestockPortraits = createAvatarThumbnails(THREE, {
         return species ? { assetUrl: livestockAssetUrl(species), poseClip: (gltf) => livestockClips(gltf, species).idle, height: 1.45, lookAtY: 0.7, yaw: species.modelYaw + (species.portraitTurn ?? 0), fitPosed: species.fitPosed } : undefined;
     },
 });
+// Hollis's horses are pets (FARM_RIDING_PLAN.md): their portraits come from the pets' bodies' asset and clips.
+const petPortraits = createAvatarThumbnails(THREE, {
+    resolve: (speciesId) => {
+        const species = findAnimal(speciesId);
+        return species ? { assetUrl: assetUrlFor(species), poseClip: (gltf) => petClips(THREE, gltf, species).idle, height: 1.45, lookAtY: 0.8, yaw: -0.6 } : undefined;
+    },
+});
 const dealerPanel = createLivestockDealerPanel({
     root: requiredElement("#dealerPanel"),
     closeButton: requiredElement("#closeDealer"),
@@ -532,10 +597,26 @@ const dealerPanel = createLivestockDealerPanel({
     name: requiredElement("#dealerName"),
 }, {
     buy: buyLivestock,
-    farm: () => ({ homes: livestockHomes(farm.decor), herd }),
+    farm: () => ({ homes: herdHomes(farm.decor, farm.pets), herd }),
     husbandryLevel: () => farmingLevelForXp(farm.skills.husbandry.xp),
     thumbnail: livestockPortraits.get,
     onClose: () => canvas.focus(),
+});
+// Hollis's paddock, under his young stock: today's three horses (FARM_RIDING_PLAN.md).
+const horsePaddock = createHorsePaddock({
+    list: requiredElement("#horseList"),
+    room: requiredElement("#horseRoom"),
+    status: requiredElement("#horseStatus"),
+    name: requiredElement("#dealerName"),
+}, {
+    room: () => ({
+        freeStalls: freeHorseStalls(farm.decor, farm.pets, herd).length,
+        stalls: livestockHomes(farm.decor).filter((home) => home.kind === "stall").length,
+        petRoom: MAX_PETS - farm.pets.length,
+    }),
+    ridingLevel: () => farmingLevelForXp(farm.skills.riding.xp),
+    buy: buyHorse,
+    thumbnail: petPortraits.get,
 });
 // Hollis's feed shelf, under his young stock: hay, pig feed, chicken feed, into the farm's supplies.
 const feedShelf = createVendorShelf({
@@ -811,6 +892,7 @@ function workStall(stall) {
         sawmill.open();
     else if (stall.id === LIVESTOCK_STALL_ID) {
         dealerPanel.open();
+        horsePaddock.render();
         feedShelf.render();
         if (!market)
             void loadMarketDay();
@@ -838,8 +920,32 @@ function workStall(stall) {
 function updateInteraction() {
     const pose = { x: player.x, z: player.z, y: body.y, yaw: player.yaw, forward: forwardOf(player.yaw) };
     const walking = entered && !leaving && !panelOpen() && body.mode === "walking";
-    doorInReach = walking ? nearestDoor(doors, pose, (entry) => canWorkDoor(pose, entry.door, entry.reach)) : null;
-    stallInReach = walking && !doorInReach ? findStallInReach(pose) : null;
+    const ride = away.state();
+    const reachFrom = ride ? riderReach(ride) : pose;
+    doorInReach = walking ? nearestDoor(doors, reachFrom, (entry) => canWorkDoor(reachFrom, entry.door, entry.reach)) : null;
+    // In the saddle: a gate, the hitching rail, and nothing else — tie up to walk the stalls.
+    if (away.mounted()) {
+        stallInReach = null;
+        seatInReach = null;
+        nearbyVisitor = null;
+        if (!entered || panelOpen() || leaving) {
+            if (!leaving)
+                setPrompt("");
+            return;
+        }
+        if (performance.now() < noticeUntil)
+            return;
+        if (doorInReach) {
+            const home = doorInReach.doorId === MARKET_HOME_GATE;
+            const cove = doorInReach.doorId === MARKET_COVE_GATE;
+            const downs = doorInReach.doorId === MARKET_DOWNS_GATE;
+            return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? " · ride home to the farm" : cove ? " · ride down to the Cove" : downs ? " · ride out to Windrush Downs" : ""));
+        }
+        const tie = away.action(pose);
+        return setPrompt(tie ? tie.prompt : getRidingPrompt(away.horseName(), "away"));
+    }
+    const untie = walking ? away.action(pose) : null;
+    stallInReach = walking && !doorInReach && !untie ? findStallInReach(pose) : null;
     seatInReach = walking && !doorInReach && !stallInReach ? findSeatInReach(seats, pose) : null;
     nearbyVisitor = walking && !doorInReach && !stallInReach && !seatInReach ? visitors.nearest(pose) : null;
     // A keeper calls out once as someone steps up to an open counter.
@@ -858,8 +964,11 @@ function updateInteraction() {
     if (doorInReach) {
         const home = doorInReach.doorId === MARKET_HOME_GATE;
         const cove = doorInReach.doorId === MARKET_COVE_GATE;
-        return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? " · the road back to the farm" : cove ? " · down to the Cove" : ""));
+        const downs = doorInReach.doorId === MARKET_DOWNS_GATE;
+        return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? " · the road back to the farm" : cove ? " · down to the Cove" : downs ? " · Windrush Downs, for riders only" : ""));
     }
+    if (untie)
+        return setPrompt(untie.prompt);
     if (stallInReach)
         return setPrompt(stallPrompt(stallInReach, canSell));
     if (seatInReach)
@@ -869,6 +978,26 @@ function updateInteraction() {
     setPrompt("");
 }
 function interact() {
+    if (away.mounted() && !doorInReach) {
+        const spot = away.act(player);
+        if (spot) {
+            player.x = spot.x;
+            player.z = spot.z;
+            keys.clear();
+            notice(`${away.horseName()} is tied up. Walk back to the rail and press E to ride again.`, 4);
+        }
+        return;
+    }
+    if (!away.mounted() && !doorInReach && away.action(player)?.kind === "mount") {
+        const spot = away.act(player);
+        if (spot) {
+            player.x = spot.x;
+            player.z = spot.z;
+            player.pitch = -0.32;
+            keys.clear();
+        }
+        return;
+    }
     if (body.mode === "seated") {
         const step = standUp(player, body);
         Object.assign(player, step.pose);
@@ -905,6 +1034,15 @@ function interact() {
 function updatePlayer(dt) {
     if (!entered || leaving || panelOpen())
         return;
+    if (away.mounted()) {
+        away.step(dt, keys);
+        const ride = away.state();
+        if (ride) {
+            player.x = ride.x;
+            player.z = ride.z;
+        }
+        return;
+    }
     const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms: [], ladders: [] });
     if (!step.moved)
         return;
@@ -920,14 +1058,22 @@ function checkGateway() {
     if (!gate)
         return;
     const toCove = gate.instanceId === MARKET_COVE_GATE;
+    const toDowns = gate.instanceId === MARKET_DOWNS_GATE;
+    // Windrush Downs is for riders: on foot, the gate stays a view of the gallops.
+    if (toDowns && !away.mounted()) {
+        notice(away.hasHorse() ? `Windrush Downs is for riders — ride ${away.horseName()} out through this gate.` : "Windrush Downs is for riders — come back on your horse (Hollis sells them).", 3);
+        player.x = Math.max(player.x, gate.x + 1.2);
+        return;
+    }
     leaving = true;
     keys.clear();
     document.exitPointerLock?.();
-    const words = toCove ? "Down the path to the Cove…" : "Back up the road to the farm…";
+    const horse = away.mounted() ? away.horseId() : "";
+    const words = toDowns ? "Out through the gate to Windrush Downs…" : toCove ? (horse ? "Riding down the path to the Cove…" : "Down the path to the Cove…") : (horse ? "Riding back up the road to the farm…" : "Back up the road to the farm…");
     setPrompt(words);
     status.textContent = words;
     presence.disconnect();
-    location.href = toCove ? coveUrl : homeUrl;
+    location.href = toDowns ? downsUrl(horse) : toCove ? `../cove/index.html?${horseTravelQuery(fromFarm, horse)}` : `../index.html?${horseTravelQuery(fromFarm, horse, "id")}`;
 }
 window.addEventListener("keydown", (event) => {
     if (panelOpen()) {
@@ -1061,6 +1207,8 @@ function frame(now) {
     world.update(frameSeconds);
     keepers.update(frameSeconds, now, keeperMembers);
     visitors.update(frameSeconds, now, presence.members());
+    riderClock += frameSeconds;
+    away.draw(frameSeconds, riderClock, visitors.placements());
     chatView.tick();
     applyCamera();
     resize();
@@ -1070,6 +1218,8 @@ function frame(now) {
 // Read-only handle for headless verification. Nothing in the page uses it.
 globalThis.__market = Object.freeze({
     pose: () => ({ ...player, y: body.y }),
+    mounted: () => away.mounted(),
+    ride: () => away.state(),
     stallInReach: () => stallInReach?.id ?? "",
     doorInReach: () => doorInReach?.doorId ?? "",
     openDoors: () => [...openDoors],

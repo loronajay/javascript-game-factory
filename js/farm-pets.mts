@@ -42,7 +42,10 @@ import type { FloorObstacle, RoomBounds } from "./arcade-room-layout.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 import { WATER_LEVEL, groundHeightAt, insidePondWater, pondAt, type PondRegion } from "./farm-pond.mjs";
 
-export type PetState = "idle" | "wander" | "called" | "attention" | "carried";
+export type PetState = "idle" | "wander" | "called" | "attention" | "carried" | "ridden";
+
+/** Where the rider has a ridden horse this tick (FARM_RIDING_PLAN.md): the ride sim decides, the pet sim only carries it. */
+export type RiddenPose = Readonly<{ x: number; z: number; yaw: number; y: number; gait: NonNullable<PetBody["gait"]>; gaitRate: number }>;
 
 export type PetBody = Readonly<{
   instanceId: string;
@@ -65,6 +68,9 @@ export type PetBody = Readonly<{
   moving: boolean;
   /** This individual's walk relative to its species (Speed and its movement traits, `petPace`); the walk clip plays at it too. */
   pace: number;
+  /** A ridden horse's gait, which picks its clip over `moving` (FARM_RIDING_PLAN.md), and the rate that clip plays at. */
+  gait?: "idle" | "walk" | "trot" | "run" | "jump";
+  gaitRate?: number;
 }>;
 
 type Pet = {
@@ -90,6 +96,9 @@ type Pet = {
   targetZ: number;
   /** Bob phase for air species. */
   phase: number;
+  /** A ridden horse's gait and clip rate, from the ride sim. */
+  gait?: PetBody["gait"];
+  gaitRate?: number;
   /** A swimmer's height in the water (its feet), and the height it is gliding to; unused on land. */
   swimY: number;
   targetY: number;
@@ -125,6 +134,14 @@ export type PetSim = Readonly<{
   canStand: (speciesId: string, spot: Readonly<{ x: number; z: number }>, sizeMultiplier?: number) => boolean;
   /** The pet in the player's arms, if any. */
   carried: () => PetBody | null;
+  /** Mount a ridable pet (the horse): it stops its own life and goes where the ride sim puts it. False for any other pet. */
+  mount: (instanceId: string) => boolean;
+  /** This tick's pose for the ridden horse. */
+  ride: (instanceId: string, pose: RiddenPose) => void;
+  /** Get off: the horse stands where it is and takes up its own life again. */
+  dismount: (instanceId: string) => boolean;
+  /** The ridden horse, if any. */
+  ridden: () => PetBody | null;
   find: (instanceId: string) => PetBody | null;
 }>;
 
@@ -404,6 +421,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
   function tickPet(pet: Pet, dt: number, player: Readonly<{ x: number; z: number; yaw?: number; y?: number }>): void {
     pet.moving = false;
     const { species } = pet;
+    if (pet.state === "ridden") return;
     if (pet.state === "carried") {
       const pose = carryPose(player);
       pet.x = pose.x;
@@ -482,6 +500,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
       state: pet.state,
       moving: pet.moving,
       pace: pet.pace,
+      ...(pet.state === "ridden" && pet.gait ? { gait: pet.gait, gaitRate: pet.gaitRate ?? 1 } : {}),
     };
   }
 
@@ -555,7 +574,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     },
     pickUp(instanceId) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-      if (!pet || pet.state === "carried") return false;
+      if (!pet || pet.state === "carried" || pet.state === "ridden" || pet.species.ridable) return false;
       pet.state = "carried";
       pet.moving = false;
       pet.timer = 0;
@@ -587,6 +606,42 @@ export function createPetSim(options: PetSimOptions): PetSim {
       const pet = pets.find((candidate) => candidate.state === "carried");
       return pet ? view(pet) : null;
     },
+    mount(instanceId) {
+      const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+      if (!pet || !pet.species.ridable || pet.state === "carried" || pet.state === "ridden") return false;
+      pet.state = "ridden";
+      pet.moving = false;
+      pet.timer = 0;
+      pet.gait = "idle";
+      pet.gaitRate = 1;
+      return true;
+    },
+    ride(instanceId, pose) {
+      const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+      if (!pet || pet.state !== "ridden") return;
+      pet.x = pose.x;
+      pet.z = pose.z;
+      pet.yaw = pose.yaw;
+      pet.hover = pose.y;
+      pet.gait = pose.gait;
+      pet.gaitRate = pose.gaitRate;
+      pet.moving = pose.gait !== "idle";
+    },
+    dismount(instanceId) {
+      const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+      if (!pet || pet.state !== "ridden") return false;
+      pet.targetX = pet.x;
+      pet.targetZ = pet.z;
+      pet.hover = 0;
+      pet.gait = undefined;
+      pet.gaitRate = undefined;
+      startIdle(pet);
+      return true;
+    },
+    ridden() {
+      const pet = pets.find((candidate) => candidate.state === "ridden");
+      return pet ? view(pet) : null;
+    },
     attention(instanceId) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
       if (!pet) return false;
@@ -597,7 +652,7 @@ export function createPetSim(options: PetSimOptions): PetSim {
     },
     call(instanceId, player) {
       const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-      if (!pet || pet.state === "carried") return false;
+      if (!pet || pet.state === "carried" || pet.state === "ridden") return false;
       pet.state = "called";
       pet.targetX = player.x;
       pet.targetZ = player.z;

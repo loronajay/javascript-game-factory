@@ -29,7 +29,7 @@ import { findPetInReach } from "./farm-interaction.mjs";
 import type { PetBodyView } from "./farm-pet-bodies.mjs";
 import { createLivestockBodies, livestockPaletteId } from "./farm-livestock-bodies.mjs";
 import { createHerdSim, type HerdEntry } from "./farm-livestock-sim.mjs";
-import { livestockHomes, type LivestockHome } from "./farm-livestock-housing.mjs";
+import { herdHomes, type LivestockHome } from "./farm-livestock-housing.mjs";
 import { gradeStars, livestockSize, livestockSummary, normalizeLivestockAnimal, normalizeLivestockHerd, type LivestockAnimal } from "./farm-livestock.mjs";
 import { advanceLivestockCare, goodsState, livestockDueToDie, livestockNeed, wantsFood } from "./farm-livestock-care.mjs";
 import { findLivestockSpecies, findLivestockGood, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
@@ -105,7 +105,7 @@ export function createFarmLivestockController(options: Readonly<{
   onAchievements?: (achievements: readonly unknown[]) => void;
 }>): LivestockController {
   let herd: readonly LivestockAnimal[] = [];
-  let homes: readonly LivestockHome[] = livestockHomes(options.layout().decor);
+  let homes: readonly LivestockHome[] = herdHomes(options.layout().decor, options.layout().pets);
   let nearby: PetBodyView | null = null;
   let growthTimer = 0;
   let caring = false;
@@ -247,7 +247,7 @@ export function createFarmLivestockController(options: Readonly<{
       if (Array.isArray(answer)) apply(normalizeLivestockHerd(answer));
     },
     sync() {
-      homes = livestockHomes(options.layout().decor);
+      homes = herdHomes(options.layout().decor, options.layout().pets);
       askedBirth.clear();
       sim.sync(entries());
       render();

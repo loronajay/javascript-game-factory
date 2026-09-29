@@ -38,6 +38,14 @@ export const MARKET_COVE_GATE = "market-gate-cove";
 export const COVE_GATE_X = 3.7;
 /** Just inside the north gate, back up from the Cove, looking south into the square. */
 export const MARKET_COVE_SPAWN = Object.freeze({ x: COVE_GATE_X, z: -(MARKET_BOUNDS.depth / 2 - 2.2), yaw: Math.PI });
+/** The gate in the west wall, out to Windrush Downs (FARM_RIDING_PLAN.md): only a rider may pass it. */
+export const MARKET_DOWNS_GATE = "market-gate-downs";
+/** Where the Downs gate stands along the west wall: between the oak and the west stall. */
+export const DOWNS_GATE_Z = -2.4;
+/** Just inside the west gate, back from the Downs, looking east into the square. */
+export const MARKET_DOWNS_SPAWN = Object.freeze({ x: -(MARKET_BOUNDS.width / 2 - 2.6), z: DOWNS_GATE_Z, yaw: -Math.PI / 2 });
+/** The hitching rails: a rider ties up here to walk the square (farm-riding-away.mts). */
+export const MARKET_RAIL_IDS = Object.freeze(["market-rail-home", "market-rail-cove", "market-rail-downs"]);
 // The stone wall is 0.5 deep; its outer face sits on the inset line like the farm's fence.
 const WALL = MARKET_BOUNDS.width / 2 - MARKET_BOUNDS.wallInset - 0.25;
 const GATE_WIDTH = 2.4;
@@ -45,6 +53,9 @@ const SOUTH_RUN = WALL - GATE_WIDTH / 2 + 0.25;
 // The north wall runs either side of the Cove gate.
 const NORTH_WEST_RUN = WALL + 0.25 + (COVE_GATE_X - GATE_WIDTH / 2);
 const NORTH_EAST_RUN = WALL + 0.25 - (COVE_GATE_X + GATE_WIDTH / 2);
+// The west wall runs either side of the Downs gate.
+const WEST_NORTH_RUN = WALL + 0.25 + (DOWNS_GATE_Z - GATE_WIDTH / 2);
+const WEST_SOUTH_RUN = WALL + 0.25 - (DOWNS_GATE_Z + GATE_WIDTH / 2);
 const QUARTER = Math.PI / 2;
 const row = (instanceId, itemId, x, z, rotationY = 0, length = 0) => Object.freeze({ instanceId, itemId, x, z, rotationY, length });
 /** Everything in the square the farm's catalog already draws. */
@@ -54,12 +65,19 @@ export const MARKET_DECOR = Object.freeze([
     row("market-wall-ne", "decor.fence.stone-wall", WALL + 0.25 - NORTH_EAST_RUN / 2, -WALL, 0, NORTH_EAST_RUN),
     row(MARKET_COVE_GATE, "decor.fence.gate", COVE_GATE_X, -WALL, 0),
     row("market-signpost-cove", "decor.prop.signpost", COVE_GATE_X - 1.9, -WALL + 1.1, Math.PI),
-    row("market-wall-w", "decor.fence.stone-wall", -WALL, 0, QUARTER, WALL * 2 + 0.5),
+    row("market-wall-wn", "decor.fence.stone-wall", -WALL, -(WALL + 0.25) + WEST_NORTH_RUN / 2, QUARTER, WEST_NORTH_RUN),
+    row("market-wall-ws", "decor.fence.stone-wall", -WALL, WALL + 0.25 - WEST_SOUTH_RUN / 2, QUARTER, WEST_SOUTH_RUN),
+    row(MARKET_DOWNS_GATE, "decor.fence.gate", -WALL, DOWNS_GATE_Z, QUARTER),
+    row("market-signpost-downs", "decor.prop.signpost", -WALL + 1.1, DOWNS_GATE_Z - 1.9, -QUARTER),
     row("market-wall-e", "decor.fence.stone-wall", WALL, 0, QUARTER, WALL * 2 + 0.5),
     row("market-wall-sw", "decor.fence.stone-wall", -(GATE_WIDTH / 2 + SOUTH_RUN / 2), WALL, 0, SOUTH_RUN),
     row("market-wall-se", "decor.fence.stone-wall", GATE_WIDTH / 2 + SOUTH_RUN / 2, WALL, 0, SOUTH_RUN),
     row(MARKET_HOME_GATE, "decor.fence.gate", 0, WALL, 0),
     row("market-signpost", "decor.prop.signpost", 2.1, WALL - 1.1, 0),
+    // Hitching rails by each gate: tie a horse up here to walk the square.
+    row("market-rail-home", "decor.prop.hitching-rail", -3.8, WALL - 3.2, 0),
+    row("market-rail-cove", "decor.prop.hitching-rail", -1.2, -WALL + 1.2, 0),
+    row("market-rail-downs", "decor.prop.hitching-rail", -8.4, -5.6, 0),
     // The middle of the square: the well, benches facing it, lamps at the corners.
     row("market-well", "decor.prop.well", 0, 0),
     row("market-bench-n", "decor.prop.bench", 0, -2.6, Math.PI),

@@ -6,6 +6,14 @@
 // THREE is injected (only `AnimationUtils.subclip` is used), so the cut is
 // testable under node with a stub.
 import { ANIMAL_CLIP_FPS } from "./farm-catalog/animals.mjs";
+/** A named-clip model's clips by state (the horse: its walk, trot, gallop and jump). A missing clip is null. */
+export function namedAnimalClips(gltf, names) {
+    const named = (name) => (name ? gltf.animations?.find((clip) => clip?.name === name) ?? null : null);
+    return Object.freeze({
+        idle: named(names.idle), walk: named(names.walk), attack: named(names.attack), dead: named(names.dead),
+        trot: named(names.trot), run: named(names.run), jump: named(names.jump),
+    });
+}
 export const ANIMAL_CLIP_NAMES = Object.freeze(["idle", "attack", "dead", "walk"]);
 /** Cut the pack's single track into the four named clips. A missing track gives four nulls, not a throw. */
 export function splitAnimalClips(THREE, track, table, fps = ANIMAL_CLIP_FPS) {

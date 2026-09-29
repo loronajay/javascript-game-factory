@@ -11,6 +11,13 @@
 // THE PACK SHIPS ONE 120-FRAME TRACK, NOT NAMED CLIPS. `clips` is the frame
 // table `farm-animal-clips.mts` subclips it by, so the rest of the code can say
 // "walk" the way the room's avatars do.
+//
+// THE HORSE IS THE ONE PET FROM ANOTHER PACK (planning-docs/FARM_RIDING_PLAN.md).
+// It is the Quaternius horse in `farm/assets/yield-animals/`, so its row says
+// so in `model`: the folder, the pack's clip NAMES (walk, trot, gallop, jump —
+// riding plays all four) and, on each palette, which of the model's two flat
+// materials is painted which colour. It is sold by Hollis the Livestock Dealer
+// (`soldBy: "dealer"`), never adopted from the Pets panel, and it can be ridden.
 export const ANIMAL_HABITATS = Object.freeze(["ground", "water", "air"]);
 export const ANIMAL_CLIP_FPS = 24;
 /** The pack's shared frame table: every file uses the same four ranges. */
@@ -20,6 +27,7 @@ export const GOBKIT_CLIPS = Object.freeze({
     dead: Object.freeze({ from: 60, to: 89 }),
     walk: Object.freeze({ from: 90, to: 119 }),
 });
+const GOBKIT_MODEL = Object.freeze({ kind: "gobkit" });
 function animal(id, spec) {
     return Object.freeze({
         id: `pet.${id}`,
@@ -34,6 +42,10 @@ function animal(id, spec) {
         palettes: Object.freeze(spec.palettes.map((palette) => Object.freeze({ ...palette }))),
         clips: GOBKIT_CLIPS,
         needs: spec.habitat === "water" ? "Needs a pond" : "",
+        model: spec.model ?? GOBKIT_MODEL,
+        soldBy: spec.soldBy ?? "adoption",
+        ridable: spec.ridable ?? false,
+        petGames: !spec.ridable,
     });
 }
 const palette = (spec, tier, weight, statBoost, finish) => {
@@ -46,6 +58,21 @@ const petPalettes = (uncommon, rare, superRare) => Object.freeze([
     palette(rare, "rare", 6, 0.08),
     palette(superRare, "super-rare", 1, 0.15, "pearl"),
 ]);
+/** The Quaternius horse's two flat materials: the coat, and the mane, tail and hooves. */
+export const HORSE_COAT_MATERIAL = "Material.003";
+export const HORSE_MANE_MATERIAL = "Material.006";
+const coat = ([id, title, body, mane], tier, weight, statBoost, finish) => Object.freeze({ id, title, tier, weight, statBoost, tint: body, materials: Object.freeze({ [HORSE_COAT_MATERIAL]: body, [HORSE_MANE_MATERIAL]: mane }), ...(finish ? { finish } : {}) });
+/** Bay is the model as shipped; the rest repaint its coat and mane. Out of 100, like every pet's table. */
+export const HORSE_PALETTES = Object.freeze([
+    Object.freeze({ id: "standard", title: "Bay", tier: "classic", weight: 51, statBoost: 0, tint: "#ffffff" }),
+    coat(["chestnut", "Chestnut", "#8a4521", "#5e2c14"], "uncommon", 14, 0),
+    coat(["grey", "Grey", "#9c9a96", "#e2e0dc"], "uncommon", 14, 0),
+    coat(["black", "Black", "#1e1c1b", "#0c0b0b"], "uncommon", 14, 0),
+    coat(["palomino", "Palomino", "#d3a458", "#f4ead0"], "rare", 6, 0.08),
+    coat(["starlight", "Starlight", "#e9e6ff", "#8ea6ff"], "super-rare", 1, 0.15, "pearl"),
+]);
+/** The pack's clip names; the horse's walk is the slow one and its trot the brisk one. */
+export const HORSE_CLIPS = Object.freeze({ idle: "Idle", walk: "WalkSlow", attack: "Jump", dead: "Death", trot: "Walk", run: "Run", jump: "Jump" });
 export const ANIMAL_CATALOG = Object.freeze([
     animal("corgi", { title: "Corgi", file: "corgi.glb", habitat: "ground", height: 0.6, radius: 0.45, walkSpeed: 1.5, turnRate: 3.2, palettes: petPalettes([["sable", "Sable", ["#b96f32", "#7b4c32", "#dca45f"]], ["cream", "Cream", ["#d8b47a", "#f0d9ad", "#a96f43"]], ["tricolor", "Tricolor", ["#352a25", "#eadbc4", "#b76536"]]], ["midnight", "Midnight", ["#24345f", "#4e63a6", "#d08a4f"]], ["cosmic", "Cosmic", ["#8a2be2", "#22d3ee", "#f6c453"]]) }),
     animal("duck", { title: "Duck", file: "duck.glb", habitat: "ground", height: 0.5, radius: 0.35, walkSpeed: 0.9, turnRate: 3.4, palettes: petPalettes([["mallard", "Mallard", ["#37694e", "#4c8172", "#d6a94f"]], ["pekin", "Pekin", ["#e7d9aa", "#fff1c4", "#e49a39"]], ["bluewing", "Bluewing", ["#52788d", "#7fa6b8", "#d3a24b"]]], ["lavender", "Lavender", ["#9367cf", "#b18ae3", "#f2a55f"]], ["prism", "Prism", ["#e553ff", "#5ee7f2", "#ffdd57"]]) }),
@@ -57,6 +84,8 @@ export const ANIMAL_CATALOG = Object.freeze([
     animal("shark", { title: "Shark", file: "shark.glb", habitat: "water", height: 1.2, radius: 0.8, walkSpeed: 1.4, turnRate: 1.8, hoverHeight: -0.45, palettes: petPalettes([["tiger", "Tiger", ["#9f7b31", "#c8a950", "#5b4c32"]], ["blue", "Blue", ["#365e78", "#5d89a1", "#a9bec8"]], ["reef", "Reef", ["#39766f", "#63a096", "#d0b06a"]]], ["albino", "Albino", ["#d894a2", "#f0c5cd", "#fff0e8"]], ["voidfin", "Voidfin", ["#172d6b", "#18c6d9", "#9b5de5"]]) }),
     animal("anglerfish", { title: "Anglerfish", file: "anglerfish.glb", habitat: "water", height: 0.6, radius: 0.4, walkSpeed: 0.7, hoverHeight: -0.3, palettes: petPalettes([["ember", "Ember", ["#a7432f", "#d5693f", "#efac55"]], ["scarlet", "Scarlet", ["#792d39", "#b7464c", "#e58a65"]], ["deepsea", "Deep Sea", ["#254b5a", "#397486", "#79a699"]]], ["abyss", "Abyss", ["#302052", "#594083", "#2ac5b5"]], ["biolume", "Biolume", ["#0f7c78", "#28e66f", "#e8ff63"]]) }),
     animal("jellyfish", { title: "Jellyfish", file: "jellyfish.glb", habitat: "water", height: 0.6, radius: 0.4, walkSpeed: 0.4, turnRate: 1.5, hoverHeight: -0.2, palettes: petPalettes([["sunset", "Sunset", ["#cb668f", "#ea95ad", "#f0b272"]], ["lagoon", "Lagoon", ["#3a9299", "#68bdba", "#aad8c3"]], ["peach", "Peach", ["#d98979", "#efa99a", "#f6cfaa"]]], ["aurora", "Aurora", ["#2ebda9", "#527cdb", "#ce62d7"]], ["starborn", "Starborn", ["#5336d6", "#26e0d0", "#ff59c7"]]) }),
+    animal("horse", { title: "Horse", file: "horse.glb", habitat: "ground", height: 1.65, radius: 0.95, walkSpeed: 1.2, turnRate: 1.6, palettes: HORSE_PALETTES,
+        model: Object.freeze({ kind: "named", folder: "yield-animals", clips: HORSE_CLIPS, modelYaw: 0 }), soldBy: "dealer", ridable: true }),
 ]);
 export function findAnimal(id) {
     return typeof id === "string" ? ANIMAL_CATALOG.find((entry) => entry.id === id) : undefined;
@@ -76,7 +105,11 @@ export function pickAnimalPalette(speciesId, random) {
 export function allAnimalIds() {
     return ANIMAL_CATALOG.map((entry) => entry.id);
 }
-/** The species the picker offers given what the farm has. Ground and air always; water once there is a pond. */
+/** The species the Pets panel offers given what the farm has. Ground and air always; water once there is a pond. Never the Dealer's horse. */
 export function adoptableAnimals(habitats) {
-    return ANIMAL_CATALOG.filter((entry) => entry.habitat !== "water" || habitats.water);
+    return ANIMAL_CATALOG.filter((entry) => entry.soldBy === "adoption" && (entry.habitat !== "water" || habitats.water));
+}
+/** True for a species that can be mounted and ridden. */
+export function isRidable(speciesId) {
+    return findAnimal(speciesId)?.ridable === true;
 }

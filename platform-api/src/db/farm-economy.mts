@@ -1,6 +1,6 @@
 import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
-import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply } from "../services/farm-economy-catalog.mjs";
+import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply, isAdoptableFarmSpecies } from "../services/farm-economy-catalog.mjs";
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
 import { farmMarketDay, farmMarketProducePrice, farmMarketSeedPrice } from "../services/farm-market-day.mjs";
@@ -86,7 +86,7 @@ export async function saveFarm(client: any, playerId: string, layout: any): Prom
   );
 }
 
-function nextPetId(layout: any, speciesId: string): string {
+export function nextPetId(layout: any, speciesId: string): string {
   const stem = speciesId.replace(/^pet\./, "");
   let highest = 0;
   for (const row of [...(layout.pets ?? []), ...(layout.petHistory ?? [])]) {
@@ -101,7 +101,8 @@ export async function adoptFarmPet(pool: any, input: any, random: () => number =
   const purchaseId = required(input?.purchaseId, "purchaseId");
   if (!PURCHASE_ID.test(purchaseId)) throw new TypeError("invalid purchaseId");
   const species = findFarmSpecies(input?.speciesId);
-  if (!species) return { ok: false, error: "unknown_species" };
+  // The horse is Hollis's to sell (db/farm-horses.mts), never the Pets panel's.
+  if (!species || !isAdoptableFarmSpecies(species.id)) return { ok: false, error: "unknown_species" };
   const transactionKey = `farm:adoption:${purchaseId}`;
   return transaction(pool, async (client) => {
     const farm = await lockedFarm(client, playerId);

@@ -147,17 +147,35 @@ export function normalizeHusbandryRecord(value) {
         butchered: count(source.butchered), meat: counts(source.meat, LIVESTOCK_MEAT_IDS), births: count(source.births),
     };
 }
+export function emptyRidingRecord() {
+    return { xp: 0, runs: 0, races: 0, wins: 0, horses: 0, today: { day: 0, runs: {} } };
+}
+const RIDING_COURSE_ID = /^[a-z0-9-]{1,32}$/;
+export function normalizeRidingRecord(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const today = source.today && typeof source.today === "object" ? source.today : {};
+    const runs = {};
+    for (const [id, raw] of Object.entries(today.runs && typeof today.runs === "object" ? today.runs : {})) {
+        const n = count(raw);
+        if (RIDING_COURSE_ID.test(id) && n > 0)
+            runs[id] = n;
+    }
+    return {
+        xp: count(source.xp, FARMING_MAX_XP), runs: count(source.runs), races: count(source.races), wins: count(source.wins), horses: count(source.horses),
+        today: { day: count(today.day), runs },
+    };
+}
 /** Every server-owned skill record, shape-bounded. */
 export function normalizeFarmSkillRecords(value) {
     const source = value && typeof value === "object" ? value : {};
     return {
         farming: normalizeFarmingRecord(source.farming), woodcutting: normalizeWoodcuttingRecord(source.woodcutting),
         cooking: normalizeCookingRecord(source.cooking), carpentry: normalizeCarpentryRecord(source.carpentry), bartering: normalizeBarteringRecord(source.bartering),
-        husbandry: normalizeHusbandryRecord(source.husbandry),
+        husbandry: normalizeHusbandryRecord(source.husbandry), riding: normalizeRidingRecord(source.riding),
     };
 }
 export function emptyFarmSkillRecords() {
-    return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord(), bartering: emptyBarteringRecord(), husbandry: emptyHusbandryRecord() };
+    return { farming: emptyFarmingRecord(), woodcutting: emptyWoodcuttingRecord(), cooking: emptyCookingRecord(), carpentry: emptyCarpentryRecord(), bartering: emptyBarteringRecord(), husbandry: emptyHusbandryRecord(), riding: emptyRidingRecord() };
 }
 /** One completed NPC deal. Player-to-player trades never feed this record. */
 export function recordFarmBarter(record, side, baseTickets, actualTickets) {

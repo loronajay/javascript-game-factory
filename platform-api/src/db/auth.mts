@@ -237,6 +237,8 @@ const PLAYER_SCOPED_DELETES: ReadonlyArray<readonly [string, readonly string[]]>
   ["farm_fish", ["player_id"]],
   // Livestock: every animal the player bought or bred, alive or gone.
   ["farm_livestock", ["player_id"]],
+  // Windrush Downs: what races took from and paid to the player (the daily limits' ledger).
+  ["farm_race_ledger", ["player_id"]],
 ]);
 
 /**

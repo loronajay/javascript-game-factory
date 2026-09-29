@@ -11,6 +11,7 @@
 // layout change because they are few and carry live inputs.
 
 import { adoptableAnimals, findAnimal, findAnimalPalette, type AnimalDefinition } from "./farm-catalog/animals.mjs";
+import { HORSE_STAT_BLURBS, horseStats } from "./farm-horse-riding.mjs";
 import { animalPaletteDisplayName } from "./farm-pet-palettes.mjs";
 import { MAX_PETS, PET_NAME_MAX_LENGTH, farmHabitats, type FarmLayout } from "./farm-layout.mjs";
 import { findPetCare, findPetTrait, petGrowthView, visiblePetStats } from "./farm-pet-care.mjs";
@@ -121,6 +122,8 @@ export function createPetsPanel(elements: PetsPanelElements, actions: PetsPanelA
       const palette = findAnimalPalette(pet.speciesId, profile?.paletteId);
       const stats = profile ? visiblePetStats(profile) : null;
       const growth = profile ? petGrowthView(profile, pet.speciesId) : null;
+      // A horse (FARM_RIDING_PLAN.md) also shows the two riding stats; its Speed and Strength include any training.
+      const riding = profile?.riding ? horseStats(profile) : null;
       const needs = profile ? petNeedStatus(profile) : null;
       const warning = profile ? petOutcomeWarning(profile, pet.speciesId) : null;
       const statMarkup = stats ? `<dl class="pet-row__stats">
@@ -129,8 +132,9 @@ export function createPetsPanel(elements: PetsPanelElements, actions: PetsPanelA
         <div><dt>Size</dt><dd>${Number(stats.size).toFixed(2)}×</dd></div>
         <div class="pet-row__need pet-row__need--${needs?.level ?? "content"}"><dt>Hunger</dt><dd>${stats.hunger}% · ${needs?.label ?? "Unknown"}</dd></div>
         <div><dt>Happiness</dt><dd>${stats.happiness}%</dd></div>
-        <div><dt>Speed</dt><dd>${stats.speed}${gainedMarkup(growth?.gained.speed)}</dd></div>
-        <div><dt>Strength</dt><dd>${stats.strength}${gainedMarkup(growth?.gained.strength)}</dd></div>
+        <div><dt>Speed</dt><dd>${riding?.speed ?? stats.speed}${gainedMarkup(growth?.gained.speed)}</dd></div>
+        <div><dt>Strength</dt><dd>${riding?.strength ?? stats.strength}${gainedMarkup(growth?.gained.strength)}</dd></div>
+        ${riding ? `<div title="${escapeHtml(HORSE_STAT_BLURBS.stamina)}"><dt>Stamina</dt><dd>${riding.stamina}</dd></div><div title="${escapeHtml(HORSE_STAT_BLURBS.agility)}"><dt>Agility</dt><dd>${riding.agility}</dd></div>` : ""}
         ${growth ? `<div class="pet-row__growth pet-row__growth--${growth.outlook.level}"><dt>Growth</dt><dd title="Speed and Strength grow every day until old age. Potential is rolled at adoption (rarer looks roll higher more often); food, happiness, trust and treating it the way its traits like decide how much of it is reached."><span class="pet-row__potential" aria-label="${growth.stars} of 4 stars">${"★".repeat(growth.stars)}<span class="pet-row__potential-empty">${"★".repeat(4 - growth.stars)}</span></span> ${escapeHtml(growth.gradeTitle)} potential · ${escapeHtml(growth.stageTitle)} · ${escapeHtml(growth.outlook.label)}</dd></div>` : ""}
       </dl>` : `<p class="pet-row__unscoped">This pet's profile could not be loaded.</p>`;
       const care = petCareSummary(pet.speciesId, layout!.decor, layout!.agriculture.inventory.supplies);

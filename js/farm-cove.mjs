@@ -203,6 +203,8 @@ export const SHADOW_WATERS = Object.freeze({
 export const COVE_SPAWN = Object.freeze({ x: 0, z: HALF - 2.2, yaw: 0 });
 /** The gate in the south wall, back up the road to the Market Square. */
 export const COVE_MARKET_GATE = "cove-gate-market";
+/** The hitching rail inside the gate: a rider ties up here to walk the shore and fish (FARM_RIDING_PLAN.md). */
+export const COVE_RAIL_ID = "cove-rail";
 const WALL = HALF - COVE_BOUNDS.wallInset - 0.25;
 const GATE_WIDTH = 2.4;
 const SOUTH_RUN = WALL - GATE_WIDTH / 2 + 0.25;
@@ -219,6 +221,7 @@ export const COVE_DECOR = Object.freeze([
     row("cove-wall-e", "decor.fence.stone-wall", WALL, SHORE_Z + SIDE_RUN / 2, QUARTER, SIDE_RUN),
     row("cove-signpost", "decor.prop.signpost", 2.1, WALL - 1.1, 0),
     row("cove-lamp-gate-w", "decor.prop.lamp-post", -1.8, WALL - 1.1),
+    row(COVE_RAIL_ID, "decor.prop.hitching-rail", -4.4, WALL - 3.2, 0),
     // The campfire between the shops, benches round it, for sitting and talking.
     row("cove-campfire", "decor.prop.campfire", 0, 11.4),
     row("cove-bench-w", "decor.prop.bench", -2.5, 11.4, QUARTER),

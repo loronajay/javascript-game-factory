@@ -34,9 +34,10 @@ test("the player stats view includes every farm skill and its lifetime records",
     carpentry: { xp: 500, milled: 7, pieces: 3, masterwork: 1, patterns: { "decor.furniture.crate": 3 } },
     bartering: { xp: 750, deals: 8, bought: 200, sold: 500, saved: 14, bonus: 26 },
     husbandry: { xp: 400, collections: 6, orders: 1, goods: { "milk-sheep": 5, wool: 3 }, butchered: 2, meat: { pork: 9 } },
+    riding: { xp: 0, runs: 0, races: 0, wins: 0, horses: 0, today: { day: 0, runs: {} } },
   }, { fishing: { xp: 250, catches: 4, dex: { "fish.koi": { caught: 3, bestG: 4000 }, "fish.tetra": { caught: 1, bestG: 40 } } } });
 
-  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry", "Fishing", "Husbandry", "Bartering"]);
+  assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry", "Fishing", "Husbandry", "Riding", "Bartering"]);
   assert.equal(view.totalXp, 4_900);
   assert.equal(view.totalLevel, view.skills.reduce((total, skill) => total + skill.level, 0));
   assert.deepEqual(view.skills[0].stats, [
@@ -57,7 +58,8 @@ test("the player stats view includes every farm skill and its lifetime records",
   assert.deepEqual(view.skills[4].stats, [{ label: "Fish landed", value: 4 }, { label: "Species caught", value: 2 }]);
   assert.deepEqual(view.skills[5].stats, [{ label: "Collections", value: 6 }, { label: "Goods collected", value: 8 }, { label: "Herd orders filled", value: 1 }, { label: "Sent to the Butcher", value: 2 }]);
   assert.deepEqual(view.skills[5].breakdown, [{ label: "Sheep's Milk", value: 5 }, { label: "Wool", value: 3 }, { label: "Pork", value: 9 }]);
-  assert.deepEqual(view.skills[6].stats, [{ label: "Deals made", value: 8 }, { label: "Tickets spent", value: 200 }, { label: "Tickets earned", value: 500 }, { label: "Tickets saved", value: 14 }, { label: "Bonus earned", value: 26 }]);
+  assert.deepEqual(view.skills[6].stats, [{ label: "Course runs", value: 0 }, { label: "Races run", value: 0 }, { label: "Races won", value: 0 }, { label: "Horses bought", value: 0 }]);
+  assert.deepEqual(view.skills[7].stats, [{ label: "Deals made", value: 8 }, { label: "Tickets spent", value: 200 }, { label: "Tickets earned", value: 500 }, { label: "Tickets saved", value: 14 }, { label: "Bonus earned", value: 26 }]);
   assert.deepEqual(view.skills[0].breakdown.map((line) => line.label), ["Bean", "Carrot", "Apple Tree"]);
   assert.deepEqual(view.skills[2].breakdown, [{ label: "Farm Stew", value: 5 }]);
   assert.deepEqual(view.skills[3].breakdown, [{ label: "Wooden Crate", value: 3 }]);
@@ -242,7 +244,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /return kitchen\.cooking\(\) \|\| workshop\.crafting\(\);/, "a dish on the stove and a piece on the bench both hold the player");
   assert.match(source, /return kitchenPanel\.isOpen\(\) \|\| workshop\.panelOpen\(\);/, "the cookbook, the pattern book and the Sawmill counter are all station panels");
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
-  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay \}\)/);
+  assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay, ridable \}\)/);
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
   assert.match(source, /function interactWithPet\(action: PetInteractionId\)/);
   assert.match(source, /const checkpoint = advancePetNeeds\(layout, clockMinutes\)/, "handling checkpoints elapsed care before changing a profile");
@@ -284,7 +286,7 @@ test("every building's door is worked with E, at its own reach, and the door is 
   assert.match(source, /if \(event\.code === "KeyX" && !event\.repeat && farmEntered && crops\.inReach\(\)\) \{\s*if \(crops\.clear\(\)\) event\.preventDefault\(\);\s*return;/, "X clears only the targeted planting cell");
   // Doors are per building AND per door fixture, found from the layout with the catalog's reach — the nearest in reach wins, so a
   // stall door beside the stable's own is the one E works — and a building that leaves takes its open doors with it.
-  assert.match(source, /nearestDoor\(doorRows\(layout\), pose, \(entry\) => canWorkDoor\(pose, entry\.door, entry\.reach\)\)/);
+  assert.match(source, /nearestDoor\(doorRows\(layout\), reachFrom, \(entry\) => canWorkDoor\(reachFrom, entry\.door, entry\.reach\)\)/);
   assert.match(source, /getDoorPrompt\(openDoors\.has\(doorInReach\.doorId\), doorInReach\)/, "the prompt names the door, keyed by door id");
   assert.doesNotMatch(source, /barnDoor|BARN/, "the page knows buildings, not the barn");
   assert.match(source, /if \(!world\.doorsFor\(doorId\)\) openDoors\.delete\(doorId\)/);

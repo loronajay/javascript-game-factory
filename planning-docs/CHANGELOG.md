@@ -1,5 +1,35 @@
 # Changelog
 
+## The horse, the Riding skill and Windrush Downs (2026-09-29)
+
+Phase 7 of `FARM_LIVESTOCK_PLAN.md`, scoped and built as `planning-docs/FARM_RIDING_PLAN.md` (its "As built" section has the module map and the defaults taken).
+
+**The horse** is a pet (`pet.horse`, the Quaternius model) bought from **Hollis** at the Livestock Dealer. Three horses a UTC day are rolled from seeds, so the card shows exactly the horse you get. A horse lives in a Stable stall (taken from the herd's homes) and has four riding stats: Speed, Strength, **Stamina** and **Agility**. The two new ones grow alongside the pets' growth, plus capped training. Hollis keeps Exceptional horses for Riding 20 and Prodigies for Riding 60.
+
+**Riding.** One pure sim (`farm-ride.mts`) runs in two modes:
+- **Cosmetic** on the farm, in the Market Square and at the Cove: your own walk and run, A/D to turn.
+- **Piloted** at the Downs: momentum, gaits, wind, a turning circle that widens with speed, Space to jump, stumbles and knocked rails.
+
+You ride first person from the saddle, over the horse's own head and neck. The horse travels through the gates with you (the URL names it and the server's farm supplies it). Away from the farm you tie up at a hitching rail. Other people see riders in the saddle: presence poses carry a `mount`, which is a network-server bridge change.
+
+**Windrush Downs** (`/farm/downs/`, through the Market's west gate, riders only) is 200 × 160 m of rolling ground with:
+- the Hitching Green (arrival, notice board)
+- a Gallop strip
+- a Novice and an Open show ring
+- a 12-fence cross-country trail with a bank, a drop, a ditch and a water splash
+- a railed Oval with a stand, betting booth and race board
+- a map and the riding HUD
+
+**The Riding skill** is server-owned. A finished course run is ridden again on the server from its input log (`POST /games/farm/riding/runs`), and it pays XP and trains the horse only if the replay matches the claim. Levels give perks to every horse you ride.
+
+**Races and betting.** Races are posted at the race board: friendly, or with a stake where the winner takes the pot less 10%. Spectators back riders at the booth in a pari-mutuel pool, less 10%. Caps are 500 per stake, 1,000 per bet and 10,000 a day each way. The API signs who rides on what (the ticket, plus a seat for each rider). `factory-network-server/games/farm-downs/` runs the race at 60 Hz on the mirrored sim and signs the finish order. Any rider hands that result to the API, which settles it. An unsettled race is refunded at its deadline. Migration **059**.
+
+**The riding set is mirrored** byte for byte to both servers by `tools/mirror-riding-sim.mjs`.
+
+**Deploy:** both repos together, run migration 059, and set the same `FARM_RACE_SECRET` on platform-api and factory-network-server (without it, races cannot be posted).
+
+**Not yet verified:** a live race between two people.
+
 ## Livestock: feed, names, and trading (Phase 6) (2026-09-29)
 
 **Feed you can find.** The feeds were only sold as a buy button deep in Inventory → Supplies. The Herd panel (L) now opens on a **Feed bin**: each feed the herd eats, how many are held (orange at zero), Buy 5 / Buy 10, and **Feed the herd**, which gives one serving to every animal with room for a whole one. Each animal's row says what it would eat and has a Feed button. Hollis sells the same feeds at his stall (`FEED_STOCK` on the shared vendor shelf). The "nothing to eat" message points at the Feed bin.

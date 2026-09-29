@@ -24,6 +24,7 @@ import { handleFarmTradeRoute } from "./routes/farm-trade-routes.mjs";
 import { handleFarmListingRoute } from "./routes/farm-listing-routes.mjs";
 import { handleFarmFishingRoute } from "./routes/farm-fishing-routes.mjs";
 import { handleFarmLivestockRoute } from "./routes/farm-livestock-routes.mjs";
+import { handleFarmRidingRoute } from "./routes/farm-riding-routes.mjs";
 import { handleGameResultRoute } from "./routes/game-result-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
@@ -363,6 +364,8 @@ export function createApp(options: any = {}) {
   const renameFarmLivestock = typeof options?.renameFarmLivestock === "function" ? options.renameFarmLivestock : null;
   const careFarmLivestock = typeof options?.careFarmLivestock === "function" ? options.careFarmLivestock : null;
   const butcherFarmLivestock = typeof options?.butcherFarmLivestock === "function" ? options.butcherFarmLivestock : null;
+  const buyFarmHorse = typeof options?.buyFarmHorse === "function" ? options.buyFarmHorse : null;
+  const ridingService = (name: string) => (typeof options?.[name] === "function" ? options[name] : null);
   const castFarmLine = typeof options?.castFarmLine === "function" ? options.castFarmLine : null;
   const landFarmCast = typeof options?.landFarmCast === "function" ? options.landFarmCast : null;
   const sellFarmFish = typeof options?.sellFarmFish === "function" ? options.sellFarmFish : null;
@@ -709,6 +712,17 @@ export function createApp(options: any = {}) {
   const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
   const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };
   const farmLivestockServices = { getFarmLivestock, getFarmLivestockCards, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock, butcherFarmLivestock };
+  const farmRidingServices = {
+    buyFarmHorse,
+    submitFarmRidingRun: ridingService("submitFarmRidingRun"),
+    listFarmRaces: ridingService("listFarmRaces"),
+    postFarmRace: ridingService("postFarmRace"),
+    enterFarmRace: ridingService("enterFarmRace"),
+    leaveFarmRace: ridingService("leaveFarmRace"),
+    startFarmRace: ridingService("startFarmRace"),
+    betFarmRace: ridingService("betFarmRace"),
+    settleFarmRace: ridingService("settleFarmRace"),
+  };
   const gameResultServices = { submitGameResult, getPetGameCareer };
   const progressionServices = {
     getGameXpProgress,
@@ -1210,6 +1224,11 @@ export function createApp(options: any = {}) {
     if (await handleFarmLivestockRoute({
       req, res, method, pathname, authClaims, requestOrigin, timestamp,
       services: farmLivestockServices,
+    })) return;
+
+    if (await handleFarmRidingRoute({
+      req, res, method, pathname, authClaims, requestOrigin, timestamp,
+      services: farmRidingServices,
     })) return;
 
     if (await handleGameSocialRoute({

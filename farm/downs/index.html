@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Windrush Downs | Javascript Game Factory</title>
+  <link rel="stylesheet" href="../../css/space-presence.css">
+  <link rel="stylesheet" href="../farm.css">
+  <link rel="stylesheet" href="downs.css">
+</head>
+<body>
+  <main class="farm-shell downs-shell">
+    <canvas id="downsCanvas" tabindex="0" aria-label="Windrush Downs, in 3D"></canvas>
+
+    <header class="farm-header">
+      <a id="downsBackLink" href="../market/index.html?from=downs" class="back-link">← Back to the Market Square</a>
+      <div>
+        <span class="eyebrow">SHARED SPACE · WEST OF THE MARKET</span>
+        <h1>Windrush Downs</h1>
+      </div>
+      <div class="farm-header__actions">
+        <span id="downsRiding" class="downs-riding-chip" title="Your Riding level" hidden><span>Riding</span><strong>1</strong></span>
+        <span id="downsTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
+        <button id="toggleDownsMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
+      </div>
+    </header>
+
+    <section id="startGate" class="start-gate">
+      <div class="start-card">
+        <span class="start-card__tag">FOR RIDERS ONLY</span>
+        <h2 id="startTitle">Windrush Downs.</h2>
+        <p id="startWords">Open rolling country for you and your horse: the Gallop, two show rings, a cross-country trail over the hills and the Oval for racing. Here your horse is yours to pilot — its Speed, Strength, Stamina and Agility, and your Riding, decide how it goes.</p>
+        <button id="enterDowns" type="button">Ride in</button>
+        <a id="noHorseBack" class="start-card__link" href="../market/index.html?from=downs" hidden>Back to the Market Square</a>
+        <small id="downsStatus">W urge on · Shift gallop · S rein in · A/D turn · Space jump · E use · Enter chat · out the east gate for the Market</small>
+      </div>
+    </section>
+
+    <div id="downsVisitors" class="visitors-chip" aria-live="polite" hidden>
+      <span id="downsVisitorsLabel" class="visitors-chip__label">AT THE DOWNS</span>
+      <span id="downsVisitorsNames" class="visitors-chip__names"></span>
+    </div>
+    <section id="downsChat" class="room-chat" data-open="false" aria-label="Downs chat" hidden>
+      <ol id="downsChatLog" class="room-chat__log" aria-live="polite"></ol>
+      <input id="downsChatInput" class="room-chat__input" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Say something to the Downs… (Enter to send, Esc to cancel)" aria-label="Chat message">
+    </section>
+
+    <canvas id="downsMap" class="downs-map" width="240" height="192" aria-label="Map of the Downs"></canvas>
+
+    <section id="rideHud" class="ride-hud" aria-live="off" hidden>
+      <div class="ride-hud__name"><strong id="rideHorseName">Horse</strong><span id="rideGait">Standing</span></div>
+      <div class="ride-hud__wind" title="Wind: the gallop and jumps spend it, easier gaits get it back">
+        <span>WIND</span>
+        <div class="ride-hud__bar"><i id="rideWind"></i></div>
+      </div>
+      <div class="ride-hud__speed"><strong id="rideSpeed">0</strong><span>km/h</span></div>
+      <div id="rideWinded" class="ride-hud__winded" hidden>WINDED — ease up to get its wind back</div>
+    </section>
+
+    <section id="runHud" class="run-hud" aria-live="polite" hidden>
+      <span id="runCourse" class="run-hud__course">Course</span>
+      <strong id="runTime" class="run-hud__time">0.00s</strong>
+      <span id="runFaults" class="run-hud__faults">0 faults</span>
+      <span id="runNext" class="run-hud__next"></span>
+    </section>
+    <div id="runToast" class="run-toast" aria-live="polite" hidden></div>
+
+    <div id="downsPrompt" class="farm-prompt" aria-live="polite"></div>
+    <div class="control-hint" aria-hidden="true">
+      <span><b>W</b> Urge on</span><span><b>Shift</b> Gallop</span><span><b>S</b> Rein in</span><span><b>A/D</b> Turn</span><span><b>Space</b> Jump</span><span><b>Mouse</b> Look</span><span><b>E</b> Use</span><span><b>Enter</b> Chat</span><span><b>M</b> Music</span>
+    </div>
+
+    <aside id="boardPanel" class="inventory-panel downs-panel" aria-label="Windrush Downs notice board" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE HITCHING GREEN</span><strong>Notice board</strong></div>
+        <button id="closeBoard" class="farm-button" type="button">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p id="boardRider" class="sale-note"></p>
+        <h3 class="vendor-shelf__title">Courses · your bests</h3>
+        <ol id="boardCourses" class="sale-list downs-courses"></ol>
+        <h3 class="vendor-shelf__title">Cross-country line</h3>
+        <div id="boardLine" class="downs-line"></div>
+        <h3 class="vendor-shelf__title">Riding perks</h3>
+        <ol id="boardPerks" class="downs-perks"></ol>
+      </div>
+    </aside>
+
+    <aside id="racePanel" class="inventory-panel downs-panel" aria-label="Race board" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE OVAL</span><strong>Race board</strong></div>
+        <button id="closeRaces" class="farm-button" type="button">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Post a race and whoever is here can enter. Friendly races are free; with a stake, every rider puts it up and the winner takes the pot, less a 10% house fee. The race runs on the server, so nobody's clock decides it.</p>
+        <div id="raceCompose" class="downs-compose"></div>
+        <h3 class="vendor-shelf__title">Races</h3>
+        <ol id="raceList" class="sale-list downs-races"></ol>
+      </div>
+      <footer class="sale-footer"><p id="raceStatus" class="pets-status" aria-live="polite"></p></footer>
+    </aside>
+
+    <aside id="boothPanel" class="inventory-panel downs-panel" aria-label="Betting booth" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE OVAL</span><strong>Betting booth</strong></div>
+        <button id="closeBooth" class="farm-button" type="button">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body">
+        <p class="sale-note">Back a rider in a race that is still taking bets. Every bet goes in one pool; when the race is run, the pool less a 10% house fee is shared by everyone who backed the winner, by how much they put in. Riders in a race cannot bet on it.</p>
+        <ol id="boothList" class="sale-list downs-races"></ol>
+      </div>
+      <footer class="sale-footer"><p id="boothStatus" class="pets-status" aria-live="polite"></p></footer>
+    </aside>
+  </main>
+  <script type="module" src="../../js/platform-config.mjs"></script>
+  <script type="module" src="../../js/farm-downs-page.mjs"></script>
+</body>
+</html>

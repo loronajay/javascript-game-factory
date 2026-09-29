@@ -51,7 +51,7 @@ import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { farmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeHusbandryRecord, recordFarmBirth, recordFarmButcher, recordFarmCollection } from "../services/farm-skill-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
-import { LIVESTOCK_STATS, MAX_HERD, REST_DAYS, breedingRefusal, clampStat, freePlacesForYoung, inheritLivestock, livestockBirthXp, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmLivestockHomes, farmLivestockProductsFor, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
+import { LIVESTOCK_STATS, MAX_HERD, REST_DAYS, breedingRefusal, clampStat, freePlacesForYoung, inheritLivestock, livestockBirthXp, adultAgeDays, advanceLivestockCare, butcherCuts, butcherQuality, livestockButcherXp, cleanLivestockName, farmHerdHomes, farmLivestockProductsFor, feedLivestockCare, goodQuality, goodsPerCollection, livestockCollectXp, livestockDeathMinute, newLivestockCare, normalizeLivestockCare, wantsFood, farmLivestockRule, livestockGrade, pickFarmLivestockHome, rollFarmLivestock, } from "../services/farm-livestock-catalog.mjs";
 const PURCHASE_ID = /^[A-Za-z0-9_-]{1,80}$/;
 const ANIMAL_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 const HOME_ID = /^[A-Za-z0-9_-]{1,80}#[a-z0-9-]{1,20}$/;
@@ -120,7 +120,7 @@ export async function buyFarmLivestock(pool, input, random = Math.random) {
         const level = farmingLevelForXp(normalizeHusbandryRecord(farm.layout.skills?.husbandry).xp);
         if (level < species.minLevel)
             return { ok: false, error: "level_too_low", minLevel: species.minLevel, level };
-        const home = pickFarmLivestockHome(farmLivestockHomes(farm.layout.decor), herd.map((row) => row.home_id ?? null), input?.homeId, species.id);
+        const home = pickFarmLivestockHome(farmHerdHomes(farm.layout), herd.map((row) => row.home_id ?? null), input?.homeId, species.id);
         if (!home)
             return { ok: false, error: input?.homeId ? "home_full" : "no_room" };
         const spend = await spendTicketsInTransaction(client, {
@@ -166,7 +166,7 @@ export async function moveFarmLivestock(pool, input) {
         if (!animal)
             return { ok: false, error: "not_found" };
         if (wanted !== null) {
-            const homes = farmLivestockHomes(farm.layout.decor);
+            const homes = farmHerdHomes(farm.layout);
             if (!homes.some((entry) => entry.id === wanted))
                 return { ok: false, error: "unknown_home" };
             const others = herd.filter((row) => row.animal_id !== animalId).map((row) => row.home_id ?? null);
@@ -269,7 +269,7 @@ async function settleHerd(client, playerId, layout, rows, clock, random) {
 async function deliverYoung(client, playerId, layout, living, clock, random) {
     const births = [];
     const achievements = [];
-    const homes = farmLivestockHomes(layout.decor);
+    const homes = farmHerdHomes(layout);
     const skills = normalizeFarmSkillRecords(layout.skills);
     let husbandry = skills.husbandry;
     for (const mother of [...living]) {
@@ -360,7 +360,7 @@ export async function careFarmLivestock(pool, input, now = Date.now(), random = 
             if (!mother || !sire)
                 return answer({ ok: false, error: settled.deaths.some((death) => death.id === animalId || death.id === mateId) ? "died" : "not_found" });
             const level = farmingLevelForXp(normalizeHusbandryRecord(layout.skills?.husbandry).xp);
-            const freePlaces = freePlacesForYoung(farmLivestockHomes(layout.decor), settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })), String(mother.species_id));
+            const freePlaces = freePlacesForYoung(farmHerdHomes(layout), settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })), String(mother.species_id));
             const refusal = breedingRefusal(breedingSubject(mother), breedingSubject(sire), { clock, level, freePlaces });
             if (refusal)
                 return answer({ ok: false, error: refusal, ...(refusal === "level_too_low" ? { level } : {}) });

@@ -68,7 +68,7 @@ type VisitorBody = {
   card: any;
   cardUntil: number;
   mixer: any | null;
-  clips: { idle: any | null; walk: any | null; run: any | null; emote: any | null };
+  clips: { idle: any | null; walk: any | null; run: any | null; emote: any | null; sit: any | null };
   current: any | null;
   emoteUntil: number;
   emoteSeenAt: number;
@@ -88,14 +88,23 @@ export type RoomVisitors = Readonly<{
   nearest: (viewer: Readonly<{ x: number; z: number; forward: Readonly<{ x: number; z: number }> }>) => RemoteMember | null;
   setVisible: (visible: boolean) => void;
   count: () => number;
+  /** Where each body is drawn this frame (eased), for things drawn with it — a rider's horse. */
+  placements: () => readonly VisitorPlacement[];
   dispose: () => void;
+}>;
+
+export type VisitorPlacement = Readonly<{ clientId: string; x: number; z: number; yaw: number; member: RemoteMember }>;
+
+export type RoomVisitorsOptions = Readonly<{
+  /** How high a member riding `mount` sits (the saddle); a place with no mounts leaves this out and everyone stands on the ground. */
+  mountSeat?: (mount: NonNullable<RemoteMember["pose"]["mount"]>) => number;
 }>;
 
 function tagLabel(member: RemoteMember): string {
   return member.pose.activity ? `${member.displayName}\n▶ ${member.pose.activity}` : member.displayName;
 }
 
-export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisitors {
+export function createRoomVisitors(THREE: ThreeNamespace, scene: any, options: RoomVisitorsOptions = {}): RoomVisitors {
   const root = new THREE.Group();
   root.name = "visitors";
   scene.add(root);
@@ -240,6 +249,7 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
         walk: find(/^walk_a$/i) ?? find(/walk/i),
         run: find(/^run_a$/i) ?? find(/run/i),
         emote: find(/^cheer_idle_a$/i) ?? find(/cheer/i),
+        sit: find(/^sit_chair_idle_a$/i) ?? find(/sit.*idle/i) ?? find(/sit/i),
       };
       body.mixer = clips.length ? new THREE.AnimationMixer(body.model) : null;
       body.current = null;
@@ -283,7 +293,7 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
       card,
       cardUntil: 0,
       mixer: null,
-      clips: { idle: null, walk: null, run: null, emote: null },
+      clips: { idle: null, walk: null, run: null, emote: null, sit: null },
       current: null,
       emoteUntil: 0,
       emoteSeenAt: member.emoteAt,
@@ -386,6 +396,9 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
       const target = body.motion.target(now);
       group.position.x += (target.x - group.position.x) * ease;
       group.position.z += (target.z - group.position.z) * ease;
+      // A rider sits in the saddle, lifted with the horse over a jump.
+      const seat = pose.mount && options.mountSeat ? options.mountSeat(pose.mount) : 0;
+      group.position.y += (seat - group.position.y) * (pose.mount?.gait === "jump" ? 1 : ease);
       const targetYaw = pose.yaw + Math.PI;
       let delta = targetYaw - group.rotation.y;
       delta = Math.atan2(Math.sin(delta), Math.cos(delta));
@@ -418,6 +431,8 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
         const gait = body.motion.gait();
         if (body.emoteUntil > now && body.clips.emote) {
           // Let the emote finish.
+        } else if (pose.mount && options.mountSeat) {
+          play(body, body.clips.sit ?? body.clips.idle);
         } else if (gait === "run") {
           play(body, body.clips.run ?? body.clips.walk ?? body.clips.idle);
         } else if (gait === "walk") {
@@ -437,6 +452,7 @@ export function createRoomVisitors(THREE: ThreeNamespace, scene: any): RoomVisit
     nearest: (viewer) => findVisitorInReach(viewer, [...bodies.values()].map((body) => body.member)),
     setVisible: (visible: boolean) => { root.visible = visible; },
     count: () => bodies.size,
+    placements: () => [...bodies.values()].map((body) => Object.freeze({ clientId: body.member.clientId, x: body.group.position.x, z: body.group.position.z, yaw: body.group.rotation.y - Math.PI, member: body.member })),
     dispose: () => {
       for (const body of bodies.values()) removeBody(body);
       bodies.clear();

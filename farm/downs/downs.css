@@ -1,0 +1,83 @@
+/* Windrush Downs: the farm's shell (../farm.css) and the shared presence
+   chrome, plus the riding HUD, the course clock, the map and the Downs'
+   notice board, race board and betting booth. */
+
+#downsCanvas { display: block; width: 100%; height: 100%; outline: 0; }
+
+.downs-shell .room-chat { bottom: 20px; }
+
+.market-tickets, .downs-riding-chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 10px 15px; border: 1px solid var(--farm-accent); border-radius: 999px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
+.market-tickets[hidden], .downs-riding-chip[hidden] { display: none; }
+.market-tickets span, .downs-riding-chip span { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.market-tickets strong, .downs-riding-chip strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; }
+
+.start-card__link { display: inline-block; margin-top: 10px; color: var(--farm-accent); font-weight: 800; }
+.start-card__link[hidden] { display: none; }
+
+/* The map: top right, under the header. */
+.downs-map { position: fixed; top: 96px; right: 18px; z-index: 4; width: 240px; height: 192px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(18, 32, 20, .72); box-shadow: 0 10px 30px rgba(0,0,0,.35); pointer-events: none; }
+
+/* The riding HUD: bottom centre, above the control hint. */
+.ride-hud { position: fixed; left: 50%; bottom: 162px; z-index: 4; display: grid; grid-template-columns: auto minmax(160px, 260px) auto; align-items: center; gap: 16px; padding: 10px 16px; transform: translateX(-50%); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(18, 32, 20, .78); backdrop-filter: blur(8px); color: #fff; pointer-events: none; }
+.ride-hud[hidden] { display: none; }
+.ride-hud__name { display: grid; gap: 1px; min-width: 96px; }
+.ride-hud__name strong { color: #fff6cf; font-size: 14px; }
+.ride-hud__name span { color: var(--farm-leaf); font: 800 10.5px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.ride-hud__wind { display: grid; gap: 4px; }
+.ride-hud__wind > span { color: #c9d7bd; font: 800 9.5px ui-monospace, monospace; letter-spacing: .16em; }
+.ride-hud__bar { position: relative; height: 10px; overflow: hidden; border-radius: 5px; background: rgba(255,255,255,.12); }
+.ride-hud__bar i { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 5px; background: linear-gradient(90deg, #6fc16a, #d8e86a); transition: width .12s linear, background .3s; }
+.ride-hud.is-winded .ride-hud__bar i { background: linear-gradient(90deg, #d0573d, #e8a04a); }
+.ride-hud__speed { display: grid; justify-items: end; }
+.ride-hud__speed strong { color: #fff6cf; font: 900 22px ui-monospace, monospace; line-height: 1; }
+.ride-hud__speed span { color: #c9d7bd; font: 800 9.5px ui-monospace, monospace; letter-spacing: .12em; }
+.ride-hud__winded { grid-column: 1 / -1; color: #ffb38a; font: 800 11px ui-monospace, monospace; letter-spacing: .08em; text-align: center; }
+.ride-hud__winded[hidden] { display: none; }
+
+/* The course clock: top centre. */
+.run-hud { position: fixed; top: 92px; left: 50%; z-index: 4; display: flex; align-items: baseline; gap: 14px; padding: 8px 16px; transform: translateX(-50%); border: 1px solid var(--farm-accent); border-radius: 999px; background: rgba(18, 32, 20, .82); color: #fff; pointer-events: none; }
+.run-hud[hidden] { display: none; }
+.run-hud__course { color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.run-hud__time { color: #fff6cf; font: 900 20px ui-monospace, monospace; }
+.run-hud__faults { color: #ffcf9a; font: 800 12px ui-monospace, monospace; }
+.run-hud__next { color: #c9d7bd; font: 700 12px system-ui, sans-serif; }
+.run-hud__next.is-missed { color: #ff9a8a; }
+.run-toast { position: fixed; top: 150px; left: 50%; z-index: 5; max-width: min(560px, calc(100vw - 32px)); padding: 12px 18px; transform: translateX(-50%); border: 1px solid var(--farm-accent); border-radius: 14px; background: rgba(18, 32, 20, .9); color: #fff6cf; font: 800 15px system-ui, sans-serif; text-align: center; pointer-events: none; }
+.run-toast[hidden] { display: none; }
+.run-toast small { display: block; margin-top: 4px; color: #c9d7bd; font-weight: 600; font-size: 12px; }
+
+.downs-panel { width: min(540px, calc(100vw - 36px)); }
+.sale-note { margin: 0 0 12px; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
+.sale-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.vendor-shelf__title { margin: 16px 0 8px; color: var(--farm-leaf); font: 900 11px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.downs-course { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
+.downs-course strong { display: block; color: #fff6cf; font-size: 13.5px; }
+.downs-course small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11.5px; }
+.downs-course.is-locked { opacity: .55; }
+.downs-course__best { color: var(--farm-accent); font: 900 13px ui-monospace, monospace; text-align: right; }
+.downs-line { display: flex; gap: 8px; flex-wrap: wrap; }
+.downs-line .farm-button.is-active { border-color: var(--farm-accent); background: rgba(242, 196, 90, .18); }
+.downs-perks { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.downs-perks li { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; color: #c9d7bd; font-size: 12px; }
+.downs-perks li b { color: var(--farm-leaf); font: 900 11px ui-monospace, monospace; }
+.downs-perks li.is-owned { color: #fff6cf; }
+.downs-perks li.is-owned b { color: var(--farm-accent); }
+.downs-compose { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.downs-compose label { display: grid; gap: 4px; color: #d6e3c8; font: 700 11.5px system-ui, sans-serif; }
+.downs-compose select, .downs-compose input { min-width: 0; padding: 7px 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; background: rgba(0,0,0,.25); color: #fff; font: 700 13px system-ui, sans-serif; }
+.downs-compose .farm-button { grid-column: 1 / -1; }
+.downs-race { display: grid; gap: 6px; padding: 10px 11px; border: 1px solid rgba(255,255,255,.12); border-radius: 11px; background: rgba(255,255,255,.04); }
+.downs-race__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.downs-race__head strong { color: #fff6cf; font-size: 13.5px; }
+.downs-race__head span { color: var(--farm-leaf); font: 800 10.5px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.downs-race__riders { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.downs-race__riders li { display: flex; justify-content: space-between; gap: 8px; color: #d6e3c8; font-size: 12.5px; }
+.downs-race__riders li small { color: #b9c9ad; }
+.downs-race__actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.downs-race__actions input { width: 90px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(0,0,0,.25); color: #fff; font: 700 12.5px ui-monospace, monospace; }
+.downs-race.is-mine { border-color: rgba(242, 196, 90, .55); }
+@media (max-width: 720px) {
+  .downs-map { top: auto; bottom: 150px; width: 160px; height: 128px; }
+  .ride-hud { grid-template-columns: auto minmax(110px, 1fr) auto; bottom: 150px; width: calc(100vw - 32px); }
+  .downs-compose { grid-template-columns: 1fr; }
+}

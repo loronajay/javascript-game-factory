@@ -209,7 +209,8 @@ function normalizePet(value) {
     if (profile && profile.traits.length === 0 && migratedProfile) {
         profile = normalizePetProfile(species.id, { ...profile, traits: migratedProfile.traits });
     }
-    return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile };
+    const stall = typeof source.stall === "string" && /^[a-z0-9-]{1,40}#stall-\d{1,2}$/.test(source.stall) ? source.stall : "";
+    return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile, ...(stall ? { stall } : {}) };
 }
 function finiteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);

@@ -116,7 +116,10 @@ export type HusbandryRecord = Readonly<{
   births: number;
 }>;
 
-export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord; husbandry: HusbandryRecord }>;
+/** The Riding skill (FARM_RIDING_PLAN.md): server-owned, raised only by verified Windrush Downs runs and settled races. */
+export type RidingRecord = Readonly<{ xp: number; runs: number; races: number; wins: number; horses: number; today: Readonly<{ day: number; runs: Readonly<Record<string, number>> }> }>;
+
+export type FarmSkills = Readonly<{ farming: FarmingRecord; woodcutting: WoodcuttingRecord; cooking: CookingRecord; carpentry: CarpentryRecord; bartering: BarteringRecord; husbandry: HusbandryRecord; riding: RidingRecord }>;
 
 export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   farming: Object.freeze({ xp: 0, harvests: 0, orders: 0, crops: Object.freeze({}), fruit: Object.freeze({}) }),
@@ -125,6 +128,7 @@ export const EMPTY_FARM_SKILLS: FarmSkills = Object.freeze({
   carpentry: Object.freeze({ xp: 0, milled: 0, pieces: 0, masterwork: 0, patterns: Object.freeze({}) }),
   bartering: Object.freeze({ xp: 0, deals: 0, bought: 0, sold: 0, saved: 0, bonus: 0 }),
   husbandry: Object.freeze({ xp: 0, collections: 0, orders: 0, goods: Object.freeze({}), butchered: 0, meat: Object.freeze({}), births: 0 }),
+  riding: Object.freeze({ xp: 0, runs: 0, races: 0, wins: 0, horses: 0, today: Object.freeze({ day: 0, runs: Object.freeze({}) }) }),
 });
 
 function count(value: unknown, limit = 100_000_000): number {
@@ -155,7 +159,8 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
   const carpentry: any = source.carpentry && typeof source.carpentry === "object" ? source.carpentry : null;
   const bartering: any = source.bartering && typeof source.bartering === "object" ? source.bartering : null;
   const husbandry: any = source.husbandry && typeof source.husbandry === "object" ? source.husbandry : null;
-  if (!farming && !woodcutting && !cooking && !carpentry && !bartering && !husbandry) return EMPTY_FARM_SKILLS;
+  const riding: any = source.riding && typeof source.riding === "object" ? source.riding : null;
+  if (!farming && !woodcutting && !cooking && !carpentry && !bartering && !husbandry && !riding) return EMPTY_FARM_SKILLS;
   return Object.freeze({
     farming: farming ? Object.freeze({
       xp: count(farming.xp, FARMING_MAX_XP),
@@ -195,6 +200,14 @@ export function normalizeFarmSkills(value: unknown): FarmSkills {
       meat: counts(husbandry.meat, LIVESTOCK_MEATS.map((meat) => meat.itemId)),
       births: count(husbandry.births),
     }) : EMPTY_FARM_SKILLS.husbandry,
+    riding: riding ? Object.freeze({
+      xp: count(riding.xp, FARMING_MAX_XP), runs: count(riding.runs), races: count(riding.races), wins: count(riding.wins), horses: count(riding.horses),
+      today: Object.freeze({
+        day: count(riding.today?.day),
+        runs: Object.freeze(Object.fromEntries(Object.entries(riding.today?.runs && typeof riding.today.runs === "object" ? riding.today.runs : {})
+          .filter(([id, n]) => /^[a-z0-9-]{1,32}$/.test(id) && count(n) > 0).map(([id, n]) => [id, count(n)]))),
+      }),
+    }) : EMPTY_FARM_SKILLS.riding,
   });
 }
 

@@ -44,14 +44,35 @@ function finite(value, fallback = 0) {
 export function normalizeChatText(value) {
     return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_LENGTH) : "";
 }
+const MOUNT_GAITS = new Set(["idle", "walk", "trot", "run", "jump"]);
+/** A rider's horse made safe (the bridge's `sanitizeMount`), or null. */
+export function normalizePresenceMount(value) {
+    const source = value && typeof value === "object" ? value : null;
+    if (!source)
+        return null;
+    const speciesId = typeof source.speciesId === "string" ? source.speciesId : "";
+    const paletteId = typeof source.paletteId === "string" ? source.paletteId : "";
+    if (!/^pet\.[a-z0-9-]{1,32}$/.test(speciesId) || !/^[a-z0-9-]{1,24}$/.test(paletteId))
+        return null;
+    const clampTo = (raw, min, max, fallback) => Math.min(max, Math.max(min, finite(raw, fallback)));
+    return Object.freeze({
+        speciesId,
+        paletteId,
+        gait: (MOUNT_GAITS.has(String(source.gait)) ? source.gait : "idle"),
+        y: clampTo(source.y, -2, 4, 0),
+        size: clampTo(source.size, 0.4, 1.3, 1),
+    });
+}
 export function normalizePresencePose(value, previous = null) {
     const source = value && typeof value === "object" ? value : {};
+    const mount = normalizePresenceMount(source.mount);
     return Object.freeze({
         x: finite(source.x, previous?.x ?? 0),
         z: finite(source.z, previous?.z ?? 0),
         yaw: finite(source.yaw, previous?.yaw ?? 0),
         moving: source.moving === true,
         activity: cleanText(source.activity).slice(0, 40),
+        ...(mount ? { mount } : {}),
     });
 }
 export function posesDiffer(a, b) {
@@ -61,7 +82,10 @@ export function posesDiffer(a, b) {
         || Math.abs(a.z - b.z) > POSE_EPSILON
         || Math.abs(a.yaw - b.yaw) > YAW_EPSILON
         || a.moving !== b.moving
-        || a.activity !== b.activity;
+        || a.activity !== b.activity
+        || a.mount?.gait !== b.mount?.gait
+        || a.mount?.paletteId !== b.mount?.paletteId
+        || Math.abs((a.mount?.y ?? 0) - (b.mount?.y ?? 0)) > 0.05;
 }
 function normalizeMember(value, now) {
     const source = value && typeof value === "object" ? value : null;

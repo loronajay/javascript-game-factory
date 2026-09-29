@@ -1,6 +1,6 @@
 import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
-import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply } from "../services/farm-economy-catalog.mjs";
+import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply, isAdoptableFarmSpecies } from "../services/farm-economy-catalog.mjs";
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
 import { farmMarketDay, farmMarketProducePrice, farmMarketSeedPrice } from "../services/farm-market-day.mjs";
@@ -63,7 +63,7 @@ export async function saveFarm(client, playerId, layout) {
     await client.query(`update game_loadouts set garage = $3::jsonb, updated_at = now()
      where player_id = $1 and game_slug = $2`, [playerId, "farm", JSON.stringify(layout)]);
 }
-function nextPetId(layout, speciesId) {
+export function nextPetId(layout, speciesId) {
     const stem = speciesId.replace(/^pet\./, "");
     let highest = 0;
     for (const row of [...(layout.pets ?? []), ...(layout.petHistory ?? [])]) {
@@ -79,7 +79,8 @@ export async function adoptFarmPet(pool, input, random = Math.random) {
     if (!PURCHASE_ID.test(purchaseId))
         throw new TypeError("invalid purchaseId");
     const species = findFarmSpecies(input?.speciesId);
-    if (!species)
+    // The horse is Hollis's to sell (db/farm-horses.mts), never the Pets panel's.
+    if (!species || !isAdoptableFarmSpecies(species.id))
         return { ok: false, error: "unknown_species" };
     const transactionKey = `farm:adoption:${purchaseId}`;
     return transaction(pool, async (client) => {

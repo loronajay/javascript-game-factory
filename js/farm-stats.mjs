@@ -66,6 +66,12 @@ export function buildFarmStats(skills, extras = {}) {
         { label: "Herd orders filled", value: skills.husbandry.orders },
         { label: "Sent to the Butcher", value: skills.husbandry.butchered },
     ], "Goods collected and meat cut", breakdown([...LIVESTOCK_GOODS, ...LIVESTOCK_MEATS].map((item) => ({ id: item.itemId, title: item.title })), { ...skills.husbandry.goods, ...skills.husbandry.meat })));
+    rows.push(skill("riding", "Riding", "Ride courses and race at Windrush Downs. Levels give every horse you ride perks, and open Hollis's best horses.", skills.riding.xp, [
+        { label: "Course runs", value: skills.riding.runs },
+        { label: "Races run", value: skills.riding.races },
+        { label: "Races won", value: skills.riding.wins },
+        { label: "Horses bought", value: skills.riding.horses },
+    ], "Riding record", []));
     const benefits = barteringBenefits(farmingProgress(skills.bartering.xp).level);
     rows.push(skill("bartering", "Bartering", `Negotiate NPC prices: ${Math.round(benefits.purchaseDiscount * 1000) / 10}% off purchases and ${Math.round(benefits.saleBonus * 1000) / 10}% extra on sales.`, skills.bartering.xp, [
         { label: "Deals made", value: skills.bartering.deals },

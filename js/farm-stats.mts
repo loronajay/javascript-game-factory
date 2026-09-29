@@ -13,7 +13,7 @@ import { farmingProgress, type FarmSkills } from "./farm-skills.mjs";
 
 export type FarmStatLine = Readonly<{ label: string; value: number }>;
 export type FarmSkillStats = Readonly<{
-  id: "farming" | "woodcutting" | "cooking" | "carpentry" | "fishing" | "husbandry" | "bartering";
+  id: "farming" | "woodcutting" | "cooking" | "carpentry" | "fishing" | "husbandry" | "riding" | "bartering";
   title: string;
   description: string;
   level: number;
@@ -139,6 +139,16 @@ export function buildFarmStats(skills: FarmSkills, extras: Readonly<{ fishing?: 
     ],
     "Goods collected and meat cut",
     breakdown([...LIVESTOCK_GOODS, ...LIVESTOCK_MEATS].map((item) => ({ id: item.itemId, title: item.title })), { ...skills.husbandry.goods, ...skills.husbandry.meat }),
+  ));
+  rows.push(skill(
+    "riding", "Riding", "Ride courses and race at Windrush Downs. Levels give every horse you ride perks, and open Hollis's best horses.", skills.riding.xp,
+    [
+      { label: "Course runs", value: skills.riding.runs },
+      { label: "Races run", value: skills.riding.races },
+      { label: "Races won", value: skills.riding.wins },
+      { label: "Horses bought", value: skills.riding.horses },
+    ],
+    "Riding record", [],
   ));
   const benefits = barteringBenefits(farmingProgress(skills.bartering.xp).level);
   rows.push(skill(

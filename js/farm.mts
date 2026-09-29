@@ -13,27 +13,32 @@
 
 import * as THREE_VENDOR from "./vendor/three.module.js";
 import { createLayoutStore } from "./arcade-room-store.mjs";
-import { forwardOf, lookWalker } from "./arcade-room-walker.mjs";
+import { forwardOf, lookWalker, obstacleBlocks } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
 import { gatewayAt, perimeterGates } from "./farm-gateway.mjs";
 import { EYE_HEIGHT, FARM_SPAWN, doorRows, nearestDoor, farmLadders, farmObstacles, farmPlatforms, farmSeats, keepOutBoxes, waterRegions, type DoorRow } from "./farm-scene.mjs";
 import { groundHeightAt, underwater, waterDepthAt, type PondRegion } from "./farm-pond.mjs";
-import { createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
+import { GROUNDED_BODY, bodyObstacles, createFarmBody, eyeHeight, grabLadder, isMoveKey, obstaclesForSpan, releaseLadder, sitOn, standUp, stepFarmBody, type FarmBody } from "./farm-body.mjs";
+import { getRidingPrompt } from "./farm-interaction.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type PetInteractionId, type SeatInReach } from "./farm-interaction.mjs";
 import { canNap, formatNapMinutes, napBankReadyIn } from "./farm-nap-bank.mjs";
 import { FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withFarmTrees, withNapTaken, withProductionCheckpoint, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
-import { assetUrlFor, createPetBodies, type PetBodyView } from "./farm-pet-bodies.mjs";
+import { assetUrlFor, createPetBodies, petClips, type PetBodyView } from "./farm-pet-bodies.mjs";
 import { createPetsPanel } from "./farm-pets-panel.mjs";
 import { createFarmLivestockController } from "./farm-livestock-controller.mjs";
 import { createLivestockPanel } from "./farm-livestock-panel.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
-import { findAnimal } from "./farm-catalog/animals.mjs";
+import { findAnimal, isRidable } from "./farm-catalog/animals.mjs";
+import { createRidingController } from "./farm-riding-controller.mjs";
+import { createRiderView } from "./farm-rider-view.mjs";
+import { cosmeticRideProfile } from "./farm-ride-profile.mjs";
+import { horseTravelQuery, ridingHorseFrom } from "./farm-riding-travel.mjs";
+import { riderReach } from "./farm-ride.mjs";
 import { createFarmInventory } from "./farm-catalog/inventory.mjs";
 import { createTicketWalletClient, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
-import { animalTrack, splitAnimalClips } from "./farm-animal-clips.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
 import { advanceAgriculture } from "./farm-crops.mjs";
@@ -326,13 +331,82 @@ const petSim = createPetSim({
 petSim.sync(layout);
 const petBodies = createPetBodies(THREE, scene);
 let nearbyPet: PetBodyView | null = null;
+// Riding (FARM_RIDING_PLAN.md): on the farm it is cosmetic — the rider's own walk and run, A/D to turn,
+// no wind and no jump. The horse's own body is what the rider sees ahead of them from the saddle.
+const riding = createRidingController({
+  pets: petSim,
+  mode: "cosmetic",
+  profile: () => cosmeticRideProfile(),
+  // A horse does not go indoors: every building's whole box is solid to it, doorway and all.
+  world: () => ({ bounds: walkerBounds, solids: [...obstaclesForSpan(obstacles, 0.3, 2.4), ...keepOutBoxes(layout)], ground: groundAt, water: waterAt }),
+  canStand: (point) => Math.abs(point.x) < walkerBounds.halfWidth - walkerBounds.margin && Math.abs(point.z) < walkerBounds.halfDepth - walkerBounds.margin
+    && !bodyObstacles(obstacles, groundAt(point)).some((solid) => obstacleBlocks(point, solid)),
+  horseHeight: findAnimal("pet.horse")?.height ?? 1.65,
+});
+const riderView = createRiderView(THREE, scene);
+let riderClock = 0;
+// Riding home through the gate (FARM_RIDING_PLAN.md): the URL names the horse, the farm has it, the rider is in the saddle.
+const arrivingHorse = canManageFarm ? ridingHorseFrom(layout, new URLSearchParams(location.search).get("horse")) : null;
+if (arrivingHorse && riding.arrive(arrivingHorse.instanceId, { x: player.x, z: player.z, heading: player.yaw })) {
+  petBodies.setTagVisible(arrivingHorse.instanceId, false);
+  player.pitch = -0.32;
+}
+
+/** E beside a horse: into the saddle, facing the way it faces. */
+function mountHorse(instanceId: string): boolean {
+  if (!canManageFarm) {
+    status.textContent = "This isn't your horse to ride.";
+    return false;
+  }
+  if (carrying || !riding.mount(instanceId)) {
+    status.textContent = "There is no room to get on here — call it out into the open (H) first.";
+    return false;
+  }
+  const horse = petSim.find(instanceId);
+  petBodies.setTagVisible(instanceId, false);
+  player.yaw = horse?.yaw ?? player.yaw;
+  player.pitch = -0.32;
+  keys.clear();
+  status.textContent = `You swing up onto ${horse?.name ?? "your horse"}. Ride through the front gate to take ${horse?.name ?? "it"} to the Market Square.`;
+  return true;
+}
+
+/** E in the saddle: down beside the horse, where there is room. */
+function dismountHorse(): boolean {
+  const horseId = riding.mounted();
+  const spot = riding.dismount();
+  if (!spot) {
+    status.textContent = "No room to get down here — ride somewhere more open.";
+    return false;
+  }
+  petBodies.setTagVisible(horseId, true);
+  player.x = spot.x;
+  player.z = spot.z;
+  body = { ...GROUNDED_BODY, y: groundAt(spot) };
+  keys.clear();
+  return true;
+}
+
 // The pet in the player's arms, by instance id, and the spot ahead it would be set down on right now (null: no room).
 let carrying = "";
 let carryPatienceSeconds: number | null = null;
 let putDownAt: Readonly<{ x: number; z: number; yaw: number }> | null = null;
 
 function applyCamera(): void {
-  camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
+  if (riding.mounted()) {
+    const eye = riding.eye(riderClock);
+    camera.position.set(eye.x, eye.y, eye.z);
+    if (Math.abs(camera.fov - (65 + eye.fovKick)) > 0.05) {
+      camera.fov = 65 + eye.fovKick;
+      camera.updateProjectionMatrix();
+    }
+  } else {
+    camera.position.set(player.x, eyeHeight(body, EYE_HEIGHT), player.z);
+    if (camera.fov !== 65) {
+      camera.fov = 65;
+      camera.updateProjectionMatrix();
+    }
+  }
   camera.rotation.set(player.pitch, player.yaw, 0);
 }
 
@@ -417,7 +491,33 @@ function updateInteraction(): void {
   // A released pet leaves the arms with the layout.
   if (carrying && !petSim.find(carrying)) carrying = "";
   // In order of what is nearest to hand: a door, then — hands free — a ladder, a seat, a pet. A door is still worked with a pet in hand.
-  doorInReach = walking ? nearestDoor(doorRows(layout), pose, (entry) => canWorkDoor(pose, entry.door, entry.reach)) : null;
+  const ride = riding.state();
+  const reachFrom = ride ? riderReach(ride) : pose;
+  doorInReach = walking ? nearestDoor(doorRows(layout), reachFrom, (entry) => canWorkDoor(reachFrom, entry.door, entry.reach)) : null;
+  // In the saddle only a door (the gate, to ride out) and getting down are in reach.
+  if (riding.mounted()) {
+    ladderInReach = null;
+    bedInReach = null;
+    seatInReach = null;
+    nearbyPet = null;
+    crops.update(pose, false);
+    trees.update(pose, false);
+    kitchen.update(pose, false);
+    workshop.update(pose, false);
+    livestock.update(pose, false);
+    if (petsPanel.isOpen() || livestockPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
+      setPrompt("");
+      return;
+    }
+    const horseName = petSim.find(riding.mounted())?.name ?? "your horse";
+    if (doorInReach) {
+      const road = perimeterGates(layout.decor, FARM_BOUNDS).some((gate) => gate.instanceId === doorInReach!.doorId);
+      setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · ride out to the Market Square" : " · a horse does not go indoors"));
+      return;
+    }
+    setPrompt(getRidingPrompt(horseName));
+    return;
+  }
   const handsFree = walking && !carrying;
   ladderInReach = handsFree && !doorInReach ? findLadderInReach(ladders, pose) : null;
   bedInReach = handsFree && !doorInReach && !ladderInReach ? findBedInReach(layout.decor, pose) : null;
@@ -436,7 +536,8 @@ function updateInteraction(): void {
     ? advancePetProfile(nearbyPetRow.profile, nearbyPetRow.speciesId, clockMinutes - layout.clock.farmMinutes, layout.decor)
     : null;
   const nearbyPetCare = nearbyPetRow ? findPetCare(nearbyPetRow.speciesId) : null;
-  const canPickUp = Boolean(nearbyPetState);
+  const ridable = Boolean(nearbyPetRow && isRidable(nearbyPetRow.speciesId));
+  const canPickUp = Boolean(nearbyPetState) && !ridable;
   const canFeed = Boolean(canManageFarm && nearbyPetProfile && nearbyPetProfile.hunger < 100 && nearbyPetCare
     && (layout.agriculture.inventory.supplies[nearbyPetCare.food.itemId] ?? 0) > 0);
   const canPlay = Boolean(canManageFarm && nearbyPetRow && petCareEnvironment(nearbyPetRow.speciesId, layout.decor).toyCount > 0);
@@ -512,7 +613,7 @@ function updateInteraction(): void {
   if (nearbyPet) {
     const needs = nearbyPetProfile ? petNeedStatus(nearbyPetProfile) : null;
     const feedback = needs && nearbyPetProfile ? `${needs.label} · hunger ${Math.round(nearbyPetProfile.hunger)}% · ` : "";
-    setPrompt(feedback + getPetInteractionPrompt(nearbyPet.name, { canPickUp, canFeed, canPlay }));
+    setPrompt(feedback + getPetInteractionPrompt(nearbyPet.name, { canPickUp, canFeed, canPlay, ridable }));
     return;
   }
   if (livestock.inReach()) {
@@ -533,6 +634,13 @@ function applyBodyStep(step: Readonly<{ pose: Readonly<{ x: number; z: number; y
 
 /** E, while walking: whatever `updateInteraction` found nearest to hand. */
 function interact(): boolean {
+  if (riding.mounted()) {
+    if (doorInReach) {
+      toggleDoors();
+      return true;
+    }
+    return dismountHorse();
+  }
   if (trees.chopping()) {
     trees.swing();
     return true;
@@ -615,6 +723,7 @@ function adoptServerFarm(next: FarmLayout, sentMinutes: number): void {
 function interactWithPet(action: PetInteractionId): boolean {
   if (action === "call") return false;
   if (!nearbyPet) return false;
+  if (action === "pet" && isRidable(petSim.find(nearbyPet.instanceId)?.speciesId)) return mountHorse(nearbyPet.instanceId);
   if (action === "feed") {
     if (!nearbyPetCanFeed) return false;
     const result = feedPet(layout, nearbyPet.instanceId, clockMinutes);
@@ -1012,6 +1121,16 @@ document.addEventListener("mousemove", (event) => {
 
 function updatePlayer(dt: number): void {
   if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0) return;
+  if (riding.mounted()) {
+    riding.step(dt, keys);
+    const ride = riding.state();
+    if (ride) {
+      player.x = ride.x;
+      player.z = ride.z;
+      body = { ...GROUNDED_BODY, y: ride.y };
+    }
+    return;
+  }
   const step = stepFarmBody(player, body, keys, dt, { bounds: walkerBounds, obstacles, platforms, ladders, ground: groundAt, waterDepth: waterAt });
   if (!step.moved) return;
   player.x = step.pose.x;
@@ -1072,7 +1191,7 @@ const speciesThumbnails = createAvatarThumbnails(THREE, {
     if (!species) return undefined;
     return {
       assetUrl: assetUrlFor(species),
-      poseClip: (gltf) => splitAnimalClips(THREE, animalTrack(gltf), species.clips).idle,
+      poseClip: (gltf) => petClips(THREE, gltf, species).idle,
       height: 1.4,
       lookAtY: 0.7,
     };
@@ -1409,6 +1528,7 @@ const farmEditor = createFarmEditor({
     draggingLook = false;
     grid.visible = editing;
     if (editing) dropCarried();
+    if (editing && riding.mounted()) dismountHorse();
     if (editing) trees.cancelChop();
     // Come up for air first, so the underwater fog does not keep the overview's fog when it lets go.
     if (editing) updateUnderwater(true);
@@ -1444,6 +1564,7 @@ function checkGateway(): void {
     setPrompt(`Set ${petSim.find(carrying)?.name ?? "your pet"} down before heading to the market`);
     return;
   }
+  const ridingOut = riding.mounted();
   leavingForMarket = true;
   keys.clear();
   document.exitPointerLock?.();
@@ -1452,8 +1573,8 @@ function checkGateway(): void {
   setPrompt("Off down the road to the Market Square…");
   const departure = canPersistFarm ? layoutStore.save(stampPresence(progressedLayout())) : Promise.resolve(null);
   void departure.catch(() => null).then(() => {
-    const back = visiting ? `?farm=${encodeURIComponent(layoutStore.ownerPlayerId)}` : "";
-    location.href = `market/index.html${back}`;
+    const query = horseTravelQuery(visiting ? layoutStore.ownerPlayerId : "", ridingOut);
+    location.href = `market/index.html${query ? `?${query}` : ""}`;
   });
 }
 
@@ -1485,6 +1606,14 @@ function frame(now: number): void {
   treesView.update(frameSeconds);
   kitchenView.update(frameSeconds);
   petBodies.sync(petSim.pets(), frameSeconds);
+  riderClock += frameSeconds;
+  const rideNow = riding.state();
+  const horseNow = rideNow ? petSim.find(riding.mounted()) : null;
+  riderView.update(rideNow && horseNow && !farmEditor.isEditing() ? {
+    eye: riding.eye(riderClock),
+    horse: { x: rideNow.x, z: rideNow.z, y: rideNow.y, heading: rideNow.heading, height: (findAnimal("pet.horse")?.height ?? 1.65) * horseNow.sizeMultiplier },
+    reach: Math.min(1, Math.abs(rideNow.speed) / 6),
+  } : null);
   livestock.draw(frameSeconds);
   if (!farmEditor.isEditing()) applyCamera();
   updateUnderwater();
@@ -1507,6 +1636,8 @@ function frame(now: number): void {
   nearbyPet: () => nearbyPet?.instanceId ?? "",
   carrying: () => carrying,
   putDownFits: () => putDownAt !== null,
+  mounted: () => riding.mounted(),
+  ride: () => riding.state(),
   layout: () => layout,
   chopping: () => trees.chopping(),
   kitchenInReach: () => kitchen.inReach(),

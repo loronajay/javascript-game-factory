@@ -20,7 +20,7 @@
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { findAnimal, findAnimalPalette, type AnimalDefinition } from "./farm-catalog/animals.mjs";
-import { animalTrack, splitAnimalClips, type AnimalClips } from "./farm-animal-clips.mjs";
+import { animalTrack, namedAnimalClips, splitAnimalClips, type AnimalClips } from "./farm-animal-clips.mjs";
 import { materialForAnimalPalette } from "./farm-pet-palettes.mjs";
 import type { PetBody as PetPose } from "./farm-pets.mjs";
 
@@ -49,14 +49,31 @@ export type BodyOptions<S extends BodySpecies = BodySpecies> = Readonly<{
   paint: (THREE: ThreeNamespace, material: any, species: S, paletteId: string) => any;
 }>;
 
-/** The pets: Gobkit animals, one track cut into clips, the palette ramp over the atlas. */
+/** A pet's clips: the Gobkit pack's one track cut by frames, or a named-clip model's own (the horse). */
+export function petClips(THREE: ThreeNamespace, gltf: any, species: AnimalDefinition): AnimalClips {
+  return species.model.kind === "named" ? namedAnimalClips(gltf, species.model.clips) : splitAnimalClips(THREE, animalTrack(gltf), species.clips);
+}
+
+/** One of a pet's materials for its palette: the atlas ramp, or a named-material model's coat repainted by material name. */
+export function paintPetMaterial(THREE: ThreeNamespace, material: any, species: AnimalDefinition, paletteId: string): any {
+  const palette = findAnimalPalette(species.id, paletteId) ?? species.palettes[0]!;
+  if (species.model.kind !== "named") return materialForAnimalPalette(THREE, material, palette);
+  const copy = material.clone();
+  const color = palette.materials?.[String(material.name ?? "")];
+  if (color) copy.color = new THREE.Color(color);
+  copy.roughness = palette.finish === "pearl" ? 0.45 : Math.max(copy.roughness ?? 0.8, 0.72);
+  copy.metalness = palette.finish === "pearl" ? 0.25 : 0;
+  copy.needsUpdate = true;
+  return copy;
+}
+
+/** The pets: Gobkit animals (one track cut into clips, the palette ramp over the atlas) and the horse (named clips, repainted coat). */
 export const PET_BODY_OPTIONS: BodyOptions<AnimalDefinition> = Object.freeze({
   name: "pets",
   lookup: (speciesId: string) => findAnimal(speciesId),
   assetUrl: (species: AnimalDefinition) => assetUrlFor(species),
-  clips: (THREE: ThreeNamespace, gltf: any, species: AnimalDefinition) => splitAnimalClips(THREE, animalTrack(gltf), species.clips),
-  paint: (THREE: ThreeNamespace, material: any, species: AnimalDefinition, paletteId: string) =>
-    materialForAnimalPalette(THREE, material, findAnimalPalette(species.id, paletteId) ?? species.palettes[0]!),
+  clips: petClips,
+  paint: paintPetMaterial,
 });
 
 export type PetBodyView = Readonly<{ instanceId: string; name: string; radius: number; pose: Readonly<{ x: number; z: number }> }>;
@@ -105,7 +122,8 @@ type Body = {
 };
 
 export function assetUrlFor(species: AnimalDefinition): string {
-  return new URL(`../farm/assets/animals/${species.file}`, import.meta.url).toString();
+  const folder = species.model.kind === "named" ? species.model.folder : "animals";
+  return new URL(`../farm/assets/${folder}/${species.file}`, import.meta.url).toString();
 }
 
 function wrapAngle(angle: number): number {
@@ -298,8 +316,8 @@ export function createPetBodies<S extends BodySpecies = AnimalDefinition>(THREE:
   }
 
   function ease(body: Body, pet: PetPose, dt: number): void {
-    // A carried pet is glued to the player's hand: any easing would trail it behind a walking player.
-    const blend = pet.state === "carried" ? 1 : 1 - Math.exp(-EASE_RATE * dt);
+    // A carried pet is glued to the player's hand, and a ridden horse to the saddle the camera sits in: any easing would trail it.
+    const blend = pet.state === "carried" || pet.state === "ridden" ? 1 : 1 - Math.exp(-EASE_RATE * dt);
     body.x += (pet.x - body.x) * blend;
     body.z += (pet.z - body.z) * blend;
     body.y += (pet.hover - body.y) * blend;
@@ -329,9 +347,12 @@ export function createPetBodies<S extends BodySpecies = AnimalDefinition>(THREE:
         body.visual.scale.setScalar(pet.sizeMultiplier);
         body.tag.position.y = body.height * pet.sizeMultiplier + TAG_HEIGHT_PADDING;
         ease(body, pet, dt);
-        play(body, pet.moving ? body.clips.walk : body.clips.idle);
+        // A ridden horse names its gait (walk, trot, gallop, in the air); every other body walks or stands.
+        const gaitClip = pet.gait ? body.clips[pet.gait] ?? (pet.gait === "idle" ? body.clips.idle : body.clips.walk) : null;
+        const clip = gaitClip ?? (pet.moving ? body.clips.walk : body.clips.idle);
+        play(body, clip);
         // A quicker individual steps quicker, so its feet keep up with the ground it covers.
-        if (body.mixer && body.clips.walk) body.mixer.clipAction(body.clips.walk).timeScale = pet.pace ?? 1;
+        if (body.mixer && clip && clip !== body.clips.idle) body.mixer.clipAction(clip).timeScale = pet.gait ? pet.gaitRate ?? 1 : pet.pace ?? 1;
         body.mixer?.update(dt);
         body.clock += dt;
         if (body.heart.visible) {

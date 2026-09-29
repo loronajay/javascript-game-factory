@@ -67,6 +67,7 @@ import {
   butcherQuality,
   livestockButcherXp,
   cleanLivestockName,
+  farmHerdHomes,
   farmLivestockHomes,
   farmLivestockProductsFor,
   feedLivestockCare,
@@ -155,7 +156,7 @@ export async function buyFarmLivestock(pool: any, input: any, random: () => numb
     if (herd.length >= MAX_HERD) return { ok: false, error: "herd_full" };
     const level = farmingLevelForXp(normalizeHusbandryRecord(farm.layout.skills?.husbandry).xp);
     if (level < species.minLevel) return { ok: false, error: "level_too_low", minLevel: species.minLevel, level };
-    const home = pickFarmLivestockHome(farmLivestockHomes(farm.layout.decor), herd.map((row) => row.home_id ?? null), input?.homeId, species.id);
+    const home = pickFarmLivestockHome(farmHerdHomes(farm.layout), herd.map((row) => row.home_id ?? null), input?.homeId, species.id);
     if (!home) return { ok: false, error: input?.homeId ? "home_full" : "no_room" };
     const spend = await spendTicketsInTransaction(client, {
       playerId, transactionKey, amount: species.price, reason: "farm_livestock_purchase",
@@ -199,7 +200,7 @@ export async function moveFarmLivestock(pool: any, input: any) {
     const animal = herd.find((row) => row.animal_id === animalId);
     if (!animal) return { ok: false, error: "not_found" };
     if (wanted !== null) {
-      const homes = farmLivestockHomes(farm.layout.decor);
+      const homes = farmHerdHomes(farm.layout);
       if (!homes.some((entry) => entry.id === wanted)) return { ok: false, error: "unknown_home" };
       const others = herd.filter((row) => row.animal_id !== animalId).map((row) => row.home_id ?? null);
       if (!pickFarmLivestockHome(homes, others, wanted, animal.species_id)) return { ok: false, error: "home_full" };
@@ -312,7 +313,7 @@ async function settleHerd(client: any, playerId: string, layout: any, rows: any[
 async function deliverYoung(client: any, playerId: string, layout: any, living: any[], clock: number, random: () => number) {
   const births: { id: string; name: string; speciesId: string; motherName: string; grade: number }[] = [];
   const achievements: any[] = [];
-  const homes = farmLivestockHomes(layout.decor);
+  const homes = farmHerdHomes(layout);
   const skills = normalizeFarmSkillRecords(layout.skills);
   let husbandry = skills.husbandry;
   for (const mother of [...living]) {
@@ -400,7 +401,7 @@ export async function careFarmLivestock(pool: any, input: any, now: number = Dat
       if (!mother || !sire) return answer({ ok: false, error: settled.deaths.some((death) => death.id === animalId || death.id === mateId) ? "died" : "not_found" });
       const level = farmingLevelForXp(normalizeHusbandryRecord(layout.skills?.husbandry).xp);
       const freePlaces = freePlacesForYoung(
-        farmLivestockHomes(layout.decor),
+        farmHerdHomes(layout),
         settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })),
         String(mother.species_id),
       );

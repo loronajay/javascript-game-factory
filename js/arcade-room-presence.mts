@@ -32,6 +32,17 @@
 
 import { resolveFactoryNetworkUrl } from "./platform/api/factory-network-url.mjs";
 
+/** What a rider sits on (the farm's horse, FARM_RIDING_PLAN.md): drawn under them by everyone else. */
+export type PresenceMount = Readonly<{
+  speciesId: string;
+  paletteId: string;
+  gait: "idle" | "walk" | "trot" | "run" | "jump";
+  /** Hooves above the ground (a jump). */
+  y: number;
+  /** The horse's size multiplier. */
+  size: number;
+}>;
+
 export type PresencePose = Readonly<{
   x: number;
   z: number;
@@ -39,6 +50,8 @@ export type PresencePose = Readonly<{
   moving: boolean;
   /** What the player is doing beyond walking: a cabinet title while playing, else "". */
   activity: string;
+  /** The horse under them, when riding. */
+  mount?: PresenceMount;
 }>;
 
 export type PresenceIdentity = Readonly<{
@@ -141,14 +154,35 @@ export function normalizeChatText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_LENGTH) : "";
 }
 
+const MOUNT_GAITS: ReadonlySet<string> = new Set(["idle", "walk", "trot", "run", "jump"]);
+
+/** A rider's horse made safe (the bridge's `sanitizeMount`), or null. */
+export function normalizePresenceMount(value: unknown): PresenceMount | null {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!source) return null;
+  const speciesId = typeof source.speciesId === "string" ? source.speciesId : "";
+  const paletteId = typeof source.paletteId === "string" ? source.paletteId : "";
+  if (!/^pet\.[a-z0-9-]{1,32}$/.test(speciesId) || !/^[a-z0-9-]{1,24}$/.test(paletteId)) return null;
+  const clampTo = (raw: unknown, min: number, max: number, fallback: number) => Math.min(max, Math.max(min, finite(raw, fallback)));
+  return Object.freeze({
+    speciesId,
+    paletteId,
+    gait: (MOUNT_GAITS.has(String(source.gait)) ? source.gait : "idle") as PresenceMount["gait"],
+    y: clampTo(source.y, -2, 4, 0),
+    size: clampTo(source.size, 0.4, 1.3, 1),
+  });
+}
+
 export function normalizePresencePose(value: unknown, previous: PresencePose | null = null): PresencePose {
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const mount = normalizePresenceMount(source.mount);
   return Object.freeze({
     x: finite(source.x, previous?.x ?? 0),
     z: finite(source.z, previous?.z ?? 0),
     yaw: finite(source.yaw, previous?.yaw ?? 0),
     moving: source.moving === true,
     activity: cleanText(source.activity).slice(0, 40),
+    ...(mount ? { mount } : {}),
   });
 }
 
@@ -158,7 +192,10 @@ export function posesDiffer(a: PresencePose | null, b: PresencePose): boolean {
     || Math.abs(a.z - b.z) > POSE_EPSILON
     || Math.abs(a.yaw - b.yaw) > YAW_EPSILON
     || a.moving !== b.moving
-    || a.activity !== b.activity;
+    || a.activity !== b.activity
+    || a.mount?.gait !== b.mount?.gait
+    || a.mount?.paletteId !== b.mount?.paletteId
+    || Math.abs((a.mount?.y ?? 0) - (b.mount?.y ?? 0)) > 0.05;
 }
 
 function normalizeMember(value: unknown, now: number): RemoteMember | null {

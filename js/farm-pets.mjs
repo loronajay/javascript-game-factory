@@ -313,6 +313,8 @@ export function createPetSim(options) {
     function tickPet(pet, dt, player) {
         pet.moving = false;
         const { species } = pet;
+        if (pet.state === "ridden")
+            return;
         if (pet.state === "carried") {
             const pose = carryPose(player);
             pet.x = pose.x;
@@ -400,6 +402,7 @@ export function createPetSim(options) {
             state: pet.state,
             moving: pet.moving,
             pace: pet.pace,
+            ...(pet.state === "ridden" && pet.gait ? { gait: pet.gait, gaitRate: pet.gaitRate ?? 1 } : {}),
         };
     }
     return Object.freeze({
@@ -477,7 +480,7 @@ export function createPetSim(options) {
         },
         pickUp(instanceId) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-            if (!pet || pet.state === "carried")
+            if (!pet || pet.state === "carried" || pet.state === "ridden" || pet.species.ridable)
                 return false;
             pet.state = "carried";
             pet.moving = false;
@@ -512,6 +515,45 @@ export function createPetSim(options) {
             const pet = pets.find((candidate) => candidate.state === "carried");
             return pet ? view(pet) : null;
         },
+        mount(instanceId) {
+            const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+            if (!pet || !pet.species.ridable || pet.state === "carried" || pet.state === "ridden")
+                return false;
+            pet.state = "ridden";
+            pet.moving = false;
+            pet.timer = 0;
+            pet.gait = "idle";
+            pet.gaitRate = 1;
+            return true;
+        },
+        ride(instanceId, pose) {
+            const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+            if (!pet || pet.state !== "ridden")
+                return;
+            pet.x = pose.x;
+            pet.z = pose.z;
+            pet.yaw = pose.yaw;
+            pet.hover = pose.y;
+            pet.gait = pose.gait;
+            pet.gaitRate = pose.gaitRate;
+            pet.moving = pose.gait !== "idle";
+        },
+        dismount(instanceId) {
+            const pet = pets.find((candidate) => candidate.instanceId === instanceId);
+            if (!pet || pet.state !== "ridden")
+                return false;
+            pet.targetX = pet.x;
+            pet.targetZ = pet.z;
+            pet.hover = 0;
+            pet.gait = undefined;
+            pet.gaitRate = undefined;
+            startIdle(pet);
+            return true;
+        },
+        ridden() {
+            const pet = pets.find((candidate) => candidate.state === "ridden");
+            return pet ? view(pet) : null;
+        },
         attention(instanceId) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
             if (!pet)
@@ -523,7 +565,7 @@ export function createPetSim(options) {
         },
         call(instanceId, player) {
             const pet = pets.find((candidate) => candidate.instanceId === instanceId);
-            if (!pet || pet.state === "carried")
+            if (!pet || pet.state === "carried" || pet.state === "ridden")
                 return false;
             pet.state = "called";
             pet.targetX = player.x;

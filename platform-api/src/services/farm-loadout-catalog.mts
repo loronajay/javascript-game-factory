@@ -34,6 +34,7 @@
 import { FARM_CATALOG_IDS, FARM_STARTER_IDS } from "./farm-ticket-catalog.mjs";
 import { findFarmSpecies } from "./farm-economy-catalog.mjs";
 import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
+import { normalizeFarmHorseRiding, pinFarmHorseRiding } from "./farm-horse-catalog.mjs";
 import { farmCropRule } from "./farm-crop-catalog.mjs";
 import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, verifyFarmClock } from "./farm-time-policy.mjs";
 import { emptyFarmSkillRecords, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
@@ -368,7 +369,9 @@ function normalizePetProfile(value: any): any | null {
   };
   // Stat progression: shape-bounded here, species-bounded and pinned against the stored row below.
   const growth = normalizeFarmPetGrowthShape(value.growth);
-  return growth ? { ...profile, growth } : profile;
+  // A horse's riding block (services/farm-horse-catalog): shape here, pinned from the stored row below.
+  const riding = normalizeFarmHorseRiding(value.riding);
+  return { ...profile, ...(growth ? { growth } : {}), ...(riding ? { riding } : {}) };
 }
 
 function normalizePetRow(raw: any): any | null {
@@ -379,6 +382,9 @@ function normalizePetRow(raw: any): any | null {
   const row: any = { instanceId, speciesId, name: cleanName(source.name, NAME_LIMIT) };
   const profile = normalizePetProfile(source.profile);
   if (profile) row.profile = profile;
+  // A horse's Stable stall (FARM_RIDING_PLAN.md): server-assigned at purchase, pinned on save below.
+  const stall = typeof source.stall === "string" && /^[a-z0-9-]{1,40}#stall-\d{1,2}$/.test(source.stall) ? source.stall : "";
+  if (stall) row.stall = stall;
   return row;
 }
 
@@ -504,11 +510,16 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
       return starterTransition && row.speciesId === "pet.corgi" && row.instanceId === "corgi-1";
     }).map((row: any) => {
       const stored: any = currentPets.get(row.instanceId);
+      // A horse's stall is the server's to give: a save keeps the stored one, never a new one.
+      const { stall: _submittedStall, ...unstalled } = row;
+      row = stored?.stall ? { ...unstalled, stall: stored.stall } : unstalled;
       if (!stored?.profile || !row.profile) return row;
       // Stats grow now: the roll (grade/base/rates) is pinned from the stored row, the
       // earned part is bounded by age, and `stats` is recomputed — never taken from the client.
       const grown = pinFarmPetGrowth(findFarmSpecies(row.speciesId), row.profile, stored.profile);
-      const { growth: _submittedGrowth, ...submitted } = row.profile;
+      const { growth: _submittedGrowth, riding: _submittedRiding, ...submitted } = row.profile;
+      // A horse's riding stats are rolled at purchase and trained only by verified rides: the stored block, always.
+      const riding = pinFarmHorseRiding(stored.profile.riding);
       return {
         ...row,
         profile: {
@@ -520,6 +531,7 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
           paletteId: stored.profile.paletteId,
           paletteBonus: stored.profile.paletteBonus,
           ...(grown ? { growth: grown.growth } : stored.profile.growth ? { growth: stored.profile.growth } : {}),
+          ...(riding ? { riding } : {}),
         },
       };
     });

@@ -10,7 +10,17 @@ import { ANIMAL_CLIP_FPS, type AnimalClipTable } from "./farm-catalog/animals.mj
 
 type ThreeNamespace = Record<string, any>;
 
-export type AnimalClips = Readonly<{ idle: any; attack: any; dead: any; walk: any }>;
+/** The four clips every animal has, plus the riding gaits a named-clip model (the horse) adds. */
+export type AnimalClips = Readonly<{ idle: any; attack: any; dead: any; walk: any; trot?: any; run?: any; jump?: any }>;
+
+/** A named-clip model's clips by state (the horse: its walk, trot, gallop and jump). A missing clip is null. */
+export function namedAnimalClips(gltf: Readonly<{ animations?: readonly any[] }>, names: Readonly<Record<string, string>>): AnimalClips {
+  const named = (name: string | undefined): any => (name ? gltf.animations?.find((clip: any) => clip?.name === name) ?? null : null);
+  return Object.freeze({
+    idle: named(names.idle), walk: named(names.walk), attack: named(names.attack), dead: named(names.dead),
+    trot: named(names.trot), run: named(names.run), jump: named(names.jump),
+  });
+}
 
 export const ANIMAL_CLIP_NAMES = Object.freeze(["idle", "attack", "dead", "walk"] as const);
 

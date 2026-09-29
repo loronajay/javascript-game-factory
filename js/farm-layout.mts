@@ -48,6 +48,8 @@ export type FarmPet = Readonly<{
   name: string;
   /** Current catalog species always have a profile; null remains readable for forward/backward document compatibility. */
   profile: PetProfile | null;
+  /** A horse's Stable stall (`<stableId>#stall-N`, a livestock home id): it takes that stall's one place. Server-assigned at purchase. */
+  stall?: string;
 }>;
 
 export type PetDepartureOutcome = "runaway" | "starvation" | "old_age" | "neglect";
@@ -296,7 +298,8 @@ function normalizePet(value: unknown): FarmPet | null {
   if (profile && profile.traits.length === 0 && migratedProfile) {
     profile = normalizePetProfile(species.id, { ...profile, traits: migratedProfile.traits });
   }
-  return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile };
+  const stall = typeof (source as any).stall === "string" && /^[a-z0-9-]{1,40}#stall-\d{1,2}$/.test((source as any).stall) ? (source as any).stall as string : "";
+  return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile, ...(stall ? { stall } : {}) };
 }
 
 function finiteNumber(value: unknown): value is number {

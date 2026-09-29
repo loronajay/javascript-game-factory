@@ -19,6 +19,8 @@ import {
   type PetGrowthOutlook,
   type PetTreatmentKind,
 } from "./farm-pet-growth.mjs";
+import { HORSE_LIFE_DAYS, HORSE_SPECIES_ID, normalizeHorseRiding, rollHorseRiding, type HorseRiding } from "./farm-horse-riding.mjs";
+import { rideTraitsFor, type RideTraitMultipliers } from "./farm-ride-profile.mjs";
 
 export type PetGender = "female" | "male";
 export type PetTraitRarity = "common" | "uncommon" | "rare";
@@ -142,6 +144,11 @@ export function petTraitMultiplier(profile: Readonly<{ traits: readonly string[]
   return (profile?.traits ?? []).reduce((product, id) => product * (findPetTrait(id)?.multipliers[key] ?? 1), 1);
 }
 
+/** A horse's riding effects from its traits (`farm-ride-profile.mts`), each the product over its traits. */
+export function petRideTraits(profile: Readonly<{ traits: readonly string[] }> | null | undefined): RideTraitMultipliers {
+  return rideTraitsFor(profile?.traits ?? []);
+}
+
 export function petHasTrait(profile: Readonly<{ traits: readonly string[] }> | null | undefined, predicate: (trait: PetTrait) => boolean): boolean {
   return (profile?.traits ?? []).some((id) => { const entry = findPetTrait(id); return entry ? predicate(entry) : false; });
 }
@@ -179,7 +186,8 @@ type CareSpec = Readonly<{
   speciesId: string;
   maxLifeDays: number;
   food: Readonly<{ id: string; title: string; price: number; starter?: number }>;
-  dwelling: Readonly<{ id: string; title: string }>;
+  /** `id` is a `decor.prop.*` stem; `itemId` names any other decor row outright (the horse's home is a Stable). */
+  dwelling: Readonly<{ id: string; title: string; itemId?: string }>;
   speed: Range;
   strength: Range;
   toys?: readonly Readonly<{ itemId: string; title: string }>[];
@@ -196,7 +204,7 @@ function care(spec: CareSpec): PetCareDefinition {
     adoptionPrice: 1200,
     food: Object.freeze({ itemId: `food.${spec.food.id}`, title: spec.food.title, price: spec.food.price, starterQuantity: spec.food.starter ?? 0 }),
     needs: Object.freeze({ hungerPerDay: 25, hungerPerServing: 35 }),
-    dwelling: Object.freeze({ itemId: `decor.prop.${spec.dwelling.id}`, title: spec.dwelling.title }),
+    dwelling: Object.freeze({ itemId: spec.dwelling.itemId ?? `decor.prop.${spec.dwelling.id}`, title: spec.dwelling.title }),
     toys: Object.freeze([...(spec.toys ?? [])].map((toy) => Object.freeze({ ...toy }))),
     // Relative multipliers: the catalog's world-space height remains the species' base size.
     size: COMMON_SIZE,
@@ -242,6 +250,10 @@ export const PET_CARE: readonly PetCareDefinition[] = Object.freeze([
   care({ speciesId: "pet.jellyfish", maxLifeDays: 70, food: { id: "plankton-blend", title: "Plankton Blend", price: 28 }, dwelling: { id: "jellyfish-lagoon", title: "Jellyfish Lagoon" }, speed: { min: 12, max: 35 }, strength: { min: 8, max: 25 }, toys: [
     toy("glass-float", "Glass Float"), toy("coral-fan", "Coral Fan"), toy("current-spinner", "Current Spinner"),
   ] }),
+  // The horse (FARM_RIDING_PLAN.md): bought from Hollis, lives in a Stable stall, eats oats.
+  care({ speciesId: HORSE_SPECIES_ID, maxLifeDays: HORSE_LIFE_DAYS, food: { id: "oats", title: "Oats", price: 20 }, dwelling: { id: "stable", title: "Stable", itemId: "decor.building.stable" }, speed: { min: 45, max: 80 }, strength: { min: 40, max: 75 }, toys: [
+    toy("salt-lick", "Salt Lick"), toy("hanging-ball", "Hanging Ball"), toy("jump-pole", "Jump Pole"),
+  ] }),
 ]);
 
 /** Complete starting-profile rows, named separately so care and identity remain clear at call sites. */
@@ -266,6 +278,8 @@ export type PetProfile = Readonly<{
   paletteBonus: number;
   /** Stat progression; `stats` is always derived from this plus the palette bonus. */
   growth: PetGrowth;
+  /** A horse's Stamina and Agility and its training (`farm-horse-riding.mts`); absent on every other pet. */
+  riding?: HorseRiding;
 }>;
 
 export function findPetCare(speciesId: unknown): PetCareDefinition | undefined {
@@ -357,6 +371,8 @@ export function createPetProfile(speciesId: string, random: () => number): PetPr
   const paletteBonus = palette?.statBoost ?? 0;
   // Rolled last so every earlier draw (and every existing seeded test) is unchanged.
   const growth = rollPetGrowth(care, { speed: baseSpeed, strength: baseStrength }, palette?.tier ?? "classic", random);
+  // A horse's riding stats come after everything else, on the same potential.
+  const riding = speciesId === HORSE_SPECIES_ID ? rollHorseRiding(growth.grade, random) : null;
   return Object.freeze({
     gender,
     ageDays: 0,
@@ -371,6 +387,7 @@ export function createPetProfile(speciesId: string, random: () => number): PetPr
     paletteId: palette?.id ?? "standard",
     paletteBonus,
     growth,
+    ...(riding ? { riding } : {}),
   });
 }
 
@@ -426,6 +443,7 @@ export function normalizePetProfile(speciesId: string, value: unknown): PetProfi
     paletteId: palette?.id ?? "standard",
     paletteBonus,
     growth,
+    ...(speciesId === HORSE_SPECIES_ID ? { riding: normalizeHorseRiding((source as any).riding, rollHorseRiding(growth.grade, seededRandom(`${speciesId}:riding:${gender}:${round(growth.base.speed, 3)}`))) } : {}),
   });
 }
 

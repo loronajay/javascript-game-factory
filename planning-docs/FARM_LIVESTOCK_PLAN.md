@@ -239,7 +239,7 @@ land gets bigger, so it follows the livestock phases.
    with the daily caps raised to 10,000, and fish list on it too
    (`db/farm-fish-listing.mts`, same `listed` escrow, buyer needs creel room).
    Not built: pedigree view, trading pets.
-7. **Horse** — ridable pet. Scoped in its own plan: `FARM_RIDING_PLAN.md` (the horse as a pet, cosmetic riding everywhere, piloted riding in Windrush Downs off the Market Square).
+7. ✅ **Horse** — ridable pet (built 2026-09-29). Scoped and built in its own plan: `FARM_RIDING_PLAN.md` (the horse as a pet, cosmetic riding everywhere, piloted riding in Windrush Downs off the Market Square).
 
 Later, outside this plan: **Weaving** (wool → cloth/goods at a loom), pig
 **truffle hunting**, pet breeding.

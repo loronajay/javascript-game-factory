@@ -271,6 +271,52 @@ function pushingLog(THREE: ThreeNamespace): ToyModel {
   return still(group);
 }
 
+// ---------------------------------------------------------------- horse
+
+function saltLick(THREE: ThreeNamespace): ToyModel {
+  const group = new THREE.Group();
+  const wood = timber(THREE, "#6b4527");
+  tbox(THREE, group, [0.08, 0.9, 0.08], [0, 0.45, 0], wood);
+  tbox(THREE, group, [0.34, 0.04, 0.34], [0, 0.02, 0], wood);
+  // The block on its holder, worn smooth on one face.
+  const holder = standard(THREE, "#3b3b3b", 0.6, 0.5);
+  tbox(THREE, group, [0.26, 0.03, 0.2], [0, 0.72, 0.1], holder);
+  box(THREE, group, [0.22, 0.2, 0.16], [0, 0.84, 0.1], standard(THREE, "#e9ddd0", 0.55, 0));
+  sphere(THREE, group, 0.07, [0, 0.86, 0.18], standard(THREE, "#d9c6b0", 0.3, 0)).scale.set(1.2, 0.8, 0.4);
+  return still(group);
+}
+
+function hangingBall(THREE: ThreeNamespace): ToyModel {
+  const group = new THREE.Group();
+  const wood = timber(THREE, "#5d3a1f");
+  for (const x of [-0.55, 0.55]) tbox(THREE, group, [0.09, 2, 0.09], [x, 1, 0], wood);
+  tbox(THREE, group, [1.2, 0.09, 0.09], [0, 1.98, 0], wood);
+  const swing = new THREE.Group();
+  swing.position.y = 1.94;
+  group.add(swing);
+  cord(THREE, swing, 0, 0, 0, -0.62, rope(THREE));
+  sphere(THREE, swing, 0.2, [0, -0.8, 0], standard(THREE, "#e8453c", 0.45, 0));
+  torus(THREE, swing, 0.2, 0.012, [0, -0.8, 0], standard(THREE, "#f5f0d0", 0.5, 0), false);
+  let time = 0;
+  return { group, animate: (dt) => { time += dt; swing.rotation.z = Math.sin(time * 1.1) * 0.12; } };
+}
+
+function jumpPole(THREE: ThreeNamespace): ToyModel {
+  const group = new THREE.Group();
+  const white = standard(THREE, "#f2f2ee", 0.6, 0);
+  const red = standard(THREE, "#d83c3c", 0.6, 0);
+  // Two wings and a striped pole across them at a small horse's height.
+  for (const x of [-1.1, 1.1]) {
+    tbox(THREE, group, [0.1, 0.95, 0.1], [x, 0.475, 0], white);
+    tbox(THREE, group, [0.36, 0.06, 0.36], [x, 0.03, 0], white);
+    box(THREE, group, [0.06, 0.05, 0.14], [x - Math.sign(x) * 0.08, 0.62, 0], standard(THREE, "#555555", 0.5, 0.6));
+  }
+  for (let index = 0; index < 8; index += 1) {
+    lying(THREE, group, 0.05, 0.25, [-0.875 + index * 0.25, 0.66, 0], index % 2 ? red : white);
+  }
+  return still(group);
+}
+
 // ---------------------------------------------------------------- bat
 
 function fruitMobile(THREE: ThreeNamespace): ToyModel {
@@ -495,6 +541,9 @@ export const FARM_TOY_BUILDERS: Readonly<Record<string, ToyBuilder>> = Object.fr
   "toy-tractor-tire": tractorTire,
   "toy-scratch-boulder": scratchBoulder,
   "toy-pushing-log": pushingLog,
+  "toy-salt-lick": saltLick,
+  "toy-hanging-ball": hangingBall,
+  "toy-jump-pole": jumpPole,
   "toy-fruit-mobile": fruitMobile,
   "toy-moth-lantern": mothLantern,
   "toy-swing-perch": swingPerch,

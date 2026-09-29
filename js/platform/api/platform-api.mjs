@@ -652,6 +652,25 @@ export function createPlatformApiClient(options = {}) {
         buyFarmLivestock({ purchaseId, speciesId, homeId, name }) {
             return post("/games/farm/livestock/purchases", { purchaseId, speciesId, homeId, name }, "result", {}, true);
         },
+        /** One of Hollis's horses for today (FARM_RIDING_PLAN.md): the server rolls it from the day's seed and stables it. */
+        buyFarmHorse({ day, slot, name }) {
+            return post("/games/farm/horses/purchases", { day, slot, name }, "result", {}, true);
+        },
+        /** A finished Windrush Downs course run: the server rides it again from its reins and pays Riding XP and training for what really happened. */
+        submitFarmRidingRun(run) {
+            return post("/games/farm/riding/runs", run, "result", {}, true);
+        },
+        /** The Downs race board: live races (and a signed-in rider's seat), plus the last hour's results. */
+        fetchFarmRaces() {
+            return get("/games/farm/downs/races");
+        },
+        postFarmRace(race) {
+            return post("/games/farm/downs/races", race, "result", {}, true);
+        },
+        /** Enter, leave, start (the poster), bet on, or settle (with the race room's signed result) one race. */
+        farmRaceAction(raceId, action, body = {}) {
+            return post(`/games/farm/downs/races/${encodeURIComponent(raceId)}/${action}`, body, "result", {}, true);
+        },
         /** Lead an animal to another home (null: out onto the field). */
         moveFarmLivestock({ animalId, homeId }) {
             return post("/games/farm/livestock/moves", { animalId, homeId }, "result", {}, true);

@@ -179,14 +179,22 @@ export function getPetInteraction(code: string): PetInteraction | null {
 }
 
 /** The complete set of actions this pet offers right now, rendered as one contextual prompt. */
-export function getPetInteractionPrompt(name: string, capabilities: Readonly<{ canPickUp: boolean; canFeed: boolean; canPlay: boolean }>): string {
+export function getPetInteractionPrompt(name: string, capabilities: Readonly<{ canPickUp: boolean; canFeed: boolean; canPlay: boolean; ridable?: boolean }>): string {
   return PET_INTERACTIONS
     .filter((interaction) => interaction.available === "always"
       || interaction.available === "canPickUp" && capabilities.canPickUp
       || interaction.available === "canFeed" && capabilities.canFeed
       || interaction.available === "canPlay" && capabilities.canPlay)
-    .map((interaction) => `${interaction.key} ${interaction.label}${interaction.id === "pet" ? ` ${name}` : ""}`)
+    // A horse is too big to pet from the ground the way a corgi is: E climbs on (FARM_RIDING_PLAN.md).
+    .map((interaction) => `${interaction.key} ${interaction.id === "pet" && capabilities.ridable ? "Ride" : interaction.label}${interaction.id === "pet" ? ` ${name}` : ""}`)
     .join(" · ");
+}
+
+/** What the prompt says while riding (FARM_RIDING_PLAN.md): the reins, and how to get down — on the farm, anywhere; away from it, at a hitching rail; at the Downs, never. */
+export function getRidingPrompt(name: string, where: "farm" | "away" | "downs" = "farm"): string {
+  if (where === "downs") return `Riding ${name} · W urge on · Shift gallop · S rein in · A/D turn · Space jump`;
+  if (where === "away") return `Riding ${name} · W walk on · Shift trot · S rein in · A/D turn · tie up at a hitching rail to walk`;
+  return `Riding ${name} · W walk on · Shift trot · S rein in · A/D turn · E dismount`;
 }
 
 /** How far ahead of the player a carried pet is set down: its own radius past the arm's reach, so it never lands on the player's feet. */
