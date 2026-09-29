@@ -88,7 +88,6 @@ export const MARKET_DECOR: readonly FarmDecorRow[] = Object.freeze([
   row("market-wagon", "decor.prop.wagon", 11.1, -8.6, 0.12),
   row("market-pump", "decor.prop.water-pump", -3.4, 5.6),
   row("market-flowers-1", "decor.plant.flower-bed", -6.2, 11.9),
-  row("market-flowers-2", "decor.plant.flower-bed", 6.2, 11.9),
   row("market-gazebo", "decor.building.gazebo", -9.2, 8.6),
   // Trees in the corners, clear of the stalls and the road in.
   row("market-oak-1", "decor.plant.oak", -11.6, -5.4),
@@ -192,7 +191,7 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
   }),
   stall({
     id: BUTCHER_STALL_ID, kind: "stall", title: "Butcher", open: true,
-    x: 8.9, z: 11.3, rotationY: Math.PI, colors: ["#8e2a2a", "#f4ecd6"],
+    x: 5.6, z: 11.3, rotationY: Math.PI, colors: ["#8e2a2a", "#f4ecd6"],
     keeper: Object.freeze({ name: "Otto", avatarId: "avatar.ogre-heavy", greeting: "Raised one to its prime? I'll make it worth your while — good cuts, graded fair." }),
     closedNote: "",
   }),
