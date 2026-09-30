@@ -34,6 +34,7 @@
 import { FARM_CATALOG_IDS, FARM_STARTER_IDS } from "./farm-ticket-catalog.mjs";
 import { findFarmSpecies } from "./farm-economy-catalog.mjs";
 import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
+import { normalizeFarmPetLineage } from "./farm-pet-breeding-policy.mjs";
 import { normalizeFarmHorseRiding, pinFarmHorseRiding } from "./farm-horse-catalog.mjs";
 import { farmCropRule } from "./farm-crop-catalog.mjs";
 import { farmLivestockGood } from "./farm-livestock-catalog.mjs";
@@ -415,6 +416,11 @@ function normalizePetRow(raw: any): any | null {
   // A horse's Stable stall (FARM_RIDING_PLAN.md): server-assigned at purchase, pinned on save below.
   const stall = typeof source.stall === "string" && /^[a-z0-9-]{1,40}#stall-\d{1,2}$/.test(source.stall) ? source.stall : "";
   if (stall) row.stall = stall;
+  // Breeding (db/farm-pet-breeding.mts): the rest stamp and a young one's parents are server-set, pinned on save below.
+  const bredAt = boundedNumber(source.bredAt, 1e10);
+  if (bredAt !== null && bredAt >= 0) row.bredAt = Math.floor(bredAt);
+  const lineage = normalizeFarmPetLineage(source.lineage);
+  if (lineage) row.lineage = lineage;
   return row;
 }
 
@@ -541,8 +547,11 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
     }).map((row: any) => {
       const stored: any = currentPets.get(row.instanceId);
       // A horse's stall is the server's to give: a save keeps the stored one, never a new one.
-      const { stall: _submittedStall, ...unstalled } = row;
+      const { stall: _submittedStall, bredAt: _submittedBredAt, lineage: _submittedLineage, ...unstalled } = row;
       row = stored?.stall ? { ...unstalled, stall: stored.stall } : unstalled;
+      // Breeding's rest stamp and lineage are the server's to write, like the stall.
+      if (typeof stored?.bredAt === "number") row = { ...row, bredAt: stored.bredAt };
+      if (stored?.lineage) row = { ...row, lineage: stored.lineage };
       if (!stored?.profile || !row.profile) return row;
       // Stats grow now: the roll (grade/base/rates) is pinned from the stored row, the
       // earned part is bounded by age, and `stats` is recomputed — never taken from the client.

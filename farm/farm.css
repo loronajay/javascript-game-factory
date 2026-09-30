@@ -554,6 +554,9 @@ kbd, .farm-button kbd {
 .pet-row__traits li { padding: 4px 8px; border: 1px solid rgba(158,226,122,.28); border-radius: 999px; color: #dff6ce; background: var(--hud-leaf-soft); font-size: 10.5px; }
 .pet-row__traits li.pet-row__trait--uncommon { border-color: rgba(122,190,255,.45); color: #d6ecff; background: rgba(122,190,255,.1); }
 .pet-row__traits li.pet-row__trait--rare { border-color: rgba(255,204,92,.6); color: #ffe9b8; background: rgba(255,204,92,.12); }
+.pet-row__family { margin: 0; color: #f5b8d8; font-size: 11px; line-height: 1.4; }
+.pet-row__breed { padding-top: 8px; border-top: 1px solid var(--hud-line); }
+.pet-row__breed-note { flex: 1 1 100%; margin: 0; color: var(--hud-text-soft); font: 500 11px/1.4 var(--hud-font); }
 .pet-row__care { display: grid; gap: 4px; margin: 0; padding: 7px 9px; border-radius: 7px; background: var(--hud-surface-sunken); color: var(--hud-text-soft); font-size: 11px; line-height: 1.4; }
 .pet-row__care strong { display: inline-block; min-width: 38px; color: var(--hud-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 9px; }
 .pet-row__care-item { color: var(--hud-text-muted); white-space: nowrap; }

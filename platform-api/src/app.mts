@@ -346,6 +346,7 @@ export function createApp(options: any = {}) {
   const cookFarmDish = typeof options?.cookFarmDish === "function" ? options.cookFarmDish : null;
   const millFarmLogs = typeof options?.millFarmLogs === "function" ? options.millFarmLogs : null;
   const craftFarmPiece = typeof options?.craftFarmPiece === "function" ? options.craftFarmPiece : null;
+  const breedFarmPets = typeof options?.breedFarmPets === "function" ? options.breedFarmPets : null;
   const inviteFarmTrade = typeof options?.inviteFarmTrade === "function" ? options.inviteFarmTrade : null;
   const getCurrentFarmTrade = typeof options?.getCurrentFarmTrade === "function" ? options.getCurrentFarmTrade : null;
   const getFarmTrade = typeof options?.getFarmTrade === "function" ? options.getFarmTrade : null;
@@ -707,7 +708,7 @@ export function createApp(options: any = {}) {
     getPlayerAchievements,
   };
   const ticketServices = { getTicketWallet, getTicketShop, purchaseTicketShopItem };
-  const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder, cookFarmDish, millFarmLogs, craftFarmPiece };
+  const farmEconomyServices = { adoptFarmPet, purchaseFarmSupply, harvestFarmCrop, harvestFarmTree, sellFarmProduce, getFarmOrderBoard, fillFarmOrder, cookFarmDish, millFarmLogs, craftFarmPiece, breedFarmPets };
   const farmTradeServices = { inviteFarmTrade, getCurrentFarmTrade, getFarmTrade, actOnFarmTrade };
   const farmListingServices = { getFarmListings, createFarmListing, buyFarmListing, withdrawFarmListing };
   const farmFishingServices = { getFarmFishShadows, getFarmFishRecords, getFarmFishing, castFarmLine, landFarmCast, sellFarmFish, releaseFarmFish, lockFarmFish, buyFarmTackle, getFarmFishDetails, mountFarmFish };

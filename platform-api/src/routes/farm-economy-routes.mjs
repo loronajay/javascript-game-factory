@@ -17,7 +17,8 @@ export async function handleFarmEconomyRoute(context) {
     const cooking = pathname === "/games/farm/kitchen/cooks" && method === "POST";
     const milling = pathname === "/games/farm/workshop/mills" && method === "POST";
     const crafting = pathname === "/games/farm/workshop/crafts" && method === "POST";
-    if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder && !cooking && !milling && !crafting)
+    const breeding = pathname === "/games/farm/pets/breedings" && method === "POST";
+    if (!adopting && !buyingSupply && !harvesting && !harvestingTree && !selling && !readingOrders && !fillingOrder && !cooking && !milling && !crafting && !breeding)
         return false;
     if (!authClaims?.playerId) {
         writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
@@ -39,6 +40,8 @@ export async function handleFarmEconomyRoute(context) {
         return handleMill(context);
     if (crafting)
         return handleCraft(context);
+    if (breeding)
+        return handleBreeding(context);
     const action = adopting ? services?.adoptFarmPet : services?.purchaseFarmSupply;
     if (typeof action !== "function") {
         writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
@@ -328,6 +331,43 @@ async function handleOrderFill(context) {
     }
     catch {
         writeJson(res, 400, { status: "error", error: "invalid_farm_order", timestamp }, requestOrigin);
+    }
+    return true;
+}
+/**
+ * POST /games/farm/pets/breedings — self only. The body names a mother, a
+ * father, the young one's name and a breed id; whether the pair may breed, the
+ * fee and everything the young one inherits are the server's, read off the
+ * STORED farm (db/farm-pet-breeding.mts). Refusals return the stored farm.
+ */
+async function handleBreeding(context) {
+    const { req, res, authClaims, requestOrigin, timestamp, services } = context;
+    if (typeof services?.breedFarmPets !== "function") {
+        writeJson(res, 503, { status: "error", error: "farm_economy_not_configured", timestamp }, requestOrigin);
+        return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+        writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+        return true;
+    }
+    try {
+        const breeding = await services.breedFarmPets({
+            playerId: authClaims.playerId,
+            motherId: body.value?.motherId,
+            fatherId: body.value?.fatherId,
+            name: body.value?.name,
+            breedId: body.value?.breedId,
+        });
+        if (!breeding?.ok) {
+            const conflict = new Set(["insufficient_tickets", "farm_full", "not_grown", "hungry", "unhappy", "resting"]);
+            writeJson(res, conflict.has(breeding?.error) ? 409 : 400, { status: "error", ...breeding, timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { breeding }, requestOrigin);
+    }
+    catch {
+        writeJson(res, 400, { status: "error", error: "invalid_farm_breeding", timestamp }, requestOrigin);
     }
     return true;
 }

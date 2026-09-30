@@ -239,7 +239,7 @@ Every row is a decor row under `decor.prop.<id>`, referenced by the species' car
 
 - [ ] **Tricks:** roll over, backflip, run in a circle, play dead, and teaching progression. Scope with bespoke animations. **Next design pass.**
 - [~] **Minigames/competitive trials:** the first offline Barnyard Dash slice now provides player-controlled racing versus CPU and reads canonical farm pets without taking ownership of them. Network authority, rewards, accomplishment records, and the other event concepts remain deferred; see `planning-docs/PET_MINIGAMES_PLAN.md`.
-- [ ] **Breeding:** inheritance, capacity, lifecycle, consent/pairing rules, economy, and UI all require a separate design.
+- [x] **Breeding (2026-09-29):** a grown, fed, content female and male of one species pair from the Pets panel for 600 tickets; each rests 5 farm days after. The young one keeps one trait from each parent (rare and shared traits likelier to be the one passed), may inherit more, then rolls its own 1–3 on top, so a bred pet always carries more traits than an adopted one. Palette and potential lean toward the parents' (harder when both are rare); stats lean 60% toward the parents' average. Rules in `js/farm-pet-breeding.mts`, mirrored by `platform-api/src/services/farm-pet-breeding-policy.mts` (parity test), minted server-side by `db/farm-pet-breeding.mts` via `POST /games/farm/pets/breedings`. Horses are excluded (Hollis/stalls). No pregnancy: the young one is born at once.
 
 ## Resolved decisions for later outcome slices
 

@@ -23,6 +23,7 @@ import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tic
 import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
+import { breedFarmPets } from "./db/farm-pet-breeding.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
 import { butcherFarmLivestock, buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
@@ -297,6 +298,7 @@ async function bootstrap() {
         cookFarmDish: (params) => cookFarmDish(pool, params),
         millFarmLogs: (params) => millFarmLogs(pool, params),
         craftFarmPiece: (params) => craftFarmPiece(pool, params),
+        breedFarmPets: (params) => breedFarmPets(pool, params),
         sellFarmProduce: (params) => sellFarmProduce(pool, params),
         getFarmOrderBoard: (params) => getFarmOrderBoard(pool, params),
         fillFarmOrder: (params) => fillFarmOrder(pool, params),

@@ -29,6 +29,7 @@ import { normalizeFarmTrees, type FarmTree } from "./farm-trees.mjs";
 import { OFFLINE_PRODUCTION_RATE, clampOfflineRate } from "./farm-offline.mjs";
 import { TREE_PLOT_ITEM_ID } from "./farm-catalog/trees.mjs";
 import { createPetProfile, normalizePetProfile, type PetProfile } from "./farm-pet-care.mjs";
+import { normalizePetLineage, type PetLineage } from "./farm-pet-breeding.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
 import type { LayoutDocumentSpec } from "./arcade-room-store.mjs";
 
@@ -51,6 +52,10 @@ export type FarmPet = Readonly<{
   profile: PetProfile | null;
   /** A horse's Stable stall (`<stableId>#stall-N`, a livestock home id): it takes that stall's one place. Server-assigned at purchase. */
   stall?: string;
+  /** Farm minute this pet last bred (farm-pet-breeding.mts); server-set, it rests BREED_REST_DAYS after. */
+  bredAt?: number;
+  /** A bred pet's parents and generation; server-set at birth, absent on an adopted pet. */
+  lineage?: PetLineage;
 }>;
 
 export type PetDepartureOutcome = "runaway" | "starvation" | "old_age" | "neglect";
@@ -317,7 +322,14 @@ function normalizePet(value: unknown): FarmPet | null {
     profile = normalizePetProfile(species.id, { ...profile, traits: migratedProfile.traits });
   }
   const stall = typeof (source as any).stall === "string" && /^[a-z0-9-]{1,40}#stall-\d{1,2}$/.test((source as any).stall) ? (source as any).stall as string : "";
-  return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile, ...(stall ? { stall } : {}) };
+  const bredAt = typeof (source as any).bredAt === "number" && Number.isFinite((source as any).bredAt) && (source as any).bredAt >= 0 ? Math.floor((source as any).bredAt) : null;
+  const lineage = normalizePetLineage((source as any).lineage);
+  return {
+    instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile,
+    ...(stall ? { stall } : {}),
+    ...(bredAt !== null ? { bredAt } : {}),
+    ...(lineage ? { lineage } : {}),
+  };
 }
 
 function finiteNumber(value: unknown): value is number {

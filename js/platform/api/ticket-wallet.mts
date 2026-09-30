@@ -34,6 +34,9 @@ export function createTicketWalletClient(options: any = {}) {
     adoptFarmPet(speciesId: string, name: string, purchaseId: string) {
       return api.adoptFarmPet({ speciesId, name, purchaseId });
     },
+    breedFarmPets(motherId: string, fatherId: string, name: string, breedId: string) {
+      return api.breedFarmPets({ motherId, fatherId, name, breedId });
+    },
     purchaseFarmSupply(itemId: string, quantity: number, purchaseId: string, at?: { venue: "market"; day: number }) {
       return api.purchaseFarmSupply({ itemId, quantity, purchaseId, ...(at ?? {}) });
     },

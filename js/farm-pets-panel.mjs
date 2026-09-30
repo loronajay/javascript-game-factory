@@ -18,6 +18,9 @@ const gainedMarkup = (gained) => gained && gained >= 0.1 ? ` <span class="pet-ro
 import { petNeedStatus } from "./farm-pet-needs.mjs";
 import { petOutcomeWarning } from "./farm-pet-outcomes.mjs";
 import { petCareSummary } from "./farm-pet-happiness.mjs";
+import { BREEDING_PRICE, BREEDING_REFUSAL_WORDS, breedingOdds, breedingRefusal, breedingRestMinutes } from "./farm-pet-breeding.mjs";
+import { HORSE_SPECIES_ID } from "./farm-horse-riding.mjs";
+import { DAY_MINUTES } from "./farm-time.mjs";
 function escapeHtml(value) {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
 }
@@ -112,11 +115,18 @@ export function createPetsPanel(elements, actions, options = {}) {
                 const rarity = trait && trait.rarity !== "common" ? ` · ${trait.rarity === "rare" ? "Rare" : "Uncommon"} trait` : "";
                 return trait ? `<li class="pet-row__trait pet-row__trait--${trait.rarity}" title="${escapeHtml(trait.description + rarity)}">${escapeHtml(trait.title)}</li>` : "";
             }).join("")}</ul>` : "";
+            const rest = breedingRestMinutes(pet, options.farmMinutes?.() ?? layout.clock.farmMinutes);
+            const family = [
+                pet.lineage ? `Gen ${pet.lineage.generation} · of ${escapeHtml(pet.lineage.mother.name || "?")} &amp; ${escapeHtml(pet.lineage.father.name || "?")}` : "",
+                rest > 0 ? `Resting after breeding · ${(rest / DAY_MINUTES).toFixed(1)} days` : "",
+            ].filter(Boolean);
+            const familyMarkup = family.length ? `<p class="pet-row__family">${family.join(" · ")}</p>` : "";
             row.innerHTML = `<div class="pet-row__head"><span class="pet-row__species">${escapeHtml(species?.title ?? pet.speciesId)}${palette && palette.id !== "standard" ? ` · ${escapeHtml(animalPaletteDisplayName(palette))}` : ""}</span>`
                 + `<input class="pet-row__name" type="text" maxlength="${PET_NAME_MAX_LENGTH}" value="${escapeHtml(pet.name)}" aria-label="Name of ${escapeHtml(pet.name)}">`
                 + `<button class="pet-row__release" type="button" data-release="${escapeHtml(pet.instanceId)}" title="Release ${escapeHtml(pet.name)}">Release</button></div>`
                 + statMarkup
                 + (warning && warning.stage !== "safe" ? `<p class="pet-row__warning pet-row__warning--${warning.stage}"><strong>${escapeHtml(warning.label)}:</strong> ${escapeHtml(warning.message)}</p>` : "")
+                + familyMarkup
                 + traitMarkup
                 + careMarkup;
             const input = row.querySelector(".pet-row__name");
@@ -137,8 +147,73 @@ export function createPetsPanel(elements, actions, options = {}) {
             row.querySelector(".pet-row__release").addEventListener("click", async () => {
                 setStatus(await actions.release(pet.instanceId));
             });
+            const breeding = breedBlock(pet);
+            if (breeding)
+                row.append(breeding);
             return row;
         }));
+    }
+    const percent = (chance) => `${Math.round(chance * 100)}%`;
+    /** What pairing her with this male would pass on, in one line. */
+    function oddsLine(mother, father) {
+        if (!mother.profile || !father.profile)
+            return "";
+        const odds = breedingOdds(mother.speciesId, mother.profile, father.profile);
+        const looks = [...new Set([mother.profile.paletteId, father.profile.paletteId])].map((id) => {
+            const palette = findAnimalPalette(mother.speciesId, id);
+            const chance = odds.palettes.find((row) => row.paletteId === id)?.chance ?? 0;
+            return palette ? `${animalPaletteDisplayName(palette)} ${percent(chance)}` : "";
+        }).filter(Boolean).join(" · ");
+        const potential = odds.grade.mother + odds.grade.father;
+        return `Keeps one trait from each parent, then rolls 1–3 of its own. Looks: ${looks}.`
+            + (potential > 0 ? ` A parent's potential: ${percent(potential)}.` : "");
+    }
+    function breedBlock(pet) {
+        if (!layout || pet.profile?.gender !== "female" || pet.speciesId === HORSE_SPECIES_ID)
+            return null;
+        const block = document.createElement("div");
+        block.className = "livestock-breed livestock-breed--pick pet-row__breed";
+        const males = layout.pets.filter((other) => other.speciesId === pet.speciesId && other.profile?.gender === "male");
+        if (!males.length) {
+            block.textContent = `No ${findAnimal(pet.speciesId)?.title.toLowerCase() ?? "male"} ♂ on the farm to pair her with.`;
+            return block;
+        }
+        const clock = options.farmMinutes?.() ?? layout.clock.farmMinutes;
+        const refusalOf = (father) => breedingRefusal(pet, father, clock, layout.pets.length, MAX_PETS);
+        const label = document.createElement("span");
+        label.className = "livestock-breed__label";
+        label.textContent = "Pair with";
+        const select = document.createElement("select");
+        select.className = "livestock-breed__mate";
+        for (const male of males) {
+            const option = document.createElement("option");
+            option.value = male.instanceId;
+            const refusal = refusalOf(male);
+            option.textContent = refusal ? `${male.name} — ${BREEDING_REFUSAL_WORDS[refusal]}` : `${male.name} ♂`;
+            select.append(option);
+        }
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "livestock-breed__go";
+        button.textContent = `Breed · ${BREEDING_PRICE.toLocaleString()}`;
+        button.title = `Breed for ${BREEDING_PRICE.toLocaleString()} tickets`;
+        const note = document.createElement("p");
+        note.className = "pet-row__breed-note";
+        const refresh = () => {
+            const father = males.find((male) => male.instanceId === select.value) ?? males[0];
+            const refusal = refusalOf(father);
+            button.disabled = Boolean(refusal);
+            note.textContent = refusal ? BREEDING_REFUSAL_WORDS[refusal] : oddsLine(pet, father);
+        };
+        select.addEventListener("change", refresh);
+        select.addEventListener("keydown", (event) => event.stopPropagation());
+        button.addEventListener("click", async () => {
+            button.disabled = true;
+            setStatus(await actions.breed(pet.instanceId, select.value));
+        });
+        refresh();
+        block.append(label, select, button, note);
+        return block;
     }
     async function adopt() {
         if (!selectedSpecies) {

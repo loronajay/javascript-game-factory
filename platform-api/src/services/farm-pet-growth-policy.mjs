@@ -16,7 +16,8 @@ const GRADES = Object.freeze([
     Object.freeze({ id: "exceptional", multiplier: 1.8 }),
     Object.freeze({ id: "prodigy", multiplier: 2.5 }),
 ]);
-const GRADE_WEIGHTS = Object.freeze({
+/** Potential odds by palette tier, in GRADES order (exported for breeding's fresh roll). */
+export const GRADE_WEIGHTS = Object.freeze({
     classic: [72, 21, 6, 1], uncommon: [64, 26, 8, 2], rare: [45, 33, 17, 5], "super-rare": [25, 35, 28, 12],
 });
 const STAGES = Object.freeze([{ id: "youth", until: 0.4, weight: 1.2 }, { id: "adult", until: 0.75, weight: 0.8 }, { id: "elder", until: Infinity, weight: 0 }]);
@@ -77,6 +78,16 @@ export function rollFarmPetGrowth(species, base, tier, random) {
             break;
         }
     }
+    return farmPetGrowthForGrade(species, base, grade.id, random);
+}
+/** Grade ids best-last, for comparing potentials (breeding keeps the better of rolled and inherited). */
+export const FARM_PET_GROWTH_GRADE_IDS = Object.freeze(GRADES.map((grade) => grade.id));
+/** A fresh growth block at a decided potential, consuming the two rate jitters in the client's order. */
+export function farmPetGrowthForGrade(species, base, gradeId, random) {
+    const life = species ? FARM_PET_LIFESPANS[species.id] : undefined;
+    if (!species || !life)
+        return null;
+    const grade = GRADES.find((entry) => entry.id === gradeId) ?? GRADES[0];
     const rate = (range) => round(baseGrowthRate(range, life) * grade.multiplier * (RATE_JITTER.min + (RATE_JITTER.max - RATE_JITTER.min) * unit(random())), 5);
     return {
         grade: grade.id,

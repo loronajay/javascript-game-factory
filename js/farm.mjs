@@ -73,7 +73,8 @@ import { createFarmInventoryPanel } from "./farm-inventory-panel.mjs";
 import { createCropThumbnails } from "./farm-crop-thumbnails.mjs";
 import { completeFarmOnboarding, markFarmIntroSeen } from "./farm-onboarding.mjs";
 import { advancePetNeeds, advancePetProfile, feedPet, petNeedStatus } from "./farm-pet-needs.mjs";
-import { findPetCare, treatmentNote } from "./farm-pet-care.mjs";
+import { findPetCare, findPetTrait, treatmentNote } from "./farm-pet-care.mjs";
+import { BREEDING_PRICE, BREEDING_REFUSAL_WORDS } from "./farm-pet-breeding.mjs";
 import { applyPetCareMilestones, petCareEnvironment, reactToPetInteraction } from "./farm-pet-happiness.mjs";
 import { reactToPetCall } from "./farm-pet-outcomes.mjs";
 const THREE = THREE_VENDOR;
@@ -1207,7 +1208,34 @@ const petsPanel = createPetsPanel({
             return "";
         return (leaving?.name ?? "Your pet") + " went back to the wild. " + await persistLayout(next);
     },
-}, { thumbnail: speciesThumbnails.get });
+    breed: async (motherId, fatherId) => {
+        if (!layoutStore.accountBacked)
+            return "Sign in to breed your pets.";
+        // The server judges the pair on the STORED farm: save how they are right now first.
+        await persistFarmProgress();
+        const result = await ticketClient.breedFarmPets(motherId, fatherId, "", farmPurchaseId("breed"));
+        if (!result?.ok) {
+            if (result?.layout) {
+                const stored = normalizeFarmLayout(result.layout);
+                applyLayout(stored);
+                farmEditor.replaceLayout(stored);
+            }
+            if (result?.error === "insufficient_tickets")
+                return `Breeding costs ${BREEDING_PRICE.toLocaleString()} tickets.`;
+            const words = BREEDING_REFUSAL_WORDS[result?.error];
+            return words ?? "That pairing did not go through. Try again.";
+        }
+        const next = normalizeFarmLayout(result.layout);
+        applyLayout(next);
+        farmEditor.replaceLayout(next);
+        if (Number.isSafeInteger(result.balance))
+            publishTicketBalance(result.balance);
+        const young = next.pets.at(-1);
+        const title = (id) => (id && findPetTrait(id)?.title) || "";
+        const passed = [title(result.inherited?.fromMother), title(result.inherited?.fromFather), ...(result.inherited?.extra ?? []).map(title)].filter(Boolean);
+        return `${young?.name ?? "A young one"} was born${passed.length ? `, inheriting ${passed.join(", ")}` : ""}. Rename it in its row. ${Number(result.balance).toLocaleString()} tickets remain.`;
+    },
+}, { thumbnail: speciesThumbnails.get, farmMinutes: () => clockMinutes });
 petsPanel.render(layout);
 if (visiting)
     openPetsButton.hidden = true;

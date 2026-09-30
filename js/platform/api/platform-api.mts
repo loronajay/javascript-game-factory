@@ -578,6 +578,10 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     adoptFarmPet({ speciesId, name, purchaseId }: { speciesId: string; name: string; purchaseId: string }) {
       return post("/games/farm/adoptions", { speciesId, name, purchaseId }, "purchase", {}, true);
     },
+    /** Pair two pets: the server checks the pair on the stored farm, takes the fee and decides what the young one inherits. */
+    breedFarmPets({ motherId, fatherId, name, breedId }: { motherId: string; fatherId: string; name: string; breedId: string }) {
+      return post("/games/farm/pets/breedings", { motherId, fatherId, name, breedId }, "breeding", {}, true);
+    },
     /** Seeds, saplings, feed, Market ingredients and recipe cards. Market purchases name the day shown at the counter. */
     purchaseFarmSupply({ itemId, quantity, purchaseId, venue, day }: { itemId: string; quantity: number; purchaseId: string; venue?: "market"; day?: number }) {
       return post("/games/farm/supplies/purchases", { itemId, quantity, purchaseId, ...(venue === "market" ? { venue, day } : {}) }, "purchase", {}, true);

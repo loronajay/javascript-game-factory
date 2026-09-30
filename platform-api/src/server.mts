@@ -34,6 +34,7 @@ import { getTicketShop, getTicketWallet, purchaseTicketShopItem } from "./db/tic
 import { adoptFarmPet, fillFarmOrder, getFarmOrderBoard, harvestFarmCrop, harvestFarmTree, purchaseFarmSupply, sellFarmProduce } from "./db/farm-economy.mjs";
 import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
+import { breedFarmPets } from "./db/farm-pet-breeding.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
 import { butcherFarmLivestock, buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
@@ -447,6 +448,7 @@ async function bootstrap(): Promise<void> {
     cookFarmDish: (params: any) => cookFarmDish(pool, params),
     millFarmLogs: (params: any) => millFarmLogs(pool, params),
     craftFarmPiece: (params: any) => craftFarmPiece(pool, params),
+    breedFarmPets: (params: any) => breedFarmPets(pool, params),
     sellFarmProduce: (params: any) => sellFarmProduce(pool, params),
     getFarmOrderBoard: (params: any) => getFarmOrderBoard(pool, params),
     fillFarmOrder: (params: any) => fillFarmOrder(pool, params),

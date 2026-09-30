@@ -28,6 +28,7 @@ import { normalizeFarmTrees } from "./farm-trees.mjs";
 import { OFFLINE_PRODUCTION_RATE, clampOfflineRate } from "./farm-offline.mjs";
 import { TREE_PLOT_ITEM_ID } from "./farm-catalog/trees.mjs";
 import { createPetProfile, normalizePetProfile } from "./farm-pet-care.mjs";
+import { normalizePetLineage } from "./farm-pet-breeding.mjs";
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
 export const FARM_LAYOUT_VERSION = 3;
 /** The walkable field. The inset is how far in from the field's edge anything may stand. */
@@ -218,7 +219,14 @@ function normalizePet(value) {
         profile = normalizePetProfile(species.id, { ...profile, traits: migratedProfile.traits });
     }
     const stall = typeof source.stall === "string" && /^[a-z0-9-]{1,40}#stall-\d{1,2}$/.test(source.stall) ? source.stall : "";
-    return { instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile, ...(stall ? { stall } : {}) };
+    const bredAt = typeof source.bredAt === "number" && Number.isFinite(source.bredAt) && source.bredAt >= 0 ? Math.floor(source.bredAt) : null;
+    const lineage = normalizePetLineage(source.lineage);
+    return {
+        instanceId: source.instanceId, speciesId: species.id, name: cleanPetName(source.name) || species.title, profile,
+        ...(stall ? { stall } : {}),
+        ...(bredAt !== null ? { bredAt } : {}),
+        ...(lineage ? { lineage } : {}),
+    };
 }
 function finiteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
