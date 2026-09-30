@@ -34,7 +34,10 @@ import {
   waterFarmCrop,
 } from "../farm-crops.mjs";
 import { PET_CARE } from "../farm-pet-care.mjs";
-import { INGREDIENT_STOCK, RECIPE_STOCK } from "../farm-vendor-stock.mjs";
+import { INGREDIENT_STOCK, LIVESTOCK_GOODS_STOCK, MEAT_STOCK, RECIPE_STOCK } from "../farm-vendor-stock.mjs";
+import { LIVESTOCK_GOODS, LIVESTOCK_MEATS } from "../farm-catalog/livestock.mjs";
+import { tackleFile } from "../farm-fish-portraits.mjs";
+import { FISHING_LURES, FISHING_RODS, WORM_ID } from "../farm-catalog/fish.mjs";
 import { LEVEL_RECIPE_CATALOG, VENDOR_RECIPE_CATALOG } from "../farm-catalog/recipes.mjs";
 import { producePrice } from "../farm-market-prices.mjs";
 import { createFarmCropsController } from "../farm-crops-controller.mjs";
@@ -62,6 +65,22 @@ test("the Market vendors add retail ingredients and recipes outside the Cooking 
     assert.ok(recipe.price >= 100);
     assert.ok(!LEVEL_RECIPE_CATALOG.includes(recipe));
   }
+});
+
+test("Marigold sells the herd's goods and Otto every meat, above peak-day resale", () => {
+  assert.deepEqual(LIVESTOCK_GOODS_STOCK.map((line) => line.id), LIVESTOCK_GOODS.map((good) => good.itemId));
+  assert.deepEqual(MEAT_STOCK.map((line) => line.id), LIVESTOCK_MEATS.map((meat) => meat.itemId));
+  for (const line of [...LIVESTOCK_GOODS_STOCK, ...MEAT_STOCK]) {
+    assert.equal(line.itemId, `ingredient.${line.id}`);
+    assert.equal(line.itemKey, `produce:${line.id}`);
+    assert.ok(line.price > Math.ceil(producePrice(line.id) * 1.2), `${line.id} cannot be flipped on the best market day`);
+  }
+});
+
+test("every piece of tackle in the inventory has a model to portray it", () => {
+  for (const item of [...FISHING_RODS, ...FISHING_LURES]) assert.equal(tackleFile(item.id), item.file);
+  assert.equal(tackleFile(WORM_ID), "worm.glb");
+  assert.equal(tackleFile("rod.99"), null);
 });
 
 test("the farming catalog exposes every growth-cycle crop and the inventory includes pet-food supplies", () => {

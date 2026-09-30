@@ -204,7 +204,14 @@ export function createFishThumbnails(THREE: ThreeNamespace, onReady: () => void)
       return request(`fish:${speciesId}:${variant}`, () => loadFish(THREE, speciesId, 1, variant).then((fish) => fish.root));
     },
     prop(file) {
-      return request(`prop:${file}`, () => loadFishingProp(file));
+      return request(`prop:${file}`, () => loadFishingProp(file).then((model) => {
+        if (!file.startsWith("fishing-rod")) return model;
+        // A rod stands upright and is a sliver in a wide card: lay it across the card, butt low, tip high.
+        const tilted = new THREE.Group();
+        model.rotation.z = -1.05;
+        tilted.add(model);
+        return tilted;
+      }));
     },
     dispose: () => thumbnails.dispose(),
   });

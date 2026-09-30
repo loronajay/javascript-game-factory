@@ -51,6 +51,8 @@ export type FarmOrderBoard = Readonly<{
   level: number;
   levels: Readonly<Record<FarmOrderSkill, number>>;
   produce: Readonly<Record<string, number>>;
+  /** The herd goods in `produce` the farm collected itself: only these fill a herd notice. */
+  raised: Readonly<Record<string, number>>;
   dishes: Readonly<Record<string, number>>;
   /** The creel, as the server read it with the board. */
   fish: readonly AnglerFish[];
@@ -76,6 +78,11 @@ function counts(value: unknown, known: (id: string) => boolean = isBasketKey): R
   const result: Record<string, number> = {};
   for (const [id, raw] of Object.entries(source)) if (known(id)) result[id] = whole(raw);
   return result;
+}
+
+/** The farm's raised herd goods (the server's `inventory.raised`), by basket key. */
+export function normalizeRaisedGoods(value: unknown): Readonly<Record<string, number>> {
+  return Object.freeze(counts(value, (key) => Boolean(findLivestockGood(parseProduceKey(key)?.itemId ?? ""))));
 }
 
 const isDishKey = (id: string) => DISH_KEYS.includes(id);
@@ -115,17 +122,23 @@ export function normalizeOrderBoard(value: unknown): FarmOrderBoard | null {
       husbandry: Math.max(1, whole(source.husbandry?.level)),
     }),
     produce: Object.freeze(counts(source.produce)),
+    raised: normalizeRaisedGoods(source.raised),
     dishes: Object.freeze(counts(source.dishes, isDishKey)),
     fish: Object.freeze((Array.isArray(source.creel) ? source.creel : []).map(normalizeAnglerFish).filter((fish: AnglerFish | null): fish is AnglerFish => Boolean(fish))),
   });
 }
 
-export type OrderLineView = Readonly<{ cropId: string; title: string; need: number; held: number; short: number; /** The model that portrays it (farm-item-models.mts). */ itemKey: string }>;
+export type OrderLineView = Readonly<{
+  cropId: string; title: string; need: number; held: number; short: number;
+  /** A herd line: pieces in the basket that were bought or traded for, which it will not take. */
+  unraised?: number;
+  /** The model that portrays it (farm-item-models.mts). */ itemKey: string;
+}>;
 export type OrderState = "filled" | "locked" | "short" | "ready";
 export type OrderView = Readonly<{ order: FarmOrder; state: OrderState; lines: readonly OrderLineView[] }>;
 
 /** What the player holds toward the board's orders: the basket, the pantry, the creel and the levels. */
-export type OrderStock = Readonly<{ produce: Readonly<Record<string, number>>; dishes: Readonly<Record<string, number>>; fish?: readonly CreelFishLike[]; levels: Readonly<Record<FarmOrderSkill, number>> }>;
+export type OrderStock = Readonly<{ produce: Readonly<Record<string, number>>; raised?: Readonly<Record<string, number>>; dishes: Readonly<Record<string, number>>; fish?: readonly CreelFishLike[]; levels: Readonly<Record<FarmOrderSkill, number>> }>;
 
 export function orderView(order: FarmOrder, stock: OrderStock): OrderView {
   const dish = order.kind === "dish";
@@ -137,6 +150,16 @@ export function orderView(order: FarmOrder, stock: OrderStock): OrderView {
       const held = fishHeldForNeed(stock.fish ?? [], fishNeed, taken);
       for (const fish of pickFishForNeed(stock.fish ?? [], fishNeed, Math.min(held, need), taken) ?? []) taken.add(fish.id);
       return Object.freeze({ cropId: key, title: fishNeedTitle(fishNeed), need, held, short: Math.max(0, need - held), itemKey: `fish:${fishNeedPortraitSpecies(fishNeed)}` });
+    });
+    const state: OrderState = order.filled ? "filled" : (stock.levels[order.skill] ?? 1) < order.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
+    return Object.freeze({ order, state, lines: Object.freeze(lines) });
+  }
+  if (order.kind === "goods") {
+    // A herd notice takes only goods the farm raised; Marigold's and a trade's stay in the basket.
+    const lines = Object.entries(order.lines).map(([id, need]) => {
+      const held = whole(produceHeld(stock.raised ?? {}, id));
+      const unraised = Math.max(0, whole(produceHeld(stock.produce, id)) - held);
+      return Object.freeze({ cropId: id, title: basketItemTitle(id), need, held, short: Math.max(0, need - held), unraised, itemKey: `produce:${id}` });
     });
     const state: OrderState = order.filled ? "filled" : (stock.levels[order.skill] ?? 1) < order.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
     return Object.freeze({ order, state, lines: Object.freeze(lines) });

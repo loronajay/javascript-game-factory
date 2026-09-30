@@ -85,7 +85,7 @@
         <button type="button" role="tab" data-sheet-tab="buy">Buy ingredients</button>
       </nav>
       <div class="inventory-panel__body">
-        <p class="sale-note">Marigold buys every harvest at the day's price and sells Normal-grade ingredients when the kitchen needs something the farm has not grown yet. Shop prices include her retail margin.</p>
+        <p class="sale-note">Marigold buys every harvest at the day's price and sells Normal-grade ingredients — milk, eggs and wool too — when the kitchen needs something the farm has not grown yet. Shop prices include her retail margin.</p>
         <div data-sheet-pane="sell">
           <p id="saleTurnover" class="sale-turnover"></p>
           <ol id="saleList" class="sale-list"></ol>
@@ -141,15 +141,26 @@
 
     <aside id="butcherPanel" class="inventory-panel sale-panel dealer-panel butcher-panel" aria-label="Butcher" hidden>
       <header class="pets-panel__head">
-        <div><span class="eyebrow">BUTCHER · OTTO</span><strong>Send livestock for meat</strong></div>
+        <div><span class="eyebrow">BUTCHER · OTTO</span><strong>Meat &amp; livestock</strong></div>
         <button id="closeButcher" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
+      <nav class="sheet-tabs" role="tablist" aria-label="Butcher">
+        <button type="button" role="tab" data-sheet-tab="cut" aria-selected="true">Send livestock</button>
+        <button type="button" role="tab" data-sheet-tab="meat">Buy meat</button>
+      </nav>
       <div class="inventory-panel__body">
-        <p class="sale-note">Otto takes a grown animal and cuts it into meat for your harvest basket. Yield and age decide how many cuts — the most at its prime, twice its grown age — and its Quality, less the time it spent hungry, decides the grade. An animal sent here leaves your farm for good.</p>
-        <p id="butcherRoom" class="sale-turnover"></p>
-        <ol id="butcherList" class="sale-list dealer-list"></ol>
+        <div data-sheet-pane="cut">
+          <p class="sale-note">Otto takes a grown animal and cuts it into meat for your harvest basket. Yield and age decide how many cuts — the most at its prime, twice its grown age — and its Quality, less the time it spent hungry, decides the grade. An animal sent here leaves your farm for good.</p>
+          <p id="butcherRoom" class="sale-turnover"></p>
+          <ol id="butcherList" class="sale-list dealer-list"></ol>
+        </div>
+        <div data-sheet-pane="meat">
+          <p class="sale-note">No herd of your own yet? Otto sells Normal-grade cuts straight into your harvest basket for the kitchen. Prices include his retail margin.</p>
+          <ol id="meatShelf" class="sale-list vendor-shelf"></ol>
+          <p id="meatStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        </div>
       </div>
-      <footer class="sale-footer">
+      <footer class="sale-footer" data-sheet-pane="cut">
         <p id="butcherStatus" class="pets-status" aria-live="polite"></p>
       </footer>
     </aside>

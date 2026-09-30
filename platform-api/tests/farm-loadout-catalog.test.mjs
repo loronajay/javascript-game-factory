@@ -43,6 +43,19 @@ test("paid ground and decor require server-owned Farm entitlements", () => {
   assert.deepEqual(owned.decor.map((row) => row.itemId), ["decor.building.barn", "decor.building.windmill"]);
 });
 
+test("the raised tally: seeded from an older basket, never above the basket, and a save cannot forge it", () => {
+  // Before the tally no herd good could be bought, so an older basket's were all raised; crops never are.
+  const older = normalizeFarmGarage({ version: 3, onboarding: { status: "complete" }, agriculture: { inventory: { produce: { milk: 3, "egg@fine": 2, tomato: 5 } }, crops: [] } });
+  assert.deepEqual(older.agriculture.inventory.raised, { milk: 3, "egg@fine": 2 });
+  // Once the tally exists it is what it says, held to what the basket still has (the unraised pieces are spent first).
+  const stored = normalizeFarmGarage({ ...older, agriculture: { ...older.agriculture, inventory: { ...older.agriculture.inventory, produce: { milk: 2, "egg@fine": 6 }, raised: { milk: 3, "egg@fine": 2, tomato: 5 } } } });
+  assert.deepEqual(stored.agriculture.inventory.raised, { milk: 2, "egg@fine": 2 });
+  const forged = normalizeFarmGarage({ ...stored, agriculture: { ...stored.agriculture, inventory: { ...stored.agriculture.inventory, raised: { milk: 99, "egg@fine": 99 } } } }, { currentGarage: stored });
+  assert.deepEqual(forged.agriculture.inventory.raised, { milk: 2, "egg@fine": 2 });
+  const dropped = normalizeFarmGarage({ ...stored, agriculture: { ...stored.agriculture, inventory: { ...stored.agriculture.inventory, raised: undefined } } }, { currentGarage: stored });
+  assert.deepEqual(dropped.agriculture.inventory.raised, { milk: 2, "egg@fine": 2 }, "leaving it out of a save re-seeds nothing");
+});
+
 test("ordinary farm saves cannot mint paid pets, seeds, or supplies", () => {
   const existing = normalizeFarmGarage({
     version: 3,
@@ -119,7 +132,7 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     onboarding: { status: "needs_name", introSeen: false },
     ground: "",
     pets: [],
-    agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] },
+    agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] },
     trees: [],
     clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 },
     settings: { awayGrowth: 0.1 },
@@ -161,6 +174,7 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
   assert.deepEqual(garage.agriculture.inventory, {
     seeds: { bean: 4, radish: 99 },
     produce: { bean: 1 },
+    raised: {},
     supplies: { "food.dog-food": 20 },
     saplings: {},
     logs: {},

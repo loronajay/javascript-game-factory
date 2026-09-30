@@ -35,6 +35,8 @@ import { findFarmSpecies } from "./farm-economy-catalog.mjs";
 import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
 import { normalizeFarmHorseRiding, pinFarmHorseRiding } from "./farm-horse-catalog.mjs";
 import { farmCropRule } from "./farm-crop-catalog.mjs";
+import { farmLivestockGood } from "./farm-livestock-catalog.mjs";
+import { parseFarmProduceKey } from "./farm-quality-catalog.mjs";
 import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, clampOfflineRate, offlineRateForSave, verifyFarmClock } from "./farm-time-policy.mjs";
 import { emptyFarmSkillRecords, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
 import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
@@ -88,7 +90,7 @@ function normalizeRotation(value) {
 }
 export function defaultFarmGarage() {
     // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-    return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, settings: { awayGrowth: 0.1 }, skills: emptyFarmSkillRecords() };
+    return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, settings: { awayGrowth: 0.1 }, skills: emptyFarmSkillRecords() };
 }
 function normalizeCropCounts(value) {
     const input = value && typeof value === "object" ? value : {};
@@ -109,6 +111,29 @@ function normalizeProduceCounts(value) {
         if (!PRODUCE_KEY_PATTERN.test(id) || typeof raw !== "number" || !Number.isFinite(raw))
             continue;
         output[id] = Math.min(99, Math.max(0, Math.floor(raw)));
+    }
+    return output;
+}
+/**
+ * The share of the basket's herd goods the farm RAISED — collected from its own
+ * animals — by the same `item@grade` keys as `produce`. Only raised goods fill
+ * the herd's Order Board notices; Marigold's milk, eggs and wool (and goods
+ * received in a trade) are for cooking and selling. Each count is held to what
+ * the basket still has, so anything else that spends a stack spends the
+ * unraised pieces first. A document from before the tally (no `raised` object)
+ * had no way to buy herd goods, so every herd good in its basket was raised.
+ */
+function normalizeRaisedCounts(value, produce) {
+    const seeded = value && typeof value === "object"
+        ? normalizeProduceCounts(value)
+        : Object.fromEntries(Object.entries(produce).filter(([key]) => farmLivestockGood(parseFarmProduceKey(key)?.itemId)));
+    const output = {};
+    for (const [key, count] of Object.entries(seeded)) {
+        if (!farmLivestockGood(parseFarmProduceKey(key)?.itemId))
+            continue;
+        const held = Math.min(Number(count) || 0, Number(produce[key]) || 0);
+        if (held > 0)
+            output[key] = held;
     }
     return output;
 }
@@ -195,9 +220,12 @@ function normalizeAgriculture(value, decorIds) {
             fertilized: row.fertilized === true,
         });
     }
+    const produce = normalizeProduceCounts(inventory.produce);
     return {
         inventory: {
-            seeds: normalizeCropCounts(inventory.seeds), produce: normalizeProduceCounts(inventory.produce), supplies: normalizeSupplyCounts(inventory.supplies),
+            seeds: normalizeCropCounts(inventory.seeds), produce, supplies: normalizeSupplyCounts(inventory.supplies),
+            // The herd goods in `produce` this farm collected itself (normalizeRaisedCounts): the herd notices' stock.
+            raised: normalizeRaisedCounts(inventory.raised, produce),
             // Compost: one made each time a dead crop is dug out, spent to lift a growing crop a grade.
             compost: stackCount(inventory.compost),
             // Productive-tree saplings (bought) and felled logs (server-minted), by species (services/farm-tree-catalog).
@@ -268,6 +296,7 @@ function guardFarmSave(garage, current, context) {
     // Produce and logs are only ever changed by server operations (harvests,
     // picks, fellings, sales, orders). A first save starts with none.
     inventory.produce = { ...(storedInventory.produce ?? {}) };
+    inventory.raised = { ...(storedInventory.raised ?? {}) };
     inventory.logs = { ...(storedInventory.logs ?? {}) };
     inventory.dishes = { ...(storedInventory.dishes ?? {}) };
     inventory.planks = { ...(storedInventory.planks ?? {}) };

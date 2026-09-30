@@ -4,7 +4,7 @@ import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSup
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
 import { farmMarketDay, farmMarketProducePrice, farmMarketSeedPrice } from "../services/farm-market-day.mjs";
-import { farmCropQuality, farmProduceKey, parseFarmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
+import { farmCropQuality, farmProduceHeld, farmProduceKey, parseFarmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { parseFarmDishKey } from "../services/farm-recipe-catalog.mjs";
 import { parseFarmPieceKey, unplacedFarmPieces } from "../services/farm-carpentry-catalog.mjs";
 import { farmHarvestXp, farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeFarmingRecord, recordFarmBarter, recordFarmFelling, recordFarmFruit, recordFarmHarvest, recordFarmOrder, type FarmingRecord } from "../services/farm-skill-catalog.mjs";
@@ -478,6 +478,8 @@ export async function getFarmOrderBoard(pool: any, input: any, now: number = Dat
     cooking: farmingSummary(cooking, cooking.xp),
     husbandry: farmingSummary(husbandry, husbandry.xp),
     produce: layout?.agriculture?.inventory?.produce ?? {},
+    // What a herd notice can take: the goods the farm raised, not the basket's bought ones.
+    raised: layout?.agriculture?.inventory?.raised ?? {},
     dishes: layout?.agriculture?.inventory?.dishes ?? {},
   };
 }
@@ -580,11 +582,18 @@ async function fillHerdOrder(client: any, playerId: string, order: FarmOrder, fa
   const farming = farmingOf(farm.layout);
   if (level < order.minLevel) return { ok: false, error: "level_too_low", skill: "husbandry", minLevel: order.minLevel, level, layout: farm.layout };
   const agriculture = farm.layout.agriculture;
+  // Only goods the farm raised itself fill a herd notice — never Marigold's, never a trade's
+  // (`raised` in the loadout catalog). The plainest raised pieces go first, off both tallies.
   let produce: Record<string, number> = { ...(agriculture?.inventory?.produce ?? {}) };
+  let raised: Record<string, number> = { ...(agriculture?.inventory?.raised ?? {}) };
   for (const [itemId, count] of Object.entries(order.lines)) {
-    const taken = takeFarmProduce(produce, itemId, count);
-    if (!taken) return { ok: false, error: "not_enough_goods", itemId, layout: farm.layout };
-    produce = taken;
+    const taken = takeFarmProduce(raised, itemId, count);
+    if (!taken) {
+      const bought = farmProduceHeld(produce, itemId) >= count;
+      return { ok: false, error: bought ? "goods_not_raised" : "not_enough_goods", itemId, layout: farm.layout };
+    }
+    for (const [key, left] of Object.entries(taken)) produce[key] = (Number(produce[key]) || 0) - ((Number(raised[key]) || 0) - left);
+    raised = taken;
   }
   const award = await awardTicketsInTransaction(client, {
     playerId, transactionKey, amount: order.tickets, reason: "farm_order",
@@ -593,7 +602,7 @@ async function fillHerdOrder(client: any, playerId: string, order: FarmOrder, fa
   const husbandry = recordFarmHerdOrder(before, order.xp);
   const next = normalizeFarmGarage({
     ...farm.layout,
-    agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce } },
+    agriculture: { ...agriculture, inventory: { ...agriculture.inventory, produce, raised } },
     skills: { ...farm.layout.skills, husbandry },
   }, { ownedEntitlementIds: farm.owned });
   await saveFarm(client, playerId, next);

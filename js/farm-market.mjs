@@ -76,7 +76,7 @@ import { createOrderBoardPanel } from "./farm-orders-panel.mjs";
 import { createMarketSawmill } from "./farm-market-sawmill.mjs";
 import { createMarketTrading } from "./farm-market-trading.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
-import { SKILL_TITLES, normalizeOrderBoard } from "./farm-orders.mjs";
+import { SKILL_TITLES, normalizeOrderBoard, normalizeRaisedGoods } from "./farm-orders.mjs";
 import { SELLABLE_DISHES } from "./farm-market-prices.mjs";
 import { farmingLevelForXp } from "./farm-skills.mjs";
 import { barterPurchasePrice, barterSalePrice } from "./farm-bartering.mjs";
@@ -84,7 +84,7 @@ import { createAchievementToaster } from "./platform/achievements/achievements.m
 import { createFarmItemThumbnails } from "./farm-item-thumbnails.mjs";
 import { createFishPortraits } from "./farm-fish-portraits.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
-import { FEED_STOCK, INGREDIENT_STOCK, RECIPE_STOCK } from "./farm-vendor-stock.mjs";
+import { FEED_STOCK, INGREDIENT_STOCK, LIVESTOCK_GOODS_STOCK, MEAT_STOCK, RECIPE_STOCK } from "./farm-vendor-stock.mjs";
 import { createVendorShelf } from "./farm-vendor-shelf.mjs";
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
@@ -439,25 +439,25 @@ const vendorPurchaseMessages = Object.freeze({
     prices_changed: "The market day changed while you were choosing. Check the shelf again.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
 });
-async function buyIngredient(line, quantity) {
+async function buyIngredient(line, quantity, seller = PRODUCE_STALL_ID) {
     if (!market)
         await loadMarketDay();
     if (!market)
-        return { ok: false, message: "Marigold is still opening the till. Try again in a moment." };
+        return { ok: false, message: seller === PRODUCE_STALL_ID ? "Marigold is still opening the till. Try again in a moment." : "Otto is still sharpening his knives. Try again in a moment." };
     const purchaseId = `ingredient-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
     const result = await ticketClient.purchaseFarmSupply(`ingredient.${line.id}`, quantity, purchaseId, { venue: "market", day: market.day });
     takeStock(result?.layout);
     if (!result?.ok)
         return { ok: false, message: vendorPurchaseMessages[result?.error] ?? "The purchase did not go through. Nothing was bought." };
     takeBalance(result.balance);
-    keeperSays(findMarketStall(PRODUCE_STALL_ID), "Straight into your harvest basket.");
+    keeperSays(findMarketStall(seller), seller === PRODUCE_STALL_ID ? "Straight into your harvest basket." : "Wrapped and in your basket. Cook it well.");
     return { ok: true, message: `Bought ${quantity} ${line.title}${quantity === 1 ? "" : "s"} for ${Number(result.price).toLocaleString()} tickets.` };
 }
 const ingredientShelf = createVendorShelf({
     list: requiredElement("#ingredientShelf"),
     status: requiredElement("#ingredientStatus"),
 }, {
-    stock: INGREDIENT_STOCK,
+    stock: [...INGREDIENT_STOCK, ...LIVESTOCK_GOODS_STOCK],
     buy: (line, quantity) => buyIngredient(line, quantity),
     held: (line) => Number(produce[line.id]) || 0,
     price: (base) => barterPurchasePrice(base, barteringLevel()),
@@ -649,6 +649,17 @@ const butcherCounter = createMarketButcher({
     thumbnail: livestockPortraits.get,
     onClose: () => canvas.focus(),
 });
+// Otto's meat counter, the Butcher's second tab: Normal-grade cuts into the basket, bought like Marigold's ingredients.
+const meatShelf = createVendorShelf({
+    list: requiredElement("#meatShelf"),
+    status: requiredElement("#meatStatus"),
+}, {
+    stock: MEAT_STOCK,
+    buy: (line, quantity) => buyIngredient(line, quantity, BUTCHER_STALL_ID),
+    held: (line) => Number(produce[line.id]) || 0,
+    price: (base) => barterPurchasePrice(base, barteringLevel()),
+    thumbnail: itemThumbnails.get,
+});
 void loadHerd();
 const kitchenPanel = createMarketSalePanel({
     root: requiredElement("#kitchenPanel"),
@@ -696,6 +707,7 @@ const orderMessages = Object.freeze({
     not_enough_dishes: "Your pantry came up short when it was counted. Nothing was delivered.",
     not_enough_fish: "Your creel came up short when it was counted (a locked fish never goes). Nothing was delivered.",
     not_enough_goods: "Your basket came up short of milk or wool when it was counted. Nothing was delivered.",
+    goods_not_raised: "The herd's customers only take goods from your own animals — bought or traded milk, eggs and wool don't count. Nothing was delivered.",
     level_too_low: "That order needs a higher level. Nothing was delivered.",
     order_expired: "That notice came down while you were reading it — the board has turned over. Nothing was delivered.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
@@ -707,6 +719,8 @@ function takeBalance(value) {
     publishTicketBalance(balance);
     renderTickets();
 }
+/** The herd goods the farm raised itself, as the board or a fill last said: a herd notice's stock. */
+let raisedGoods = Object.freeze({});
 /** The board as last read: a fish fill answers with the fish it took, and the creel shown is this one less those. */
 let lastBoard = null;
 async function loadOrderBoard() {
@@ -714,6 +728,7 @@ async function loadOrderBoard() {
     // The board carries the basket and pantry as the server holds them now: fresher than the page's.
     if (board) {
         produce = board.produce;
+        raisedGoods = board.raised;
         dishes = board.dishes;
         lastBoard = board;
     }
@@ -732,7 +747,9 @@ async function fillOrder(orderId) {
     const fish = lastBoard ? lastBoard.fish.filter((entry) => !used.has(entry.id)) : undefined;
     if (lastBoard && fish)
         lastBoard = { ...lastBoard, fish };
-    const stock = { produce, dishes, levels, fish };
+    if (layout)
+        raisedGoods = normalizeRaisedGoods(result?.layout?.agriculture?.inventory?.raised);
+    const stock = { produce, raised: raisedGoods, dishes, levels, fish };
     if (!result?.ok) {
         return { ok: false, message: orderMessages[result?.error] ?? "The delivery did not go through. Nothing was taken — try again in a moment.", ...stock };
     }
@@ -921,7 +938,10 @@ function workStall(stall) {
     }
     else if (stall.id === BUTCHER_STALL_ID) {
         butcherCounter.open();
+        meatShelf.render();
         void loadHerd();
+        if (!market)
+            void loadMarketDay();
     }
     else if (stall.id === SEED_STALL_ID) {
         seedPanel.open(seeds);

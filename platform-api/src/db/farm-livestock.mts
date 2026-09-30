@@ -456,13 +456,16 @@ export async function careFarmLivestock(pool: any, input: any, now: number = Dat
     if (held >= MAX_STACK) return answer({ ok: false, error: "basket_full" });
     const collected = Math.min(quantity, MAX_STACK - held);
     produce[key] = held + collected;
+    // Collected from the farm's own animal: these pieces may fill a herd notice (the loadout catalog's `raised`).
+    const raised = { ...(inventory.raised ?? {}) };
+    raised[key] = (Number(raised[key]) || 0) + collected;
     // Husbandry: the good's cycle in farm days, less the share of it the animal went hungry.
     const skills = normalizeFarmSkillRecords(layout.skills);
     const xp = livestockCollectXp(product, care.stress[product.itemId] ?? 0);
     const husbandry = recordFarmCollection(skills.husbandry, product.itemId, collected, xp);
     row.care = { ...care, progress: { ...care.progress, [product.itemId]: 0 }, stress: { ...care.stress, [product.itemId]: 0 } };
     await client.query(`update farm_livestock set care = $3::jsonb, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, animalId, JSON.stringify(row.care)]);
-    layout = { ...layout, agriculture: { ...agriculture, inventory: { ...inventory, produce } }, skills: { ...skills, husbandry } };
+    layout = { ...layout, agriculture: { ...agriculture, inventory: { ...inventory, produce, raised } }, skills: { ...skills, husbandry } };
     const achievements = await awardServerAchievementsInTransaction(client, {
       playerId, gameSlug: "farm", facts: { farming: skills.farming, husbandry }, sourceId: `collect:${animalId}:${Math.round(clock)}`,
     });

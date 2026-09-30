@@ -21,6 +21,8 @@ export type OrderFillOutcome = Readonly<{
   message: string;
   /** The basket, pantry and levels after the server answered, and whether this order is now filled. */
   produce?: Readonly<Record<string, number>>;
+  /** The raised herd goods after the answer (a herd notice takes only these). */
+  raised?: Readonly<Record<string, number>>;
   dishes?: Readonly<Record<string, number>>;
   /** The creel after a fish order took its fish. */
   fish?: FarmOrderBoard["fish"];
@@ -101,7 +103,9 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
       const label = document.createElement("span");
       label.textContent = `${line.need} ${line.title}`;
       const have = document.createElement("small");
-      have.textContent = view.state === "filled" ? "delivered" : `you have ${line.held}`;
+      have.textContent = view.state === "filled" ? "delivered"
+        : line.unraised ? `you raised ${line.held} · ${line.unraised} bought don't count`
+          : view.order.kind === "goods" ? `you raised ${line.held}` : `you have ${line.held}`;
       entry.replaceChildren(portrait, label, have);
       lines.append(entry);
     }
@@ -159,6 +163,7 @@ export function createOrderBoardPanel(elements: Elements, options: Options): Ord
       board = Object.freeze({
         ...board,
         produce: outcome.produce ?? board.produce,
+        raised: outcome.raised ?? board.raised,
         dishes: outcome.dishes ?? board.dishes,
         fish: outcome.fish ?? board.fish,
         levels,

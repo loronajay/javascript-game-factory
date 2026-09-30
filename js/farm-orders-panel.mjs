@@ -64,7 +64,9 @@ export function createOrderBoardPanel(elements, options) {
             const label = document.createElement("span");
             label.textContent = `${line.need} ${line.title}`;
             const have = document.createElement("small");
-            have.textContent = view.state === "filled" ? "delivered" : `you have ${line.held}`;
+            have.textContent = view.state === "filled" ? "delivered"
+                : line.unraised ? `you raised ${line.held} · ${line.unraised} bought don't count`
+                    : view.order.kind === "goods" ? `you raised ${line.held}` : `you have ${line.held}`;
             entry.replaceChildren(portrait, label, have);
             lines.append(entry);
         }
@@ -124,6 +126,7 @@ export function createOrderBoardPanel(elements, options) {
             board = Object.freeze({
                 ...board,
                 produce: outcome.produce ?? board.produce,
+                raised: outcome.raised ?? board.raised,
                 dishes: outcome.dishes ?? board.dishes,
                 fish: outcome.fish ?? board.fish,
                 levels,

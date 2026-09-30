@@ -38,6 +38,10 @@ function counts(value, known = isBasketKey) {
             result[id] = whole(raw);
     return result;
 }
+/** The farm's raised herd goods (the server's `inventory.raised`), by basket key. */
+export function normalizeRaisedGoods(value) {
+    return Object.freeze(counts(value, (key) => Boolean(findLivestockGood(parseProduceKey(key)?.itemId ?? ""))));
+}
 const isDishKey = (id) => DISH_KEYS.includes(id);
 const isRecipe = (id) => Boolean(findRecipe(id));
 const isFishNeed = (id) => Boolean(parseFishNeed(id));
@@ -75,6 +79,7 @@ export function normalizeOrderBoard(value) {
             husbandry: Math.max(1, whole(source.husbandry?.level)),
         }),
         produce: Object.freeze(counts(source.produce)),
+        raised: normalizeRaisedGoods(source.raised),
         dishes: Object.freeze(counts(source.dishes, isDishKey)),
         fish: Object.freeze((Array.isArray(source.creel) ? source.creel : []).map(normalizeAnglerFish).filter((fish) => Boolean(fish))),
     });
@@ -90,6 +95,16 @@ export function orderView(order, stock) {
             for (const fish of pickFishForNeed(stock.fish ?? [], fishNeed, Math.min(held, need), taken) ?? [])
                 taken.add(fish.id);
             return Object.freeze({ cropId: key, title: fishNeedTitle(fishNeed), need, held, short: Math.max(0, need - held), itemKey: `fish:${fishNeedPortraitSpecies(fishNeed)}` });
+        });
+        const state = order.filled ? "filled" : (stock.levels[order.skill] ?? 1) < order.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
+        return Object.freeze({ order, state, lines: Object.freeze(lines) });
+    }
+    if (order.kind === "goods") {
+        // A herd notice takes only goods the farm raised; Marigold's and a trade's stay in the basket.
+        const lines = Object.entries(order.lines).map(([id, need]) => {
+            const held = whole(produceHeld(stock.raised ?? {}, id));
+            const unraised = Math.max(0, whole(produceHeld(stock.produce, id)) - held);
+            return Object.freeze({ cropId: id, title: basketItemTitle(id), need, held, short: Math.max(0, need - held), unraised, itemKey: `produce:${id}` });
         });
         const state = order.filled ? "filled" : (stock.levels[order.skill] ?? 1) < order.minLevel ? "locked" : lines.some((line) => line.short > 0) ? "short" : "ready";
         return Object.freeze({ order, state, lines: Object.freeze(lines) });

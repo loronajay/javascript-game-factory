@@ -2,6 +2,7 @@ import { paletteTier, rollFarmPetGrowth } from "./farm-pet-growth-policy.mjs";
 import { FARM_HORSE_SPECIES_ID, rollFarmHorseRiding } from "./farm-horse-catalog.mjs";
 import { farmTreeRule } from "./farm-tree-catalog.mjs";
 import { farmRecipeRule } from "./farm-recipe-catalog.mjs";
+import { FARM_LIVESTOCK_GOODS, FARM_LIVESTOCK_RULES, farmLivestockGoodPrice, farmLivestockMeatPrice } from "./farm-livestock-catalog.mjs";
 
 export const FARM_ADOPTION_PRICE = 1200;
 
@@ -80,6 +81,12 @@ const ingredientPrices: Readonly<Record<string, number>> = Object.freeze({
   corn: 44, eggplant: 29, garlic: 16, potato: 18, pumpkin: 103, radish: 16,
   strawberry: 13, sunflower: 96, tomato: 20, watermelon: 106,
   apple: 7, pear: 8, cherry: 5, peach: 10, orange: 8,
+  // The herd's goods (Marigold) and meat (Otto the Butcher), at the same 1.6x retail
+  // on the Merchant's derived price; mirrors js/farm-vendor-stock.mts LIVESTOCK_STOCK.
+  ...Object.fromEntries([
+    ...FARM_LIVESTOCK_GOODS.map((good) => [good.itemId, Math.ceil(farmLivestockGoodPrice(good) * 1.6)]),
+    ...FARM_LIVESTOCK_RULES.map((entry) => [entry.meat.itemId, Math.ceil(farmLivestockMeatPrice(entry) * 1.6)]),
+  ]),
 });
 
 export function findFarmSpecies(value: unknown): Species | null {
