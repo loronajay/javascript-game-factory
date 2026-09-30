@@ -79,10 +79,11 @@ test("inventory and stats are reachable from every farm-game screen", () => {
     assert.match(page, /id="statsSummary"/);
     assert.match(page, /id="statsGrid"/);
   }
-  assert.match(marketSource, /event\.code === "KeyI"/);
-  assert.match(coveSource, /event\.code === "KeyI"/);
-  assert.match(marketSource, /event\.code === "KeyK"/);
-  assert.match(coveSource, /event\.code === "KeyK"/);
+  // I and K are the sheets' own hotkeys, registered with the shared HUD layer (farm-hud.mts) on every screen.
+  for (const page of [marketSource, coveSource]) {
+    assert.match(page, /sheet\("inventory", \{ root: requiredElement<HTMLElement>\("#inventoryPanel"\)[^\n]*key: "KeyI"/);
+    assert.match(page, /sheet\("stats", \{ root: requiredElement<HTMLElement>\("#statsPanel"\)[^\n]*key: "KeyK"/);
+  }
   assert.match(marketSource, /createFarmStatsPanel\(/);
   assert.match(coveSource, /createFarmStatsPanel\(/);
 });
@@ -118,9 +119,9 @@ test("the farm page exposes an owner stats panel and keyboard shortcut", () => {
     assert.match(html, new RegExp(`id="${id}"`), `#${id}`);
     assert.match(source, new RegExp(`#${id}"`), `farm.mts reads #${id}`);
   }
-  assert.match(source, /event\.code === "KeyK"/);
+  assert.match(source, /hud\.sheet\("stats", \{ root: requiredElement<HTMLElement>\("#statsPanel"\)[^\n]*key: "KeyK"/);
   assert.match(source, /statsPanel\.render\(layout\.skills, anglerLink\.stats\(\)\)/);
-  assert.match(source, /statsPanel\.isOpen\(\)/, "the stats screen pauses walking like the other farm panels");
+  assert.match(source, /hud\.anyOpen\(\)/, "the stats screen pauses walking like every other farm sheet");
 });
 
 test("pet, feed, carry and play remain separate registered interactions", () => {
@@ -240,9 +241,11 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| statsPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a panel, at the stove or bench, or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| hud\.anyOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a sheet, at the stove or bench, or while napping");
   assert.match(source, /return kitchen\.cooking\(\) \|\| workshop\.crafting\(\);/, "a dish on the stove and a piece on the bench both hold the player");
-  assert.match(source, /return kitchenPanel\.isOpen\(\) \|\| workshop\.panelOpen\(\);/, "the cookbook, the pattern book and the Sawmill counter are all station panels");
+  for (const id of ["kitchenPanel", "workshopPanel", "millPanel"]) {
+    assert.match(source, new RegExp(String.raw`hud\.sheet\("\w+", \{ root: requiredElement<HTMLElement>\("#${id}"\)`), `the station counter #${id} is a sheet like the rest`);
+  }
   // Pet actions are distinct: E pets with affection, C carries, and E with a pet in hand sets it down ahead where it fits.
   assert.match(source, /getPetInteractionPrompt\(nearbyPet\.name, \{ canPickUp, canFeed, canPlay, ridable \}\)/);
   assert.doesNotMatch(source, /habitat !== "water"/, "the page does not hide carry from aquatic pets");
@@ -328,9 +331,9 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(editorSource, /relocating/, "pond relocation is a click-to-place editor gesture");
   assert.match(editorSource, /Aquatic pets stay adopted/, "the relocation instruction makes pet ownership safety explicit");
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
-  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !petsPanel\.isOpen\(\) && !livestockPanel\.isOpen\(\) && !inventoryPanel\.isOpen\(\) && !statsPanel\.isOpen\(\) && !stationPanelOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
+  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !hud\.anyOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| petsPanel\.isOpen\(\) \|\| inventoryPanel\.isOpen\(\) \|\| statsPanel\.isOpen\(\) \|\| stationPanelOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| hud\.anyOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);

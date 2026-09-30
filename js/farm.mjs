@@ -37,7 +37,8 @@ import { cosmeticRideProfile } from "./farm-ride-profile.mjs";
 import { horseTravelQuery, ridingHorseFrom } from "./farm-riding-travel.mjs";
 import { riderReach } from "./farm-ride.mjs";
 import { createFarmInventory } from "./farm-catalog/inventory.mjs";
-import { createTicketWalletClient, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
+import { TICKET_BALANCE_UPDATED_EVENT, createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
+import { createFarmHud, wireSheetTabs } from "./farm-hud.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_MINUTES_PER_REAL_SECOND, NAP_MINUTES_PER_REAL_SECOND, advanceFarmTime, farmLightProfile, formatFarmTime, quantizeFarmTime, resumeFarmClock } from "./farm-time.mjs";
 import { advanceAgriculture } from "./farm-crops.mjs";
@@ -119,13 +120,25 @@ const starterDogForm = requiredElement("#starterDogForm");
 const starterDogName = requiredElement("#starterDogName");
 const nameStarterDog = requiredElement("#nameStarterDog");
 const onboardingStatus = requiredElement("#onboardingStatus");
+const ticketChip = requiredElement("#farmTickets");
+// The HUD layer (farm-hud.mts): every sheet below is registered with it, and it
+// owns the mouse, Escape, one-sheet-at-a-time and the feedback toast.
+const hud = createFarmHud({
+    canvas,
+    canRelock: () => farmEntered && !farmEditor.isEditing() && !leavingForMarket && !napDialog.open,
+    controls: requiredElement("#controlHint"),
+});
+/** Feedback the player should see now: the toast over the field (and the gate's line, for whoever is still at it). */
+function say(text) {
+    status.textContent = text;
+    hud.toast(text, 5);
+}
 const farmMusic = createFarmMusic();
 function renderMusicButton() {
     const muted = farmMusic.isMuted();
     musicButton.setAttribute("aria-pressed", String(muted));
     musicButton.setAttribute("aria-label", muted ? "Unmute music" : "Mute music");
-    musicButton.title = muted ? "Play farm music (M)" : "Mute farm music (M)";
-    musicButton.firstChild.textContent = muted ? "Music off " : "Music on ";
+    musicButton.title = muted ? "Music off — play it (M)" : "Music on — mute it (M)";
 }
 function toggleFarmMusic() {
     farmMusic.setMuted(!farmMusic.isMuted());
@@ -344,11 +357,11 @@ if (arrivingHorse && riding.arrive(arrivingHorse.instanceId, { x: player.x, z: p
 /** E beside a horse: into the saddle, facing the way it faces. */
 function mountHorse(instanceId) {
     if (!canManageFarm) {
-        status.textContent = "This isn't your horse to ride.";
+        say("This isn't your horse to ride.");
         return false;
     }
     if (carrying || !riding.mount(instanceId)) {
-        status.textContent = "There is no room to get on here — call it out into the open (H) first.";
+        say("There is no room to get on here — call it out into the open (H) first.");
         return false;
     }
     const horse = petSim.find(instanceId);
@@ -356,7 +369,7 @@ function mountHorse(instanceId) {
     player.yaw = horse?.yaw ?? player.yaw;
     player.pitch = -0.32;
     keys.clear();
-    status.textContent = `You swing up onto ${horse?.name ?? "your horse"}. Ride through the front gate to take ${horse?.name ?? "it"} to the Market Square.`;
+    say(`You swing up onto ${horse?.name ?? "your horse"}. Ride through the front gate to take ${horse?.name ?? "it"} to the Market Square.`);
     return true;
 }
 /** E in the saddle: down beside the horse, where there is room. */
@@ -364,7 +377,7 @@ function dismountHorse() {
     const horseId = riding.mounted();
     const spot = riding.dismount();
     if (!spot) {
-        status.textContent = "No room to get down here — ride somewhere more open.";
+        say("No room to get down here — ride somewhere more open.");
         return false;
     }
     petBodies.setTagVisible(horseId, true);
@@ -400,8 +413,7 @@ function forwardVector() {
     return forwardOf(player.yaw);
 }
 function setPrompt(text) {
-    prompt.textContent = text;
-    prompt.classList.toggle("is-visible", Boolean(text));
+    hud.setPrompt(prompt, text);
 }
 function renderFarmClock() {
     const quarter = quantizeFarmTime(clockMinutes);
@@ -488,7 +500,7 @@ function updateInteraction() {
         kitchen.update(pose, false);
         workshop.update(pose, false);
         livestock.update(pose, false);
-        if (petsPanel.isOpen() || livestockPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
+        if (hud.anyOpen() || farmEditor.isEditing() || !farmEntered) {
             setPrompt("");
             return;
         }
@@ -533,7 +545,7 @@ function updateInteraction() {
     // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
     if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId))
         doorInReach = null;
-    if (petsPanel.isOpen() || livestockPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || !farmEntered) {
+    if (hud.anyOpen() || farmEditor.isEditing() || !farmEntered) {
         setPrompt("");
         return;
     }
@@ -721,7 +733,7 @@ function interactWithPet(action) {
         petSim.attention(nearbyPet.instanceId);
         const note = treatmentNote(result.treatment ?? 0);
         void persistLayout(withFarmClock(result.layout, clockMinutes, Date.now())).then((saved) => {
-            status.textContent = `${name} ate one serving of ${result.foodTitle}. ${note ? `${note} ` : ""}${saved}`;
+            say(`${name} ate one serving of ${result.foodTitle}. ${note ? `${note} ` : ""}${saved}`);
         });
         return true;
     }
@@ -739,11 +751,11 @@ function interactWithPet(action) {
     if (reaction.profile !== pet.profile) {
         const next = withFarmPets(checkpoint, checkpoint.pets.map((row) => row.instanceId === pet.instanceId ? { ...row, profile: reaction.profile } : row));
         void persistLayout(withFarmClock(next, clockMinutes, Date.now())).then((saved) => {
-            status.textContent = `${message} ${saved}`;
+            say(`${message} ${saved}`);
         });
     }
     else {
-        status.textContent = message;
+        say(message);
     }
     if (!reaction.ok) {
         petSim.attention(nearbyPet.instanceId);
@@ -781,9 +793,9 @@ function callPets() {
     }
     layout = checkpoint;
     if (answered > 0)
-        status.textContent = answered === 1 ? "A trusted pet comes when called." : `${answered} trusted pets come when called.`;
+        say(answered === 1 ? "A trusted pet comes when called." : `${answered} trusted pets come when called.`);
     else if (refused > 0)
-        status.textContent = "No pet feels ready to answer the call yet.";
+        say("No pet feels ready to answer the call yet.");
     return answered + refused > 0;
 }
 /** E with a pet in hand: set it down ahead if it fits; otherwise the prompt has already said why not and E does nothing. */
@@ -809,7 +821,7 @@ function updateCarryPatience(dt) {
     const held = petSim.find(carrying);
     if (!held || !putPetDown())
         return;
-    status.textContent = `${held.name} wriggled free and jumped down.`;
+    say(`${held.name} wriggled free and jumped down.`);
 }
 /** Build mode takes the pet out of the arms: ahead, else at the player's feet, else where a turn finds room; last resort, it stays carried. */
 function dropCarried() {
@@ -886,27 +898,7 @@ function renderFieldCapacity() {
     // The skill lines under the seed HUD: account farms only.
     skillsHud.render(layout.skills, serverHarvests);
 }
-function isFarmFullscreen() {
-    return document.fullscreenElement === document.documentElement;
-}
-function setFarmFullscreen(on) {
-    if (!document.fullscreenEnabled)
-        return;
-    if (on && !document.fullscreenElement)
-        document.documentElement.requestFullscreen?.().catch(() => undefined);
-    else if (!on && document.fullscreenElement)
-        document.exitFullscreen?.().catch(() => undefined);
-}
-function syncFullscreenButton() {
-    fullscreenButton.setAttribute("aria-pressed", String(isFarmFullscreen()));
-    fullscreenButton.firstChild.textContent = isFarmFullscreen() ? "Exit fullscreen " : "Fullscreen ";
-}
-fullscreenButton.hidden = !document.fullscreenEnabled;
-fullscreenButton.addEventListener("click", () => {
-    setFarmFullscreen(!isFarmFullscreen());
-    canvas.focus();
-});
-document.addEventListener("fullscreenchange", syncFullscreenButton);
+hud.fullscreen.bind(fullscreenButton);
 window.addEventListener("keydown", (event) => {
     if (napDialog.open || napRemainingMinutes > 0) {
         keys.clear();
@@ -932,77 +924,21 @@ window.addEventListener("keydown", (event) => {
         keys.clear();
         return;
     }
-    if (stationPanelOpen()) {
-        if (event.code === "Escape") {
-            kitchenPanel.close();
-            workshop.closePanels();
-        }
-        keys.clear();
-        return;
-    }
     // Felling holds the player at the tree: a move key or Escape puts the axe down (the damage done is kept for
     // this visit), and so does opening a panel on top of it.
-    if (trees.chopping() && (event.code === "Escape" || isMoveKey(event.code) || event.code === "KeyI" || event.code === "KeyP" || event.code === "KeyK")) {
+    if (trees.chopping() && (event.code === "Escape" || isMoveKey(event.code) || event.code === "KeyI" || event.code === "KeyP" || event.code === "KeyK" || event.code === "KeyL")) {
         trees.cancelChop();
         keys.clear();
         if (event.code === "Escape" || isMoveKey(event.code))
             return;
     }
-    if (event.code === "KeyK" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
-        event.preventDefault();
-        statsPanel.toggle();
+    // The sheets' keys (I, P, L, K toggle — and switch — their sheet; Escape closes the top one; ? the controls card),
+    // registered below with the HUD layer. While any sheet is open every other key is the sheet's.
+    if (hud.handleKey(event)) {
         keys.clear();
         return;
     }
-    if (statsPanel.isOpen()) {
-        if (event.code === "Escape")
-            statsPanel.close();
-        keys.clear();
-        return;
-    }
-    if (event.code === "KeyI" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
-        event.preventDefault();
-        if (petsPanel.isOpen())
-            petsPanel.close();
-        statsPanel.close();
-        inventoryPanel.toggle();
-        keys.clear();
-        return;
-    }
-    if (inventoryPanel.isOpen()) {
-        if (event.code === "Escape")
-            inventoryPanel.close();
-        keys.clear();
-        return;
-    }
-    // L opens and closes the Livestock panel (farm-livestock-panel.mts); while it is open every other key is the panel's.
-    if (event.code === "KeyL" && !event.repeat && farmEntered && !(event.target instanceof HTMLInputElement)) {
-        event.preventDefault();
-        livestockPanel.toggle();
-        keys.clear();
-        return;
-    }
-    if (livestockPanel.isOpen()) {
-        if (event.code === "Escape")
-            livestockPanel.close();
-        keys.clear();
-        return;
-    }
-    // P opens and closes the pets panel; while it is open every other key is the panel's.
-    if (event.code === "KeyP" && !event.repeat && canManageFarm && farmEntered && !(event.target instanceof HTMLInputElement)) {
-        event.preventDefault();
-        if (petsPanel.isOpen())
-            petsPanel.close();
-        else {
-            inventoryPanel.close();
-            statsPanel.close();
-            petsPanel.open();
-        }
-        return;
-    }
-    if (petsPanel.isOpen()) {
-        if (event.code === "Escape")
-            petsPanel.close();
+    if (hud.anyOpen()) {
         keys.clear();
         return;
     }
@@ -1017,9 +953,9 @@ window.addEventListener("keydown", (event) => {
         toggleFarmMusic();
         return;
     }
-    if (event.code === "KeyF" && !event.repeat && document.fullscreenEnabled) {
+    if (event.code === "KeyF" && !event.repeat && hud.fullscreen.supported) {
         event.preventDefault();
-        setFarmFullscreen(!isFarmFullscreen());
+        hud.fullscreen.toggle();
         return;
     }
     const petInteraction = !event.repeat && farmEntered ? getPetInteraction(event.code) : null;
@@ -1057,7 +993,7 @@ window.addEventListener("blur", () => {
     workshop.keyUp("KeyE");
 });
 canvas.addEventListener("click", () => {
-    if (farmEntered && !petsPanel.isOpen() && !livestockPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !farmEditor.isEditing())
+    if (farmEntered && !hud.anyOpen() && !farmEditor.isEditing())
         canvas.requestPointerLock?.().catch(() => undefined);
 });
 starterDogForm.addEventListener("submit", async (event) => {
@@ -1135,12 +1071,12 @@ document.addEventListener("pointerlockchange", () => {
     startGate.classList.toggle("is-hidden", farmEntered);
     status.textContent = locked
         ? "WASD to move · Mouse to look · Shift to run"
-        : "WASD to move · Drag to look · Click for mouse capture";
+        : "WASD to move · Drag to look · Click the field to capture the mouse";
 });
 canvas.addEventListener("pointerdown", () => { draggingLook = !farmEditor.isEditing(); });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
-    if (petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || stationBusy() || farmEditor.isEditing())
+    if (hud.anyOpen() || stationBusy() || farmEditor.isEditing())
         return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;
@@ -1149,7 +1085,7 @@ document.addEventListener("mousemove", (event) => {
     player.pitch = looked.pitch;
 });
 function updatePlayer(dt) {
-    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || petsPanel.isOpen() || inventoryPanel.isOpen() || statsPanel.isOpen() || stationPanelOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
+    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || hud.anyOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
         return;
     if (riding.mounted()) {
         riding.step(dt, keys);
@@ -1326,7 +1262,6 @@ const livestockPanel = createLivestockPanel({
         return words;
     },
 }, {
-    beforeOpen: () => { petsPanel.close(); inventoryPanel.close(); statsPanel.close(); },
     onClose: () => canvas.focus(),
 });
 const livestock = createFarmLivestockController({
@@ -1343,13 +1278,11 @@ const livestock = createFarmLivestockController({
     panel: livestockPanel,
     // Care goes through the harvest seam: the farm is sent, the server settles the herd and answers with the farm.
     submit: canManageFarm && serverHarvests ? submitServerHarvest : null,
-    setStatus: (text) => { status.textContent = text; livestockPanel.setStatus(text); },
+    setStatus: (text) => { say(text); livestockPanel.setStatus(text); },
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
 });
 livestockSync = () => livestock.sync();
 void livestock.refresh();
-for (const button of [openPetsButton, openInventoryButton, openStatsButton])
-    button.addEventListener("click", () => livestockPanel.close());
 if (visiting)
     requiredElement("#openLivestock").title = "The livestock on this farm (L)";
 const inventoryPanel = createFarmInventoryPanel({
@@ -1382,8 +1315,6 @@ const statsPanel = createFarmStatsPanel({
     closeButton: requiredElement("#closeStats"),
     summary: requiredElement("#statsSummary"),
     grid: requiredElement("#statsGrid"),
-}, {
-    beforeOpen: () => { inventoryPanel.close(); petsPanel.close(); },
 });
 statsPanel.render(layout.skills, anglerLink.stats());
 // The owner's away-growth rate lives beside their stats: 0 is a farm that waits for them.
@@ -1397,8 +1328,6 @@ const awaySettings = createFarmAwaySettings({
 });
 awaySettings.render(layout.settings.awayGrowth);
 awaySettingsRoot.hidden = visiting;
-openInventoryButton.addEventListener("click", () => statsPanel.close());
-openPetsButton.addEventListener("click", () => statsPanel.close());
 if (visiting)
     openStatsButton.hidden = true;
 if (!visiting) {
@@ -1415,7 +1344,7 @@ const crops = createFarmCropsController({
     farmingLevel,
     persist: persistLayout,
     submitHarvest: serverHarvests ? (plotId, cellId) => submitServerHarvest((sent) => ticketClient.harvestFarmCrop(sent, plotId, cellId)) : null,
-    setStatus: (text) => { status.textContent = text; },
+    setStatus: say,
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
 });
 const trees = createFarmTreesController({
@@ -1426,7 +1355,7 @@ const trees = createFarmTreesController({
     selectedSaplingId: () => inventoryPanel.selectedSaplingId(),
     persist: persistLayout,
     submitHarvest: serverHarvests ? (plotId) => submitServerHarvest((sent) => ticketClient.harvestFarmTree(sent, plotId)) : null,
-    setStatus: (text) => { status.textContent = text; },
+    setStatus: say,
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
 });
 // The kitchen (farm-kitchen-controller.mts): E at a Kitchen Range opens the cookbook, Cook plays the
@@ -1452,7 +1381,7 @@ const kitchen = createFarmKitchenController({
     layout: () => layout,
     persist: persistLayout,
     submitCook: serverHarvests ? (recipeId, scores, cookId) => submitServerHarvest((sent) => ticketClient.cookFarmDish(sent, recipeId, scores, cookId)) : null,
-    setStatus: (text) => { status.textContent = text; },
+    setStatus: say,
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
     creel: () => anglerLink.creel(),
     onFishUsed: () => { void anglerLink.refresh(); },
@@ -1497,17 +1426,31 @@ const workshop = createFarmWorkshopController({
     view: workshopView,
     layout: () => layout,
     submitCraft: serverHarvests ? (itemId, scores, craftId) => submitServerHarvest((sent) => ticketClient.craftFarmPiece(sent, itemId, scores, craftId)) : null,
-    setStatus: (text) => { status.textContent = text; },
+    setStatus: say,
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
 });
 workshopSync = () => workshop.sync();
+// Every sheet on the farm, with the HUD layer (farm-hud.mts): it frees the mouse for whichever opens, keeps one
+// open at a time, and closes the top one on Escape or a click on the field. I, P, L and K are the owner's hotkeys.
+const ownerHotkey = () => canManageFarm && farmEntered && !farmEditor.isEditing();
+hud.sheet("inventory", { root: requiredElement("#inventoryPanel"), open: () => inventoryPanel.open(), close: () => inventoryPanel.close(), key: "KeyI", enabled: ownerHotkey });
+hud.sheet("pets", { root: petsPanelRoot, open: () => petsPanel.open(), close: () => petsPanel.close(), key: "KeyP", enabled: ownerHotkey });
+hud.sheet("livestock", { root: requiredElement("#livestockPanel"), open: () => livestockPanel.open(), close: () => livestockPanel.close(), key: "KeyL", enabled: () => farmEntered && !farmEditor.isEditing() });
+hud.sheet("stats", { root: requiredElement("#statsPanel"), open: () => statsPanel.open(), close: () => statsPanel.close(), key: "KeyK", enabled: ownerHotkey });
+hud.sheet("kitchen", { root: requiredElement("#kitchenPanel"), close: () => kitchenPanel.close() });
+hud.sheet("workshop", { root: requiredElement("#workshopPanel"), close: () => workshop.closePanels() });
+hud.sheet("mill", { root: requiredElement("#millPanel"), close: () => workshop.closePanels() });
+wireSheetTabs(requiredElement("#inventoryPanel"));
+// Tickets in the toolbar: what the shop said on the way in, then every purchase's answer.
+function renderTickets(balance) {
+    ticketChip.hidden = !Number.isSafeInteger(balance);
+    ticketChip.querySelector("strong").textContent = formatTicketBalance(balance);
+}
+renderTickets(shop?.balance);
+document.addEventListener(TICKET_BALANCE_UPDATED_EVENT, (event) => renderTickets(event.detail?.balance));
 /** A dish on the stove or a piece on the bench: the station owns the player. */
 function stationBusy() {
     return kitchen.cooking() || workshop.crafting();
-}
-/** The cookbook, the pattern book or the Sawmill's counter is open. */
-function stationPanelOpen() {
-    return kitchenPanel.isOpen() || workshop.panelOpen();
 }
 // Build mode: the shared editor frame over the farm's own placement rules. The
 // editor owns the layout while it is open; every change comes back through `applyLayout`.
@@ -1572,7 +1515,7 @@ const farmEditor = createFarmEditor({
         inspector: requiredElement("#farmInspector"),
     },
     // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-    canEnter: () => canManageFarm && farmEntered && !petsPanel.isOpen() && !livestockPanel.isOpen() && !inventoryPanel.isOpen() && !statsPanel.isOpen() && !stationPanelOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
+    canEnter: () => canManageFarm && farmEntered && !hud.anyOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
     onEditingChange: (editing) => {
         keys.clear();
         draggingLook = false;
@@ -1709,5 +1652,4 @@ globalThis.__farm = Object.freeze({
     underwater: () => document.body.classList.contains("is-underwater"),
 });
 applyCamera();
-syncFullscreenButton();
 requestAnimationFrame(frame);

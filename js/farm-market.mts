@@ -119,6 +119,7 @@ import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } f
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
+import { createFarmHud, wireSheetTabs } from "./farm-hud.mjs";
 import { normalizeAngler, type Angler } from "./farm-angler.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
 
@@ -142,6 +143,14 @@ const visitorsChip = requiredElement<HTMLElement>("#marketVisitors");
 const visitorsChipLabel = requiredElement<HTMLElement>("#marketVisitorsLabel");
 const visitorsChipNames = requiredElement<HTMLElement>("#marketVisitorsNames");
 
+// The HUD layer (farm-hud.mts): the counters below register with it; it owns the mouse, Escape and the toast.
+const hud = createFarmHud({
+  canvas,
+  canRelock: () => entered && !leaving,
+  controls: requiredElement<HTMLElement>("#controlHint"),
+});
+hud.fullscreen.bind(requiredElement<HTMLButtonElement>("#fullscreenMarket"));
+
 // The road home: back to whichever farm the player walked out of.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const homeUrl = fromFarm ? `../index.html?id=${encodeURIComponent(fromFarm)}` : "../index.html";
@@ -152,7 +161,7 @@ const cameFromDowns = new URLSearchParams(location.search).get("from") === "down
 // Out the west gate to Windrush Downs — on horseback only (FARM_RIDING_PLAN.md).
 const downsUrl = (horseId: string): string => `../downs/index.html?${horseTravelQuery(fromFarm, horseId)}`;
 homeLink.href = homeUrl;
-if (fromFarm) homeLink.textContent = "← Back to their farm";
+if (fromFarm) homeLink.querySelector(".back-link__words")!.textContent = "Their farm";
 
 // What the player has to sell is on THEIR farm document (visiting someone else's
 // farm does not change whose basket this is). Read once; the server's answer to
@@ -251,7 +260,7 @@ const music = createFarmMusic();
 function renderMusicButton(): void {
   const muted = music.isMuted();
   musicButton.setAttribute("aria-pressed", String(muted));
-  musicButton.firstChild!.textContent = muted ? "Music off " : "Music on ";
+  musicButton.title = muted ? "Music off — play it (M)" : "Music on — mute it (M)";
 }
 musicButton.addEventListener("click", () => { music.setMuted(!music.isMuted()); renderMusicButton(); });
 renderMusicButton();
@@ -341,8 +350,6 @@ let doorInReach: DoorRow | null = null;
 let seatInReach: SeatInReach | null = null;
 let stallInReach: MarketStall | null = null;
 let nearbyVisitor: RemoteMember | null = null;
-/** A notice E put up (a shut stall's, a wave) holds the prompt until this time. */
-let noticeUntil = 0;
 
 function applyCamera(): void {
   if (away.mounted()) {
@@ -355,13 +362,12 @@ function applyCamera(): void {
 }
 
 function setPrompt(text: string): void {
-  prompt.textContent = text;
-  prompt.classList.toggle("is-visible", Boolean(text));
+  hud.setPrompt(prompt, text);
 }
 
+/** What just happened (a shut stall, a wave, a trade note): the HUD's toast, above the prompt, which stays live. */
 function notice(text: string, seconds = 6): void {
-  noticeUntil = performance.now() + seconds * 1000;
-  setPrompt(text);
+  hud.toast(text, seconds);
 }
 
 // ---------------------------------------------------------------- the others in the square
@@ -889,9 +895,25 @@ const trading = createMarketTrading({
 window.addEventListener("pagehide", () => trading.stop());
 window.addEventListener("pageshow", () => { if (entered) trading.start(); });
 
+// Every counter, board and table in the square is a sheet of the HUD layer: it frees the mouse, keeps one open,
+// and closes the top one on Escape or a click on the square. Walking away from a trade is Escape's alone.
+hud.sheet("inventory", { root: requiredElement<HTMLElement>("#inventoryPanel"), open: () => inventorySummary.toggle(), close: () => inventorySummary.close(), key: "KeyI", enabled: () => entered && !leaving });
+hud.sheet("stats", { root: requiredElement<HTMLElement>("#statsPanel"), open: () => statsPanel.open(), close: () => statsPanel.close(), key: "KeyK", enabled: () => entered && !leaving });
+hud.sheet("sale", { root: requiredElement<HTMLElement>("#salePanel"), close: () => salePanel.close() });
+hud.sheet("seeds", { root: requiredElement<HTMLElement>("#seedPanel"), close: () => seedPanel.close() });
+hud.sheet("dealer", { root: requiredElement<HTMLElement>("#dealerPanel"), close: () => dealerPanel.close() });
+hud.sheet("butcher", { root: requiredElement<HTMLElement>("#butcherPanel"), close: () => butcherCounter.close() });
+hud.sheet("kitchen", { root: requiredElement<HTMLElement>("#kitchenPanel"), close: () => kitchenPanel.close() });
+hud.sheet("orders", { root: requiredElement<HTMLElement>("#ordersPanel"), close: () => ordersPanel.close() });
+hud.sheet("exchange", { root: requiredElement<HTMLElement>("#exchangePanel"), close: () => exchangePanel.close() });
+hud.sheet("mill", { root: requiredElement<HTMLElement>("#millPanel"), close: () => sawmill.close() });
+hud.sheet("furniture", { root: requiredElement<HTMLElement>("#furniturePanel"), close: () => sawmill.close() });
+hud.sheet("trade", { root: requiredElement<HTMLElement>("#tradePanel"), close: () => trading.escape(), escape: () => trading.escape(), dismissable: false });
+for (const id of ["#salePanel", "#kitchenPanel", "#dealerPanel"]) wireSheetTabs(requiredElement<HTMLElement>(id));
+
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 function panelOpen(): boolean {
-  return inventorySummary.isOpen() || statsPanel.isOpen() || salePanel.isOpen() || seedPanel.isOpen() || dealerPanel.isOpen() || butcherCounter.isOpen() || exchangePanel.isOpen() || kitchenPanel.isOpen() || ordersPanel.isOpen() || sawmill.isOpen() || trading.isOpen();
+  return hud.anyOpen();
 }
 
 function workStall(stall: MarketStall): void {
@@ -972,7 +994,6 @@ function updateInteraction(): void {
       if (!leaving) setPrompt("");
       return;
     }
-    if (performance.now() < noticeUntil) return;
     if (doorInReach) {
       const home = doorInReach.doorId === MARKET_HOME_GATE;
       const cove = doorInReach.doorId === MARKET_COVE_GATE;
@@ -994,7 +1015,6 @@ function updateInteraction(): void {
     if (!leaving) setPrompt("");
     return;
   }
-  if (performance.now() < noticeUntil) return;
   if (body.mode === "seated") return setPrompt(SEATED_PROMPT);
   if (doorInReach) {
     const home = doorInReach.doorId === MARKET_HOME_GATE;
@@ -1103,25 +1123,12 @@ function checkGateway(): void {
 }
 
 window.addEventListener("keydown", (event) => {
+  // I and K toggle (and switch) their sheets, Escape closes the top one, ? the controls card (farm-hud.mts).
+  if (hud.handleKey(event)) {
+    keys.clear();
+    return;
+  }
   if (panelOpen()) {
-    if (event.code === "KeyI" && inventorySummary.isOpen()) {
-      inventorySummary.close();
-    } else if (event.code === "KeyK" && statsPanel.isOpen()) {
-      statsPanel.close();
-    } else if (event.code === "Escape" && trading.isOpen()) {
-      trading.escape();
-    } else if (event.code === "Escape") {
-      inventorySummary.close();
-      statsPanel.close();
-      salePanel.close();
-      seedPanel.close();
-      dealerPanel.close();
-      butcherCounter.close();
-      exchangePanel.close();
-      kitchenPanel.close();
-      ordersPanel.close();
-      sawmill.close();
-    }
     keys.clear();
     return;
   }
@@ -1131,18 +1138,6 @@ window.addEventListener("keydown", (event) => {
   }
   if (entered && !event.repeat && (event.code === "KeyY" || event.code === "KeyN") && trading.answer(event.code === "KeyY")) {
     event.preventDefault();
-    return;
-  }
-  if (entered && !event.repeat && event.code === "KeyI") {
-    event.preventDefault();
-    keys.clear();
-    inventorySummary.toggle();
-    return;
-  }
-  if (entered && !event.repeat && event.code === "KeyK") {
-    event.preventDefault();
-    keys.clear();
-    statsPanel.toggle();
     return;
   }
   if (entered && !event.repeat && event.code === "KeyT" && nearbyVisitor) {
@@ -1164,6 +1159,11 @@ window.addEventListener("keydown", (event) => {
     renderMusicButton();
     return;
   }
+  if (event.code === "KeyF" && !event.repeat && hud.fullscreen.supported) {
+    event.preventDefault();
+    hud.fullscreen.toggle();
+    return;
+  }
   if (event.code === "KeyE" && !event.repeat && entered) {
     event.preventDefault();
     interact();
@@ -1182,7 +1182,7 @@ enterButton.addEventListener("click", () => {
   music.start();
   startGate.classList.add("is-hidden");
   canvas.focus();
-  status.textContent = "WASD to move · Drag to look · Click for mouse capture";
+  status.textContent = "WASD to move · Drag to look · Click the square to capture the mouse";
 });
 document.addEventListener("pointerlockchange", () => {
   startGate.classList.toggle("is-hidden", entered);

@@ -182,6 +182,7 @@ export function createCreelPanel(root, deps) {
             tab = next;
             shell.open();
         },
+        tab: () => tab,
     });
 }
 // ---------------------------------------------------------------- the Fishmonger

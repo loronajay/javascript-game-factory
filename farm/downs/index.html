@@ -13,15 +13,17 @@
     <canvas id="downsCanvas" tabindex="0" aria-label="Windrush Downs, in 3D"></canvas>
 
     <header class="farm-header">
-      <a id="downsBackLink" href="../market/index.html?from=downs" class="back-link">← Back to the Market Square</a>
-      <div>
-        <span class="eyebrow">SHARED SPACE · WEST OF THE MARKET</span>
-        <h1>Windrush Downs</h1>
-      </div>
-      <div class="farm-header__actions">
+      <nav class="hud-place" aria-label="Where you are">
+        <a id="downsBackLink" href="../market/index.html?from=downs" class="back-link" title="Back to the Market Square"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg><span class="back-link__words">Market Square</span></a>
+        <div class="hud-place__name">
+          <span class="eyebrow">SHARED SPACE · WEST OF THE MARKET</span>
+          <h1>Windrush Downs</h1>
+        </div>
+      </nav>
+      <div class="farm-header__actions" role="toolbar" aria-label="Downs tools">
         <span id="downsRiding" class="downs-riding-chip" title="Your Riding level" hidden><span>Riding</span><strong>1</strong></span>
         <span id="downsTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
-        <button id="toggleDownsMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
+        <button id="toggleDownsMusic" class="farm-button hud-icon-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Music (M)"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16.5 9.5l5 5M21.5 9.5l-5 5" /></svg></button>
       </div>
     </header>
 
@@ -66,9 +68,16 @@
     <div id="runToast" class="run-toast" aria-live="polite" hidden></div>
 
     <div id="downsPrompt" class="farm-prompt" aria-live="polite"></div>
-    <div class="control-hint" aria-hidden="true">
-      <span><b>W</b> Urge on</span><span><b>Shift</b> Gallop</span><span><b>S</b> Rein in</span><span><b>A/D</b> Turn</span><span><b>Space</b> Jump</span><span><b>Mouse</b> Look</span><span><b>E</b> Use</span><span><b>Enter</b> Chat</span><span><b>M</b> Music</span>
-    </div>
+    <aside id="controlHint" class="control-hint" aria-label="Controls" data-expanded="false">
+      <div class="control-hint__keys">
+        <span><b>W</b> Urge on</span><span><b>Shift</b> Gallop</span>
+        <span><b>S</b> Rein in</span><span><b>A / D</b> Turn</span>
+        <span><b>Space</b> Jump</span><span><b>Mouse</b> Look</span>
+        <span><b>E</b> Use</span><span><b>Enter</b> Chat</span>
+        <span><b>M</b> Music</span><span><b>Esc</b> Close a menu</span>
+      </div>
+      <button class="control-hint__toggle" type="button" aria-expanded="false" title="Show or hide the controls (?)">Controls <kbd>?</kbd></button>
+    </aside>
 
     <aside id="boardPanel" class="inventory-panel downs-panel" aria-label="Windrush Downs notice board" hidden>
       <header class="pets-panel__head">

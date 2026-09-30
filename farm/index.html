@@ -13,22 +13,26 @@
     <div class="farm-underwater" aria-hidden="true"></div>
 
     <header class="farm-header">
-      <a href="../grid.html" class="back-link">← Game Grid</a>
-      <div>
-        <span id="farmEyebrow" class="eyebrow">PERSONAL SPACE · THE FARM</span>
-        <h1 id="farmTitle">My Farm</h1>
-      </div>
-      <a id="farmOwnerLink" class="back-link farm-owner-link" href="../player/index.html" hidden>View profile</a>
-      <div class="farm-header__actions">
-        <a href="../room/index.html" class="back-link" title="Walk over to your arcade">My Arcade</a>
-        <a id="openPetGames" href="../games/pet-games/index.html" class="farm-button farm-button--games" title="Play games with one of your pets">Pet Games</a>
-        <button id="toggleFarmMusic" class="farm-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Mute farm music (M)">Music on <kbd>M</kbd></button>
-        <button id="openStats" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="See all farm skills and lifetime stats (K)">Stats <kbd>K</kbd></button>
-        <button id="openPets" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Adopt, name and release animals (P)">Pets <kbd>P</kbd></button>
-        <button id="openLivestock" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Your livestock and where they live (L)">Herd <kbd>L</kbd></button>
-        <button id="openInventory" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Choose seeds and check the harvest (I)">Inventory <kbd>I</kbd></button>
-        <button id="editFarm" class="farm-button farm-button--accent" type="button" aria-pressed="false" title="Toggle build mode (B)">Build <kbd>B</kbd></button>
-        <button id="fullscreenFarm" class="farm-button farm-fullscreen" type="button" aria-pressed="false" title="Fill the screen with the farm (F)">Fullscreen <kbd>F</kbd></button>
+      <nav class="hud-place" aria-label="Where you are">
+        <a href="../grid.html" class="back-link" title="Back to the Game Grid"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg><span class="back-link__words">Game Grid</span></a>
+        <div class="hud-place__name">
+          <span id="farmEyebrow" class="eyebrow">PERSONAL SPACE · THE FARM</span>
+          <h1 id="farmTitle">My Farm</h1>
+        </div>
+        <a id="farmOwnerLink" class="back-link farm-owner-link" href="../player/index.html" hidden><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" /></svg><span class="back-link__words">View profile</span></a>
+      </nav>
+      <div class="farm-header__actions" role="toolbar" aria-label="Farm tools">
+        <button id="openInventory" class="farm-button hud-tool" type="button" aria-pressed="false" title="Inventory — choose seeds, check the harvest (I)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2zM9 8V6a3 3 0 0 1 6 0v2" /></svg><span class="hud-tool__label">Inventory</span><kbd>I</kbd></button>
+        <button id="openPets" class="farm-button hud-tool" type="button" aria-pressed="false" title="Pets — adopt, name and look after them (P)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13.5c-3 0-5 2.3-5 4.3 0 1.3 1.2 1.8 2.4 1.5 1-.3 1.7-.5 2.6-.5s1.6.2 2.6.5c1.2.3 2.4-.2 2.4-1.5 0-2-2-4.3-5-4.3zM4.9 10a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0zM8.2 6.5a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0zM12.6 6.5a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0zM15.9 10a1.6 1.6 0 1 0 3.2 0 1.6 1.6 0 1 0-3.2 0z" /></svg><span class="hud-tool__label">Pets</span><kbd>P</kbd></button>
+        <button id="openLivestock" class="farm-button hud-tool" type="button" aria-pressed="false" title="Herd — your livestock and where they live (L)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7C5 7 3.5 6 3.5 4M17 7c2 0 3.5-1 3.5-3M7 7h10v6a5 5 0 0 1-10 0zM10 15.5h.01M14 15.5h.01" /></svg><span class="hud-tool__label">Herd</span><kbd>L</kbd></button>
+        <button id="openStats" class="farm-button hud-tool" type="button" aria-pressed="false" title="Stats — your skills and lifetime totals (K)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20v-8M12 20V5M18 20v-5M3 20h18" /></svg><span class="hud-tool__label">Stats</span><kbd>K</kbd></button>
+        <button id="editFarm" class="farm-button hud-tool" type="button" aria-pressed="false" title="Build — place fences, buildings, plants and more (B)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3.5l6.5 6.5-3 3L11 6.5zM11.5 7L4 14.5V19h4.5L16 11.5" /></svg><span class="hud-tool__label">Build</span><kbd>B</kbd></button>
+        <span class="hud-toolbar__divider" aria-hidden="true"></span>
+        <span id="farmTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
+        <a id="openPetGames" href="../games/pet-games/index.html" class="farm-button hud-icon-button" title="Pet Games — play games with one of your pets" aria-label="Pet Games"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8" /></svg></a>
+        <a href="../room/index.html" class="farm-button hud-icon-button" title="My Arcade — walk over to your arcade" aria-label="My Arcade"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0zM12 9v6M5 15h14l1 5H4z" /></svg></a>
+        <button id="toggleFarmMusic" class="farm-button hud-icon-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Music (M)"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16.5 9.5l5 5M21.5 9.5l-5 5" /></svg></button>
+        <button id="fullscreenFarm" class="farm-button hud-icon-button farm-fullscreen" type="button" aria-pressed="false" title="Fullscreen (F)"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg><span class="hud-tool__label" data-label>Fullscreen</span></button>
       </div>
     </header>
 
@@ -58,20 +62,39 @@
     </section>
 
     <div id="farmPrompt" class="farm-prompt" aria-live="polite"></div>
-    <div class="farm-clock" aria-label="Farm time">
-      <span id="farmClockPhase">Morning</span>
-      <strong id="farmClock">8:00 AM</strong>
-    </div>
-    <div class="seed-hud" aria-label="Selected seed"><span>Selected seed</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small><div id="farmingSkill" class="farming-skill" hidden><small id="farmingSkillLabel">Farming 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="farmingSkillBar"></i></span></div><div id="woodcuttingSkill" class="farming-skill farming-skill--wood" hidden><small id="woodcuttingSkillLabel">Woodcutting 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="woodcuttingSkillBar"></i></span></div><div id="cookingSkill" class="farming-skill farming-skill--cook" hidden><small id="cookingSkillLabel">Cooking 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="cookingSkillBar"></i></span></div><div id="carpentrySkill" class="farming-skill farming-skill--carpentry" hidden><small id="carpentrySkillLabel">Carpentry 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="carpentrySkillBar"></i></span></div><div id="husbandrySkill" class="farming-skill farming-skill--husbandry" hidden><small id="husbandrySkillLabel">Husbandry 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="husbandrySkillBar"></i></span></div></div>
+    <section class="hud-status" aria-label="Farm status">
+      <div class="hud-status__row">
+        <div class="farm-clock" aria-label="Farm time"><span id="farmClockPhase">Morning</span><strong id="farmClock">8:00 AM</strong></div>
+        <div class="seed-hud" aria-label="What E plants"><span>In hand · I to change</span><strong id="selectedSeed">Bean seeds × 5</strong><small id="fieldCapacity">0/6 growing</small></div>
+      </div>
+      <div class="hud-skills" aria-label="Skills">
+        <div id="farmingSkill" class="farming-skill" hidden><small id="farmingSkillLabel">Farming 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="farmingSkillBar"></i></span></div>
+        <div id="woodcuttingSkill" class="farming-skill farming-skill--wood" hidden><small id="woodcuttingSkillLabel">Woodcutting 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="woodcuttingSkillBar"></i></span></div>
+        <div id="cookingSkill" class="farming-skill farming-skill--cook" hidden><small id="cookingSkillLabel">Cooking 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="cookingSkillBar"></i></span></div>
+        <div id="carpentrySkill" class="farming-skill farming-skill--carpentry" hidden><small id="carpentrySkillLabel">Carpentry 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="carpentrySkillBar"></i></span></div>
+        <div id="husbandrySkill" class="farming-skill farming-skill--husbandry" hidden><small id="husbandrySkillLabel">Husbandry 1</small><span class="farming-skill__bar" aria-hidden="true"><i id="husbandrySkillBar"></i></span></div>
+      </div>
+    </section>
     <section id="chopMeter" class="chop-meter" aria-live="polite" hidden>
       <strong data-chop-title>Felling</strong>
       <div class="chop-meter__bar" aria-hidden="true"><span class="chop-meter__good" data-chop-good></span><span class="chop-meter__perfect" data-chop-perfect></span><i class="chop-meter__marker" data-chop-marker></i></div>
       <div class="chop-meter__tree" aria-hidden="true"><i data-chop-health></i></div>
       <small><kbd>E</kbd> swing<span class="chop-meter__word" data-chop-word></span></small>
     </section>
-    <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Pet · Plant · Water · Harvest · Chop</span><span><b>G</b> Feed pet</span><span><b>C</b> Carry pet</span><span><b>Shift</b> Sprint</span><span class="control-hint__owner"><b>K</b> Stats</span><span class="control-hint__owner"><b>I</b> Inventory</span><span class="control-hint__owner"><b>P</b> Pets</span><span class="control-hint__owner"><b>B</b> Build</span><span><b>F</b> Fullscreen</span>
-    </div>
+    <aside id="controlHint" class="control-hint" aria-label="Controls" data-expanded="false">
+      <div class="control-hint__keys">
+        <span><b>WASD</b> Move</span><span><b>Shift</b> Run</span>
+        <span><b>Mouse</b> Look (click to capture)</span><span><b>E</b> Use · plant · water · harvest</span>
+        <span><b>G</b> Feed a pet</span><span><b>C</b> Pick up a pet</span>
+        <span><b>Y</b> Play with a pet</span><span><b>H</b> Call your pets</span>
+        <span><b>X</b> Clear a plot</span><span><b>L</b> Herd</span>
+        <span class="control-hint__owner"><b>I</b> Inventory</span><span class="control-hint__owner"><b>P</b> Pets</span>
+        <span class="control-hint__owner"><b>K</b> Stats</span><span class="control-hint__owner"><b>B</b> Build</span>
+        <span><b>M</b> Music</span><span><b>F</b> Fullscreen</span>
+        <span><b>Esc</b> Close a menu</span><span><b>?</b> Hide this card</span>
+      </div>
+      <button class="control-hint__toggle" type="button" aria-expanded="false" title="Show or hide the controls (?)">Controls <kbd>?</kbd></button>
+    </aside>
 
     <aside id="petsPanel" class="pets-panel" aria-label="Your pets" hidden>
       <header class="pets-panel__head">
@@ -118,44 +141,50 @@
         <div><span class="eyebrow">SEED SHED</span><strong>Farm inventory</strong></div>
         <button id="closeInventory" class="farm-button" type="button" title="Back to the field (I)">Done <kbd>I</kbd></button>
       </header>
+      <nav class="sheet-tabs" role="tablist" aria-label="Inventory sections">
+        <button type="button" role="tab" data-sheet-tab="seeds" aria-selected="true">Seeds</button>
+        <button type="button" role="tab" data-sheet-tab="basket">Basket</button>
+        <button type="button" role="tab" data-sheet-tab="workshop">Workshop</button>
+        <button type="button" role="tab" data-sheet-tab="supplies">Supplies</button>
+      </nav>
       <div class="inventory-panel__body">
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="seeds">
           <h3 class="pets-section__title">Seeds · choose what E plants</h3>
           <div id="seedGrid" class="seed-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="seeds">
           <h3 class="pets-section__title">Saplings · choose what E plants in a Tree Plot</h3>
           <div id="saplingGrid" class="sapling-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="basket">
           <h3 class="pets-section__title">Harvest basket</h3>
           <div id="produceGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="basket">
           <h3 class="pets-section__title">Fish · creel and trophy mounts</h3>
           <div id="fishGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="supplies">
           <h3 class="pets-section__title">Fishing tackle</h3>
           <div id="tackleGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="basket">
           <h3 class="pets-section__title">Pantry · cooked at a Kitchen Range</h3>
           <div id="pantryGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="workshop">
           <h3 class="pets-section__title">Log pile · for the Sawmill</h3>
           <div id="logsGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="workshop">
           <h3 class="pets-section__title">Planks · for the Carpenter's Workbench</h3>
           <div id="planksGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="workshop">
           <h3 class="pets-section__title">Furniture · made at the Workbench</h3>
           <div id="furnitureGrid" class="item-grid"></div>
         </section>
-        <section class="pets-section">
+        <section class="pets-section" data-sheet-pane="supplies">
           <h3 class="pets-section__title">Compost, pet food &amp; livestock feed</h3>
           <div id="suppliesGrid" class="item-grid item-grid--wide"></div>
         </section>

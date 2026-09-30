@@ -1,166 +1,157 @@
-/* The Market Square: the farm's shell (../farm.css) and the shared presence
-   chrome (../../css/space-presence.css), plus the ticket chip, the Produce
-   Merchant's counter and the Order Board. */
+/* The Market Square: the farm's HUD and sheets (../farm.css) and the shared
+   presence chrome (../../css/space-presence.css), plus what only the square's
+   counters have — sale rows with a running total, the Order Board's cards,
+   the Exchange Board's form, the trading table and the Livestock Dealer's
+   cards. The Cove and the Downs link this file too. Colours come from the
+   --hud-* tokens in farm.css. */
 
 #marketCanvas { display: block; width: 100%; height: 100%; outline: 0; }
 
-.market-tickets { display: inline-flex; align-items: baseline; gap: 7px; padding: 10px 15px; border: 1px solid var(--farm-accent); border-radius: 999px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
-.market-tickets[hidden] { display: none; }
-.market-tickets span { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.market-tickets strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; }
+.sale-panel { --sheet-width: 540px; }
 
+/* ---------------------------------------------------------------- counter rows */
 
-.sale-panel { width: min(520px, calc(100vw - 36px)); }
-.vendor-shelf__title { margin: 16px 0 8px; color: var(--farm-leaf); font: 900 11px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.vendor-shelf__title:first-of-type { margin-top: 4px; }
+.vendor-shelf__title { margin-top: 18px; }
+.vendor-shelf__title:first-child, .sale-note + .vendor-shelf__title { margin-top: 4px; }
 .vendor-shelf__status { min-height: 0; margin: 7px 0 0; }
 .vendor-shelf__status:empty { display: none; }
 .vendor-shelf__row { grid-template-columns: 54px minmax(0, 1fr) auto; }
 .vendor-shelf__actions { justify-content: end; }
-.vendor-shelf__actions .farm-button { padding: 6px 9px; font-size: 11px; white-space: nowrap; }
-.sale-note { margin: 0 0 12px; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
+.vendor-shelf__actions .farm-button { min-height: 30px; padding: 0 10px; font-size: 11.5px; white-space: nowrap; }
 .sale-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
-.sale-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto 56px; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
+.sale-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto 56px; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); }
 .sale-row .seed-card__image { width: 54px; height: 48px; }
-.sale-row__label strong { display: block; font-size: 13.5px; }
-.sale-row__label small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11px; }
-.sale-row__stepper { display: flex; align-items: center; gap: 4px; }
-.sale-row__stepper button { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.07); color: #fff; font-weight: 900; cursor: pointer; }
-.sale-row__stepper button:hover:not(:disabled) { border-color: var(--farm-accent); }
-.sale-row__stepper button:disabled { opacity: .35; cursor: not-allowed; }
-.sale-row__stepper input { width: 46px; height: 28px; padding: 0 4px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(0,0,0,.25); color: #fff; font: 800 13px ui-monospace, monospace; text-align: center; }
-.sale-row__stepper input:focus { outline: 0; border-color: var(--farm-accent); }
-.sale-row__all { font: 800 10px ui-monospace, monospace !important; letter-spacing: .06em; }
-.sale-row__subtotal { color: var(--farm-accent); font: 900 14px ui-monospace, monospace; text-align: right; }
-.sale-turnover { margin: -4px 0 10px; color: var(--farm-leaf); font: 800 10.5px ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.sale-row__label strong { display: block; color: var(--hud-text); font-size: 13.5px; }
+.sale-row__label small { display: block; margin-top: 2px; color: var(--hud-text-muted); font-size: 11px; }
+.sale-row__all { font: 800 10px var(--hud-mono) !important; letter-spacing: .06em; }
+.sale-row__subtotal { color: var(--hud-accent); font: 900 14px var(--hud-mono); text-align: right; }
+.sale-turnover { margin: -4px 0 10px; color: var(--hud-leaf); font: 800 10.5px var(--hud-mono); letter-spacing: .12em; text-transform: uppercase; }
 .sale-turnover:empty { display: none; }
 .seed-row { grid-template-columns: 54px minmax(0, 1fr) auto; }
 .seed-row.is-special { border-color: rgba(242, 196, 90, .55); background: rgba(242, 196, 90, .08); }
-.seed-row__special { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: #f2c45a; color: #2a1d05; font: 900 9.5px ui-monospace, monospace; font-style: normal; letter-spacing: .08em; text-transform: uppercase; vertical-align: 1px; }
+.seed-row__special { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--hud-warn); color: var(--hud-accent-ink); font: 900 9.5px var(--hud-mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; vertical-align: 1px; }
 .seed-row__actions { display: flex; gap: 6px; }
-.seed-row__actions .farm-button { padding: 6px 10px; font-size: 11.5px; white-space: nowrap; }
-.exchange-panel { width: min(600px, calc(100vw - 36px)); }
-/* The tabs hide one view with the `hidden` attribute; `.sale-list`'s own display must not win over it. */
-.exchange-panel [hidden] { display: none !important; }
-.exchange-tabs { display: flex; gap: 6px; padding: 10px 18px 0; }
-.exchange-tabs button { flex: 1; padding: 8px 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; background: rgba(255,255,255,.05); color: #d9e6cf; font: 800 12px ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
-.exchange-tabs button[aria-selected="true"] { border-color: var(--farm-accent); background: rgba(242, 196, 90, .14); color: #fff6cf; }
+.seed-row__actions .farm-button { min-height: 30px; padding: 0 10px; font-size: 11.5px; white-space: nowrap; }
+/* The summary Inventory at the Market and the Cove: name and count. */
+.inventory-summary__row { grid-template-columns: minmax(0, 1fr) auto; }
+.inventory-summary__row b { color: var(--hud-accent); font: 800 12.5px var(--hud-mono); }
+.inventory-summary__section + .inventory-summary__section { margin-top: 16px; }
+
+/* Total on the left, the one big action on the right. */
+.sale-footer__total { display: flex; align-items: baseline; gap: 8px; }
+.sale-footer__total span { color: var(--hud-leaf); font: 800 10.5px var(--hud-mono); letter-spacing: .16em; text-transform: uppercase; }
+.sale-footer__total strong { color: var(--hud-heading); font: 900 24px var(--hud-mono); }
+.sale-footer__total small { color: var(--hud-text-soft); }
+.sale-footer__actions { display: flex; gap: 8px; }
+.sale-footer__sell { flex: 1; min-height: 40px; }
+.sale-footer__sell:not(:disabled) { background: var(--hud-accent); color: var(--hud-accent-ink); }
+
+/* ---------------------------------------------------------------- the Exchange Board */
+
+.exchange-panel { --sheet-width: 600px; }
 .exchange-row { grid-template-columns: 54px minmax(0, 1fr) auto auto; }
 .exchange-row--mine { grid-template-columns: 54px minmax(0, 1fr) auto; }
 /* An animal or a fish: one of its kind, so no count to pick — picture, words, price. */
 .exchange-row--single { grid-template-columns: 54px minmax(0, 1fr) auto; }
-.exchange-row > .farm-button { padding: 6px 10px; font-size: 11.5px; white-space: nowrap; }
+.exchange-row > .farm-button { min-height: 30px; padding: 0 10px; font-size: 11.5px; white-space: nowrap; }
 .exchange-form { display: grid; gap: 10px; margin-bottom: 18px; }
-.exchange-form__good { padding: 8px 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; background: rgba(0,0,0,.25); color: #fff; font: 700 13px system-ui, sans-serif; }
+.exchange-form__good { padding: 8px 10px; font-size: 13px; font-weight: 700; }
 .exchange-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.exchange-form__field { display: grid; gap: 4px; color: #b9c9ad; font: 800 10.5px ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.exchange-form__field input { height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(0,0,0,.25); color: #fff; font: 800 14px ui-monospace, monospace; }
+.exchange-form__field { display: grid; gap: 4px; color: var(--hud-text-muted); font: 800 10.5px var(--hud-mono); letter-spacing: .12em; text-transform: uppercase; }
+.exchange-form__field input { height: 34px; padding: 0 8px; font: 800 14px var(--hud-mono); }
 .exchange-form__note { margin: 0; }
-.exchange-limits { margin: 0; color: #b9c9ad; font-size: 11px; line-height: 1.4; }
+.exchange-limits { margin: 0; color: var(--hud-text-muted); font-size: 11px; line-height: 1.4; }
 .exchange-limits:empty { display: none; }
-@media (max-width: 560px) {
-  .exchange-row { grid-template-columns: 44px minmax(0, 1fr); }
-  .exchange-row .sale-row__stepper, .exchange-row > .farm-button { grid-column: 2; justify-self: start; }
-}
-.sale-empty { padding: 18px 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 11px; color: #c9d7bd; text-align: center; font-size: 13px; }
-.sale-footer { display: grid; gap: 10px; padding: 14px 18px 16px; border-top: 1px solid rgba(255,255,255,.1); }
-.sale-footer__total { display: flex; align-items: baseline; gap: 8px; }
-.sale-footer__total span { color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
-.sale-footer__total strong { color: #fff6cf; font: 900 26px ui-monospace, monospace; }
-.sale-footer__total small { color: #c9d7bd; }
-.sale-footer__actions { display: flex; gap: 8px; }
-.sale-footer__sell { flex: 1; }
-.sale-footer__actions button:disabled { opacity: .45; cursor: not-allowed; }
-.sale-footer .pets-status { margin: 0; }
 
-/* The Order Board: one card per notice. */
-.orders-panel { width: min(560px, calc(100vw - 36px)); }
-.orders-turnover { display: block; margin-top: 6px; color: var(--farm-accent); font: 800 11px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+/* ---------------------------------------------------------------- the Order Board */
+
+.orders-panel { --sheet-width: 560px; }
+.orders-turnover { display: block; margin-top: 6px; color: var(--hud-accent); font: 800 11px var(--hud-mono); letter-spacing: .08em; text-transform: uppercase; }
 .orders-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.order-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(246,239,217,.06); }
+.order-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: rgba(246,239,217,.06); }
 .order-card[data-state="filled"] { opacity: .62; }
 .order-card[data-state="locked"] { border-style: dashed; }
 .order-card__head { display: grid; gap: 2px; }
-.order-card__tier { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.order-card__head strong { font-size: 15px; }
-.order-card__note { margin: 0; color: #c9d7bd; font: italic 12.5px/1.4 Georgia, serif; }
+.order-card__tier { color: var(--hud-leaf); font: 800 10px var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
+.order-card__head strong { color: var(--hud-heading); font-size: 15px; }
+.order-card__note { margin: 0; color: var(--hud-text-soft); font: italic 12.5px/1.4 Georgia, serif; }
 .order-card__lines { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .order-card__lines li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; }
 .order-card__lines .seed-card__image { width: 42px; height: 38px; }
-.order-card__lines small { color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
+.order-card__lines small { color: var(--hud-text-muted); font: 700 11px var(--hud-mono); }
 .order-card__lines li.is-short small { color: #ffb08a; }
-.order-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.order-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid var(--hud-line); }
 .order-card__reward { display: grid; }
-.order-card__reward strong { color: #fff6cf; font: 900 16px ui-monospace, monospace; }
-.order-card__reward small { color: var(--farm-leaf); font: 700 11px ui-monospace, monospace; }
-.order-card__fill:disabled { opacity: .55; cursor: not-allowed; }
-.orders-footer { padding-top: 10px; padding-bottom: 12px; }
-.orders-footer .pets-status:empty::before { content: "Deliver from your basket or pantry: the goods come off, the tickets and XP go on."; color: #9fb294; }
+.order-card__reward strong { color: var(--hud-heading); font: 900 16px var(--hud-mono); }
+.order-card__reward small { color: var(--hud-leaf); font: 700 11px var(--hud-mono); }
+.orders-footer .pets-status:empty { display: block; }
+.orders-footer .pets-status:empty::before { content: "Deliver from your basket or pantry: the goods come off, the tickets and XP go on."; color: var(--hud-text-muted); }
 
-/* Trading: an invitation toast, and a two-sided table. */
-.trade-invite { position: fixed; z-index: 8; top: 92px; left: 50%; translate: -50% 0; display: grid; gap: 8px; width: min(380px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--farm-accent); border-radius: 14px; background: var(--farm-ink); color: #f8fbf4; box-shadow: 0 24px 70px rgba(0,0,0,.55); backdrop-filter: blur(16px); }
-.trade-invite[hidden] { display: none; }
-.trade-invite strong { font-size: 15px; }
+/* ---------------------------------------------------------------- trading: an invitation, and a two-sided table */
+
+.trade-invite { border-color: var(--hud-accent); }
+.trade-invite strong { color: var(--hud-heading); font-size: 15px; }
 .trade-invite__actions { display: flex; gap: 8px; }
 .trade-invite__actions button { flex: 1; }
 .trade-invite__actions button:disabled { opacity: .5; cursor: wait; }
-.trade-panel { left: 50%; right: auto; translate: -50% 0; width: min(860px, calc(100vw - 36px)); }
+.trade-panel { --sheet-width: 860px; left: 50%; right: auto; translate: -50% 0; animation: none; }
 .trade-panel__body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-content: start; }
 .trade-side { display: grid; gap: 8px; align-content: start; min-width: 0; }
-.trade-side--theirs { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.1); }
-.trade-side__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
-.trade-chip { padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); color: #d6e3c8; font: 800 9.5px ui-monospace, monospace; font-style: normal; letter-spacing: .12em; }
-.trade-chip[data-state="locked"] { border-color: var(--farm-accent); color: var(--farm-accent); }
-.trade-chip[data-state="confirmed"] { border-color: var(--farm-leaf); background: rgba(158,226,122,.18); color: var(--farm-leaf); }
+.trade-side--theirs { padding-left: 16px; border-left: 1px solid var(--hud-line); }
+.trade-side__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; color: var(--hud-leaf); font: 800 10.5px var(--hud-mono); letter-spacing: .16em; text-transform: uppercase; }
+.trade-chip { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--hud-line-strong); color: var(--hud-text-soft); font: 800 9.5px var(--hud-mono); font-style: normal; letter-spacing: .12em; }
+.trade-chip[data-state="locked"] { border-color: var(--hud-accent); color: var(--hud-accent); }
+.trade-chip[data-state="confirmed"] { border-color: var(--hud-leaf); background: var(--hud-leaf-soft); color: var(--hud-leaf); }
 .trade-row { grid-template-columns: 46px minmax(0, 1fr) auto; }
 .trade-row .seed-card__image { width: 46px; height: 42px; }
 .trade-row[data-offered="true"] { border-color: rgba(255, 211, 61, .55); background: rgba(255, 211, 61, .09); }
-.trade-row__count { min-width: 26px; color: #fff6cf; font: 900 14px ui-monospace, monospace; text-align: center; }
-.trade-row--theirs .trade-row__count { color: var(--farm-accent); text-align: right; }
-.trade-panel[data-status="completed"] .trade-side--theirs .trade-row { border-color: rgba(158,226,122,.5); background: rgba(158,226,122,.1); }
-.trade-footer .pets-status { color: #fff6cf; font-weight: 700; }
-.trade-footer__rule { margin: 0; color: #9fb294; font-size: 11.5px; }
-#lockTrade[aria-pressed="true"] { border-color: var(--farm-accent); color: var(--farm-accent); }
-#confirmTrade:disabled, #lockTrade:disabled { opacity: .45; cursor: not-allowed; }
+.trade-row__count { min-width: 26px; color: var(--hud-heading); font: 900 14px var(--hud-mono); text-align: center; }
+.trade-row--theirs .trade-row__count { color: var(--hud-accent); text-align: right; }
+.trade-panel[data-status="completed"] .trade-side--theirs .trade-row { border-color: rgba(158,226,122,.5); background: var(--hud-leaf-soft); }
+.trade-footer .pets-status { color: var(--hud-heading); font-weight: 700; }
+.trade-footer__rule { margin: 0; color: var(--hud-text-muted); font-size: 11.5px; }
+#lockTrade[aria-pressed="true"] { border-color: var(--hud-accent); color: var(--hud-accent); }
+
+/* ---------------------------------------------------------------- the Livestock Dealer and the Butcher */
+
+.dealer-card { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); }
+.dealer-card__picture { display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border-radius: var(--hud-r-md); background: radial-gradient(circle at 50% 70%, rgba(112,148,59,.4), rgba(20,35,18,.25) 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.dealer-card__picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dealer-card__letter { color: var(--hud-heading); font: 900 24px var(--hud-font); }
+.dealer-card__words { display: grid; gap: 3px; min-width: 0; }
+.dealer-card__words strong { color: var(--hud-heading); font-size: 14px; }
+.dealer-card__words small { color: var(--hud-text-soft); font-size: 12px; }
+.dealer-card__grow { color: var(--hud-text-muted) !important; }
+.dealer-card__buy { white-space: nowrap; }
+.dealer-card.is-locked .dealer-card__picture { filter: grayscale(.8) brightness(.8); }
+/* The Butcher asks twice: the second press is the one that sends. */
+.butcher-card__warning { color: #f5b8d8 !important; font-weight: 700; }
+.horse-card { align-items: start; }
+.horse-card__picture { position: relative; }
+.horse-card__coat { position: absolute; right: 4px; bottom: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--coat, #6b3a1f); box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
+.horse-card__stars { color: var(--hud-warn); letter-spacing: 1px; }
+.horse-card__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 12px; margin: 4px 0 2px; }
+.horse-card__stat { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 6px; }
+.horse-card__stat dt { color: var(--hud-text-soft); font: 700 11px var(--hud-font); }
+.horse-card__stat dd { display: flex; align-items: center; gap: 6px; margin: 0; }
+.horse-card__bar { position: relative; flex: 1; height: 6px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.1); }
+.horse-card__bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--value, 0%); border-radius: 3px; background: linear-gradient(90deg, #8fbf55, #d8e86a); }
+.horse-card__value { min-width: 20px; color: var(--hud-heading); font: 800 11px var(--hud-font); text-align: right; }
+.horse-card.is-sold { opacity: .55; }
+/* Hollis's name box: what the next animal bought is called. */
+.dealer-name { display: grid; gap: 5px; margin: 0 0 12px; color: var(--hud-text-soft); font: 700 12px var(--hud-font); }
+.dealer-name small { color: var(--hud-text-muted); font-weight: 600; }
+.dealer-name input { padding: 8px 11px; font: 700 14px var(--hud-font); }
 
 @media (max-width: 720px) {
   .sale-row { grid-template-columns: 36px minmax(0, 1fr) 48px; }
   .sale-row__stepper { grid-column: 2 / 4; }
   .order-card__foot { flex-direction: column; align-items: stretch; }
   .trade-panel__body { grid-template-columns: 1fr; }
-  .trade-side--theirs { padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.1); }
+  .trade-side--theirs { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--hud-line); }
   .trade-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
 }
-
-/* The Livestock Dealer: one card per species, its portrait, what it gives, and a Buy. */
-.dealer-card { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); }
-.dealer-card__picture { display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border-radius: 12px; background: radial-gradient(circle at 50% 70%, rgba(112,148,59,.4), rgba(20,35,18,.25) 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
-.dealer-card__picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.dealer-card__letter { color: #fff6cf; font: 900 24px system-ui, sans-serif; }
-.dealer-card__words { display: grid; gap: 3px; min-width: 0; }
-.dealer-card__words strong { color: #fff6cf; font-size: 14px; }
-.dealer-card__words small { color: #c9d7bd; font-size: 12px; }
-.dealer-card__grow { color: #9fb294 !important; }
-.dealer-card__buy { white-space: nowrap; }
-.dealer-card__buy:disabled { opacity: .45; cursor: not-allowed; }
-.dealer-card.is-locked .dealer-card__picture { filter: grayscale(.8) brightness(.8); }
-/* The Butcher asks twice: the second press is the one that sends. */
-.butcher-card .farm-button--danger { border-color: #e06a5a; background: rgba(224, 106, 90, .24); color: #ffe3dc; }
-.butcher-card__warning { color: #f5b8d8 !important; font-weight: 700; }
-/* Hollis's name box: what the next animal bought is called. */
-.horse-card { align-items: start; }
-.horse-card__picture { position: relative; }
-.horse-card__coat { position: absolute; right: 4px; bottom: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--coat, #6b3a1f); box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
-.horse-card__stars { color: #f3c64a; letter-spacing: 1px; }
-.horse-card__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 12px; margin: 4px 0 2px; }
-.horse-card__stat { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 6px; }
-.horse-card__stat dt { color: #c9d7bd; font: 700 11px system-ui, sans-serif; }
-.horse-card__stat dd { display: flex; align-items: center; gap: 6px; margin: 0; }
-.horse-card__bar { position: relative; flex: 1; height: 6px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.1); }
-.horse-card__bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--value, 0%); border-radius: 3px; background: linear-gradient(90deg, #8fbf55, #d8e86a); }
-.horse-card__value { min-width: 20px; color: #fff6cf; font: 800 11px system-ui, sans-serif; text-align: right; }
-.horse-card.is-sold { opacity: .55; }
-.dealer-name { display: grid; gap: 5px; margin: 0 0 10px; color: #d6e3c8; font: 700 12px system-ui, sans-serif; }
-.dealer-name small { color: #9fb294; font-weight: 600; }
-.dealer-name input { min-width: 0; padding: 8px 11px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(0,0,0,.25); color: #fff; font: 700 14px system-ui, sans-serif; }
-.dealer-name input:focus { outline: 0; border-color: var(--farm-accent); }
+@media (max-width: 560px) {
+  .exchange-row { grid-template-columns: 44px minmax(0, 1fr); }
+  .exchange-row .sale-row__stepper, .exchange-row > .farm-button { grid-column: 2; justify-self: start; }
+}

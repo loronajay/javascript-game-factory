@@ -9,6 +9,7 @@
 // sends every finished one to the server to be ridden again for Riding XP and
 // training, and shares the place with everyone else riding there. It decides
 // nothing itself; every rule lives in a pure module.
+import { createFarmHud } from "./farm-hud.mjs";
 import * as THREE_VENDOR from "./vendor/three.module.js";
 import { createLayoutStore, createRoomLayoutStore } from "./arcade-room-store.mjs";
 import { lookWalker } from "./arcade-room-walker.mjs";
@@ -106,7 +107,7 @@ const music = createFarmMusic();
 function renderMusicButton() {
     const muted = music.isMuted();
     musicButton.setAttribute("aria-pressed", String(muted));
-    musicButton.firstChild.textContent = muted ? "Music off " : "Music on ";
+    musicButton.title = muted ? "Music off — play it (M)" : "Music on — mute it (M)";
 }
 musicButton.addEventListener("click", () => { music.setMuted(!music.isMuted()); renderMusicButton(); });
 renderMusicButton();
@@ -154,17 +155,22 @@ const keys = new Set();
 let entered = false;
 let leaving = false;
 let draggingLook = false;
-let noticeUntil = 0;
 let riderClock = 0;
 /** A tap of Space shorter than a tick still jumps: held until the next tick reads it. */
 let jumpLatch = false;
+// The farm HUD layer (farm-hud.mts), shared with the Farm, Market and Cove: it owns the mouse around the
+// Downs' sheets, Escape, the controls card and the feedback toast. (`hud` below is the riding readout.)
+const farmHud = createFarmHud({
+    canvas,
+    canRelock: () => entered && !leaving,
+    controls: requiredElement("#controlHint"),
+});
 function setPrompt(text) {
-    prompt.textContent = text;
-    prompt.classList.toggle("is-visible", Boolean(text));
+    farmHud.setPrompt(prompt, text);
 }
+/** What just happened: the toast above the prompt, which stays live. */
 function notice(text, seconds = 4) {
-    noticeUntil = performance.now() + seconds * 1000;
-    setPrompt(text);
+    farmHud.toast(text, seconds);
 }
 // ---------------------------------------------------------------- the HUD, the map, the board
 const hud = createDownsHud({
@@ -281,8 +287,11 @@ const racing = createDownsRacing({
     },
     onClose: () => canvas.focus(),
 });
+farmHud.sheet("board", { root: requiredElement("#boardPanel"), close: () => board.close() });
+farmHud.sheet("races", { root: requiredElement("#racePanel"), close: () => racing.closePanels() });
+farmHud.sheet("booth", { root: requiredElement("#boothPanel"), close: () => racing.closePanels() });
 function panelOpen() {
-    return board.isOpen() || racing.panelOpen();
+    return farmHud.anyOpen();
 }
 function publishPresence() {
     presence.publishPose({
@@ -354,8 +363,6 @@ function updateInteraction() {
             setPrompt("");
         return;
     }
-    if (performance.now() < noticeUntil)
-        return;
     if (racing.prompt())
         return setPrompt(racing.prompt());
     if (nearProp(DOWNS_NOTICE_BOARD))
@@ -424,11 +431,7 @@ function checkGateway() {
     location.href = backUrl(true);
 }
 window.addEventListener("keydown", (event) => {
-    if (panelOpen()) {
-        if (event.code === "Escape") {
-            board.close();
-            racing.closePanels();
-        }
+    if (farmHud.handleKey(event) || panelOpen()) {
         keys.clear();
         return;
     }

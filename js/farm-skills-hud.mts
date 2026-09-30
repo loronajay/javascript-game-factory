@@ -1,4 +1,4 @@
-// The skill lines under the seed HUD: Farming, Woodcutting, Cooking, Carpentry and Husbandry, each a label
+// The skill lines in the status card: Farming, Woodcutting, Cooking, Carpentry and Husbandry, each a label
 // and a bar to its next level. Account farms only — a signed-out farm earns no
 // skill XP. The numbers come from the pure farm-skills.mts; this file only
 // writes them into the elements it is handed, and glows a line briefly when a
@@ -30,11 +30,12 @@ export function createFarmSkillsHud(lines: Readonly<Record<SkillName, SkillLineE
     line.root.hidden = !enabled || (name !== "farming" && xp <= 0);
     if (line.root.hidden) return;
     const progress = farmingProgress(xp);
-    line.label.textContent = skillLabel(TITLES[name], xp);
+    // The card shows name and level; the XP (and how to earn it) is the tooltip, and the Stats sheet (K) has the rest.
+    line.label.textContent = `${TITLES[name]} ${progress.level}`;
     line.bar.style.width = `${Math.round(progress.fraction * 100)}%`;
     line.root.title = progress.maxed
-      ? `${TITLES[name]} is mastered.`
-      : `${(progress.nextLevelXp - progress.xp).toLocaleString()} XP to ${TITLES[name]} ${progress.level + 1}. ${HOW[name]}`;
+      ? `${skillLabel(TITLES[name], xp)}. ${TITLES[name]} is mastered.`
+      : `${skillLabel(TITLES[name], xp)}. ${(progress.nextLevelXp - progress.xp).toLocaleString()} XP to ${TITLES[name]} ${progress.level + 1}. ${HOW[name]}`;
     if (shown[name] && progress.level > shown[name]) {
       line.root.classList.add("is-levelled");
       setTimeout(() => line.root.classList.remove("is-levelled"), 2400);

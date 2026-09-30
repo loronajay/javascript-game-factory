@@ -1,5 +1,30 @@
 # Changelog
 
+## One HUD for the Farm, the Market Square, the Cove and the Downs (2026-09-29)
+
+The farm family's screens had grown by accretion: a giant header of nine pill buttons, three stacked HUD boxes in the bottom-left corner, an always-on row of eleven key chips, and a dozen panel modules each deciding for itself whether to free the mouse. Redesigned as one system.
+
+**The HUD layer** (`js/farm-hud.mts` over the pure `js/farm-hud-model.mts`). A page registers each sheet with `hud.sheet(id, { root, close, open?, key? })`. The layer watches each root's `hidden` attribute, which every panel module already sets, so no panel module changed. From then on it owns:
+- **The mouse.** Any sheet that becomes visible, however it was opened, releases pointer lock. This fixes the bug where Pets, Herd, the Dealer, the Butcher and all four Cove counters opened with the mouse still captured, which in fullscreen left no way to use the menu, because Escape exits fullscreen. Closing the last sheet captures the mouse again if it was captured when the sheet opened.
+- **One sheet at a time.** The newest sheet wins, so I/P/L/K switch between sheets instead of being swallowed.
+- **Leaving a sheet.** Escape, the sheet's hotkey again, or a click on the dimmed world (`.hud-scrim`) closes it. The trade table opts out of click-to-close.
+- **Fullscreen.** The layer keeps Escape with the Keyboard Lock API, so Escape closes menus in fullscreen and holding Escape leaves fullscreen. The Market and Cove now have fullscreen too.
+- **Shared chrome.** The feedback toast, key-cap prompts, the collapsible controls card and sheet tabs.
+
+**Feedback is visible.** The farm wrote every message ("no room to get down here", "Rex ate one serving…") into the start card's status line, which is invisible once you have entered. Those messages now go through `say()` to the toast. The Market, Cove and Downs `notice()`s moved from the prompt to the toast, so the prompt ("[E] to …") stays live under them.
+
+**One design** in `farm/farm.css`, built on `--hud-*` tokens for surface, text, meaning, radii and layers:
+- a slim top bar: the way back and the place name on the left, and on the right one toolbar of icon tools with key hints (gold when open) plus tickets (now on the farm too), music and fullscreen;
+- a single status card at the bottom left: clock, what E plants, and a compact skills grid with the XP in a tooltip;
+- the Cove's tackle bar redrawn as the same kind of card;
+- a controls card that is open on a first visit and remembered after (`?` toggles it);
+- key-cap prompts at the bottom centre;
+- every menu drawn in one sheet shape.
+
+**Long sheets have tabs:** the farm Inventory (Seeds, Basket, Workshop, Supplies), Marigold (Sell harvest, Buy ingredients), Basil (Sell cooking, Recipe cards) and Hollis (Livestock, Horses, Feed). The Cove gained Creel and Fishdex tools, and C/F now toggle and switch between them.
+
+Verified headlessly: 20 of 21 scripted checks passed on all three places. The one miss was a test artefact (the game loop overwrote an injected prompt; the live Cove prompt showed its key caps). New tests are in `js/tests/farm-hud.test.mjs`.
+
 ## The horse, the Riding skill and Windrush Downs (2026-09-29)
 
 Phase 7 of `FARM_LIVESTOCK_PLAN.md`, scoped and built as `planning-docs/FARM_RIDING_PLAN.md` (its "As built" section has the module map and the defaults taken).

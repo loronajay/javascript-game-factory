@@ -1,527 +1,829 @@
-/* The farm's shell: the room's chrome (header, start gate, prompt, control
-   hint) in a daylight palette. The build-mode frame is the shared
-   css/space-editor.css; this file only tints it. */
+/* The farm's HUD and sheets — one design shared by the Farm, the Market Square,
+   the Cove and Windrush Downs (each links this file first and only adds its own
+   pieces). The build-mode frame is the shared css/space-editor.css; this file
+   only tints it.
+
+   Reading order: tokens → the world's chrome (top bar, status, prompt, toast,
+   controls, chat) → sheets (the one panel shape every menu uses) → the
+   components inside sheets → the minigame HUDs → build mode.
+
+   Rules of the system, so it stays one:
+   - colours, radii, type and layers come from the tokens below, never literals;
+   - gold (--hud-accent) means "the thing to press / what is selected / money",
+     leaf green (--hud-leaf) labels sections and good news, nothing else;
+   - every menu is a sheet (.inventory-panel / .pets-panel) on the right, under
+     the top bar; the HUD layer (js/farm-hud.mts) opens one at a time, frees the
+     mouse for it and dims the world behind it (.hud-scrim). */
 
 :root {
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --hud-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --hud-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --hud-display: "Arial Black", var(--hud-font);
+
+  /* Surfaces: glass over the world, then rows and wells inside it. */
+  --hud-surface: rgba(19, 29, 18, .92);
+  --hud-surface-soft: rgba(19, 29, 18, .74);
+  --hud-surface-raised: rgba(255, 255, 255, .05);
+  --hud-surface-hover: rgba(255, 255, 255, .09);
+  --hud-surface-sunken: rgba(0, 0, 0, .26);
+  --hud-line: rgba(255, 248, 225, .12);
+  --hud-line-strong: rgba(255, 240, 200, .3);
+
+  /* Text, strongest to quietest. */
+  --hud-heading: #fff6d6;
+  --hud-text: #f4f3e8;
+  --hud-text-soft: #cdd7c1;
+  --hud-text-muted: #9dab93;
+
+  /* Meaning. */
+  --hud-accent: #ffd33d;
+  --hud-accent-soft: rgba(255, 211, 61, .15);
+  --hud-accent-ink: #2a2206;
+  --hud-leaf: #9ee27a;
+  --hud-leaf-soft: rgba(158, 226, 122, .14);
+  --hud-warn: #ffc85a;
+  --hud-danger: #ff8a78;
+  --hud-danger-soft: rgba(255, 110, 90, .16);
+  --hud-info: #8fd8ff;
+
+  --hud-r-sm: 8px;
+  --hud-r-md: 12px;
+  --hud-r-lg: 16px;
+  --hud-shadow: 0 18px 50px rgba(0, 0, 0, .38);
+  --hud-blur: blur(14px);
+
+  /* Layout. */
+  --hud-gap: 12px;
+  --hud-top: 68px;
+  --hud-control: 36px;
+
+  /* Layers, low to high. */
+  --z-chrome: 10;
+  --z-prompt: 12;
+  --z-chat: 14;
+  --z-minigame: 16;
+  --z-scrim: 20;
+  --z-gate: 21;
+  --z-topbar: 22;
+  --z-sheet: 24;
+  --z-toast: 26;
+  --z-notice: 28;
+
+  /* The names older page stylesheets still use. */
+  --farm-ink: var(--hud-surface);
+  --farm-ink-soft: var(--hud-surface-soft);
+  --farm-line: var(--hud-line-strong);
+  --farm-accent: var(--hud-accent);
+  --farm-leaf: var(--hud-leaf);
+
+  font-family: var(--hud-font);
   background: #dbe9f4;
-  color: #f8fbf4;
-  --farm-ink: rgba(24, 38, 22, .86);
-  --farm-ink-soft: rgba(24, 38, 22, .68);
-  --farm-line: rgba(255, 240, 200, .45);
-  --farm-accent: #ffd33d;
-  --farm-leaf: #9ee27a;
+  color: var(--hud-text);
 }
 
 * { box-sizing: border-box; }
 html, body, .farm-shell { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-button, a { font: inherit; }
+button, a, input, select { font: inherit; }
+[hidden] { display: none !important; }
 
 #farmCanvas { display: block; width: 100%; height: 100%; outline: 0; }
 
 /* Under a pond's surface: a murky tint and a darker edge over the canvas; the fog does the rest. */
-.farm-underwater {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  background: radial-gradient(ellipse at 50% 35%, rgba(40, 110, 120, 0.18), rgba(8, 36, 44, 0.62));
-}
+.farm-underwater { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s ease; background: radial-gradient(ellipse at 50% 35%, rgba(40, 110, 120, .18), rgba(8, 36, 44, .62)); }
 .farm-underwater.is-visible { opacity: 1; }
 
+/* ================================================================ shared bits */
+
+.eyebrow { color: var(--hud-leaf); font: 800 10px/1.2 var(--hud-mono); letter-spacing: .16em; text-transform: uppercase; }
+
+kbd, .farm-button kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font: 800 10px/1 var(--hud-mono);
+  opacity: .8;
+}
+
+.hud-icon { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Buttons: one shape. Gold = primary; quiet = secondary; danger asks twice. */
+.farm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: var(--hud-control);
+  padding: 0 14px;
+  border: 1px solid var(--hud-line-strong);
+  border-radius: 10px;
+  background: var(--hud-surface-soft);
+  color: var(--hud-text);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.1;
+  text-decoration: none;
+  cursor: pointer;
+  backdrop-filter: var(--hud-blur);
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.farm-button:hover:not(:disabled) { border-color: var(--hud-accent); background: var(--hud-surface); }
+.farm-button:focus-visible, .hud-tool:focus-visible, .back-link:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
+.farm-button:disabled { opacity: .45; cursor: not-allowed; }
+.farm-button kbd { margin-left: 2px; }
+.farm-button--accent { border-color: var(--hud-accent); background: var(--hud-accent-soft); color: var(--hud-heading); }
+.farm-button--accent:hover:not(:disabled) { background: var(--hud-accent); color: var(--hud-accent-ink); }
+.farm-button--accent[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-ink); }
+.farm-button--games { border-color: var(--hud-leaf); background: var(--hud-leaf-soft); }
+.farm-button--danger { border-color: var(--hud-danger); background: var(--hud-danger-soft); color: #ffe3dc; }
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--hud-control);
+  padding: 0 13px;
+  border: 1px solid var(--hud-line-strong);
+  border-radius: 10px;
+  background: var(--hud-surface-soft);
+  color: var(--hud-text);
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+  backdrop-filter: var(--hud-blur);
+}
+.back-link:hover { border-color: var(--hud-accent); background: var(--hud-surface); }
+
+/* ================================================================ the top bar */
+
+/* Left: where you are and the way back. Right: the toolbar. Nothing else lives up here. */
 .farm-header {
   position: fixed;
-  z-index: 4;
-  top: 0;
-  left: 0;
-  right: 0;
+  z-index: var(--z-topbar);
+  top: var(--hud-gap);
+  left: var(--hud-gap);
+  right: var(--hud-gap);
   display: flex;
-  align-items: center;
-  gap: 22px;
-  padding: 22px clamp(18px, 4vw, 54px);
+  align-items: flex-start;
+  gap: var(--hud-gap);
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(20, 34, 18, .78), transparent);
 }
 .farm-header > * { pointer-events: auto; }
-.farm-header h1 { margin: 2px 0 0; font: 900 clamp(23px, 3vw, 42px)/1 "Arial Black", sans-serif; letter-spacing: -.05em; text-transform: uppercase; text-shadow: 0 2px 12px rgba(0,0,0,.35); }
-.farm-header__actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.farm-owner-link[hidden] { display: none; }
+.hud-place { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hud-place__name { display: grid; gap: 2px; min-width: 0; padding: 3px 12px 4px; border-radius: 10px; background: var(--hud-surface-soft); backdrop-filter: var(--hud-blur); }
+.hud-place__name .eyebrow { font-size: 9px; }
+.farm-header h1 { margin: 0; overflow: hidden; color: var(--hud-heading); font: 900 17px/1.15 var(--hud-font); letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
 
-.eyebrow { color: var(--farm-leaf); font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .18em; }
-.back-link { color: #f8fbf4; text-decoration: none; border: 1px solid var(--farm-line); border-radius: 999px; padding: 10px 15px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
-.back-link:hover { border-color: var(--farm-accent); background: var(--farm-ink); }
-
-.farm-button {
-  border: 1px solid var(--farm-line);
-  border-radius: 999px;
-  padding: 10px 15px;
-  background: var(--farm-ink-soft);
-  color: #f8fbf4;
-  font-weight: 800;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  text-decoration: none;
+.farm-header__actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--hud-line);
+  border-radius: 14px;
+  background: var(--hud-surface-soft);
+  backdrop-filter: var(--hud-blur);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
 }
-.farm-button:hover { border-color: var(--farm-accent); background: var(--farm-ink); }
-.farm-button kbd { margin-left: 7px; padding: 2px 6px; border: 1px solid currentColor; border-radius: 5px; font: 800 10px ui-monospace, monospace; opacity: .85; }
-.farm-button[hidden] { display: none; }
-.farm-button--accent { border-color: var(--farm-accent); background: rgba(255, 211, 61, .18); }
-.farm-button--games { border-color: var(--farm-leaf); background: rgba(158, 226, 122, .18); }
-.farm-button--accent[aria-pressed="true"] { background: var(--farm-accent); color: #23301c; }
-.is-visiting .control-hint__owner { display: none; }
-.is-visiting #openPetGames { display: none; }
+.hud-toolbar__divider { width: 1px; height: 22px; margin: 0 4px; background: var(--hud-line-strong); }
+
+/* A tool: icon, word, key. Inside the toolbar it sits flat; open = gold. */
+.farm-header__actions .farm-button { border-color: transparent; background: transparent; backdrop-filter: none; padding: 0 10px; }
+.farm-header__actions .farm-button:hover:not(:disabled) { border-color: transparent; background: var(--hud-surface-hover); }
+.hud-tool[aria-pressed="true"],
+.farm-header__actions .farm-button[aria-pressed="true"]:not(.hud-icon-button) { background: var(--hud-accent); color: var(--hud-accent-ink); }
+.hud-tool kbd { opacity: .6; }
+.hud-tool[aria-pressed="true"] kbd { opacity: .9; }
+.hud-icon-button { width: var(--hud-control); padding: 0 !important; }
+.hud-icon-button .hud-tool__label, .hud-icon-button kbd { display: none; }
+/* Music and fullscreen show the state they are in. */
+.farm-music .hud-icon--off, .farm-music[aria-pressed="true"] .hud-icon--on { display: none; }
+.farm-music[aria-pressed="true"] .hud-icon--off { display: block; }
+.farm-music[aria-pressed="true"] { color: var(--hud-text-muted); }
+.farm-fullscreen .hud-icon--off, .farm-fullscreen[aria-pressed="true"] .hud-icon--on { display: none; }
+.farm-fullscreen[aria-pressed="true"] .hud-icon--off { display: block; }
+
+.market-tickets {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: var(--hud-control);
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--hud-accent-soft);
+  white-space: nowrap;
+}
+.market-tickets span { color: var(--hud-accent); font: 800 9.5px var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
+.market-tickets strong { color: var(--hud-heading); font: 900 14px var(--hud-mono); }
+
+.is-visiting .control-hint__owner, .is-visiting #openPetGames, .is-visiting #editFarm, .is-visiting #farmTickets { display: none; }
+
+/* ================================================================ the start gate */
 
 .start-gate {
   position: fixed;
-  z-index: 3;
+  z-index: var(--z-gate);
   inset: 0;
   display: grid;
   place-items: center;
   padding: 24px;
-  background: radial-gradient(circle at 50% 45%, rgba(255, 244, 200, .18), rgba(20, 34, 18, .62));
+  background: radial-gradient(circle at 50% 45%, rgba(255, 244, 200, .16), rgba(16, 28, 15, .66));
   transition: opacity .2s ease;
 }
 .start-gate.is-hidden { opacity: 0; pointer-events: none; }
-.start-card { width: min(480px, 100%); padding: 30px; text-align: center; border: 1px solid var(--farm-line); border-radius: 22px; background: var(--farm-ink); box-shadow: 0 30px 90px rgba(0, 0, 0, .4), inset 0 1px rgba(255,255,255,.08); backdrop-filter: blur(16px); }
-.start-card__tag { color: var(--farm-accent); font: 800 10px ui-monospace, monospace; letter-spacing: .18em; }
-.start-card h2 { margin: 10px 0 8px; font: 900 clamp(30px, 6vw, 48px)/.98 "Arial Black", sans-serif; letter-spacing: -.06em; }
-.start-card p { margin: 0 auto 22px; max-width: 35ch; color: #d6e3c8; line-height: 1.55; }
-.start-card button { border: 0; border-radius: 10px; padding: 13px 22px; background: var(--farm-accent); color: #23301c; font-weight: 900; text-transform: uppercase; cursor: pointer; box-shadow: 0 7px 0 #9c7911; }
-.start-card button:active { transform: translateY(4px); box-shadow: 0 3px 0 #9c7911; }
-.start-card small { display: block; margin-top: 18px; color: var(--farm-leaf); }
+.start-card { width: min(480px, 100%); padding: 30px; text-align: center; border: 1px solid var(--hud-line-strong); border-radius: 22px; background: var(--hud-surface); box-shadow: 0 30px 90px rgba(0, 0, 0, .4), inset 0 1px rgba(255,255,255,.08); backdrop-filter: var(--hud-blur); }
+.start-card__tag { color: var(--hud-accent); font: 800 10px var(--hud-mono); letter-spacing: .18em; }
+.start-card h2 { margin: 10px 0 8px; color: var(--hud-heading); font: 900 clamp(30px, 6vw, 46px)/.98 var(--hud-display); letter-spacing: -.05em; }
+.start-card p { margin: 0 auto 22px; max-width: 36ch; color: var(--hud-text-soft); line-height: 1.55; }
+.start-card button { border: 0; border-radius: 10px; padding: 13px 24px; background: var(--hud-accent); color: var(--hud-accent-ink); font-weight: 900; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; box-shadow: 0 6px 0 #9c7911; }
+.start-card button:active { transform: translateY(4px); box-shadow: 0 2px 0 #9c7911; }
+.start-card small { display: block; margin-top: 18px; color: var(--hud-text-muted); font-size: 12px; line-height: 1.5; }
 .start-gate[data-state="error"] .start-card button { display: none; }
-.starter-dog[hidden], .start-card > button[hidden] { display: none; }
 .starter-dog { margin: 0 auto 6px; text-align: left; }
-.starter-dog label { display: block; margin-bottom: 8px; color: #fff6cf; font-weight: 850; }
+.starter-dog label { display: block; margin-bottom: 8px; color: var(--hud-heading); font-weight: 850; }
 .starter-dog__action { display: flex; gap: 9px; }
-.starter-dog input { min-width: 0; flex: 1; border: 1px solid var(--farm-line); border-radius: 10px; padding: 13px 14px; background: rgba(255,255,255,.09); color: #fff; font: inherit; outline: 0; }
-.starter-dog input:focus { border-color: var(--farm-accent); box-shadow: 0 0 0 3px rgba(255,211,61,.16); }
+.starter-dog input { min-width: 0; flex: 1; border: 1px solid var(--hud-line-strong); border-radius: 10px; padding: 13px 14px; background: var(--hud-surface-raised); color: var(--hud-text); outline: 0; }
+.starter-dog input:focus { border-color: var(--hud-accent); box-shadow: 0 0 0 3px var(--hud-accent-soft); }
 .starter-dog button { white-space: nowrap; }
-.starter-dog span { display: block; min-height: 1.4em; margin-top: 10px; color: var(--farm-leaf); font-size: 12px; text-align: center; }
+.starter-dog span { display: block; min-height: 1.4em; margin-top: 10px; color: var(--hud-leaf); font-size: 12px; text-align: center; }
 
+/* ================================================================ the prompt and the toast */
+
+/* What E (or Space) does right now: the key as a cap, then the words. Bottom centre, always. */
 .farm-prompt {
   position: fixed;
-  z-index: 5;
+  z-index: var(--z-prompt);
   left: 50%;
-  bottom: 94px;
-  translate: -50% 12px;
-  padding: 13px 19px;
-  border: 1px solid rgba(255, 211, 61, .8);
-  border-radius: 10px;
-  background: var(--farm-ink);
-  color: #fff6cf;
-  font-weight: 850;
+  bottom: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 211, 61, .55);
+  border-radius: 12px;
+  background: var(--hud-surface);
+  color: var(--hud-heading);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
   opacity: 0;
-  transition: opacity .16s ease, translate .16s ease;
+  translate: -50% 10px;
+  transition: opacity .14s ease, translate .14s ease;
   pointer-events: none;
-  box-shadow: 0 15px 45px rgba(0,0,0,.3);
+  box-shadow: var(--hud-shadow);
 }
 .farm-prompt.is-visible { opacity: 1; translate: -50% 0; }
-.farm-prompt::first-letter { color: var(--farm-accent); }
+.farm-prompt kbd { min-width: 24px; height: 24px; padding: 0 7px; border-color: var(--hud-accent); color: var(--hud-accent); font-size: 12px; opacity: 1; background: rgba(255, 211, 61, .08); }
+.hud-prompt__gap { width: 1px; height: 16px; margin: 0 6px; background: var(--hud-line-strong); }
 
-.farm-clock {
+/* Feedback — what just happened — above the prompt for a few seconds. */
+.hud-toast {
   position: fixed;
-  z-index: 2;
-  left: clamp(18px, 4vw, 54px);
-  bottom: 20px;
-  min-width: 116px;
-  padding: 9px 13px;
-  border: 1px solid var(--farm-line);
+  z-index: var(--z-toast);
+  left: 50%;
+  bottom: 86px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 9px 15px;
+  border: 1px solid var(--hud-line-strong);
+  border-left: 3px solid var(--hud-leaf);
   border-radius: 10px;
-  background: var(--farm-ink-soft);
-  text-align: right;
-  backdrop-filter: blur(10px);
+  background: var(--hud-surface);
+  color: var(--hud-text);
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0;
+  translate: -50% 8px;
+  transition: opacity .2s ease, translate .2s ease;
+  pointer-events: none;
+  box-shadow: var(--hud-shadow);
 }
-.farm-clock span { display: block; color: var(--farm-leaf); font: 800 9px/1.2 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.farm-clock strong { display: block; margin-top: 2px; color: #fff6cf; font: 900 17px/1.2 ui-monospace, monospace; }
-.seed-hud { position: fixed; z-index: 2; left: clamp(152px, calc(4vw + 134px), 194px); bottom: 20px; min-width: 145px; padding: 9px 13px; border: 1px solid var(--farm-line); border-radius: 10px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
-.seed-hud span { display: block; color: var(--farm-leaf); font: 800 9px/1.2 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.seed-hud strong { display: block; margin-top: 2px; color: #fff6cf; font-size: 13px; }
-.seed-hud small { display: block; margin-top: 3px; color: #c9d7bd; font: 800 10px/1.2 ui-monospace, monospace; letter-spacing: .06em; }
-.seed-hud small.is-full { color: var(--farm-accent); }
-.farming-skill { margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.1); }
-.farming-skill[hidden] { display: none; }
-.seed-hud .farming-skill small { margin-top: 0; color: #fff6cf; }
-.farming-skill__bar { display: block; height: 5px; margin-top: 4px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.12); }
-.farming-skill__bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--farm-leaf); transition: width .4s ease; }
-.farming-skill.is-levelled .farming-skill__bar i { background: var(--farm-accent); }
-.farming-skill--wood .farming-skill__bar i { background: #c98a4b; }
-.farming-skill--cook .farming-skill__bar i { background: #e0673a; }
-.farming-skill--carpentry .farming-skill__bar i { background: #c9a06a; }
-.farming-skill--husbandry .farming-skill__bar i { background: #e7d3a4; }
+.hud-toast.is-visible { opacity: 1; translate: -50% 0; }
+.has-sheet .farm-prompt, .has-sheet .control-hint { opacity: 0; pointer-events: none; }
+/* A toast from a sheet (a purchase, a sale) still shows, clear of the sheet on the right. */
+.has-sheet .hud-toast { left: calc((100vw - min(540px, 100vw)) / 2); }
 
-/* The felling meter: a marker sweeps the bar; E when it is in the green. */
-.chop-meter { position: fixed; left: 50%; bottom: 200px; z-index: 6; width: min(420px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: rgba(20, 26, 16, .86); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
-.chop-meter[hidden] { display: none; }
-.chop-meter strong { font-size: 15px; letter-spacing: .02em; }
-.chop-meter small { font-size: 12px; color: rgba(255,246,207,.8); }
-.chop-meter__bar { position: relative; height: 22px; border-radius: 11px; background: linear-gradient(90deg, #5a2a1d, #7a3a22 50%, #5a2a1d); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
-.chop-meter__good { position: absolute; top: 0; bottom: 0; background: #6fae4a; }
-.chop-meter__perfect { position: absolute; top: 0; bottom: 0; background: #d8f07a; }
-.chop-meter__marker { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.8); }
-.chop-meter__tree { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
-.chop-meter__tree i { display: block; height: 100%; width: 100%; background: #c98a4b; transition: width .15s ease; }
-.chop-meter__word:not(:empty)::before { content: " · "; color: rgba(255,246,207,.6); font-weight: 400; }
-.chop-meter__word[data-quality="perfect"] { color: #d8f07a; font-weight: 700; }
-.chop-meter__word[data-quality="good"] { color: #9fdc74; }
-.chop-meter__word[data-quality="poor"] { color: #e0a080; }
+/* The world behind an open sheet, dimmed; a click on it walks back into the world. */
+.hud-scrim { position: fixed; z-index: var(--z-scrim); inset: 0; background: rgba(6, 12, 6, .3); opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.has-sheet .hud-scrim { opacity: 1; pointer-events: auto; cursor: pointer; }
 
-/* Saplings in the inventory: pick one for E, or buy one. */
-.sapling-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
-.sapling-card { display: grid; gap: 6px; padding: 8px; border-radius: 12px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); border-left: 4px solid var(--fruit, #8a5a34); }
-.sapling-card[aria-pressed="true"] { background: rgba(143, 196, 94, .18); box-shadow: inset 0 0 0 2px var(--farm-leaf); }
-.sapling-card__pick { display: grid; grid-template-columns: 42px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.sapling-card__pick:disabled { cursor: default; opacity: .7; }
-.sapling-card__pick small { font-size: 12px; opacity: .8; }
+/* ================================================================ the farm's status card */
 
-.nap-dialog { width: min(440px, calc(100vw - 36px)); padding: 0; border: 1px solid var(--farm-line); border-radius: 18px; background: var(--farm-ink); color: #f8fbf4; box-shadow: 0 30px 90px rgba(0,0,0,.65); }
+/* Bottom left: the time, what E plants, and the skills — one card, not three. */
+.hud-status {
+  position: fixed;
+  z-index: var(--z-chrome);
+  left: var(--hud-gap);
+  bottom: var(--hud-gap);
+  display: grid;
+  gap: 10px;
+  width: 268px;
+  padding: 11px 13px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-r-lg);
+  background: var(--hud-surface-soft);
+  backdrop-filter: var(--hud-blur);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+}
+.hud-status__row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; }
+.farm-clock { display: grid; gap: 1px; padding-right: 14px; border-right: 1px solid var(--hud-line); }
+.farm-clock span { color: var(--hud-leaf); font: 800 9px/1.2 var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
+.farm-clock strong { color: var(--hud-heading); font: 900 17px/1.15 var(--hud-mono); white-space: nowrap; }
+.seed-hud { display: grid; gap: 1px; min-width: 0; }
+.seed-hud > span { color: var(--hud-text-muted); font: 800 9px/1.2 var(--hud-mono); letter-spacing: .12em; text-transform: uppercase; }
+.seed-hud strong { overflow: hidden; color: var(--hud-heading); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.seed-hud small { color: var(--hud-text-soft); font: 750 10.5px/1.2 var(--hud-mono); }
+.seed-hud small.is-full { color: var(--hud-accent); }
+.is-visiting .seed-hud { display: none; }
+.is-visiting .farm-clock { padding-right: 0; border-right: 0; }
+
+/* Skills: two columns of name, level and a thin bar; the XP is in the tooltip. */
+.hud-skills { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; padding-top: 9px; border-top: 1px solid var(--hud-line); }
+.hud-skills:not(:has(.farming-skill:not([hidden]))) { display: none; }
+.farming-skill { --skill-color: var(--hud-leaf); display: grid; gap: 4px; min-width: 0; cursor: help; }
+.farming-skill small { overflow: hidden; color: var(--hud-text-soft); font: 750 10.5px/1.1 var(--hud-mono); text-overflow: ellipsis; white-space: nowrap; }
+.farming-skill__bar { display: block; height: 4px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.12); }
+.farming-skill__bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--skill-color); transition: width .4s ease; }
+.farming-skill.is-levelled small { color: var(--hud-accent); }
+.farming-skill.is-levelled .farming-skill__bar i { background: var(--hud-accent); box-shadow: 0 0 8px var(--hud-accent); }
+.farming-skill--wood { --skill-color: #d79b5b; }
+.farming-skill--cook { --skill-color: #ef7950; }
+.farming-skill--carpentry { --skill-color: #dbb37b; }
+.farming-skill--husbandry { --skill-color: #eadbb4; }
+
+/* ================================================================ controls */
+
+/* Bottom right: a "Controls ?" chip that opens into the full key list. First visit it starts open. */
+.control-hint { position: fixed; z-index: var(--z-chrome); right: var(--hud-gap); bottom: var(--hud-gap); display: grid; justify-items: end; gap: 8px; max-width: min(460px, calc(100vw - 24px)); }
+.control-hint__toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border: 1px solid var(--hud-line); border-radius: 10px; background: var(--hud-surface-soft); color: var(--hud-text-soft); font-size: 12px; font-weight: 800; cursor: pointer; backdrop-filter: var(--hud-blur); }
+.control-hint__toggle:hover { border-color: var(--hud-accent); color: var(--hud-text); }
+.control-hint__keys { display: none; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 5px 16px; padding: 12px 14px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-soft); backdrop-filter: var(--hud-blur); box-shadow: 0 10px 30px rgba(0, 0, 0, .22); color: var(--hud-text-soft); font-size: 12px; }
+.control-hint[data-expanded="true"] .control-hint__keys { display: grid; }
+.control-hint__keys span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.control-hint__keys b { min-width: 44px; color: var(--hud-heading); font: 800 11px var(--hud-mono); }
+
+/* ================================================================ chat and company (Market, Cove, Downs) */
+
+/* Who else is here: under the place name, top left. */
+.farm-shell .visitors-chip { z-index: var(--z-chrome); left: var(--hud-gap); right: auto; top: var(--hud-top); max-width: min(340px, calc(100vw - 24px)); border-color: var(--hud-line-strong); border-radius: var(--hud-r-md); background: var(--hud-surface-soft); backdrop-filter: var(--hud-blur); box-shadow: 0 10px 30px rgba(0,0,0,.22); }
+.farm-shell .visitors-chip__label { color: var(--hud-leaf); font-family: var(--hud-mono); }
+/* A readable log on the left, clear of the bottom row, always backed: bare text over grass cannot be read. */
+.farm-shell .room-chat { z-index: var(--z-chat); left: var(--hud-gap); bottom: 64px; width: min(440px, calc(100vw - 24px)); }
+.farm-shell .room-chat__log { max-height: 34vh; padding: 10px 14px; row-gap: 5px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: rgba(14, 24, 16, .74); backdrop-filter: blur(8px); box-shadow: 0 12px 34px rgba(0,0,0,.35); font-size: 14px; line-height: 1.4; text-shadow: 0 1px 1px rgba(0,0,0,.6); }
+.farm-shell .room-chat__log:empty { display: none; }
+.farm-shell .room-chat[data-open="true"] .room-chat__log { background: var(--hud-surface); border-color: rgba(255, 211, 61, .35); }
+.farm-shell .room-chat__name { color: var(--hud-info); }
+.farm-shell .room-chat__line--self .room-chat__name { color: var(--hud-accent); }
+.farm-shell .room-chat__line--system { color: var(--hud-text-muted); font-size: 13px; }
+.farm-shell .room-chat__input { border-radius: var(--hud-r-md); background: var(--hud-surface); font-size: 14px; }
+.has-sheet .room-chat { opacity: .35; }
+
+/* ================================================================ notices over everything */
+
+.away-report, .trade-invite {
+  position: fixed;
+  z-index: var(--z-notice);
+  top: var(--hud-top);
+  left: 50%;
+  translate: -50% 0;
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 16px 18px;
+  border: 1px solid var(--hud-line-strong);
+  border-radius: var(--hud-r-lg);
+  background: var(--hud-surface);
+  color: var(--hud-text);
+  box-shadow: 0 24px 70px rgba(0,0,0,.55);
+  backdrop-filter: var(--hud-blur);
+}
+.away-report h2 { margin: 2px 0 4px; color: var(--hud-heading); font: 900 19px/1.15 var(--hud-display); letter-spacing: -.02em; }
+.away-report ul { margin: 0 0 6px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.away-report li { padding: 7px 10px; border-radius: var(--hud-r-sm); background: var(--hud-surface-raised); color: var(--hud-text-soft); font-size: 13px; }
+.away-report li[data-tone="warn"] { background: var(--hud-accent-soft); color: #ffe89a; }
+.away-report li[data-tone="good"] { background: var(--hud-leaf-soft); color: #cdf3b4; }
+.away-report li[data-tone="loss"] { background: var(--hud-danger-soft); color: #ffc2b5; }
+.away-report button { min-height: 38px; border: 1px solid var(--hud-line-strong); border-radius: 10px; background: var(--hud-surface-raised); color: var(--hud-text); font-weight: 850; cursor: pointer; }
+.away-report button:hover { border-color: var(--hud-accent); background: var(--hud-accent-soft); }
+.is-editing .away-report { display: none; }
+
+.nap-dialog { width: min(440px, calc(100vw - 36px)); padding: 0; border: 1px solid var(--hud-line-strong); border-radius: 18px; background: var(--hud-surface); color: var(--hud-text); box-shadow: 0 30px 90px rgba(0,0,0,.65); }
 .nap-dialog::backdrop { background: rgba(3, 7, 15, .68); backdrop-filter: blur(4px); }
 .nap-dialog form { padding: 26px; text-align: center; }
-.nap-dialog h2 { margin: 8px 0; font: 900 28px/1.05 "Arial Black", sans-serif; letter-spacing: -.04em; }
-.nap-dialog p { margin: 0 0 20px; color: #d6e3c8; }
-.nap-dialog p.nap-dialog__bank { margin: -10px 0 16px; color: var(--farm-leaf); font: 800 11px/1.3 ui-monospace, monospace; letter-spacing: .06em; }
-.nap-dialog__choices button:disabled { opacity: .38; cursor: not-allowed; }
+.nap-dialog h2 { margin: 8px 0; color: var(--hud-heading); font: 900 28px/1.05 var(--hud-display); letter-spacing: -.04em; }
+.nap-dialog p { margin: 0 0 20px; color: var(--hud-text-soft); }
+.nap-dialog p.nap-dialog__bank { margin: -10px 0 16px; color: var(--hud-leaf); font: 800 11px/1.3 var(--hud-mono); letter-spacing: .06em; }
 .nap-dialog__choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.nap-dialog__choices button, .nap-dialog__cancel { border: 1px solid var(--farm-line); border-radius: 10px; padding: 12px 9px; background: rgba(255,255,255,.07); color: #fff; font-weight: 850; cursor: pointer; }
-.nap-dialog__choices button:hover { border-color: var(--farm-accent); background: rgba(255,211,61,.18); }
-.nap-dialog__cancel { margin-top: 12px; border: 0; background: transparent; color: #c9d7bd; }
-/* Offline production report: top centre, over the field and the gate alike. */
-.away-report { position: fixed; z-index: 9; top: 92px; left: 50%; translate: -50% 0; width: min(420px, calc(100vw - 32px)); padding: 18px 20px; border: 1px solid var(--farm-line); border-radius: 14px; background: var(--farm-ink); color: #f8fbf4; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
-.away-report[hidden] { display: none; }
-.away-report h2 { margin: 6px 0 10px; font: 900 19px/1.15 "Arial Black", sans-serif; letter-spacing: -.02em; }
-.away-report ul { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 6px; }
-.away-report li { padding: 7px 10px; border-radius: 8px; background: rgba(255,255,255,.06); color: #d6e3c8; font-size: 13px; }
-.away-report li[data-tone="warn"] { background: rgba(255,211,61,.14); color: #ffe89a; }
-.away-report li[data-tone="good"] { background: rgba(126,200,90,.16); color: #cdf3b4; }
-.away-report li[data-tone="loss"] { background: rgba(214,92,72,.2); color: #ffc2b5; }
-.away-report button { width: 100%; border: 1px solid var(--farm-line); border-radius: 10px; padding: 10px; background: rgba(255,255,255,.07); color: #fff; font-weight: 850; cursor: pointer; }
-.away-report button:hover { border-color: var(--farm-accent); background: rgba(255,211,61,.18); }
-.is-editing .away-report { display: none; }
-.nap-shade { position: fixed; z-index: 7; inset: 0; display: grid; place-items: center; background: #030711; color: #e8f1ff; font: 800 12px ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+.nap-dialog__choices button, .nap-dialog__cancel { border: 1px solid var(--hud-line-strong); border-radius: 10px; padding: 12px 9px; background: var(--hud-surface-raised); color: var(--hud-text); font-weight: 850; cursor: pointer; }
+.nap-dialog__choices button:hover:not(:disabled) { border-color: var(--hud-accent); background: var(--hud-accent-soft); }
+.nap-dialog__choices button:disabled { opacity: .38; cursor: not-allowed; }
+.nap-dialog__cancel { margin-top: 12px; border: 0; background: transparent; color: var(--hud-text-soft); }
+.nap-shade { position: fixed; z-index: var(--z-notice); inset: 0; display: grid; place-items: center; background: #030711; color: #e8f1ff; font: 800 12px var(--hud-mono); letter-spacing: .18em; text-transform: uppercase; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
 .is-napping .nap-shade { opacity: .54; }
 
-.control-hint { position: fixed; z-index: 2; right: 24px; bottom: 20px; display: flex; gap: 8px; color: #e2ecd6; font-size: 11px; }
-.control-hint span { padding: 7px 9px; background: var(--farm-ink-soft); border: 1px solid rgba(255,255,255,.12); border-radius: 7px; }
-.control-hint b { color: #fff; margin-right: 5px; }
+/* ================================================================ sheets */
 
-/* Chat in the farm's shared places (Market, Cove, Downs): a readable panel on the
-   left, lifted clear of the bottom row of chips (the Cove's tackle bar, the hints),
-   and always backed — bare text over grass, sand and water cannot be read. */
-.farm-shell .room-chat { left: 18px; bottom: 68px; width: min(460px, calc(100vw - 36px)); z-index: 6; }
-.farm-shell .room-chat__log {
-  max-height: 36vh;
-  padding: 10px 14px;
-  row-gap: 5px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(14, 24, 16, .74);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 12px 34px rgba(0,0,0,.35);
-  font-size: 15px;
-  line-height: 1.4;
-  text-shadow: 0 1px 1px rgba(0,0,0,.6);
-}
-.farm-shell .room-chat__log:empty { display: none; }
-.farm-shell .room-chat[data-open="true"] .room-chat__log { background: rgba(14, 24, 16, .9); border-color: rgba(255, 211, 61, .35); }
-.farm-shell .room-chat__name { color: #9be7ff; }
-.farm-shell .room-chat__line--self .room-chat__name { color: var(--farm-accent); }
-.farm-shell .room-chat__line--system { color: #b9c9ad; font-size: 13px; }
-.farm-shell .room-chat__input { font-size: 15px; }
-
-@media (max-width: 720px) {
-  .farm-header { gap: 12px; padding: 14px 16px; }
-  .farm-header h1 { font-size: 20px; }
-  .control-hint { display: none; }
-  /* The tackle bar wraps to two rows on a phone. */
-  .farm-shell .room-chat { bottom: 104px; }
-  .farm-shell .room-chat__log { max-height: 28vh; font-size: 14px; }
-}
-
-/* Build mode: the shared frame (css/space-editor.css) in the farm's daylight
-   palette. While building, the walking chrome steps aside. */
-.farm-editor {
-  --editor-panel: linear-gradient(160deg, rgba(24, 38, 22, .96), rgba(14, 24, 13, .94));
-  --editor-line: rgba(158, 226, 122, .32);
-}
-.farm-editor .editor-rail button[aria-selected="true"] { border-color: rgba(158, 226, 122, .55); background: rgba(158, 226, 122, .16); box-shadow: 0 0 18px rgba(158, 226, 122, .18); }
-.farm-editor .camera-views button[aria-pressed="true"] { background: rgba(158, 226, 122, .18); box-shadow: inset 0 0 0 1px rgba(158, 226, 122, .5); }
-.is-editing .farm-header,
-.is-editing .control-hint,
-.is-editing .farm-prompt,
-.is-editing .farm-clock,
-.is-editing .seed-hud { opacity: 0; pointer-events: none; }
-.is-visiting #editFarm { display: none; }
-
-/* Pets panel: a card on the right, over the field. Keys inside it are its own. */
-.pets-panel {
+/* Every menu is this shape: head (who / what / close), optional tabs, a scrolling body, an optional footer. */
+.pets-panel,
+.inventory-panel {
+  --sheet-width: 480px;
   position: fixed;
-  z-index: 6;
-  top: 92px;
-  right: 18px;
-  bottom: 18px;
-  width: min(420px, calc(100vw - 36px));
+  z-index: var(--z-sheet);
+  top: var(--hud-top);
+  right: var(--hud-gap);
+  bottom: var(--hud-gap);
+  width: min(var(--sheet-width), calc(100vw - 2 * var(--hud-gap)));
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--farm-line);
+  border: 1px solid var(--hud-line-strong);
   border-radius: 18px;
-  background: var(--farm-ink);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .4);
-  backdrop-filter: blur(16px);
+  background: var(--hud-surface);
+  color: var(--hud-text);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .45);
+  backdrop-filter: var(--hud-blur);
   overflow: hidden;
+  animation: hud-sheet-in .16s ease-out;
 }
-.pets-panel[hidden] { display: none; }
-.pets-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,.1); }
-.pets-panel__head strong { display: block; margin-top: 3px; font-size: 18px; }
-.pets-panel__count { margin-left: 8px; color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .1em; }
-.pets-panel__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; scrollbar-width: thin; }
-.pets-section + .pets-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.1); }
-.pets-section__title { margin: 0 0 10px; color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
-.pets-empty { margin: 0; color: #c9d7bd; font-size: 13px; }
-.pet-list { display: grid; gap: 6px; }
-.pet-row { display: grid; gap: 9px; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(255,255,255,.04); }
+@keyframes hud-sheet-in { from { opacity: 0; translate: 16px 0; } to { opacity: 1; translate: 0 0; } }
+.pets-panel { --sheet-width: 440px; }
+
+.pets-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px 13px 18px; border-bottom: 1px solid var(--hud-line); }
+.pets-panel__head > div { display: grid; gap: 3px; min-width: 0; }
+.pets-panel__head strong { display: block; color: var(--hud-heading); font-size: 18px; line-height: 1.2; }
+.pets-panel__head .farm-button { flex: 0 0 auto; min-height: 32px; padding: 0 11px; background: var(--hud-surface-raised); backdrop-filter: none; font-size: 12px; }
+.pets-panel__count { margin-left: 8px; color: var(--hud-leaf); font: 800 11px var(--hud-mono); letter-spacing: .08em; }
+
+.pets-panel__body,
+.inventory-panel__body,
+.livestock-panel__body,
+.stats-panel__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
+
+/* Tabs: one row under the head. Used by the Inventory, the Creel, the Exchange Board and the counters. */
+.exchange-tabs, .sheet-tabs { display: flex; gap: 4px; margin: 0; padding: 10px 14px 0; border-bottom: 1px solid var(--hud-line); }
+.exchange-tabs button, .sheet-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-height: 34px;
+  margin-bottom: -1px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--hud-text-muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.exchange-tabs button:hover, .sheet-tabs button:hover { color: var(--hud-text); background: var(--hud-surface-raised); }
+.exchange-tabs button[aria-selected="true"], .sheet-tabs button[aria-selected="true"] { border-color: var(--hud-line); border-bottom-color: var(--hud-surface); background: var(--hud-surface-raised); color: var(--hud-heading); box-shadow: inset 0 2px 0 var(--hud-accent); }
+.exchange-tabs kbd, .sheet-tabs kbd { opacity: .55; }
+.sheet-tabs__count { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: var(--hud-surface-sunken); color: var(--hud-text-soft); font: 800 10px var(--hud-mono); }
+.is-pane-hidden { display: none !important; }
+
+/* Sections inside a sheet. */
+.pets-section:not(.is-pane-hidden) ~ .pets-section:not(.is-pane-hidden) { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--hud-line); }
+.pets-section__title, .vendor-shelf__title { margin: 0 0 10px; color: var(--hud-leaf); font: 800 10.5px var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
+.pets-empty { margin: 0; color: var(--hud-text-soft); font-size: 13px; }
+.pets-status { min-height: 1.4em; margin: 10px 0 0; color: var(--hud-text-soft); font-size: 12.5px; line-height: 1.4; }
+.sale-note { margin: 0 0 12px; color: var(--hud-text-soft); font-size: 12.5px; line-height: 1.5; }
+.sale-empty, .item-empty { margin: 0; padding: 16px 12px; border: 1px dashed var(--hud-line-strong); border-radius: var(--hud-r-md); color: var(--hud-text-soft); font-size: 12.5px; line-height: 1.45; text-align: center; list-style: none; }
+
+/* A footer: status, a running total and the one big action. */
+.sale-footer { display: grid; gap: 10px; padding: 12px 18px 14px; border-top: 1px solid var(--hud-line); background: rgba(0, 0, 0, .14); }
+.sale-footer .pets-status { margin: 0; }
+.sale-footer .pets-status:empty { display: none; }
+/* A footer with nothing to say yet takes no room. */
+.sale-footer:not(:has(> :not(.pets-status:empty))) { display: none; }
+
+/* Inputs and the stepper, wherever they appear. */
+.pets-adopt__name, .pet-row__name, .dealer-name input, .exchange-form__good, .exchange-form__field input, .livestock-row__home, .livestock-breed__mate {
+  min-width: 0;
+  border: 1px solid var(--hud-line-strong);
+  border-radius: 10px;
+  background: var(--hud-surface-sunken);
+  color: var(--hud-text);
+}
+.pets-adopt__name:focus, .pet-row__name:focus, .dealer-name input:focus, .exchange-form__good:focus, .exchange-form__field input:focus { outline: 0; border-color: var(--hud-accent); box-shadow: 0 0 0 3px var(--hud-accent-soft); }
+
+/* ---------------------------------------------------------------- pets (P) */
+
+.pet-list { display: grid; gap: 8px; }
+.pet-row { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); }
 .pet-row__head { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.pet-row__species { color: #c9d7bd; font-size: 12px; font-weight: 700; }
-.pet-row__name { min-width: 0; padding: 7px 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(0,0,0,.25); color: #fff; font: inherit; }
-.pet-row__name:focus { outline: 0; border-color: var(--farm-accent); }
-.pet-row__release { padding: 7px 10px; border: 1px solid rgba(255,120,120,.4); border-radius: 8px; background: rgba(255,80,80,.12); color: #ffd6d6; font: 800 11px ui-monospace, monospace; cursor: pointer; }
+.pet-row__species { color: var(--hud-text-soft); font-size: 12px; font-weight: 700; }
+.pet-row__name { padding: 7px 9px; }
+.pet-row__release { padding: 7px 10px; border: 1px solid rgba(255,120,120,.4); border-radius: var(--hud-r-sm); background: var(--hud-danger-soft); color: #ffd6d6; font: 800 11px var(--hud-mono); cursor: pointer; }
 .pet-row__release:hover { background: rgba(255,80,80,.28); }
 .pet-row__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 0; }
-.pet-row__stats div { min-width: 0; padding: 6px; border-radius: 7px; background: rgba(0,0,0,.2); }
-.pet-row__stats dt { color: #9db192; font: 750 8px/1.2 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
-.pet-row__stats dd { margin: 2px 0 0; color: #fff6cf; font-size: 11px; text-transform: capitalize; }
+.pet-row__stats div { min-width: 0; padding: 6px; border-radius: 7px; background: var(--hud-surface-sunken); }
+.pet-row__stats dt { color: var(--hud-text-muted); font: 750 8.5px/1.2 var(--hud-mono); letter-spacing: .08em; text-transform: uppercase; }
+.pet-row__stats dd { margin: 2px 0 0; color: var(--hud-heading); font-size: 11.5px; text-transform: capitalize; }
 .pet-row__need--hungry { box-shadow: inset 0 0 0 1px rgba(255, 197, 83, .34); }
 .pet-row__need--hungry dd { color: #ffd77e; }
 .pet-row__need--starving { box-shadow: inset 0 0 0 1px rgba(255, 105, 105, .48); background: rgba(120, 20, 20, .22) !important; }
 .pet-row__need--starving dd { color: #ffabab; }
-.pet-row__gained { color: #9ee27a; font-size: 10px; }
+.pet-row__gained { color: var(--hud-leaf); font-size: 10px; }
 .pet-row__potential { color: #ffd77e; letter-spacing: .04em; }
 .pet-row__potential-empty { opacity: .25; }
 .pet-row__growth { grid-column: 1 / -1; }
-.pet-row__growth--thriving dd { color: #9ee27a; }
+.pet-row__growth--thriving dd { color: var(--hud-leaf); }
 .pet-row__growth--slow dd { color: #ffd77e; }
 .pet-row__growth--stalled { box-shadow: inset 0 0 0 1px rgba(255, 105, 105, .4); }
 .pet-row__growth--stalled dd { color: #ffabab; }
-.pet-row__warning { margin: 0; padding: 7px 9px; border-radius: 7px; font-size: 11px; line-height: 1.35; }
+.pet-row__warning { margin: 0; padding: 7px 9px; border-radius: 7px; font-size: 11.5px; line-height: 1.35; }
 .pet-row__warning--watch { color: #ffe0a0; background: rgba(137, 91, 18, .28); border: 1px solid rgba(255, 197, 83, .3); }
 .pet-row__warning--urgent, .pet-row__warning--critical { color: #ffd1d1; background: rgba(120, 20, 20, .3); border: 1px solid rgba(255, 105, 105, .4); }
 .pet-row__warning--critical { box-shadow: 0 0 12px rgba(255, 78, 78, .16); }
 .pet-row__traits { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.pet-row__traits li { padding: 4px 7px; border: 1px solid rgba(158,226,122,.28); border-radius: 999px; color: #dff6ce; background: rgba(158,226,122,.08); font-size: 10px; }
+.pet-row__traits li { padding: 4px 8px; border: 1px solid rgba(158,226,122,.28); border-radius: 999px; color: #dff6ce; background: var(--hud-leaf-soft); font-size: 10.5px; }
 .pet-row__traits li.pet-row__trait--uncommon { border-color: rgba(122,190,255,.45); color: #d6ecff; background: rgba(122,190,255,.1); }
 .pet-row__traits li.pet-row__trait--rare { border-color: rgba(255,204,92,.6); color: #ffe9b8; background: rgba(255,204,92,.12); }
-.pet-row__care { display: grid; gap: 4px; margin: 0; padding: 7px 9px; border-radius: 7px; background: rgba(0,0,0,.18); color: #cfdcc5; font-size: 10.5px; line-height: 1.4; }
-.pet-row__care strong { display: inline-block; min-width: 38px; color: #9db192; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 9px; }
-.pet-row__care-item { color: #8c9a84; white-space: nowrap; }
-.pet-row__care-item.is-placed { color: #9ee27a; }
-.pet-row__unscoped { margin: 0; color: #9db192; font-size: 11px; }
+.pet-row__care { display: grid; gap: 4px; margin: 0; padding: 7px 9px; border-radius: 7px; background: var(--hud-surface-sunken); color: var(--hud-text-soft); font-size: 11px; line-height: 1.4; }
+.pet-row__care strong { display: inline-block; min-width: 38px; color: var(--hud-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 9px; }
+.pet-row__care-item { color: var(--hud-text-muted); white-space: nowrap; }
+.pet-row__care-item.is-placed { color: var(--hud-leaf); }
+.pet-row__unscoped { margin: 0; color: var(--hud-text-muted); font-size: 11px; }
 .pet-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.pet-card { position: relative; display: grid; gap: 3px; padding: 6px 6px 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); color: #f0f6e8; text-align: center; cursor: pointer; }
-.pet-card:hover { border-color: var(--farm-leaf); background: rgba(158,226,122,.1); }
-.pet-card.is-selected { border-color: var(--farm-accent); background: rgba(255,211,61,.14); }
+.pet-card { position: relative; display: grid; gap: 3px; padding: 6px 6px 8px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); color: var(--hud-text); text-align: center; cursor: pointer; }
+.pet-card:hover { border-color: var(--hud-leaf); background: var(--hud-leaf-soft); }
+.pet-card.is-selected { border-color: var(--hud-accent); background: var(--hud-accent-soft); box-shadow: inset 0 0 0 1px var(--hud-accent); }
 .pet-card:disabled { opacity: .4; cursor: not-allowed; }
-.pet-card__picture { display: grid; place-items: center; aspect-ratio: 4 / 5; border-radius: 9px; background: radial-gradient(circle at 50% 70%, rgba(158,226,122,.25), transparent 60%), rgba(0,0,0,.25); overflow: hidden; }
+.pet-card__picture { display: grid; place-items: center; aspect-ratio: 4 / 5; border-radius: 9px; background: radial-gradient(circle at 50% 70%, rgba(158,226,122,.25), transparent 60%), var(--hud-surface-sunken); overflow: hidden; }
 .pet-card__picture img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.pet-card__letter { font: 900 34px "Arial Black", sans-serif; color: rgba(255,255,255,.35); }
+.pet-card__letter { font: 900 34px var(--hud-display); color: rgba(255,255,255,.35); }
 .pet-card__title { font-weight: 800; font-size: 13px; }
-.pet-card__note { color: #b9c9ad; font-size: 10.5px; text-transform: capitalize; }
+.pet-card__note { color: var(--hud-text-muted); font-size: 10.5px; text-transform: capitalize; }
 .pet-card:disabled .pet-card__note { color: #ffd6a0; text-transform: none; }
 .pets-adopt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 12px; }
-.pets-adopt__name { min-width: 0; padding: 10px 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(0,0,0,.25); color: #fff; font: inherit; }
-.pets-adopt__name:focus { outline: 0; border-color: var(--farm-accent); }
-.pets-status { min-height: 1.4em; margin: 10px 0 0; color: #d6e3c8; font-size: 12.5px; line-height: 1.4; }
+.pets-adopt__name { padding: 10px 12px; }
 
-.inventory-panel { position: fixed; z-index: 6; top: 92px; right: 18px; bottom: 18px; width: min(480px, calc(100vw - 36px)); display: flex; flex-direction: column; border: 1px solid var(--farm-line); border-radius: 18px; background: var(--farm-ink); box-shadow: 0 30px 90px rgba(0,0,0,.4); backdrop-filter: blur(16px); overflow: hidden; }
-.inventory-panel[hidden] { display: none; }
-.inventory-panel__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
-/* The Livestock panel (L): one card per animal, its grade, four stat bars and the home it lives in. */
-.livestock-panel__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
+/* ---------------------------------------------------------------- livestock (L) */
+
+.livestock-panel { --sheet-width: 500px; }
 .livestock-panel.is-busy .livestock-list { opacity: .6; pointer-events: none; }
+.livestock-panel .farm-button:disabled { opacity: .45; cursor: not-allowed; }
 .livestock-list { display: grid; gap: 10px; }
-.livestock-empty { margin: 4px 0; color: #c9d7bd; font-size: 13px; line-height: 1.45; }
-.livestock-row { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(255,255,255,.04); }
+.livestock-empty { margin: 4px 0; color: var(--hud-text-soft); font-size: 13px; line-height: 1.45; }
+.livestock-row { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-lg); background: var(--hud-surface-raised); }
 .livestock-row--young { border-color: rgba(158,226,122,.28); }
 .livestock-row__head { display: flex; align-items: center; gap: 10px; }
 /* The name is a field that looks like one: a dashed underline and a pencil, so renaming is found, not guessed. */
 .livestock-row__naming { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: text; }
-.livestock-row__name { flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-bottom: 1px dashed rgba(255,246,207,.35); border-radius: 8px 8px 0 0; color: #fff6cf; background: transparent; font: 800 15px system-ui, sans-serif; }
+.livestock-row__name { flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-bottom: 1px dashed rgba(255,246,207,.35); border-radius: 8px 8px 0 0; color: var(--hud-heading); background: transparent; font: 800 15px var(--hud-font); }
 .livestock-row__name:disabled { border-bottom-color: transparent; }
-.livestock-row__name:hover:not(:disabled), .livestock-row__name:focus { border-color: var(--farm-line); border-radius: 8px; background: rgba(0,0,0,.25); outline: none; }
-.livestock-row__rename { flex: 0 0 auto; padding: 3px 8px; border: 1px solid var(--farm-line); border-radius: 999px; color: #d6e3c8; font: 700 11px system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
-.livestock-row__naming:hover .livestock-row__rename, .livestock-row__naming:focus-within .livestock-row__rename { color: #1d2a16; background: #9ee27a; border-color: #9ee27a; }
+.livestock-row__name:hover:not(:disabled), .livestock-row__name:focus { border-color: var(--hud-line-strong); border-radius: 8px; background: var(--hud-surface-sunken); outline: none; }
+.livestock-row__rename { flex: 0 0 auto; padding: 3px 8px; border: 1px solid var(--hud-line-strong); border-radius: 999px; color: var(--hud-text-soft); font: 700 11px var(--hud-font); cursor: pointer; white-space: nowrap; }
+.livestock-row__naming:hover .livestock-row__rename, .livestock-row__naming:focus-within .livestock-row__rename { color: #1d2a16; background: var(--hud-leaf); border-color: var(--hud-leaf); }
 .livestock-row__naming:focus-within .livestock-row__rename { display: none; }
 /* The Feed bin heads the list: what the herd eats, how much is held, Buy, and Feed the herd. */
 .livestock-panel__status { margin: 0 0 10px; }
 .livestock-panel__status:empty { display: none; }
-.livestock-feed { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid rgba(242,193,78,.35); border-radius: 14px; background: rgba(242,193,78,.06); }
+.livestock-feed { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid rgba(242,193,78,.35); border-radius: var(--hud-r-lg); background: rgba(242,193,78,.06); }
 .livestock-feed__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.livestock-feed__title { color: #f2c14e; font: 900 11px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.livestock-feed__all { padding: 6px 12px; font-size: 12px; }
+.livestock-feed__title { color: var(--hud-warn); font: 900 10.5px var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
+.livestock-feed__all { min-height: 30px; padding: 0 12px; font-size: 12px; }
 .livestock-feed__list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .livestock-feed__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .livestock-feed__words { flex: 1 1 140px; display: grid; min-width: 0; }
-.livestock-feed__words strong { color: #fff6cf; font: 800 13px system-ui, sans-serif; }
-.livestock-feed__words small { color: #b9c9ad; font-size: 11.5px; }
+.livestock-feed__words strong { color: var(--hud-heading); font: 800 13px var(--hud-font); }
+.livestock-feed__words small { color: var(--hud-text-muted); font-size: 11.5px; }
 .livestock-feed__row.is-empty .livestock-feed__words strong { color: #ff9a6b; }
-.livestock-feed__buy { padding: 5px 9px; font-size: 11px; white-space: nowrap; }
-.livestock-feed__hint { margin: 0; color: #9fb294; font-size: 11.5px; line-height: 1.4; }
+.livestock-feed__buy { min-height: 28px; padding: 0 9px; font-size: 11px; white-space: nowrap; }
+.livestock-feed__hint { margin: 0; color: var(--hud-text-muted); font-size: 11.5px; line-height: 1.4; }
 .livestock-row__feed { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.livestock-row__eats { color: #c9d7bd; font: 700 12px system-ui, sans-serif; }
+.livestock-row__eats { color: var(--hud-text-soft); font: 700 12px var(--hud-font); }
 .livestock-row__eats.is-empty { color: #ff9a6b; }
-.livestock-row__feed-go { flex: 0 0 auto; padding: 4px 12px; font-size: 12px; }
-.livestock-row__grade { flex: 0 0 auto; color: #f2c14e; font-size: 15px; letter-spacing: 1px; }
-.livestock-row__line { margin: 0; color: #c9d7bd; font-size: 12.5px; }
+.livestock-row__feed-go { flex: 0 0 auto; min-height: 28px; padding: 0 12px; font-size: 12px; }
+.livestock-row__grade { flex: 0 0 auto; color: var(--hud-warn); font-size: 15px; letter-spacing: 1px; }
+.livestock-row__line { margin: 0; color: var(--hud-text-soft); font-size: 12.5px; }
 .livestock-row__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
 .livestock-stat { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 6px; }
-.livestock-stat dt { color: #b9c9ad; font: 700 10px ui-monospace, monospace; text-transform: uppercase; }
-.livestock-stat dd { margin: 0; color: #fff6cf; font: 800 12px ui-monospace, monospace; }
+.livestock-stat dt { color: var(--hud-text-muted); font: 700 10px var(--hud-mono); text-transform: uppercase; }
+.livestock-stat dd { margin: 0; color: var(--hud-heading); font: 800 12px var(--hud-mono); }
 .livestock-stat__bar { grid-column: 1 / -1; display: block; height: 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
-.livestock-stat__fill { display: block; height: 100%; border-radius: inherit; background: var(--farm-leaf); }
-.livestock-row__home { width: 100%; padding: 6px 8px; border: 1px solid var(--farm-line); border-radius: 9px; color: #fff6cf; background: rgba(0,0,0,.3); font: 600 12.5px system-ui, sans-serif; }
+.livestock-stat__fill { display: block; height: 100%; border-radius: inherit; background: var(--hud-leaf); }
+.livestock-row__home { width: 100%; padding: 6px 8px; font: 600 12.5px var(--hud-font); }
 .livestock-care { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.livestock-care__label { color: #d6e3c8; font: 700 12px system-ui, sans-serif; }
+.livestock-care__label { color: var(--hud-text-soft); font: 700 12px var(--hud-font); }
 .livestock-care__bar { flex: 1 1 120px; display: block; height: 6px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
-.livestock-care__fill { display: block; height: 100%; border-radius: inherit; background: var(--farm-leaf); }
-.livestock-care--hungry .livestock-care__fill, .livestock-care--hungry .livestock-care__label { background-color: transparent; color: #f2c14e; }
-.livestock-care--hungry .livestock-care__fill { background: #f2c14e; }
+.livestock-care__fill { display: block; height: 100%; border-radius: inherit; background: var(--hud-leaf); }
+.livestock-care--hungry .livestock-care__label { color: var(--hud-warn); }
+.livestock-care--hungry .livestock-care__fill { background: var(--hud-warn); }
 .livestock-care--starving .livestock-care__label { color: #ff7a6b; }
 .livestock-care--starving .livestock-care__fill { background: #ff7a6b; }
-.livestock-good { padding: 2px 8px; border-radius: 999px; color: #c9d7bd; background: rgba(255,255,255,.06); font: 700 11px ui-monospace, monospace; }
-.livestock-good.is-ready { color: #1d2a16; background: #9ee27a; }
-.livestock-row__lineage { margin: 0; color: #b9c9ad; font: italic 600 12px system-ui, sans-serif; }
-.livestock-breed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; color: #d6e3c8; font: 700 12px system-ui, sans-serif; }
+.livestock-good { padding: 2px 8px; border-radius: 999px; color: var(--hud-text-soft); background: var(--hud-surface-raised); font: 700 11px var(--hud-mono); }
+.livestock-good.is-ready { color: #1d2a16; background: var(--hud-leaf); }
+.livestock-row__lineage { margin: 0; color: var(--hud-text-muted); font: italic 600 12px var(--hud-font); }
+.livestock-breed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; color: var(--hud-text-soft); font: 700 12px var(--hud-font); }
 .livestock-breed--expecting { color: #f5b8d8; }
-.livestock-breed--due { color: #f2c14e; }
-.livestock-breed__label { color: #b9c9ad; font: 700 10px ui-monospace, monospace; text-transform: uppercase; }
-.livestock-breed__mate { flex: 1 1 180px; min-width: 0; padding: 5px 8px; border: 1px solid var(--farm-line); border-radius: 9px; color: #fff6cf; background: rgba(0,0,0,.3); font: 600 12px system-ui, sans-serif; }
-.livestock-breed__go { flex: 0 0 auto; padding: 5px 12px; border: 1px solid rgba(245,184,216,.55); border-radius: 9px; color: #2a1622; background: #f5b8d8; font: 800 12px system-ui, sans-serif; cursor: pointer; }
+.livestock-breed--due { color: var(--hud-warn); }
+.livestock-breed__label { color: var(--hud-text-muted); font: 700 10px var(--hud-mono); text-transform: uppercase; }
+.livestock-breed__mate { flex: 1 1 180px; padding: 5px 8px; font: 600 12px var(--hud-font); }
+.livestock-breed__go { flex: 0 0 auto; padding: 5px 12px; border: 1px solid rgba(245,184,216,.55); border-radius: 9px; color: #2a1622; background: #f5b8d8; font: 800 12px var(--hud-font); cursor: pointer; }
 .livestock-breed__go:disabled { opacity: .45; cursor: not-allowed; }
-.livestock-panel__note { margin: 12px 0 0; color: #9fb294; font-size: 12px; line-height: 1.45; }
-@media (max-width: 560px) { .livestock-row__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.stats-panel { width: min(820px, calc(100vw - 36px)); }
-.stats-panel__summary { display: block; margin-top: 4px; color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
-.stats-panel__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
-.away-settings { display: grid; gap: 10px; margin-bottom: 14px; padding: 15px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: linear-gradient(145deg, rgba(126, 200, 255, .08), rgba(255,255,255,.035)); }
-.away-settings[hidden] { display: none; }
+.livestock-panel__note { margin: 12px 0 0; color: var(--hud-text-muted); font-size: 12px; line-height: 1.45; }
+
+/* ---------------------------------------------------------------- stats (K) */
+
+.stats-panel { --sheet-width: 820px; }
+.stats-panel__summary { display: block; color: var(--hud-text-muted); font: 700 11px var(--hud-mono); }
+.away-settings { display: grid; gap: 10px; margin-bottom: 14px; padding: 15px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-lg); background: linear-gradient(145deg, rgba(126, 200, 255, .08), var(--hud-surface-raised)); }
 .away-settings__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.away-settings__head h3 { margin: 3px 0 0; color: #fff6cf; font-size: 20px; }
-.away-settings__switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: #fff6cf; font: 800 12px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
-.away-settings__switch input { width: 20px; height: 20px; accent-color: var(--farm-accent); cursor: pointer; }
-.away-settings__rate { display: grid; grid-template-columns: auto minmax(0, 1fr) 48px; align-items: center; gap: 12px; color: #c9d7bd; font-size: 12.5px; }
-.away-settings__rate input { width: 100%; accent-color: var(--farm-accent); cursor: pointer; }
-.away-settings__rate strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; text-align: right; }
+.away-settings__head h3 { margin: 3px 0 0; color: var(--hud-heading); font-size: 18px; }
+.away-settings__switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--hud-heading); font: 800 11.5px var(--hud-mono); letter-spacing: .1em; text-transform: uppercase; }
+.away-settings__switch input { width: 20px; height: 20px; accent-color: var(--hud-accent); cursor: pointer; }
+.away-settings__rate { display: grid; grid-template-columns: auto minmax(0, 1fr) 48px; align-items: center; gap: 12px; color: var(--hud-text-soft); font-size: 12.5px; }
+.away-settings__rate input { width: 100%; accent-color: var(--hud-accent); cursor: pointer; }
+.away-settings__rate strong { color: var(--hud-heading); font: 900 15px var(--hud-mono); text-align: right; }
 .away-settings__rate.is-off { opacity: .45; }
 .away-settings__rate.is-off input { cursor: not-allowed; }
-.away-settings__description { margin: 0; color: #c9d7bd; font-size: 12.5px; line-height: 1.45; }
-.away-settings__status { min-height: 1em; color: var(--farm-leaf); font: 700 11px ui-monospace, monospace; }
+.away-settings__description { margin: 0; color: var(--hud-text-soft); font-size: 12.5px; line-height: 1.45; }
+.away-settings__status { min-height: 1em; color: var(--hud-leaf); font: 700 11px var(--hud-mono); }
 .farm-stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.farm-stat-card { --skill-color: var(--farm-leaf); display: grid; align-content: start; gap: 11px; min-width: 0; padding: 15px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; background: linear-gradient(145deg, color-mix(in srgb, var(--skill-color) 9%, transparent), rgba(255,255,255,.035)); }
+.farm-stat-card { --skill-color: var(--hud-leaf); display: grid; align-content: start; gap: 11px; min-width: 0; padding: 15px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-lg); background: linear-gradient(145deg, color-mix(in srgb, var(--skill-color) 9%, transparent), var(--hud-surface-raised)); }
 .farm-stat-card--woodcutting { --skill-color: #d79b5b; }
 .farm-stat-card--cooking { --skill-color: #ef7950; }
 .farm-stat-card--carpentry { --skill-color: #dbb37b; }
 .farm-stat-card--husbandry { --skill-color: #eadbb4; }
 .farm-stat-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.farm-stat-card__heading h3 { margin: 3px 0 0; color: #fff6cf; font-size: 20px; }
-.farm-stat-card__level { display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px; border: 1px solid color-mix(in srgb, var(--skill-color) 65%, transparent); border-radius: 50%; color: var(--skill-color); background: color-mix(in srgb, var(--skill-color) 12%, rgba(0,0,0,.2)); font: 900 20px ui-monospace, monospace; }
-.farm-stat-card__description { min-height: 2.8em; margin: 0; color: #c9d7bd; font-size: 12.5px; line-height: 1.4; }
+.farm-stat-card__heading h3 { margin: 3px 0 0; color: var(--hud-heading); font-size: 18px; }
+.farm-stat-card__level { display: grid; place-items: center; flex: 0 0 46px; width: 46px; height: 46px; border: 1px solid color-mix(in srgb, var(--skill-color) 65%, transparent); border-radius: 50%; color: var(--skill-color); background: color-mix(in srgb, var(--skill-color) 12%, rgba(0,0,0,.2)); font: 900 19px var(--hud-mono); }
+.farm-stat-card__description { min-height: 2.8em; margin: 0; color: var(--hud-text-soft); font-size: 12.5px; line-height: 1.4; }
 .farm-stat-progress { display: grid; gap: 6px; }
-.farm-stat-progress__words { color: #fff6cf; font: 750 10.5px ui-monospace, monospace; }
+.farm-stat-progress__words { color: var(--hud-heading); font: 750 10.5px var(--hud-mono); }
 .farm-stat-progress__track { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
 .farm-stat-progress__fill { display: block; height: 100%; border-radius: inherit; background: var(--skill-color); }
 .farm-stat-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
-.farm-stat-total { min-width: 0; padding: 8px; border-radius: 9px; background: rgba(0,0,0,.2); }
-.farm-stat-total dt { color: #9db192; font: 750 8px/1.25 ui-monospace, monospace; letter-spacing: .07em; text-transform: uppercase; }
-.farm-stat-total dd { margin: 4px 0 0; color: #fff6cf; font: 900 15px ui-monospace, monospace; }
-.farm-stat-breakdown { border-top: 1px solid rgba(255,255,255,.1); padding-top: 9px; }
-.farm-stat-breakdown summary { color: var(--skill-color); font: 800 10px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.farm-stat-total { min-width: 0; padding: 8px; border-radius: 9px; background: var(--hud-surface-sunken); }
+.farm-stat-total dt { color: var(--hud-text-muted); font: 750 8.5px/1.25 var(--hud-mono); letter-spacing: .07em; text-transform: uppercase; }
+.farm-stat-total dd { margin: 4px 0 0; color: var(--hud-heading); font: 900 15px var(--hud-mono); }
+.farm-stat-breakdown { border-top: 1px solid var(--hud-line); padding-top: 9px; }
+.farm-stat-breakdown summary { color: var(--skill-color); font: 800 10px var(--hud-mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .farm-stat-breakdown__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; margin: 9px 0 0; padding: 0; list-style: none; }
-.farm-stat-breakdown__list li { display: flex; justify-content: space-between; gap: 8px; color: #c9d7bd; font-size: 11.5px; }
-.farm-stat-breakdown__list strong { color: #fff6cf; font-family: ui-monospace, monospace; }
-.farm-stat-breakdown__empty { margin: 9px 0 0; color: #8f9d87; font-size: 11.5px; }
-@media (max-width: 720px) {
-  .farm-stats-grid { grid-template-columns: 1fr; }
-  .farm-stat-card__description { min-height: 0; }
-}
+.farm-stat-breakdown__list li { display: flex; justify-content: space-between; gap: 8px; color: var(--hud-text-soft); font-size: 11.5px; }
+.farm-stat-breakdown__list strong { color: var(--hud-heading); font-family: var(--hud-mono); }
+.farm-stat-breakdown__empty { margin: 9px 0 0; color: var(--hud-text-muted); font-size: 11.5px; }
+
+/* ---------------------------------------------------------------- inventory (I) */
+
 .seed-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.seed-card { display: grid; grid-template-columns: 42px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 9px; border: 1px solid rgba(255,255,255,.12); border-radius: 11px; background: rgba(255,255,255,.04); color: #f8fbf4; text-align: left; cursor: pointer; }
-.seed-card:hover { border-color: var(--farm-leaf); }
-.seed-card[aria-pressed="true"] { border-color: var(--farm-accent); background: rgba(255,211,61,.15); }
+.seed-card { display: grid; grid-template-columns: 42px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 9px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); color: var(--hud-text); text-align: left; cursor: pointer; }
+.seed-card:hover:not(:disabled) { border-color: var(--hud-leaf); background: var(--hud-surface-hover); }
+.seed-card[aria-pressed="true"] { border-color: var(--hud-accent); background: var(--hud-accent-soft); box-shadow: inset 0 0 0 1px var(--hud-accent); }
 .seed-card:disabled { opacity: .4; cursor: not-allowed; }
 .seed-card__image { grid-row: 1 / 3; display: grid; place-items: center; width: 42px; height: 42px; overflow: hidden; border-radius: 10px; background: radial-gradient(circle at 50% 65%, rgba(112,148,59,.35), rgba(20,35,18,.2) 66%, transparent 67%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
 .seed-card__image img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
 .seed-card strong { font-size: 13px; }
-.seed-card small { color: #b9c9ad; }
+.seed-card small { color: var(--hud-text-muted); }
 .editor-seed-grid { padding: 4px 0 18px; grid-template-columns: 1fr; }
 .editor-seed-grid .seed-card { grid-template-columns: 48px minmax(0, 1fr) auto; }
 .editor-seed-grid .seed-card__buy { grid-column: 3; grid-row: 1 / 3; white-space: nowrap; color: #fff0a8; }
 
+/* Saplings: pick one for E, or buy one. */
+.sapling-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.sapling-card { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--hud-line); border-left: 4px solid var(--fruit, #8a5a34); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); }
+.sapling-card[aria-pressed="true"] { border-color: var(--hud-accent); background: var(--hud-accent-soft); }
+.sapling-card__pick { display: grid; grid-template-columns: 42px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.sapling-card__pick:disabled { cursor: default; opacity: .7; }
+.sapling-card__pick small { font-size: 12px; opacity: .8; }
+
 /* Every stack as a tile: the item's model, its name, how many. */
 .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
 .item-grid--wide { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
-.item-tile { display: grid; justify-items: center; align-content: start; gap: 3px; padding: 8px 6px 7px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); text-align: center; }
+.item-tile { display: grid; justify-items: center; align-content: start; gap: 3px; padding: 8px 6px 7px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); text-align: center; }
 .item-tile .seed-card__image { width: 64px; height: 56px; }
-.item-tile__name { color: #d6e3c8; font-size: 11.5px; line-height: 1.2; }
-.item-tile__count { color: var(--farm-accent); font: 800 12px ui-monospace, monospace; }
-.item-tile__detail { color: #aebca6; font: 700 10px/1.3 ui-monospace, monospace; }
+.item-tile__name { color: var(--hud-text-soft); font-size: 11.5px; line-height: 1.2; }
+.item-tile__count { color: var(--hud-accent); font: 800 12px var(--hud-mono); }
+.item-tile__detail { color: var(--hud-text-muted); font: 700 10px/1.3 var(--hud-mono); }
 .item-tile.is-empty { opacity: .38; }
 .item-tile.is-empty .seed-card__image img { filter: grayscale(.8); }
-.item-tile .farm-button { width: 100%; margin-top: 4px; padding: 6px 8px; font-size: 11px; }
-.item-empty { margin: 0; padding: 12px; border: 1px dashed rgba(255,255,255,.16); border-radius: 11px; color: #b9c9ad; font-size: 12.5px; line-height: 1.45; }
+.item-tile .farm-button { width: 100%; min-height: 28px; margin-top: 4px; padding: 0 8px; font-size: 11px; }
 
-/* The cookbook: the recipe list beside the chosen recipe. */
-.kitchen-panel { width: min(820px, calc(100vw - 36px)); }
+/* ---------------------------------------------------------------- the cookbook and the pattern book */
+
+.kitchen-panel { --sheet-width: 820px; }
 .kitchen-panel__body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
-.recipe-list { min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 6px; padding: 12px; border-right: 1px solid rgba(255,255,255,.1); }
-.recipe-card { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); color: #f8fbf4; text-align: left; cursor: pointer; }
-.recipe-card:hover { border-color: var(--farm-leaf); }
-.recipe-card[aria-pressed="true"] { border-color: var(--farm-accent); background: rgba(255,211,61,.14); }
+.recipe-list { min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 6px; padding: 12px; border-right: 1px solid var(--hud-line); scrollbar-width: thin; }
+.recipe-card { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); color: var(--hud-text); text-align: left; cursor: pointer; }
+.recipe-card:hover { border-color: var(--hud-leaf); }
+.recipe-card[aria-pressed="true"] { border-color: var(--hud-accent); background: var(--hud-accent-soft); }
 .recipe-card[data-state="locked"] { opacity: .5; }
 .recipe-card[data-state="locked"] .recipe-card__dish img { filter: grayscale(1) brightness(.7); }
 .recipe-card__dish, .recipe-detail__dish { display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: radial-gradient(circle at 50% 62%, rgba(255,210,150,.22), rgba(20,35,18,.15) 68%, transparent 70%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
 .recipe-card__dish { width: 58px; height: 50px; }
 .recipe-card__dish img, .recipe-detail__dish img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0,0,0,.4)); }
 .recipe-card__text strong { display: block; font-size: 13.5px; }
-.recipe-card__text small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11.5px; }
-.recipe-card[data-state="ready"] .recipe-card__text small { color: var(--farm-leaf); }
-.recipe-detail-pane { min-height: 0; overflow-y: auto; padding: 14px 18px 18px; }
+.recipe-card__text small { display: block; margin-top: 2px; color: var(--hud-text-muted); font-size: 11.5px; }
+.recipe-card[data-state="ready"] .recipe-card__text small { color: var(--hud-leaf); }
+.recipe-detail-pane { min-height: 0; overflow-y: auto; padding: 14px 18px 18px; scrollbar-width: thin; }
 .recipe-detail { display: grid; gap: 10px; }
 .recipe-detail__head { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; }
 .recipe-detail__dish { width: 150px; height: 128px; }
-.recipe-detail__title { display: block; margin-top: 3px; font-size: 20px; }
-.recipe-detail__blurb { margin: 6px 0 0; color: #d6e3c8; font-size: 13px; line-height: 1.45; }
+.recipe-detail__title { display: block; margin-top: 3px; color: var(--hud-heading); font-size: 20px; }
+.recipe-detail__blurb { margin: 6px 0 0; color: var(--hud-text-soft); font-size: 13px; line-height: 1.45; }
 .recipe-detail .pets-section__title { margin: 6px 0 0; }
 .recipe-ingredients { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.recipe-ingredients li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 10px; background: rgba(255,255,255,.04); font-size: 13px; font-weight: 700; }
+.recipe-ingredients li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 10px; background: var(--hud-surface-raised); font-size: 13px; font-weight: 700; }
 .recipe-ingredients .seed-card__image { width: 44px; height: 40px; }
-.recipe-ingredients small { color: #b9c9ad; font: 700 11px ui-monospace, monospace; }
+.recipe-ingredients small { color: var(--hud-text-muted); font: 700 11px var(--hud-mono); }
 .recipe-ingredients li.is-short small { color: #ffb08a; }
+.recipe-ingredients__tickets { display: grid; place-items: center; font-size: 22px; }
 .recipe-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
-.recipe-step { counter-increment: step; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.07); color: #fff6cf; font: 800 11px ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
-.recipe-step::before { content: counter(step) " · "; color: var(--farm-leaf); }
+.recipe-step { counter-increment: step; padding: 5px 10px; border-radius: 999px; background: var(--hud-surface-raised); color: var(--hud-heading); font: 800 11px var(--hud-mono); letter-spacing: .06em; text-transform: uppercase; }
+.recipe-step::before { content: counter(step) " · "; color: var(--hud-leaf); }
 .recipe-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 4px 0 0; font-size: 12.5px; }
-.recipe-facts dt { color: #b9c9ad; }
-.recipe-facts dd { margin: 0; color: #fff6cf; font-weight: 700; }
-.recipe-detail__cook { justify-self: stretch; margin-top: 4px; padding: 12px; font-weight: 800; }
-.recipe-detail__cook:disabled { opacity: .55; cursor: not-allowed; }
+.recipe-facts dt { color: var(--hud-text-muted); }
+.recipe-facts dd { margin: 0; color: var(--hud-heading); font-weight: 700; }
+.recipe-detail__cook { justify-self: stretch; margin-top: 4px; min-height: 42px; font-weight: 800; }
 
-/* The cooking games' readout: at the top, so the stove and the board stay in view. */
-.cooking-hud { position: fixed; left: 50%; top: 104px; z-index: 6; width: min(460px, calc(100vw - 32px)); transform: translateX(-50%); display: grid; gap: 9px; padding: 13px 15px; border-radius: 16px; background: rgba(20, 26, 16, .88); color: #fff6cf; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
-.cooking-hud[hidden] { display: none; }
+/* ---------------------------------------------------------------- the Sawmill's counter (farm and market) */
+
+.mill-panel .sale-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mill-row { display: grid; grid-template-columns: 50px minmax(0, 1fr) 50px; align-items: center; gap: 8px 10px; padding: 8px 10px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-md); background: var(--hud-surface-raised); }
+.mill-row__controls { grid-row: 2; grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* Logs in, what they are, planks out: every cell placed, since a portrait otherwise spans two rows. */
+.mill-row .seed-card__image { grid-row: 1; grid-column: 1; width: 50px; height: 44px; }
+.mill-row .sale-row__label { grid-row: 1; grid-column: 2; }
+.mill-row .seed-card__image:nth-child(3) { grid-column: 3; }
+.mill-row .sale-row__label strong { display: block; font-size: 13.5px; }
+.mill-row .sale-row__label small { display: block; margin-top: 2px; color: var(--hud-text-muted); font-size: 11px; }
+.mill-row__count { min-width: 26px; text-align: center; font: 900 14px var(--hud-mono); }
+.mill-row__saw { white-space: nowrap; }
+
+/* Rows with a count to pick, in every counter: [-] [n] [+]. */
+.sale-row__stepper { display: flex; align-items: center; gap: 4px; }
+.sale-row__stepper button { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid var(--hud-line-strong); border-radius: 7px; background: var(--hud-surface-raised); color: var(--hud-text); font-weight: 900; cursor: pointer; }
+.sale-row__stepper button:hover:not(:disabled) { border-color: var(--hud-accent); }
+.sale-row__stepper button:disabled { opacity: .35; cursor: not-allowed; }
+.sale-row__stepper input { width: 46px; height: 28px; padding: 0 4px; border: 1px solid var(--hud-line-strong); border-radius: 7px; background: var(--hud-surface-sunken); color: var(--hud-text); font: 800 13px var(--hud-mono); text-align: center; }
+.sale-row__stepper input:focus { outline: 0; border-color: var(--hud-accent); }
+
+/* ================================================================ minigame HUDs */
+
+/* The felling meter: a marker sweeps the bar; E when it is in the green. */
+.chop-meter, .cooking-hud {
+  position: fixed;
+  z-index: var(--z-minigame);
+  left: 50%;
+  width: min(440px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  padding: 12px 15px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-r-lg);
+  background: var(--hud-surface);
+  color: var(--hud-heading);
+  box-shadow: var(--hud-shadow);
+  text-align: center;
+}
+.chop-meter { bottom: 140px; }
+.chop-meter strong { font-size: 15px; letter-spacing: .02em; }
+.chop-meter small { font-size: 12px; color: var(--hud-text-soft); }
+.chop-meter__bar { position: relative; height: 22px; border-radius: 11px; background: linear-gradient(90deg, #5a2a1d, #7a3a22 50%, #5a2a1d); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.chop-meter__good { position: absolute; top: 0; bottom: 0; background: #6fae4a; }
+.chop-meter__perfect { position: absolute; top: 0; bottom: 0; background: #d8f07a; }
+.chop-meter__marker { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.8); }
+.chop-meter__tree { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.chop-meter__tree i { display: block; height: 100%; width: 100%; background: #c98a4b; transition: width .15s ease; }
+.chop-meter__word:not(:empty)::before { content: " · "; color: var(--hud-text-muted); font-weight: 400; }
+.chop-meter__word[data-quality="perfect"] { color: #d8f07a; font-weight: 700; }
+.chop-meter__word[data-quality="good"] { color: #9fdc74; }
+.chop-meter__word[data-quality="poor"] { color: #e0a080; }
+
+/* The cooking and carpentry games' readout: at the top, so the stove and the board stay in view. */
+.cooking-hud { top: var(--hud-top); gap: 9px; padding: 13px 15px; }
 .cooking-hud__head { display: grid; gap: 2px; }
 .cooking-hud__head strong { font-size: 16px; }
-.cooking-hud__head small { color: var(--farm-leaf); font: 800 10.5px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.cooking-hud__head small { color: var(--hud-leaf); font: 800 10.5px var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
 .cooking-hud__stage { display: grid; gap: 8px; }
-.cooking-hud__hint { margin: 0; color: rgba(255,246,207,.82); font-size: 12.5px; }
-.cooking-hud__word:not(:empty)::before { content: " · "; color: rgba(255,246,207,.6); }
+.cooking-hud__hint { margin: 0; color: var(--hud-text-soft); font-size: 12.5px; }
+.cooking-hud__word:not(:empty)::before { content: " · "; color: var(--hud-text-muted); }
 .cooking-hud__word { font-weight: 800; }
 .cooking-hud__word[data-quality="perfect"], .cooking-hud__word[data-quality="golden"], .cooking-hud__word[data-quality="hit"] { color: #d8f07a; }
 .cooking-hud__word[data-quality="good"] { color: #9fdc74; }
 .cooking-hud__word[data-quality="poor"], .cooking-hud__word[data-quality="miss"], .cooking-hud__word[data-quality="pale"], .cooking-hud__word[data-quality="dark"] { color: #e0a080; }
 .cooking-hud__word[data-quality="burnt"] { color: #ff7a5a; }
 .cooking-hud__steps { display: flex; justify-content: center; gap: 6px; }
-.cook-step { padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.07); color: rgba(255,246,207,.6); font: 800 10px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
-.cook-step.is-now { background: rgba(255,211,61,.2); color: var(--farm-accent); box-shadow: inset 0 0 0 1px var(--farm-accent); }
-.cook-step.is-done { color: var(--farm-leaf); }
+.cook-step { padding: 3px 9px; border-radius: 999px; background: var(--hud-surface-raised); color: var(--hud-text-muted); font: 800 10px var(--hud-mono); letter-spacing: .08em; text-transform: uppercase; }
+.cook-step.is-now { background: var(--hud-accent-soft); color: var(--hud-accent); box-shadow: inset 0 0 0 1px var(--hud-accent); }
+.cook-step.is-done { color: var(--hud-leaf); }
 .cook-bar { position: relative; height: 24px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
 .cook-bar--board { background: linear-gradient(90deg, #a07a4c, #c9a06a 50%, #a07a4c); }
 .cook-bar--heat { background: linear-gradient(90deg, #2d3f5a, #6a4a2a 45%, #c8421e 80%, #ff7a2a); }
@@ -539,44 +841,65 @@ button, a { font: inherit; }
 .craft-bar--ruler { background: repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0 1px, transparent 1px 10%), linear-gradient(90deg, #d9b77a, #ead2a0 50%, #d9b77a); }
 .craft-bar--beat { background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(201,160,106,.45)); }
 .craft-bar--hammer { background: linear-gradient(90deg, #3b444a, #6f7d86 55%, #b8452f 100%); }
+.cook-arrow { font: 900 52px/1 var(--hud-display); color: var(--hud-accent); text-shadow: 0 3px 12px rgba(255,211,61,.4); min-height: 52px; }
 .cook-arrow.craft-call { font-size: 26px; min-height: 30px; letter-spacing: .04em; }
 .cook-arrow.craft-call[data-direction="pull"] { color: #9fd9ff; text-shadow: 0 3px 12px rgba(159,217,255,.35); }
-.cook-arrow { font: 900 52px/1 "Arial Black", sans-serif; color: var(--farm-accent); text-shadow: 0 3px 12px rgba(255,211,61,.4); min-height: 52px; }
 .cook-timer { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
 .cook-timer i { display: block; height: 100%; background: #e0673a; }
-.cooking-hud.is-result .cooking-hud__hint { color: var(--farm-leaf); font-weight: 700; }
+.cooking-hud.is-result .cooking-hud__hint { color: var(--hud-leaf); font-weight: 700; }
 .cook-result { display: grid; justify-items: center; gap: 4px; }
 .cook-result__dish { display: grid; place-items: center; width: 180px; height: 150px; }
 .cook-result__dish img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45)); }
-.cook-result__stars { color: var(--farm-accent); font-size: 28px; letter-spacing: .12em; text-shadow: 0 2px 10px rgba(255,211,61,.45); }
+.cook-result__stars { color: var(--hud-accent); font-size: 28px; letter-spacing: .12em; text-shadow: 0 2px 10px rgba(255,211,61,.45); }
 
+/* ================================================================ build mode */
+
+/* The shared frame (css/space-editor.css) in the farm's palette. While building, the walking chrome steps aside. */
+.farm-editor {
+  --editor-panel: linear-gradient(160deg, rgba(24, 38, 22, .96), rgba(14, 24, 13, .94));
+  --editor-line: rgba(158, 226, 122, .32);
+}
+.farm-editor .editor-rail button[aria-selected="true"] { border-color: rgba(158, 226, 122, .55); background: rgba(158, 226, 122, .16); box-shadow: 0 0 18px rgba(158, 226, 122, .18); }
+.farm-editor .camera-views button[aria-pressed="true"] { background: rgba(158, 226, 122, .18); box-shadow: inset 0 0 0 1px rgba(158, 226, 122, .5); }
+.is-editing .farm-header,
+.is-editing .control-hint,
+.is-editing .farm-prompt,
+.is-editing .hud-toast,
+.is-editing .hud-status { opacity: 0; pointer-events: none; }
+.is-visiting #editFarm { display: none; }
+
+/* ================================================================ smaller screens */
+
+/* The toolbar keeps its icons and drops the words first. */
+@media (max-width: 1180px) {
+  .farm-header__actions .hud-tool .hud-tool__label { display: none; }
+  .farm-header__actions .hud-tool { padding: 0 9px; }
+}
+@media (max-width: 900px) {
+  .farm-header__actions .hud-tool kbd { display: none; }
+  .stats-panel, .kitchen-panel { --sheet-width: 640px; }
+}
 @media (max-width: 720px) {
+  :root { --hud-gap: 8px; --hud-top: 60px; --hud-control: 34px; }
+  .hud-place__name .eyebrow { display: none; }
+  .farm-header h1 { font-size: 15px; }
+  .back-link .back-link__words { display: none; }
+  .control-hint { display: none; }
+  .hud-status { width: 220px; }
+  .farm-shell .room-chat { bottom: 104px; }
+  .farm-shell .room-chat__log { max-height: 28vh; font-size: 13px; }
+  .farm-stats-grid { grid-template-columns: 1fr; }
+  .farm-stat-card__description { min-height: 0; }
   .kitchen-panel__body { grid-template-columns: 1fr; overflow-y: auto; }
-  .recipe-list { overflow: visible; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .recipe-list { overflow: visible; border-right: 0; border-bottom: 1px solid var(--hud-line); }
   .recipe-detail-pane { overflow: visible; }
   .recipe-detail__head { grid-template-columns: 110px minmax(0, 1fr); }
   .recipe-detail__dish { width: 110px; height: 96px; }
-}
-
-/* The Sawmill's counter (farm-mill-panel.mts): shared by the farm's own Sawmill and the Market Square's stall. */
-.mill-panel .sale-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.mill-row { display: grid; grid-template-columns: 50px minmax(0, 1fr) 50px; align-items: center; gap: 8px 10px; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 11px; background: rgba(255,255,255,.04); }
-.mill-row__controls { grid-row: 2; grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-/* Logs in, what they are, planks out: every cell placed, since a portrait otherwise spans two rows. */
-.mill-row .seed-card__image { grid-row: 1; grid-column: 1; width: 50px; height: 44px; }
-.mill-row .sale-row__label { grid-row: 1; grid-column: 2; }
-.mill-row .seed-card__image:nth-child(3) { grid-column: 3; }
-.mill-row .sale-row__label strong { display: block; font-size: 13.5px; }
-.mill-row .sale-row__label small { display: block; margin-top: 2px; color: #b9c9ad; font-size: 11px; }
-.mill-row .sale-row__stepper { display: flex; align-items: center; gap: 4px; }
-.mill-row .sale-row__stepper button { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.07); color: #fff; font-weight: 900; cursor: pointer; }
-.mill-row .sale-row__stepper button:disabled { opacity: .35; cursor: not-allowed; }
-.mill-row__count { min-width: 26px; text-align: center; font: 900 14px ui-monospace, monospace; }
-.mill-row__saw { white-space: nowrap; }
-.mill-panel .sale-empty { padding: 18px 12px; border: 1px dashed rgba(255,255,255,.18); border-radius: 11px; color: #c9d7bd; text-align: center; font-size: 13px; list-style: none; }
-.recipe-ingredients__tickets { display: grid; place-items: center; font-size: 22px; }
-@media (max-width: 720px) {
   .mill-row { grid-template-columns: 40px minmax(0, 1fr) 40px; }
   .mill-row .seed-card__image { width: 40px; height: 36px; }
 }
-.livestock-panel .farm-button:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 560px) { .livestock-row__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) {
+  .pets-panel, .inventory-panel { animation: none; }
+  .farm-prompt, .hud-toast, .hud-scrim { transition: none; }
+}

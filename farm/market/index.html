@@ -13,16 +13,20 @@
     <canvas id="marketCanvas" tabindex="0" aria-label="The Market Square, in 3D"></canvas>
 
     <header class="farm-header">
-      <a id="marketHomeLink" href="../index.html" class="back-link">← Back to the farm</a>
-      <div>
-        <span class="eyebrow">SHARED SPACE · DOWN THE FARM ROAD</span>
-        <h1>Market Square</h1>
-      </div>
-      <div class="farm-header__actions">
-        <button id="openInventory" class="farm-button" type="button" aria-pressed="false" title="See your farm inventory (I)">Inventory <kbd>I</kbd></button>
-        <button id="openStats" class="farm-button" type="button" aria-pressed="false" title="See all farm skills and lifetime stats (K)">Stats <kbd>K</kbd></button>
+      <nav class="hud-place" aria-label="Where you are">
+        <a id="marketHomeLink" href="../index.html" class="back-link" title="Back up the road to the farm"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg><span class="back-link__words">Farm</span></a>
+        <div class="hud-place__name">
+          <span class="eyebrow">SHARED SPACE · DOWN THE FARM ROAD</span>
+          <h1>Market Square</h1>
+        </div>
+      </nav>
+      <div class="farm-header__actions" role="toolbar" aria-label="Market tools">
+        <button id="openInventory" class="farm-button hud-tool" type="button" aria-pressed="false" title="Inventory — what your farm holds (I)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2zM9 8V6a3 3 0 0 1 6 0v2" /></svg><span class="hud-tool__label">Inventory</span><kbd>I</kbd></button>
+        <button id="openStats" class="farm-button hud-tool" type="button" aria-pressed="false" title="Stats — your skills and lifetime totals (K)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20v-8M12 20V5M18 20v-5M3 20h18" /></svg><span class="hud-tool__label">Stats</span><kbd>K</kbd></button>
+        <span class="hud-toolbar__divider" aria-hidden="true"></span>
         <span id="marketTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
-        <button id="toggleMarketMusic" class="farm-button farm-music" type="button" aria-pressed="false" title="Mute music (M)">Music on <kbd>M</kbd></button>
+        <button id="toggleMarketMusic" class="farm-button hud-icon-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Music (M)"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16.5 9.5l5 5M21.5 9.5l-5 5" /></svg></button>
+        <button id="fullscreenMarket" class="farm-button hud-icon-button farm-fullscreen" type="button" aria-pressed="false" title="Fullscreen (F)"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg><span class="hud-tool__label" data-label>Fullscreen</span></button>
       </div>
     </header>
 
@@ -46,9 +50,17 @@
     </section>
 
     <div id="marketPrompt" class="farm-prompt" aria-live="polite"></div>
-    <div class="control-hint" aria-hidden="true">
-      <span><b>WASD</b> Move</span><span><b>Mouse</b> Look</span><span><b>E</b> Use · Sit · Wave</span><span><b>I</b> Inventory</span><span><b>K</b> Stats</span><span><b>T</b> Trade</span><span><b>Enter</b> Chat</span><span><b>Shift</b> Sprint</span><span><b>M</b> Music</span>
-    </div>
+    <aside id="controlHint" class="control-hint" aria-label="Controls" data-expanded="false">
+      <div class="control-hint__keys">
+        <span><b>WASD</b> Move</span><span><b>Shift</b> Run</span>
+        <span><b>Mouse</b> Look (click to capture)</span><span><b>E</b> Use · sit · wave</span>
+        <span><b>T</b> Trade with someone</span><span><b>Enter</b> Chat</span>
+        <span><b>I</b> Inventory</span><span><b>K</b> Stats</span>
+        <span><b>M</b> Music</span><span><b>F</b> Fullscreen</span>
+        <span><b>Esc</b> Close a menu</span><span><b>?</b> Hide this card</span>
+      </div>
+      <button class="control-hint__toggle" type="button" aria-expanded="false" title="Show or hide the controls (?)">Controls <kbd>?</kbd></button>
+    </aside>
 
     <aside id="inventoryPanel" class="inventory-panel sale-panel" aria-label="Farm inventory" hidden>
       <header class="pets-panel__head"><div><span class="eyebrow">YOUR FARM</span><strong>Inventory</strong></div><button id="closeInventory" class="farm-button" type="button">Done <kbd>Esc</kbd></button></header>
@@ -68,16 +80,22 @@
         <div><span class="eyebrow">PRODUCE MERCHANT · MARIGOLD</span><strong>Sell your harvest</strong></div>
         <button id="closeSale" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
+      <nav class="sheet-tabs" role="tablist" aria-label="Produce Merchant">
+        <button type="button" role="tab" data-sheet-tab="sell" aria-selected="true">Sell harvest</button>
+        <button type="button" role="tab" data-sheet-tab="buy">Buy ingredients</button>
+      </nav>
       <div class="inventory-panel__body">
         <p class="sale-note">Marigold buys every harvest at the day's price and sells Normal-grade ingredients when the kitchen needs something the farm has not grown yet. Shop prices include her retail margin.</p>
-        <h3 class="vendor-shelf__title">Buy ingredients</h3>
-        <ol id="ingredientShelf" class="sale-list vendor-shelf"></ol>
-        <p id="ingredientStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
-        <h3 class="vendor-shelf__title">Sell your harvest</h3>
-        <p id="saleTurnover" class="sale-turnover"></p>
-        <ol id="saleList" class="sale-list"></ol>
+        <div data-sheet-pane="sell">
+          <p id="saleTurnover" class="sale-turnover"></p>
+          <ol id="saleList" class="sale-list"></ol>
+        </div>
+        <div data-sheet-pane="buy">
+          <ol id="ingredientShelf" class="sale-list vendor-shelf"></ol>
+          <p id="ingredientStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        </div>
       </div>
-      <footer class="sale-footer">
+      <footer class="sale-footer" data-sheet-pane="sell">
         <div class="sale-footer__total"><span>Total</span><strong id="saleTotal">0</strong><small>tickets</small></div>
         <div class="sale-footer__actions">
           <button id="pickAllProduce" class="farm-button" type="button">Pick everything</button>
@@ -92,19 +110,29 @@
         <div><span class="eyebrow">LIVESTOCK DEALER · HOLLIS</span><strong>Buy young stock</strong></div>
         <button id="closeDealer" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
+      <nav class="sheet-tabs" role="tablist" aria-label="Livestock Dealer">
+        <button type="button" role="tab" data-sheet-tab="stock" aria-selected="true">Livestock</button>
+        <button type="button" role="tab" data-sheet-tab="horses">Horses</button>
+        <button type="button" role="tab" data-sheet-tab="feed">Feed</button>
+      </nav>
       <div class="inventory-panel__body">
-        <p class="sale-note">Every animal is one of a kind: its Yield, Quality, Growth and Hardiness are its own, and its grade comes from them. Each goes straight home to the first stall, barn floor or pen with room — move it on the farm with L.</p>
-        <p id="dealerRoom" class="sale-turnover"></p>
-        <label class="dealer-name"><span>Name the next one <small>(optional — blank and Hollis names it)</small></span><input id="dealerName" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. Buttercup"></label>
-        <ol id="dealerList" class="sale-list dealer-list"></ol>
-        <h3 class="vendor-shelf__title">Horses</h3>
-        <p class="sale-note">Three horses in the paddock today, each one of a kind. A horse lives in a Stable stall, and you ride it at Windrush Downs through the Market's west gate. The best ones wait for a good enough rider.</p>
-        <p id="horseRoom" class="sale-turnover"></p>
-        <ol id="horseList" class="sale-list dealer-list horse-list"></ol>
-        <p id="horseStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
-        <h3 class="vendor-shelf__title">Feed</h3>
-        <ol id="feedShelf" class="sale-list vendor-shelf"></ol>
-        <p id="feedStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        <label class="dealer-name" data-sheet-pane="stock horses"><span>Name the next one <small>(optional — blank and Hollis names it)</small></span><input id="dealerName" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. Buttercup"></label>
+        <div data-sheet-pane="stock">
+          <p class="sale-note">Every animal is one of a kind: its Yield, Quality, Growth and Hardiness are its own, and its grade comes from them. Each goes straight home to the first stall, barn floor or pen with room — move it on the farm with L.</p>
+          <p id="dealerRoom" class="sale-turnover"></p>
+          <ol id="dealerList" class="sale-list dealer-list"></ol>
+        </div>
+        <div data-sheet-pane="horses">
+          <p class="sale-note">Three horses in the paddock today, each one of a kind. A horse lives in a Stable stall, and you ride it at Windrush Downs through the Market's west gate. The best ones wait for a good enough rider.</p>
+          <p id="horseRoom" class="sale-turnover"></p>
+          <ol id="horseList" class="sale-list dealer-list horse-list"></ol>
+          <p id="horseStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        </div>
+        <div data-sheet-pane="feed">
+          <p class="sale-note">Feed for the herd. It goes straight into your farm's feed bin; the Herd panel (L) feeds them from it.</p>
+          <ol id="feedShelf" class="sale-list vendor-shelf"></ol>
+          <p id="feedStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        </div>
       </div>
       <footer class="sale-footer">
         <p id="dealerStatus" class="pets-status" aria-live="polite"></p>
@@ -146,15 +174,21 @@
         <div><span class="eyebrow">THE KITCHEN · BASIL</span><strong>Sell your cooking</strong></div>
         <button id="closeKitchen" class="farm-button" type="button" title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
       </header>
+      <nav class="sheet-tabs" role="tablist" aria-label="The Kitchen">
+        <button type="button" role="tab" data-sheet-tab="sell" aria-selected="true">Sell cooking</button>
+        <button type="button" role="tab" data-sheet-tab="cards">Recipe cards</button>
+      </nav>
       <div class="inventory-panel__body">
         <p class="sale-note">Basil sells permanent recipe cards for dishes outside the Cooking level tree. He also buys cooked dishes: a quarter above their raw ingredients for a plain plate, up to nearly three quarters more for three stars.</p>
-        <h3 class="vendor-shelf__title">Buy recipe cards</h3>
-        <ol id="recipeShelf" class="sale-list vendor-shelf"></ol>
-        <p id="recipeStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
-        <h3 class="vendor-shelf__title">Sell your cooking</h3>
-        <ol id="kitchenList" class="sale-list"></ol>
+        <div data-sheet-pane="cards">
+          <ol id="recipeShelf" class="sale-list vendor-shelf"></ol>
+          <p id="recipeStatus" class="pets-status vendor-shelf__status" aria-live="polite"></p>
+        </div>
+        <div data-sheet-pane="sell">
+          <ol id="kitchenList" class="sale-list"></ol>
+        </div>
       </div>
-      <footer class="sale-footer">
+      <footer class="sale-footer" data-sheet-pane="sell">
         <div class="sale-footer__total"><span>Total</span><strong id="kitchenTotal">0</strong><small>tickets</small></div>
         <div class="sale-footer__actions">
           <button id="pickAllDishes" class="farm-button" type="button">Pick everything</button>

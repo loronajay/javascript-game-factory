@@ -5,19 +5,19 @@
 #downsCanvas { display: block; width: 100%; height: 100%; outline: 0; }
 
 
-.market-tickets, .downs-riding-chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 10px 15px; border: 1px solid var(--farm-accent); border-radius: 999px; background: var(--farm-ink-soft); backdrop-filter: blur(10px); }
-.market-tickets[hidden], .downs-riding-chip[hidden] { display: none; }
-.market-tickets span, .downs-riding-chip span { color: var(--farm-leaf); font: 800 10px ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.market-tickets strong, .downs-riding-chip strong { color: #fff6cf; font: 900 15px ui-monospace, monospace; }
+/* The Riding chip sits in the toolbar beside the tickets and wears the same shape. */
+.downs-riding-chip { display: inline-flex; align-items: center; gap: 7px; min-height: var(--hud-control); padding: 0 12px; border-radius: 10px; background: var(--hud-leaf-soft); white-space: nowrap; }
+.downs-riding-chip span { color: var(--hud-leaf); font: 800 9.5px var(--hud-mono); letter-spacing: .14em; text-transform: uppercase; }
+.downs-riding-chip strong { color: var(--hud-heading); font: 900 14px var(--hud-mono); }
 
 .start-card__link { display: inline-block; margin-top: 10px; color: var(--farm-accent); font-weight: 800; }
 .start-card__link[hidden] { display: none; }
 
 /* The map: top right, under the header. */
-.downs-map { position: fixed; top: 96px; right: 18px; z-index: 4; width: 240px; height: 192px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(18, 32, 20, .72); box-shadow: 0 10px 30px rgba(0,0,0,.35); pointer-events: none; }
+.downs-map { position: fixed; top: var(--hud-top); right: var(--hud-gap); z-index: var(--z-chrome); width: 240px; height: 192px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(18, 32, 20, .72); box-shadow: 0 10px 30px rgba(0,0,0,.35); pointer-events: none; }
 
 /* The riding HUD: bottom centre, above the control hint. */
-.ride-hud { position: fixed; left: 50%; bottom: 162px; z-index: 4; display: grid; grid-template-columns: auto minmax(160px, 260px) auto; align-items: center; gap: 16px; padding: 10px 16px; transform: translateX(-50%); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(18, 32, 20, .78); backdrop-filter: blur(8px); color: #fff; pointer-events: none; }
+.ride-hud { position: fixed; left: 50%; bottom: 140px; z-index: var(--z-minigame); display: grid; grid-template-columns: auto minmax(160px, 260px) auto; align-items: center; gap: 16px; padding: 10px 16px; transform: translateX(-50%); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(18, 32, 20, .78); backdrop-filter: blur(8px); color: #fff; pointer-events: none; }
 .ride-hud[hidden] { display: none; }
 .ride-hud__name { display: grid; gap: 1px; min-width: 96px; }
 .ride-hud__name strong { color: #fff6cf; font-size: 14px; }
@@ -34,14 +34,14 @@
 .ride-hud__winded[hidden] { display: none; }
 
 /* The course clock: top centre. */
-.run-hud { position: fixed; top: 92px; left: 50%; z-index: 4; display: flex; align-items: baseline; gap: 14px; padding: 8px 16px; transform: translateX(-50%); border: 1px solid var(--farm-accent); border-radius: 999px; background: rgba(18, 32, 20, .82); color: #fff; pointer-events: none; }
+.run-hud { position: fixed; top: var(--hud-top); left: 50%; z-index: var(--z-minigame); display: flex; align-items: baseline; gap: 14px; padding: 8px 16px; transform: translateX(-50%); border: 1px solid var(--farm-accent); border-radius: 999px; background: rgba(18, 32, 20, .82); color: #fff; pointer-events: none; }
 .run-hud[hidden] { display: none; }
 .run-hud__course { color: var(--farm-leaf); font: 800 11px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 .run-hud__time { color: #fff6cf; font: 900 20px ui-monospace, monospace; }
 .run-hud__faults { color: #ffcf9a; font: 800 12px ui-monospace, monospace; }
 .run-hud__next { color: #c9d7bd; font: 700 12px system-ui, sans-serif; }
 .run-hud__next.is-missed { color: #ff9a8a; }
-.run-toast { position: fixed; top: 150px; left: 50%; z-index: 5; max-width: min(560px, calc(100vw - 32px)); padding: 12px 18px; transform: translateX(-50%); border: 1px solid var(--farm-accent); border-radius: 14px; background: rgba(18, 32, 20, .9); color: #fff6cf; font: 800 15px system-ui, sans-serif; text-align: center; pointer-events: none; }
+.run-toast { position: fixed; top: calc(var(--hud-top) + 56px); left: 50%; z-index: var(--z-toast); max-width: min(560px, calc(100vw - 32px)); padding: 12px 18px; transform: translateX(-50%); border: 1px solid var(--farm-accent); border-radius: 14px; background: rgba(18, 32, 20, .9); color: #fff6cf; font: 800 15px system-ui, sans-serif; text-align: center; pointer-events: none; }
 .run-toast[hidden] { display: none; }
 .run-toast small { display: block; margin-top: 4px; color: #c9d7bd; font-weight: 600; font-size: 12px; }
 

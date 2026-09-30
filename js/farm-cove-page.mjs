@@ -61,6 +61,7 @@ import { createFarmMusic } from "./farm-music.mjs";
 import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
+import { createFarmHud } from "./farm-hud.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
@@ -81,6 +82,14 @@ const visitorsChip = requiredElement("#coveVisitors");
 const visitorsChipLabel = requiredElement("#coveVisitorsLabel");
 const visitorsChipNames = requiredElement("#coveVisitorsNames");
 const tackleBar = requiredElement("#tackleBar");
+// The HUD layer (farm-hud.mts): the Cove's sheets register with it; it owns the mouse, Escape and the toast.
+const farmHud = createFarmHud({
+    canvas,
+    canRelock: () => entered && !leaving,
+    controls: requiredElement("#controlHint"),
+});
+// F is the Fishdex here, so fullscreen is the toolbar button's alone.
+farmHud.fullscreen.bind(requiredElement("#fullscreenCove"));
 // Back up the path: to the Market Square's north gate, carrying the farm to come home to.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const marketUrl = `../market/index.html?from=cove${fromFarm ? `&farm=${encodeURIComponent(fromFarm)}` : ""}`;
@@ -99,10 +108,8 @@ const statsPanel = createFarmStatsPanel({
     summary: requiredElement("#statsSummary"),
     grid: requiredElement("#statsGrid"),
 }, {
-    beforeOpen: () => inventorySummary.close(),
     onClose: () => canvas.focus(),
 });
-requiredElement("#openInventory").addEventListener("click", () => statsPanel.close());
 // ---------------------------------------------------------------- the angler
 const api = createPlatformApiClient();
 const signedIn = readFactoryAccountSession().authenticated && api.isConfigured !== false;
@@ -150,7 +157,7 @@ const music = createFarmMusic();
 function renderMusicButton() {
     const muted = music.isMuted();
     musicButton.setAttribute("aria-pressed", String(muted));
-    musicButton.firstChild.textContent = muted ? "Music off " : "Music on ";
+    musicButton.title = muted ? "Music off — play it (M)" : "Music on — mute it (M)";
 }
 musicButton.addEventListener("click", () => { music.setMuted(!music.isMuted()); renderMusicButton(); });
 renderMusicButton();
@@ -262,7 +269,6 @@ let seatInReach = null;
 let stallInReach = null;
 let nearbyVisitor = null;
 let atWater = false;
-let noticeUntil = 0;
 function applyCamera() {
     if (away.mounted()) {
         const eye = away.eye(riderClock);
@@ -274,12 +280,11 @@ function applyCamera() {
     camera.rotation.set(player.pitch, player.yaw, 0);
 }
 function setPrompt(text) {
-    prompt.textContent = text;
-    prompt.classList.toggle("is-visible", Boolean(text));
+    farmHud.setPrompt(prompt, text);
 }
+/** What just happened (a switched bait, a wave, a sale): the HUD's toast, above the prompt, which stays live. */
 function notice(text, seconds = 5) {
-    noticeUntil = performance.now() + seconds * 1000;
-    setPrompt(text);
+    farmHud.toast(text, seconds);
 }
 // ---------------------------------------------------------------- the others at the Cove
 const visitors = createRoomVisitors(THREE, scene, { mountSeat: (mount) => away.seatFor(mount) });
@@ -505,25 +510,36 @@ function repaintPanels() {
     recordsPanel.repaint();
     renderTackleBar();
 }
-function panelOpen() {
-    return inventorySummary.isOpen() || statsPanel.isOpen() || creelPanel.isOpen() || fishmongerPanel.isOpen() || tacklePanel.isOpen() || recordsPanel.isOpen();
+// Every sheet at the Cove, with the HUD layer: it frees the mouse, keeps one open, and closes the top one on
+// Escape or a click on the water. I and K wait while a fish is on; C and F are the creel's own (below).
+const freeHands = () => entered && !leaving && !fishing.busy();
+farmHud.sheet("inventory", { root: requiredElement("#inventoryPanel"), open: () => inventorySummary.toggle(), close: () => inventorySummary.close(), key: "KeyI", enabled: freeHands });
+farmHud.sheet("stats", { root: requiredElement("#statsPanel"), open: () => statsPanel.open(), close: () => statsPanel.close(), key: "KeyK", enabled: freeHands });
+farmHud.sheet("creel", { root: requiredElement("#creelPanel"), close: () => creelPanel.close() });
+farmHud.sheet("fishmonger", { root: requiredElement("#fishmongerPanel"), close: () => fishmongerPanel.close() });
+farmHud.sheet("tackle", { root: requiredElement("#tacklePanel"), close: () => tacklePanel.close() });
+farmHud.sheet("records", { root: requiredElement("#recordsPanel"), close: () => recordsPanel.close() });
+/** C for the creel, F for the Fishdex: the same key again puts it away, the other key turns to the other tab. */
+function toggleCreel(tab) {
+    if (creelPanel.isOpen() && creelPanel.tab() === tab)
+        creelPanel.close();
+    else
+        creelPanel.showTab(tab);
 }
-function closePanels() {
-    inventorySummary.close();
-    statsPanel.close();
-    creelPanel.close();
-    fishmongerPanel.close();
-    tacklePanel.close();
-    recordsPanel.close();
+requiredElement("#openCreel").addEventListener("click", () => toggleCreel("creel"));
+requiredElement("#openFishdex").addEventListener("click", () => toggleCreel("dex"));
+function panelOpen() {
+    return farmHud.anyOpen();
 }
 function renderTackleBar() {
     const rod = findFishingRod(rodId);
     const bait = baitCount(angler, baitId);
+    // Four slots, each a label, a value and the key that changes it — the Cove's version of the farm's status card.
     tackleBar.innerHTML = `
-    <span><b>${rod?.title ?? "Rod"}</b><kbd>R</kbd></span>
-    <span><b>${baitTitle(baitId)}</b> × ${bait}<kbd>Q</kbd></span>
-    <span>Fishing ${angler.level}${signedIn ? "" : " · practice"}</span>
-    <span>Creel ${angler.creel.length}/${angler.capacity}<kbd>C</kbd></span>
+    <span class="tackle-slot"><small>Rod</small><b>${rod?.title ?? "Rod"}</b><kbd>R</kbd></span>
+    <span class="tackle-slot${bait <= 0 ? " is-empty" : ""}"><small>Bait</small><b>${baitTitle(baitId)} × ${bait}</b><kbd>Q</kbd></span>
+    <span class="tackle-slot"><small>Fishing</small><b>Level ${angler.level}${signedIn ? "" : " · practice"}</b></span>
+    <span class="tackle-slot"><small>Creel</small><b>${angler.creel.length} / ${angler.capacity}</b><kbd>C</kbd></span>
   `;
 }
 renderTackleBar();
@@ -563,8 +579,6 @@ function updateInteraction() {
                 setPrompt("");
             return;
         }
-        if (performance.now() < noticeUntil)
-            return;
         if (doorInReach) {
             const back = doorInReach.doorId === COVE_MARKET_GATE;
             return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (back ? " · ride back up to the Market Square" : ""));
@@ -573,7 +587,7 @@ function updateInteraction() {
         return setPrompt(tie ? tie.prompt : getRidingPrompt(away.horseName(), "away"));
     }
     const untie = free ? away.action(pose) : null;
-    if (untie && !doorInReach && entered && !panelOpen() && performance.now() >= noticeUntil) {
+    if (untie && !doorInReach && entered && !panelOpen()) {
         stallInReach = null;
         seatInReach = null;
         nearbyVisitor = null;
@@ -592,8 +606,6 @@ function updateInteraction() {
             setPrompt("");
         return;
     }
-    if (performance.now() < noticeUntil)
-        return;
     if (fishing.busy())
         return setPrompt("");
     if (body.mode === "seated")
@@ -706,9 +718,18 @@ function steerFromKeys() {
     fishing.steer(left === right ? 0 : left ? -1 : 1);
 }
 window.addEventListener("keydown", (event) => {
+    // I and K toggle (and switch) their sheets, Escape closes the top one, ? the controls card (farm-hud.mts).
+    if (farmHud.handleKey(event)) {
+        keys.clear();
+        return;
+    }
+    if (entered && !event.repeat && (event.code === "KeyC" || event.code === "KeyF") && !fishing.busy() && !(event.target instanceof HTMLInputElement)) {
+        event.preventDefault();
+        keys.clear();
+        toggleCreel(event.code === "KeyC" ? "creel" : "dex");
+        return;
+    }
     if (panelOpen()) {
-        if (event.code === "Escape" || (event.code === "KeyI" && inventorySummary.isOpen()) || (event.code === "KeyK" && statsPanel.isOpen()))
-            closePanels();
         keys.clear();
         return;
     }
@@ -718,18 +739,6 @@ window.addEventListener("keydown", (event) => {
     }
     if (!entered)
         return;
-    if (event.code === "KeyI" && !event.repeat && !fishing.busy()) {
-        event.preventDefault();
-        keys.clear();
-        inventorySummary.toggle();
-        return;
-    }
-    if (event.code === "KeyK" && !event.repeat && !fishing.busy()) {
-        event.preventDefault();
-        keys.clear();
-        statsPanel.toggle();
-        return;
-    }
     if (event.code === "Space") {
         event.preventDefault();
         if (event.repeat)
@@ -785,16 +794,6 @@ window.addEventListener("keydown", (event) => {
         renderTackleBar();
         notice(`${findFishingRod(rodId)?.title ?? "Rod"} in hand.`, 1.5);
     }
-    else if (event.code === "KeyC") {
-        keys.clear();
-        document.exitPointerLock?.();
-        creelPanel.showTab("creel");
-    }
-    else if (event.code === "KeyF") {
-        keys.clear();
-        document.exitPointerLock?.();
-        creelPanel.showTab("dex");
-    }
 });
 window.addEventListener("keyup", (event) => {
     keys.delete(event.code);
@@ -820,7 +819,7 @@ enterButton.addEventListener("click", () => {
     music.start();
     startGate.classList.add("is-hidden");
     canvas.focus();
-    status.textContent = "WASD to move · Drag to look · Click for mouse capture";
+    status.textContent = "WASD to move · Drag to look · Click the shore to capture the mouse";
 });
 document.addEventListener("pointerlockchange", () => {
     startGate.classList.toggle("is-hidden", entered);

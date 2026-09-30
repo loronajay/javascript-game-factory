@@ -88,7 +88,7 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
   mount: (fish: AnglerFish, mounted: boolean) => Promise<PanelOutcome>;
   mountFee: number;
   onClose: () => void;
-}>): Panel & Readonly<{ showTab: (tab: "creel" | "mounted" | "dex") => void }> {
+}>): Panel & Readonly<{ showTab: (tab: "creel" | "mounted" | "dex") => void; tab: () => "creel" | "mounted" | "dex" }> {
   const body = root.querySelector<HTMLElement>("[data-body]")!;
   const heading = root.querySelector<HTMLElement>("[data-heading]")!;
   const status = root.querySelector<HTMLElement>("[data-status]")!;
@@ -211,6 +211,7 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
       tab = next;
       shell.open();
     },
+    tab: () => tab,
   });
 }
 
