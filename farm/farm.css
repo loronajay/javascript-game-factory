@@ -866,6 +866,10 @@ kbd, .farm-button kbd {
 .is-editing .farm-prompt,
 .is-editing .hud-toast,
 .is-editing .hud-status { opacity: 0; pointer-events: none; }
+/* The top bar sits above the editor frame and its children re-enable pointer events (`.farm-header > *`),
+   so fading it is not enough: an invisible Pet Games link would land on "Save farm". Take it out of hit-testing. */
+.is-editing .farm-header,
+.is-editing .farm-header * { visibility: hidden; pointer-events: none; }
 .is-visiting #editFarm { display: none; }
 
 /* ================================================================ smaller screens */
