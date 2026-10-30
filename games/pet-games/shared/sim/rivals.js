@@ -17,16 +17,16 @@ export const SPECIES_IDS = Object.freeze([
 
 // Every coat each species ships with (js/farm-catalog/animals.mts); a test holds them equal.
 export const SPECIES_PALETTES = Object.freeze({
-  "pet.corgi": Object.freeze(["standard", "sable", "midnight", "cosmic"]),
-  "pet.duck": Object.freeze(["standard", "mallard", "lavender", "prism"]),
-  "pet.red-panda": Object.freeze(["standard", "golden", "silver", "celestial"]),
-  "pet.platypus": Object.freeze(["standard", "copper", "moonstone", "opaline"]),
-  "pet.hippo": Object.freeze(["standard", "rosy", "slate", "nebula"]),
-  "pet.rhino": Object.freeze(["standard", "ochre", "frost", "crystal"]),
-  "pet.bat": Object.freeze(["standard", "ember", "ghost", "eclipse"]),
-  "pet.shark": Object.freeze(["standard", "tiger", "albino", "voidfin"]),
-  "pet.anglerfish": Object.freeze(["standard", "ember", "abyss", "biolume"]),
-  "pet.jellyfish": Object.freeze(["standard", "sunset", "aurora", "starborn"]),
+  "pet.corgi": Object.freeze(["standard","sable","cream","tricolor","midnight","cosmic"]),
+  "pet.duck": Object.freeze(["standard","mallard","pekin","bluewing","lavender","prism"]),
+  "pet.red-panda": Object.freeze(["standard","golden","cinnamon","snowcap","silver","celestial"]),
+  "pet.platypus": Object.freeze(["standard","copper","riverstone","moss","moonstone","opaline"]),
+  "pet.hippo": Object.freeze(["standard","rosy","mauve","river","slate","nebula"]),
+  "pet.rhino": Object.freeze(["standard","ochre","sand","mossback","frost","crystal"]),
+  "pet.bat": Object.freeze(["standard","ember","cocoa","dusky","ghost","eclipse"]),
+  "pet.shark": Object.freeze(["standard","tiger","blue","reef","albino","voidfin"]),
+  "pet.anglerfish": Object.freeze(["standard","ember","scarlet","deepsea","abyss","biolume"]),
+  "pet.jellyfish": Object.freeze(["standard","sunset","lagoon","peach","aurora","starborn"]),
 });
 
 function rival(id, name, speciesId, paletteId, tier, speed, strength, size, farm) {

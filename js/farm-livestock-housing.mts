@@ -26,6 +26,7 @@ import { barnFloor, coopFloor, stableStalls } from "./farm-fixtures.mjs";
 import { buildingLocalToWorld } from "./farm-shell.mjs";
 import type { FarmDecorRow } from "./farm-layout.mjs";
 import type { LivestockAnimal } from "./farm-livestock.mjs";
+import { livestockSpace, occupiedSpace } from "./farm-livestock-space.mjs";
 
 export type LivestockHomeKind = "stall" | "barn" | "pen" | "coop";
 
@@ -114,12 +115,8 @@ export function totalLivestockSlots(homes: readonly LivestockHome[]): number {
 }
 
 /** How many animals live in each home now, by home id (animals naming a home that is gone count nowhere). */
-export function homeOccupancy(homes: readonly LivestockHome[], herd: readonly Pick<LivestockAnimal, "homeId">[]): Map<string, number> {
-  const counts = new Map<string, number>(homes.map((entry) => [entry.id, 0]));
-  for (const animal of herd) {
-    if (animal.homeId && counts.has(animal.homeId)) counts.set(animal.homeId, counts.get(animal.homeId)! + 1);
-  }
-  return counts;
+export function homeOccupancy(homes: readonly LivestockHome[], herd: readonly (Pick<LivestockAnimal, "homeId"> & { speciesId?: string })[]): Map<string, number> {
+  return occupiedSpace(homes, herd);
 }
 
 /** Whether a home takes this species (every home takes any species unless it names some). */
@@ -128,9 +125,9 @@ export function homeTakes(entry: Pick<LivestockHome, "species">, speciesId: stri
 }
 
 /** The homes with room for one more, in order — for one of `speciesId`, when given. */
-export function homesWithRoom(homes: readonly LivestockHome[], herd: readonly Pick<LivestockAnimal, "homeId">[], speciesId?: string): readonly LivestockHome[] {
+export function homesWithRoom(homes: readonly LivestockHome[], herd: readonly (Pick<LivestockAnimal, "homeId"> & { speciesId?: string })[], speciesId?: string): readonly LivestockHome[] {
   const counts = homeOccupancy(homes, herd);
-  return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
+  return homes.filter((entry) => (counts.get(entry.id) ?? 0) + livestockSpace(entry.id, speciesId) <= entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
 }
 
 /**

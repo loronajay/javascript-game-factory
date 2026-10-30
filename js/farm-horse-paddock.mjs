@@ -28,16 +28,36 @@ export function createHorsePaddock(elements, options) {
     /** Slots bought this session, by day, so a sold horse reads as sold at once. */
     const bought = new Set();
     let busy = false;
+    const refresh = element("button", "farm-button", "Refresh horses");
+    refresh.type = "button";
+    refresh.hidden = !options.refresh;
+    elements.room.after(refresh);
+    refresh.addEventListener("click", async () => {
+        if (busy || !options.refresh)
+            return;
+        busy = true;
+        render();
+        try {
+            elements.status.textContent = (await options.refresh()).message;
+        }
+        catch {
+            elements.status.textContent = "Could not refresh the paddock. Try again.";
+        }
+        finally {
+            busy = false;
+            render();
+        }
+    });
     async function buy(line) {
         if (busy)
             return;
         busy = true;
         render();
         const name = elements.name?.value.trim() ?? "";
-        const outcome = await options.buy(line.day, line.slot, name).catch(() => ({ ok: false, message: "Hollis could not be reached. Nothing was bought." }));
+        const outcome = await options.buy(line.day, line.slot, name, line.roll).catch(() => ({ ok: false, message: "Hollis could not be reached. Nothing was bought." }));
         busy = false;
         if (outcome.ok || outcome.bought)
-            bought.add(`${line.day}:${line.slot}`);
+            bought.add(`${line.day}:${line.roll}:${line.slot}`);
         if (outcome.ok && elements.name)
             elements.name.value = "";
         elements.status.textContent = outcome.message;
@@ -76,17 +96,22 @@ export function createHorsePaddock(elements, options) {
     }
     function render() {
         const day = horseStockDay(now());
+        const refreshedAt = options.refreshedAt?.() ?? 0;
+        const roll = horseStockDay(refreshedAt) === day ? refreshedAt : 0;
+        const remaining = refreshedAt > 0 ? Math.max(0, refreshedAt + 86400000 - now()) : 0;
+        refresh.disabled = busy || remaining > 0;
+        refresh.textContent = remaining > 0 ? `Refresh horses in ${Math.ceil(remaining / 3600000)}h` : "Refresh horses · 24h cooldown";
         const room = options.room();
         const level = options.ridingLevel();
         elements.room.textContent = room.stalls
             ? `Stable stalls free for a horse: ${room.freeStalls} of ${room.stalls}`
             : "A horse lives in a Stable stall — build a Stable on your farm first.";
         elements.list.replaceChildren();
-        for (const line of horseStock(day)) {
+        for (const line of horseStock(day, roll)) {
             const card = element("li", "dealer-card horse-card");
             const grade = findGrowthGrade(line.grade);
             const locked = level < line.minRidingLevel;
-            const sold = bought.has(`${day}:${line.slot}`);
+            const sold = bought.has(`${day}:${line.roll}:${line.slot}`);
             card.classList.toggle("is-locked", locked);
             card.classList.toggle("is-sold", sold);
             const words = element("div", "dealer-card__words");
@@ -101,7 +126,7 @@ export function createHorsePaddock(elements, options) {
             button.title = sold ? "You bought this one today"
                 : locked ? `Hollis keeps his ${grade.title.toLowerCase()} horses for riders of Riding ${line.minRidingLevel}. You are Riding ${level}.`
                     : room.freeStalls <= 0 ? "No free Stable stall at home"
-                        : room.petRoom <= 0 ? "Your farm has as many pets as it can keep"
+                        : room.petRoom <= 0 ? "Your horse capacity is full (separate from pets)"
                             : `Buy this horse for ${line.price.toLocaleString()} tickets`;
             button.addEventListener("click", () => void buy(line));
             card.append(picture(line), words, button);

@@ -21,6 +21,7 @@ import { petCareSummary } from "./farm-pet-happiness.mjs";
 import { BREEDING_PRICE, BREEDING_REFUSAL_WORDS, breedingOdds, breedingRefusal, breedingRestMinutes } from "./farm-pet-breeding.mjs";
 import { HORSE_SPECIES_ID } from "./farm-horse-riding.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
+import { farmingLevelForXp } from "./farm-skills.mjs";
 function escapeHtml(value) {
     return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
 }
@@ -29,11 +30,13 @@ export function createPetsPanel(elements, actions, options = {}) {
     let selectedSpecies = "";
     let cardsBuilt = false;
     let open = false;
+    let releasing = null;
+    let releaseBusy = false;
     function setStatus(text) {
         elements.status.textContent = text;
     }
     function full() {
-        return (layout?.pets.length ?? 0) >= MAX_PETS;
+        return (layout?.pets.filter((pet) => pet.speciesId !== HORSE_SPECIES_ID).length ?? 0) >= MAX_PETS;
     }
     function speciesCard(species, adoptable) {
         const card = document.createElement("button");
@@ -76,7 +79,8 @@ export function createPetsPanel(elements, actions, options = {}) {
     function renderPets() {
         if (!layout)
             return;
-        elements.count.textContent = `${layout.pets.length} / ${MAX_PETS}`;
+        const horses = layout.pets.filter((pet) => pet.speciesId === HORSE_SPECIES_ID).length;
+        elements.count.textContent = `${layout.pets.length - horses} / ${MAX_PETS} pets${horses ? ` · ${horses} horses (separate)` : ""}`;
         if (!layout.pets.length) {
             elements.petList.innerHTML = `<p class="pets-empty">Nobody lives here yet. Pick an animal below.</p>`;
             return;
@@ -102,7 +106,7 @@ export function createPetsPanel(elements, actions, options = {}) {
         <div><dt>Happiness</dt><dd>${stats.happiness}%</dd></div>
         <div><dt>Speed</dt><dd>${riding?.speed ?? stats.speed}${gainedMarkup(growth?.gained.speed)}</dd></div>
         <div><dt>Strength</dt><dd>${riding?.strength ?? stats.strength}${gainedMarkup(growth?.gained.strength)}</dd></div>
-        ${riding ? `<div title="${escapeHtml(HORSE_STAT_BLURBS.stamina)}"><dt>Stamina</dt><dd>${riding.stamina}</dd></div><div title="${escapeHtml(HORSE_STAT_BLURBS.agility)}"><dt>Agility</dt><dd>${riding.agility}</dd></div>` : ""}
+        ${riding ? `<div title="${escapeHtml(HORSE_STAT_BLURBS.stamina)}"><dt>Stamina</dt><dd>${riding.stamina}</dd></div><div title="${escapeHtml(HORSE_STAT_BLURBS.agility)}"><dt>Agility</dt><dd>${riding.agility}</dd></div><div title="This horse earns its own experience from verified courses, separately from your Riding skill."><dt>Horse level</dt><dd>${farmingLevelForXp(profile?.riding?.xp ?? 0)} · ${profile?.riding?.xp ?? 0} XP</dd></div>` : ""}
         ${growth ? `<div class="pet-row__growth pet-row__growth--${growth.outlook.level}"><dt>Growth</dt><dd title="Speed and Strength grow every day until old age. Potential is rolled at adoption (rarer looks roll higher more often); food, happiness, trust and treating it the way its traits like decide how much of it is reached."><span class="pet-row__potential" aria-label="${growth.stars} of 4 stars">${"★".repeat(growth.stars)}<span class="pet-row__potential-empty">${"★".repeat(4 - growth.stars)}</span></span> ${escapeHtml(growth.gradeTitle)} potential · ${escapeHtml(growth.stageTitle)} · ${escapeHtml(growth.outlook.label)}</dd></div>` : ""}
       </dl>` : `<p class="pet-row__unscoped">This pet's profile could not be loaded.</p>`;
             const care = petCareSummary(pet.speciesId, layout.decor, layout.agriculture.inventory.supplies);
@@ -144,9 +148,46 @@ export function createPetsPanel(elements, actions, options = {}) {
                 }
                 event.stopPropagation();
             });
-            row.querySelector(".pet-row__release").addEventListener("click", async () => {
-                setStatus(await actions.release(pet.instanceId));
+            const releaseButton = row.querySelector(".pet-row__release");
+            releaseButton.addEventListener("click", () => {
+                releasing = pet.instanceId;
+                renderPets();
             });
+            if (releasing === pet.instanceId) {
+                const confirmation = document.createElement("div");
+                confirmation.className = "pet-release-confirm";
+                confirmation.setAttribute("role", "group");
+                confirmation.setAttribute("aria-label", `Confirm releasing ${pet.name}`);
+                const message = document.createElement("p");
+                message.textContent = `Release ${pet.name}? This cannot be undone.`;
+                const cancel = document.createElement("button");
+                cancel.type = "button";
+                cancel.className = "farm-button";
+                cancel.textContent = "Keep pet";
+                cancel.disabled = releaseBusy;
+                cancel.addEventListener("click", () => { releasing = null; renderPets(); });
+                const confirm = document.createElement("button");
+                confirm.type = "button";
+                confirm.className = "farm-button pet-row__release";
+                confirm.textContent = `Release ${pet.name}`;
+                confirm.disabled = releaseBusy;
+                confirm.addEventListener("click", async () => {
+                    if (releaseBusy)
+                        return;
+                    releaseBusy = true;
+                    confirm.disabled = cancel.disabled = true;
+                    try {
+                        setStatus(await actions.release(pet.instanceId));
+                    }
+                    finally {
+                        releaseBusy = false;
+                        releasing = null;
+                        renderPets();
+                    }
+                });
+                confirmation.append(message, cancel, confirm);
+                row.append(confirmation);
+            }
             const breeding = breedBlock(pet);
             if (breeding)
                 row.append(breeding);
@@ -179,7 +220,7 @@ export function createPetsPanel(elements, actions, options = {}) {
             return block;
         }
         const clock = options.farmMinutes?.() ?? layout.clock.farmMinutes;
-        const refusalOf = (father) => breedingRefusal(pet, father, clock, layout.pets.length, MAX_PETS);
+        const refusalOf = (father) => breedingRefusal(pet, father, clock, layout.pets.filter((entry) => entry.speciesId !== HORSE_SPECIES_ID).length, MAX_PETS);
         const label = document.createElement("span");
         label.className = "livestock-breed__label";
         label.textContent = "Pair with";
@@ -248,6 +289,7 @@ export function createPetsPanel(elements, actions, options = {}) {
         setStatus(selectedSpecies ? "" : "Pick an animal, give it a name, and it moves in.");
     }
     function close() {
+        releasing = null;
         open = false;
         elements.root.hidden = true;
         elements.openButton.setAttribute("aria-pressed", "false");

@@ -40,8 +40,8 @@ export async function breedFarmPets(pool, input, random = Math.random) {
         const father = pets.find((row) => row.instanceId === fatherId);
         if (!mother || !father)
             return { ok: false, error: "unknown_pet", layout: farm.layout };
-        const farmMinutes = Number(farm.layout.clock?.farmMinutes) || 0;
-        const refusal = farmBreedingRefusal(mother, father, farmMinutes, pets.length, MAX_PETS);
+        const farmMinutes = (Number(farm.layout.clock?.farmMinutes) || 0) + (Number(farm.layout.clock?.animalMinutes) || 0);
+        const refusal = farmBreedingRefusal(mother, father, farmMinutes, pets.filter((pet) => pet.speciesId !== "pet.horse").length, MAX_PETS);
         if (refusal)
             return { ok: false, error: refusal, layout: farm.layout };
         const bred = breedFarmPetProfile(mother.speciesId, mother.profile, father.profile, random);

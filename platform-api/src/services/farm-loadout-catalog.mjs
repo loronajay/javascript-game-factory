@@ -38,7 +38,7 @@ import { normalizeFarmHorseRiding, pinFarmHorseRiding } from "./farm-horse-catal
 import { farmCropRule } from "./farm-crop-catalog.mjs";
 import { farmLivestockGood } from "./farm-livestock-catalog.mjs";
 import { parseFarmProduceKey } from "./farm-quality-catalog.mjs";
-import { NAP_BANK_CAPACITY_MINUTES, boundCropGrowth, clampOfflineRate, offlineRateForSave, verifyFarmClock } from "./farm-time-policy.mjs";
+import { NAP_BANK_CAPACITY_MINUTES, boundAnimalMinutes, boundCropGrowth, clampOfflineRate, offlineRateForSave, verifyFarmClock } from "./farm-time-policy.mjs";
 import { emptyFarmSkillRecords, farmCropCapacity, farmingLevelForXp, normalizeFarmSkillRecords } from "./farm-skill-catalog.mjs";
 import { parseFarmDishKey } from "./farm-recipe-catalog.mjs";
 import { farmPieceKey, farmPieceRule, parseFarmPieceKey } from "./farm-carpentry-catalog.mjs";
@@ -91,7 +91,7 @@ function normalizeRotation(value) {
 }
 export function defaultFarmGarage() {
     // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-    return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 }, settings: { awayGrowth: 0.1 }, skills: emptyFarmSkillRecords() };
+    return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440, animalMinutes: 0 }, settings: { awayGrowth: 0.1, awayAnimals: 0 }, skills: emptyFarmSkillRecords() };
 }
 function normalizeCropCounts(value) {
     const input = value && typeof value === "object" ? value : {};
@@ -305,8 +305,13 @@ function guardFarmSave(garage, current, context) {
     // So are the skill records: XP is minted by harvests, fellings, cooks and orders, never a save.
     garage.skills = current?.skills ? normalizeFarmSkillRecords(current.skills) : emptyFarmSkillRecords();
     const now = typeof context.now === "number" && Number.isFinite(context.now) ? context.now : Date.now();
+    if (current?.horseStockRefreshedAt)
+        garage.horseStockRefreshedAt = current.horseStockRefreshedAt;
+    else
+        delete garage.horseStockRefreshedAt;
     const storedAt = current?.clock ? (current.clock.verifiedAt ?? (typeof context.currentSavedAt === "number" ? context.currentSavedAt : null)) : null;
     const verified = verifyFarmClock(current?.clock ?? null, storedAt, garage.clock.farmMinutes, now);
+    garage.clock.animalMinutes = Number(boundAnimalMinutes(current, garage.clock.animalMinutes, verified.elapsedSeconds).toFixed(4));
     garage.clock.farmMinutes = Number(verified.farmMinutes.toFixed(4));
     garage.clock.napBank = Number(verified.napBank.toFixed(4));
     garage.clock.verifiedAt = verified.verifiedAt;
@@ -518,6 +523,7 @@ export function normalizeFarmGarage(value, context = {}) {
     }
     const submittedGround = cleanText(input.ground, 80);
     const garage = {
+        ...(typeof input.horseStockRefreshedAt === "number" && input.horseStockRefreshedAt > 0 ? { horseStockRefreshedAt: Math.min(input.horseStockRefreshedAt, 1000000000000000) } : {}),
         version: LAYOUT_VERSIONS.has(input.version) ? input.version : LAYOUT_VERSION,
         ground: GROUND_ID_PATTERN.test(submittedGround) && mayUseCatalogId(submittedGround, context) ? submittedGround : "",
         pets,
@@ -619,13 +625,14 @@ export function normalizeFarmGarage(value, context = {}) {
         garage.skills = normalizeFarmSkillRecords(input.skills);
         // The owner's choices: the away-growth rate, 0 (the farm waits) up to the ceiling.
         const settings = input.settings && typeof input.settings === "object" ? input.settings : {};
-        garage.settings = { awayGrowth: clampOfflineRate(settings.awayGrowth) };
+        garage.settings = { awayGrowth: clampOfflineRate(settings.awayGrowth), awayAnimals: clampOfflineRate(typeof settings.awayAnimals === "number" ? settings.awayAnimals : 0) };
         const clock = input.clock && typeof input.clock === "object" ? input.clock : {};
         garage.clock = {
             farmMinutes: Math.max(0, boundedNumber(clock.farmMinutes, 1000000000) ?? 480),
             updatedAt: Math.max(0, boundedNumber(clock.updatedAt, 1000000000000000) ?? 0),
             // Real time the owner was last on the farm; 0 = never entered, so no offline production.
             checkpointAt: Math.max(0, boundedNumber(clock.checkpointAt, 1000000000000000) ?? 0),
+            animalMinutes: Math.max(0, boundedNumber(clock.animalMinutes, 1000000000) ?? 0),
             // Farm minutes of naps available (js/farm-nap-bank.mts); absent = a full bank.
             napBank: Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, boundedNumber(clock.napBank, 100000) ?? NAP_BANK_CAPACITY_MINUTES)),
         };

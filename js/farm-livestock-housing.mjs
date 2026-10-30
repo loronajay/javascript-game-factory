@@ -23,6 +23,7 @@
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
 import { barnFloor, coopFloor, stableStalls } from "./farm-fixtures.mjs";
 import { buildingLocalToWorld } from "./farm-shell.mjs";
+import { livestockSpace, occupiedSpace } from "./farm-livestock-space.mjs";
 /** How many a pen holds, by catalog id. */
 export const PEN_SLOTS = Object.freeze({
     "decor.building.pen-small": 2,
@@ -88,12 +89,7 @@ export function totalLivestockSlots(homes) {
 }
 /** How many animals live in each home now, by home id (animals naming a home that is gone count nowhere). */
 export function homeOccupancy(homes, herd) {
-    const counts = new Map(homes.map((entry) => [entry.id, 0]));
-    for (const animal of herd) {
-        if (animal.homeId && counts.has(animal.homeId))
-            counts.set(animal.homeId, counts.get(animal.homeId) + 1);
-    }
-    return counts;
+    return occupiedSpace(homes, herd);
 }
 /** Whether a home takes this species (every home takes any species unless it names some). */
 export function homeTakes(entry, speciesId) {
@@ -102,7 +98,7 @@ export function homeTakes(entry, speciesId) {
 /** The homes with room for one more, in order — for one of `speciesId`, when given. */
 export function homesWithRoom(homes, herd, speciesId) {
     const counts = homeOccupancy(homes, herd);
-    return homes.filter((entry) => (counts.get(entry.id) ?? 0) < entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
+    return homes.filter((entry) => (counts.get(entry.id) ?? 0) + livestockSpace(entry.id, speciesId) <= entry.slots && (speciesId === undefined || homeTakes(entry, speciesId)));
 }
 /**
  * The homes the HERD can use (FARM_RIDING_PLAN.md): every home, less the

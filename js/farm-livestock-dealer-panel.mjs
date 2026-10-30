@@ -12,6 +12,7 @@
 // cleared by a sale so two animals are never given one name by accident.
 import { LIVESTOCK_CATALOG } from "./farm-catalog/livestock.mjs";
 import { homesWithRoom, totalLivestockSlots } from "./farm-livestock-housing.mjs";
+import { livestockSpace, occupiedSpace } from "./farm-livestock-space.mjs";
 function element(tag, className, text = "") {
     const node = document.createElement(tag);
     node.className = className;
@@ -67,8 +68,8 @@ export function createLivestockDealerPanel(elements, options) {
         const farm = options.farm();
         // Free places, all told and for one species (the coop takes only chickens).
         const freeFor = (speciesId) => homesWithRoom(farm.homes, farm.herd, speciesId).reduce((sum, home) => {
-            const taken = farm.herd.filter((animal) => animal.homeId === home.id).length;
-            return sum + (home.slots - taken);
+            const taken = occupiedSpace(farm.homes, farm.herd).get(home.id) ?? 0;
+            return sum + (speciesId ? Math.max(0, Math.floor((home.slots - taken) / livestockSpace(home.id, speciesId))) : Math.max(0, home.slots - taken));
         }, 0);
         const free = freeFor();
         const total = totalLivestockSlots(farm.homes);

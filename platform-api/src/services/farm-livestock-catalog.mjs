@@ -11,6 +11,7 @@
 // Chicken Coop six chickens (and nothing but chickens). The ids are the
 // page's (`js/farm-livestock-housing.mts`): `<instanceId>#stall-N`,
 // `<instanceId>#floor`, `<instanceId>#pen`, `<instanceId>#coop`.
+import { livestockSpace, occupiedSpace, freeYoungPlaces } from "./farm-livestock-space.mjs";
 export const LIVESTOCK_STATS = Object.freeze(["yield", "quality", "growth", "hardiness"]);
 export const STAT_MIN = 1;
 export const STAT_MAX = 100;
@@ -43,7 +44,7 @@ export const FARM_LIVESTOCK_RULES = Object.freeze([
     }),
     rule("sheep", {
         title: "Sheep", price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
-        products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
+        products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14, onlyFrom: "female" }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
         meat: { itemId: "mutton", cuts: 4 },
         feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
@@ -61,7 +62,7 @@ export const FARM_LIVESTOCK_RULES = Object.freeze([
     }),
     rule("cow", {
         title: "Cow", price: 750, minLevel: 10, adultDays: 3, gestationDays: 3,
-        products: [{ itemId: "milk", everyDays: 1, dayValue: 28 }],
+        products: [{ itemId: "milk", everyDays: 1, dayValue: 28, onlyFrom: "female" }],
         meat: { itemId: "beef", cuts: 8 },
         feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
@@ -175,11 +176,8 @@ export function farmHerdHomes(layout) {
  * the homes the live herd names.
  */
 export function pickFarmLivestockHome(homes, herdHomes, wanted, speciesId) {
-    const counts = new Map();
-    for (const id of herdHomes)
-        if (id)
-            counts.set(id, (counts.get(id) ?? 0) + 1);
-    const hasRoom = (entry) => (counts.get(entry.id) ?? 0) < entry.slots && farmHomeTakes(entry, speciesId);
+    const counts = occupiedSpace(homes, herdHomes.map((entry) => typeof entry === "object" && entry ? entry : { homeId: entry }));
+    const hasRoom = (entry) => (counts.get(entry.id) ?? 0) + livestockSpace(entry.id, typeof speciesId === "string" ? speciesId : undefined) <= entry.slots && farmHomeTakes(entry, speciesId);
     if (typeof wanted === "string" && wanted) {
         const chosen = homes.find((entry) => entry.id === wanted);
         return chosen && hasRoom(chosen) ? chosen : null;
@@ -404,12 +402,7 @@ export const MOTHER_COAT_SHARE = 0.45;
 export const SIRE_COAT_SHARE = 0.45;
 /** Empty slots in standing homes that take `speciesId` (every home, without one), less the places other mothers' young are owed. */
 export function freePlacesForYoung(homes, herd, speciesId) {
-    const counts = new Map(homes.map((home) => [home.id, 0]));
-    for (const animal of herd)
-        if (animal.homeId && counts.has(animal.homeId))
-            counts.set(animal.homeId, counts.get(animal.homeId) + 1);
-    const empty = homes.filter((home) => speciesId === undefined || farmHomeTakes(home, speciesId)).reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
-    return Math.max(0, empty - herd.filter((animal) => animal.pregnant).length);
+    return freeYoungPlaces(homes, herd, speciesId);
 }
 /** Why this pair cannot be bred now, or null — the page's `breedingRefusal`, reason for reason, in the same order. */
 export function breedingRefusal(mother, sire, context) {
@@ -514,7 +507,7 @@ export function placeArrivingLivestock(input) {
         const home = pickFarmLivestockHome(input.homes, occupied, undefined, rule.id);
         if (!home)
             return { ok: false, error: "no_room", speciesId: rule.id };
-        occupied.push(home.id);
+        occupied.push({ homeId: home.id, speciesId: animal.speciesId });
         homeIds.push(home.id);
     }
     return { ok: true, homeIds };

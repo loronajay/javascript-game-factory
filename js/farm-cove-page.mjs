@@ -58,6 +58,7 @@ import { createAchievementToaster } from "./platform/achievements/achievements.m
 import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } from "./platform/api/ticket-wallet.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
+import { createFarmSoundEffects, catchEffect } from "./farm-sound-effects.mjs";
 import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
@@ -154,6 +155,8 @@ if (signedIn)
     void ticketClient.getWallet().then((wallet) => takeBalance(wallet?.balance)).catch(() => undefined);
 renderTickets();
 const music = createFarmMusic();
+const farmSounds = createFarmSoundEffects();
+window.addEventListener("pagehide", () => farmSounds.destroy(), { once: true });
 function renderMusicButton() {
     const muted = music.isMuted();
     musicButton.setAttribute("aria-pressed", String(muted));
@@ -272,6 +275,7 @@ let atWater = false;
 function applyCamera() {
     if (away.mounted()) {
         const eye = away.eye(riderClock);
+        player.yaw = away.state().heading;
         camera.position.set(eye.x, eye.y, eye.z);
     }
     else {
@@ -402,6 +406,8 @@ function onFishingEvent(event) {
             return;
         case "landed": {
             const fish = event.fish;
+            farmSounds.play(catchEffect(fish));
+            farmSounds.result(event.answer);
             const news = catchNews(angler, fish.speciesId, fish.weightG);
             const answer = event.answer;
             const levelUp = answer?.fishing && Number(answer.fishing.level) > Number(answer.fishing.levelBefore) ? Number(answer.fishing.level) : null;
@@ -828,6 +834,8 @@ canvas.addEventListener("pointerdown", () => { draggingLook = true; });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
     if (panelOpen())
+        return;
+    if (away.mounted())
         return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;

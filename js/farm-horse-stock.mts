@@ -58,13 +58,14 @@ export function horseStockDay(now: number): number {
 }
 
 /** The seed text of one of the day's horses. */
-export function horseStockSeed(day: number, slot: number): string {
-  return `farm-horses:v1:${day}:${slot}`;
+export function horseStockSeed(day: number, slot: number, roll = 0): string {
+  return `farm-horses:v1:${day}:${slot}${roll ? `:refresh:${roll}` : ""}`;
 }
 
 export type HorseStockLine = Readonly<{
   day: number;
   slot: number;
+  roll: number;
   profile: PetProfile;
   stats: HorseStats;
   grade: PetGrowthGradeId;
@@ -73,19 +74,19 @@ export type HorseStockLine = Readonly<{
 }>;
 
 /** One of the day's horses, rolled from its seed. */
-export function horseStockLine(day: number, slot: number): HorseStockLine | null {
-  const profile = createPetProfile(HORSE_SPECIES_ID, horseSeededRandom(horseSeedFor(horseStockSeed(day, slot))));
+export function horseStockLine(day: number, slot: number, roll = 0): HorseStockLine | null {
+  const profile = createPetProfile(HORSE_SPECIES_ID, horseSeededRandom(horseSeedFor(horseStockSeed(day, slot, roll))));
   if (!profile) return null;
   const grade = profile.growth.grade;
   const rule = HORSE_GRADE_RULES[grade];
-  return Object.freeze({ day, slot, profile, stats: horseStats(profile), grade, price: rule.price, minRidingLevel: rule.minRidingLevel });
+  return Object.freeze({ day, slot, roll, profile, stats: horseStats(profile), grade, price: rule.price, minRidingLevel: rule.minRidingLevel });
 }
 
 /** The whole paddock for a day. */
-export function horseStock(day: number): readonly HorseStockLine[] {
+export function horseStock(day: number, roll = 0): readonly HorseStockLine[] {
   const lines: HorseStockLine[] = [];
   for (let slot = 0; slot < HORSE_STOCK_SIZE; slot += 1) {
-    const line = horseStockLine(day, slot);
+    const line = horseStockLine(day, slot, roll);
     if (line) lines.push(line);
   }
   return Object.freeze(lines);

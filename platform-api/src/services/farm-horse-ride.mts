@@ -29,5 +29,6 @@ export function serverRideProfile(pet: any, ridingLevel: number): RideProfile {
   const elder = growthStage(Number(profile.ageDays) || 0, FARM_HORSE_LIFE_DAYS).id === "elder";
   const hunger = Number.isFinite(profile.hunger) ? profile.hunger : 100;
   const happiness = Number.isFinite(profile.happiness) ? profile.happiness : 100;
-  return rideProfile(horseStats(profile), { hunger, happiness, elder }, rideTraitsFor(Array.isArray(profile.traits) ? profile.traits : []), ridingLevel);
+  const horseLevel = farmingLevelForXp(Number(profile.riding?.xp) || 0);
+  return rideProfile(horseStats(profile), { hunger, happiness, elder }, rideTraitsFor(Array.isArray(profile.traits) ? profile.traits : []), horseLevel);
 }

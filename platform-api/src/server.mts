@@ -38,7 +38,7 @@ import { breedFarmPets } from "./db/farm-pet-breeding.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
 import { butcherFarmLivestock, buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
-import { buyFarmHorse } from "./db/farm-horses.mjs";
+import { buyFarmHorse, refreshFarmHorses } from "./db/farm-horses.mjs";
 import { submitFarmRidingRun } from "./db/farm-riding.mjs";
 import { betFarmRace, enterFarmRace, leaveFarmRace, listFarmRaces, postFarmRace, settleFarmRace, startFarmRace } from "./db/farm-races.mjs";
 import { getFarmLivestockCards } from "./db/farm-livestock-transfer.mjs";
@@ -472,6 +472,7 @@ async function bootstrap(): Promise<void> {
     getFarmLivestockCards: (params: any) => getFarmLivestockCards(pool, params),
     buyFarmLivestock: (params: any) => buyFarmLivestock(pool, params),
     buyFarmHorse: (params: any) => buyFarmHorse(pool, params),
+    refreshFarmHorses: (params: any) => refreshFarmHorses(pool, params),
     // Windrush Downs (FARM_RIDING_PLAN.md). FARM_RACE_SECRET is shared with factory-network-server's race room; unset, races cannot be posted.
     submitFarmRidingRun: (params: any) => submitFarmRidingRun(pool, params),
     listFarmRaces: (params: any) => listFarmRaces(pool, params, Date.now(), process.env.FARM_RACE_SECRET ?? ""),

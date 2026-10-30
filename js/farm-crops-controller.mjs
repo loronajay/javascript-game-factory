@@ -112,6 +112,8 @@ export function createFarmCropsController(deps) {
                     return true;
                 }
                 action = harvestFarmCrop(layout.agriculture, plotId, cellId, now);
+                if (action.ok)
+                    deps.onLocalHarvest?.(state.quality);
             }
             else if (state.needsCare)
                 action = tendFarmCrop(layout.agriculture, plotId, cellId, now);

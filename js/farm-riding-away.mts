@@ -72,6 +72,7 @@ export type AwayRiding = Readonly<{
   halt: () => void;
   /** Take the horse's state from a race. */
   setState: (state: RideState) => void;
+  refreshProfile: () => void;
 }>;
 
 function distanceToRail(rail: FarmDecorRow, point: Readonly<{ x: number; z: number }>): number {
@@ -201,5 +202,6 @@ export function createAwayRiding(THREE: ThreeNamespace, scene: any, options: Awa
     seatFor: (mount) => (findAnimal(mount.speciesId)?.height ?? 1.65) * mount.size * SEAT_SHARE + mount.y - 0.1,
     halt: () => riding.halt(),
     setState: (state) => riding.setState(state),
+    refreshProfile: () => riding.refreshProfile(),
   });
 }

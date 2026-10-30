@@ -10,12 +10,14 @@ import { createArena } from "./arena.js?v=20260928-pet-online";
 import { matchStandings, sessionBanner, createSession, stepSession } from "./sim/session.js?v=20260928-pet-online";
 import { PONDSIDE_ONLINE, createOnlineBrawl } from "./online-brawl.js?v=20260928-pet-online";
 import { createPetPicker } from "../../pet-games/shared/ui/pet-picker.js";
+import { createPetGameAudio } from "../../pet-games/shared/audio.js";
 import { createOnlinePanel } from "../../pet-games/shared/ui/online-panel.js";
 import { createPetLobbyClient } from "../../pet-games/shared/online/lobby-client.js";
 import { CPU_LEVELS, cpuLevelIndex, normalizeCpuLevel } from "../../pet-games/shared/sim/levels.js";
 import { fetchCareer, fileResult, loadAccountGate, loadIdentity, newResultId, onlineResultId, recordLine } from "../../pet-games/shared/platform.js";
 
 const GAME_SLUG = "pondside-push";
+const sounds = createPetGameAudio();
 const TICK_SECONDS = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
 
@@ -47,6 +49,9 @@ function escapeHtml(value) {
 }
 
 function show(name) {
+  sounds.setMenuActive(name !== "match");
+  if (name === "result") sounds.play("finish");
+  sounds.reset();
   screen = name;
   for (const [key, panel] of Object.entries(panels)) panel.hidden = key !== name;
   const playing = name === "match";
@@ -284,6 +289,7 @@ function loop(timestamp) {
     renderScoreboard(session.match, names);
     roundBanner.textContent = sessionBanner(session) || roundCall(session, names);
     impact = Math.max(0, ...session.match.players.map((player) => player.impact));
+    sounds.observe({ countdown: session.countdown?.phase === "countdown" ? Math.ceil(session.countdown.remaining) : 0, impact, out: session.match.players.filter((player) => player.eliminated).length });
   }
   arena.render(timestamp, impact);
   requestAnimationFrame(loop);

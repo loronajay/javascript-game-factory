@@ -116,7 +116,7 @@ export const BREEDING_REFUSAL_WORDS: Readonly<Record<BreedingRefusal, string>> =
   not_grown: "Both must be past Youth.",
   hungry: "Both must be fed.",
   unhappy: `Both must be at least ${BREED_MIN_HAPPINESS}% happy.`,
-  resting: `Each pet rests ${BREED_REST_DAYS} farm days after breeding.`,
+  resting: `The mother rests ${BREED_REST_DAYS} farm days after breeding.`,
   farm_full: "The farm is full. Release a pet to make room for a young one.",
 });
 
@@ -125,7 +125,8 @@ const round = (value: number, places = 2): number => Number(value.toFixed(places
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 /** Farm minutes this pet still rests before it may breed again (0 = ready). */
-export function breedingRestMinutes(pet: Readonly<{ bredAt?: number }>, farmMinutes: number): number {
+export function breedingRestMinutes(pet: Readonly<{ bredAt?: number; profile?: Readonly<{ gender: string }> | null }>, farmMinutes: number): number {
+  if (pet.profile?.gender === "male") return 0;
   if (typeof pet.bredAt !== "number" || !Number.isFinite(pet.bredAt)) return 0;
   return Math.max(0, pet.bredAt + BREED_REST_MINUTES - farmMinutes);
 }

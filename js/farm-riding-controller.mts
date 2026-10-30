@@ -56,6 +56,7 @@ export type RidingController = Readonly<{
   halt: () => void;
   /** Take the horse's state from elsewhere (a race drives it while it runs). */
   setState: (state: RideState) => void;
+  refreshProfile: () => void;
 }>;
 
 /** The saddle sits this far behind the body's middle and this high up its withers, as shares of the horse. */
@@ -110,6 +111,11 @@ export function createRidingController(options: RidingOptions): RidingController
     state: () => ride,
     gait: () => (ride && profile ? rideGait(ride.speed, profile) : "idle"),
     profile: () => profile,
+    refreshProfile() {
+      if (!horseId || !ride) return;
+      profile = options.profile(horseId);
+      ride = Object.freeze({ ...ride, speed: Math.min(ride.speed, profile.gallopSpeed), stamina: Math.min(ride.stamina, profile.staminaMax) });
+    },
     mount(instanceId) {
       const horse = options.pets.find(instanceId);
       if (!horse || horseId) return false;

@@ -74,7 +74,7 @@ export async function submitFarmRidingRun(pool: any, input: any, now: number = D
     };
     const next = normalizeFarmGarage({
       ...farm.layout,
-      pets: farm.layout.pets.map((pet: any) => (pet.instanceId === horse.instanceId ? { ...pet, profile: { ...pet.profile, riding: trained.riding } } : pet)),
+      pets: farm.layout.pets.map((pet: any) => (pet.instanceId === horse.instanceId ? { ...pet, profile: { ...pet.profile, riding: { ...trained.riding, xp: Math.min(1e9, (Number(horse.profile.riding.xp) || 0) + xp) } } } : pet)),
       skills: { ...skills, riding },
     }, { ownedEntitlementIds: farm.owned });
     await saveFarm(client, playerId, next);

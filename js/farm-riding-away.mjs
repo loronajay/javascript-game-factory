@@ -158,5 +158,6 @@ export function createAwayRiding(THREE, scene, options) {
         seatFor: (mount) => (findAnimal(mount.speciesId)?.height ?? 1.65) * mount.size * SEAT_SHARE + mount.y - 0.1,
         halt: () => riding.halt(),
         setState: (state) => riding.setState(state),
+        refreshProfile: () => riding.refreshProfile(),
     });
 }

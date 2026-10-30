@@ -66,6 +66,9 @@ js/tests/*
 !js/tests/farm-page.test.mjs
 !js/tests/farm-model-geometry.test.mjs
 !js/tests/farm-sky.test.mjs
+!js/tests/farm-livestock-usability.test.mjs
+!js/tests/farm-progression-regressions.test.mjs
+!js/tests/farm-sound-effects.test.mjs
 
 # Keep the database regression that prevents narrow profile updates from
 # erasing canonical fields after an origin/domain change.

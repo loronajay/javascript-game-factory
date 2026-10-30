@@ -48,23 +48,23 @@ export function horseStockDay(now) {
     return Math.floor(now / HORSE_STOCK_DAY_MS);
 }
 /** The seed text of one of the day's horses. */
-export function horseStockSeed(day, slot) {
-    return `farm-horses:v1:${day}:${slot}`;
+export function horseStockSeed(day, slot, roll = 0) {
+    return `farm-horses:v1:${day}:${slot}${roll ? `:refresh:${roll}` : ""}`;
 }
 /** One of the day's horses, rolled from its seed. */
-export function horseStockLine(day, slot) {
-    const profile = createPetProfile(HORSE_SPECIES_ID, horseSeededRandom(horseSeedFor(horseStockSeed(day, slot))));
+export function horseStockLine(day, slot, roll = 0) {
+    const profile = createPetProfile(HORSE_SPECIES_ID, horseSeededRandom(horseSeedFor(horseStockSeed(day, slot, roll))));
     if (!profile)
         return null;
     const grade = profile.growth.grade;
     const rule = HORSE_GRADE_RULES[grade];
-    return Object.freeze({ day, slot, profile, stats: horseStats(profile), grade, price: rule.price, minRidingLevel: rule.minRidingLevel });
+    return Object.freeze({ day, slot, roll, profile, stats: horseStats(profile), grade, price: rule.price, minRidingLevel: rule.minRidingLevel });
 }
 /** The whole paddock for a day. */
-export function horseStock(day) {
+export function horseStock(day, roll = 0) {
     const lines = [];
     for (let slot = 0; slot < HORSE_STOCK_SIZE; slot += 1) {
-        const line = horseStockLine(day, slot);
+        const line = horseStockLine(day, slot, roll);
         if (line)
             lines.push(line);
     }

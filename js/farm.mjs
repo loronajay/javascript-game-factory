@@ -11,6 +11,8 @@
 // is the one seam both go through so the world, the sim, the obstacles, the
 // platforms and the store never disagree.
 import * as THREE_VENDOR from "./vendor/three.module.js";
+import { createFarmSoundEffects } from "./farm-sound-effects.mjs";
+import { applyOfflineAnimals } from "./farm-offline-animals.mjs";
 import { createLayoutStore } from "./arcade-room-store.mjs";
 import { forwardOf, lookWalker, obstacleBlocks } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
@@ -135,6 +137,8 @@ function say(text) {
     hud.toast(text, 5);
 }
 const farmMusic = createFarmMusic();
+const farmSounds = createFarmSoundEffects();
+window.addEventListener("pagehide", () => farmSounds.destroy(), { once: true });
 function renderMusicButton() {
     const muted = farmMusic.isMuted();
     musicButton.setAttribute("aria-pressed", String(muted));
@@ -173,11 +177,12 @@ const showFarmIntro = canManageFarm && layout.onboarding.status === "needs_name"
 let onboardingInitialization = null;
 const resumedClock = resumeFarmClock(layout.clock, Date.now());
 layout = withFarmClock(advancePetNeeds(layout, resumedClock.farmMinutes), resumedClock.farmMinutes, resumedClock.updatedAt);
-// Crops (only crops) caught up for the time the owner was away, at the offline
-// rate and cap. A farm whose owner has never stepped onto it has no checkpoint
+// Production and animals catch up at independently chosen rates. A farm whose
+// owner has never stepped onto it has no checkpoint
 // and so never moves. Visitors see the farm exactly as it was saved.
 let pendingAwayReport = null;
 if (canManageFarm && layout.clock.checkpointAt > 0) {
+    layout = applyOfflineAnimals(layout, layout.clock.checkpointAt, resumedClock.updatedAt);
     const caughtUp = applyOfflineProduction(layout.agriculture, offlineSpan(layout.clock.checkpointAt, resumedClock.updatedAt, layout.settings.awayGrowth), resumedClock.farmMinutes, layout.trees);
     layout = withProductionCheckpoint(withFarmTrees(withFarmAgriculture(layout, caughtUp.agriculture), caughtUp.trees), resumedClock.updatedAt);
     pendingAwayReport = caughtUp.report;
@@ -395,6 +400,7 @@ let putDownAt = null;
 function applyCamera() {
     if (riding.mounted()) {
         const eye = riding.eye(riderClock);
+        player.yaw = riding.state().heading;
         camera.position.set(eye.x, eye.y, eye.z);
         if (Math.abs(camera.fov - (65 + eye.fovKick)) > 0.05) {
             camera.fov = 65 + eye.fovKick;
@@ -701,6 +707,7 @@ async function submitServerHarvest(send) {
     const next = result?.layout ? normalizeFarmLayout(result.layout) : null;
     if (next)
         adoptServerFarm(next, sent.clock.farmMinutes);
+    farmSounds.result(result);
     return result;
 }
 /**
@@ -1065,7 +1072,7 @@ document.addEventListener("visibilitychange", () => {
     const caughtUp = applyOfflineProduction(progressed.agriculture, span, clockMinutes, progressed.trees);
     if (caughtUp.report)
         awayReport.show(caughtUp.report);
-    void persistLayout(withFarmTrees(withFarmAgriculture(progressed, caughtUp.agriculture), caughtUp.trees));
+    void persistLayout(applyOfflineAnimals(withFarmTrees(withFarmAgriculture(progressed, caughtUp.agriculture), caughtUp.trees), since, Date.now()));
 });
 document.addEventListener("pointerlockchange", () => {
     const locked = document.pointerLockElement === canvas;
@@ -1078,6 +1085,8 @@ canvas.addEventListener("pointerdown", () => { draggingLook = !farmEditor.isEdit
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
     if (hud.anyOpen() || stationBusy() || farmEditor.isEditing())
+        return;
+    if (riding.mounted())
         return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;
@@ -1231,11 +1240,13 @@ const petsPanel = createPetsPanel({
         if (Number.isSafeInteger(result.balance))
             publishTicketBalance(result.balance);
         const young = next.pets.at(-1);
+        if (!result.duplicate)
+            farmSounds.play("breed-complete");
         const title = (id) => (id && findPetTrait(id)?.title) || "";
         const passed = [title(result.inherited?.fromMother), title(result.inherited?.fromFather), ...(result.inherited?.extra ?? []).map(title)].filter(Boolean);
         return `${young?.name ?? "A young one"} was born${passed.length ? `, inheriting ${passed.join(", ")}` : ""}. Rename it in its row. ${Number(result.balance).toLocaleString()} tickets remain.`;
     },
-}, { thumbnail: speciesThumbnails.get, farmMinutes: () => clockMinutes });
+}, { thumbnail: speciesThumbnails.get, farmMinutes: () => clockMinutes + layout.clock.animalMinutes });
 petsPanel.render(layout);
 if (visiting)
     openPetsButton.hidden = true;
@@ -1281,6 +1292,7 @@ const livestockPanel = createLivestockPanel({
     rename: (animalId, name) => livestock.rename(animalId, name),
     breed: (motherId, sireId) => livestock.breed(motherId, sireId),
     feed: (animalId) => livestock.feedAnimal(animalId),
+    collect: (animalId, itemId) => livestock.collectAnimal(animalId, itemId),
     feedHerd: () => livestock.feedHerd(),
     buyFeed: async (itemId, quantity) => {
         if (!layoutStore.accountBacked)
@@ -1299,7 +1311,7 @@ const livestock = createFarmLivestockController({
     ownerId: layoutStore.ownerPlayerId,
     canManage: canManageFarm && layoutStore.accountBacked,
     layout: () => layout,
-    clockMinutes: () => clockMinutes,
+    clockMinutes: () => clockMinutes + layout.clock.animalMinutes,
     obstacles: () => obstaclesForSpan(obstacles, 0.05, 1.2),
     keepOut: () => keepOutBoxes(layout),
     water: () => waterRegions(layout),
@@ -1356,6 +1368,14 @@ const awaySettings = createFarmAwaySettings({
 });
 awaySettings.render(layout.settings.awayGrowth);
 awaySettingsRoot.hidden = visiting;
+const awayAnimalSettingsRoot = requiredElement("#awayAnimalSettings");
+const awayAnimalSettings = createFarmAwaySettings({
+    root: awayAnimalSettingsRoot,
+    animals: true,
+    onChange: async (rate) => persistLayout({ ...progressedLayout(), settings: { ...layout.settings, awayAnimals: rate } }),
+});
+awayAnimalSettings.render(layout.settings.awayAnimals);
+awayAnimalSettingsRoot.hidden = visiting;
 if (visiting)
     openStatsButton.hidden = true;
 if (!visiting) {
@@ -1374,6 +1394,8 @@ const crops = createFarmCropsController({
     submitHarvest: serverHarvests ? (plotId, cellId) => submitServerHarvest((sent) => ticketClient.harvestFarmCrop(sent, plotId, cellId)) : null,
     setStatus: say,
     onAchievements: (achievements) => achievementToaster.show("farm", "The Farm", achievements),
+    onLocalHarvest: (quality) => { if (quality === "perfect")
+        farmSounds.play("perfect-harvest"); },
 });
 const trees = createFarmTreesController({
     view: treesView,

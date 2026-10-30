@@ -61,6 +61,12 @@ export function createRidingController(options) {
         state: () => ride,
         gait: () => (ride && profile ? rideGait(ride.speed, profile) : "idle"),
         profile: () => profile,
+        refreshProfile() {
+            if (!horseId || !ride)
+                return;
+            profile = options.profile(horseId);
+            ride = Object.freeze({ ...ride, speed: Math.min(ride.speed, profile.gallopSpeed), stamina: Math.min(ride.stamina, profile.staminaMax) });
+        },
         mount(instanceId) {
             const horse = options.pets.find(instanceId);
             if (!horse || horseId)

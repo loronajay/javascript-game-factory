@@ -27,6 +27,7 @@
 // A pregnancy ends with her: if she dies or goes to the Butcher, so does it.
 import { LIVESTOCK_STATS, STAT_MAX, STAT_MIN, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { DAY_MINUTES } from "./farm-time.mjs";
+import { freeYoungPlaces } from "./farm-livestock-space.mjs";
 import { HUNGRY_AT, HUSBANDRY_XP_PER_CYCLE_DAY, adultAgeDays, gestationMinutes } from "./farm-livestock-care.mjs";
 export const BREEDING_MIN_LEVEL = 3;
 /** Farm days a mother rests after a birth before she can be paired again. */
@@ -52,18 +53,11 @@ export const BREEDING_REFUSAL_WORDS = Object.freeze({
 /**
  * Places a young one could be born into: empty slots in standing homes (those
  * that take `speciesId`, when given — a calf is never born into the coop), less
- * those other mothers' young are owed. Every owed young one is counted against
- * every species, so the answer may be short, never long.
+ * those other mothers' young are owed, reserved in compatible homes. Chickens
+ * share pen space; their coop reservations do not consume a calf's barn place.
  */
 export function freePlacesForYoung(homes, herd, speciesId) {
-    const counts = new Map(homes.map((home) => [home.id, 0]));
-    for (const animal of herd)
-        if (animal.homeId && counts.has(animal.homeId))
-            counts.set(animal.homeId, counts.get(animal.homeId) + 1);
-    const takes = (home) => speciesId === undefined || !home.species || home.species.includes(speciesId);
-    const empty = homes.filter(takes).reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
-    const owed = herd.filter((animal) => Boolean(animal.care?.pregnancy)).length;
-    return Math.max(0, empty - owed);
+    return freeYoungPlaces(homes, herd.map((animal) => ({ ...animal, pregnant: Boolean(animal.care?.pregnancy) })), speciesId);
 }
 function grown(animal, species, clock) {
     return (clock - animal.bornAt) / DAY_MINUTES >= adultAgeDays(species, animal.stats);

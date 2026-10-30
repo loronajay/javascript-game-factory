@@ -2,10 +2,9 @@
 // Pure — no clock, DOM or THREE — so the page, tests and a later server check
 // all read one rule.
 //
-// This is deliberately NOT the farm clock. The clock stays paused while the
-// player is away (see resumeFarmClock), so pets never go hungry, age or die off
-// screen. Only production moves — crops and the productive trees — at a
-// fraction of active speed and for a capped span. Both drink, so both can go
+// This is deliberately NOT the farm clock. Crops and productive trees have
+// their own capped away rate; animals progress separately in farm-offline-animals.mts
+// under settings.awayAnimals. Both crops and trees drink, so both can go
 // thirsty and wilt while away, and neither can die of it.
 //
 // A farm never progresses until its owner has stepped onto it at least once:

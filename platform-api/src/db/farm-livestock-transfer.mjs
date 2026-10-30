@@ -25,7 +25,7 @@ export const LIVESTOCK_ANIMAL_ID = /^stock-[A-Za-z0-9-]{8,64}$/;
 const COLUMNS = `animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, state`;
 /** A farm's clock as saved: the minute its animals are carried to when they leave or arrive. */
 export function storedFarmClock(layout) {
-    return Math.max(0, Number(layout?.clock?.farmMinutes) || 0);
+    return Math.max(0, Number(layout?.clock?.farmMinutes) || 0) + Math.max(0, Number(layout?.clock?.animalMinutes) || 0);
 }
 function husbandryLevel(layout) {
     return farmingLevelForXp(normalizeHusbandryRecord(layout?.skills?.husbandry).xp);
@@ -97,7 +97,7 @@ export async function planLivestockTrade(client, a, b, fromA, fromB) {
         const staying = herds.get(farm.playerId).filter((row) => !sides[receiver].out.includes(row.animal_id));
         const placed = placeArrivingLivestock({
             homes: farmHerdHomes(farm.layout),
-            herdHomes: staying.map((row) => (row.home_id ? String(row.home_id) : null)),
+            herdHomes: staying.map((row) => ({ homeId: row.home_id ? String(row.home_id) : null, speciesId: String(row.species_id) })),
             level: husbandryLevel(farm.layout),
             arriving: arriving.map((entry) => ({ speciesId: String(entry.row.species_id) })),
         });
@@ -160,7 +160,7 @@ export async function planListedLanding(client, animalId, owner, strict) {
     const row = await lockedListedAnimal(client, animalId);
     if (!row)
         return { ok: false, error: "not_found" };
-    const herdHomes = herd.map((entry) => (entry.home_id ? String(entry.home_id) : null));
+    const herdHomes = herd.map((entry) => ({ homeId: entry.home_id ? String(entry.home_id) : null, speciesId: String(entry.species_id) }));
     const homes = farmHerdHomes(owner.layout);
     let homeId;
     if (strict) {

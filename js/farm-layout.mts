@@ -32,6 +32,7 @@ import { createPetProfile, normalizePetProfile, type PetProfile } from "./farm-p
 import { normalizePetLineage, type PetLineage } from "./farm-pet-breeding.mjs";
 import type { RoomBounds } from "./arcade-room-layout.mjs";
 import type { LayoutDocumentSpec } from "./arcade-room-store.mjs";
+import { MAX_HORSES, companionCount, horseCount } from "./farm-resident-capacity.mjs";
 
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
 export const FARM_LAYOUT_VERSION = 3;
@@ -41,7 +42,7 @@ export const FARM_BOUNDS: RoomBounds = Object.freeze({ width: 28, depth: 28, wal
 
 export const MAX_PETS = 12;
 export const MAX_DECOR = 120;
-const MAX_PERSISTED_DECOR = MAX_DECOR + MAX_PETS; // terminal outcomes may add one unique memorial per resident to a full field
+const MAX_PERSISTED_DECOR = MAX_DECOR + MAX_PETS + MAX_HORSES;
 export const PET_NAME_MAX_LENGTH = 20;
 
 export type FarmPet = Readonly<{
@@ -107,7 +108,7 @@ export type FarmLayout = Readonly<{
    * was last on the farm. 0 until they first step onto it — a farm never
    * progresses before that (see farm-offline.mts).
    */
-  clock: Readonly<{ farmMinutes: number; updatedAt: number; checkpointAt: number; napBank: number }>;
+  clock: Readonly<{ farmMinutes: number; updatedAt: number; checkpointAt: number; napBank: number; animalMinutes: number }>;
   /**
    * The Farming and Woodcutting records (farm-skills.mts). Server-owned: only a
    * server harvest, pick, felling or filled order changes them and a save
@@ -122,14 +123,15 @@ export type FarmLayout = Readonly<{
    * when never set.
    */
   settings: FarmSettings;
+  horseStockRefreshedAt?: number;
 }>;
 
-export type FarmSettings = Readonly<{ awayGrowth: number }>;
-export const DEFAULT_FARM_SETTINGS: FarmSettings = Object.freeze({ awayGrowth: OFFLINE_PRODUCTION_RATE });
+export type FarmSettings = Readonly<{ awayGrowth: number; awayAnimals: number }>;
+export const DEFAULT_FARM_SETTINGS: FarmSettings = Object.freeze({ awayGrowth: OFFLINE_PRODUCTION_RATE, awayAnimals: 0 });
 
 export function normalizeFarmSettings(value: unknown): FarmSettings {
-  const source = value && typeof value === "object" ? value as { awayGrowth?: unknown } : {};
-  return Object.freeze({ awayGrowth: clampOfflineRate(source.awayGrowth) });
+  const source = value && typeof value === "object" ? value as { awayGrowth?: unknown; awayAnimals?: unknown } : {};
+  return Object.freeze({ awayGrowth: clampOfflineRate(source.awayGrowth), awayAnimals: clampOfflineRate(typeof source.awayAnimals === "number" ? source.awayAnimals : 0) });
 }
 
 export type FarmPetResult = Readonly<{ valid: boolean; layout: FarmLayout; instanceId: string; reason: string }>;
@@ -271,7 +273,7 @@ export function createDefaultFarmLayout(random: () => number = Math.random): Far
     decor: STARTER_FARM_DECOR,
     agriculture: createStarterAgriculture(random),
     trees: Object.freeze([]),
-    clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES }),
+    clock: Object.freeze({ farmMinutes: 8 * 60, updatedAt: 0, checkpointAt: 0, napBank: NAP_BANK_CAPACITY_MINUTES, animalMinutes: 0 }),
     skills: EMPTY_FARM_SKILLS,
     settings: DEFAULT_FARM_SETTINGS,
   });
@@ -406,7 +408,7 @@ export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }
 
 export function normalizeFarmLayout(value: unknown): FarmLayout {
   if (!value || typeof value !== "object") return createDefaultFarmLayout();
-  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown };
+  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown; horseStockRefreshedAt?: unknown };
   if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
   const seen = new Set<string>();
   // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
@@ -435,7 +437,7 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     if (findAnimal(pet.speciesId)?.habitat === "water" && !habitats.water) continue;
     petIds.add(pet.instanceId);
     pets.push(pet);
-    if (pets.length >= MAX_PETS) break;
+    if (pets.length >= MAX_PETS + MAX_HORSES) break;
   }
   const petHistory: PetMemorial[] = [];
   const historyIds = new Set<string>();
@@ -469,16 +471,17 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
   const agriculture = onboarding.status === "needs_name" && seedRows.length === 0
     ? createStarterAgriculture()
     : source.version === 3 ? normalizeAgriculture(source.agriculture, plotIds) : normalizeAgriculture(undefined, plotIds);
-  const rawClock = source.clock && typeof source.clock === "object" ? source.clock as { farmMinutes?: unknown; updatedAt?: unknown; checkpointAt?: unknown; napBank?: unknown } : {};
+  const rawClock = source.clock && typeof source.clock === "object" ? source.clock as { farmMinutes?: unknown; updatedAt?: unknown; checkpointAt?: unknown; napBank?: unknown; animalMinutes?: unknown } : {};
   const clock = {
     farmMinutes: finiteNumber(rawClock.farmMinutes) ? Math.max(0, rawClock.farmMinutes) : 8 * 60,
     updatedAt: finiteNumber(rawClock.updatedAt) ? Math.max(0, rawClock.updatedAt) : 0,
     checkpointAt: finiteNumber(rawClock.checkpointAt) ? Math.max(0, rawClock.checkpointAt) : 0,
+    animalMinutes: finiteNumber(rawClock.animalMinutes) ? Math.max(0, rawClock.animalMinutes) : 0,
     // Nap minutes available as of `updatedAt` (farm-nap-bank.mts). Absent = full.
     napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
   };
   const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-  return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings) });
+  return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
 }
 
 export function parseFarmLayout(serialized: string | null): FarmLayout {
@@ -509,7 +512,7 @@ export function addPet(layout: FarmLayout, speciesId: string, name: string, rand
   const species = findAnimal(speciesId);
   if (!species) return { valid: false, layout, instanceId: "", reason: "unknown_species" };
   if (species.habitat === "water" && !farmHabitats(layout).water) return { valid: false, layout, instanceId: "", reason: "needs_water" };
-  if (layout.pets.length >= MAX_PETS) return { valid: false, layout, instanceId: "", reason: "full" };
+  if (speciesId === "pet.horse" ? horseCount(layout.pets) >= MAX_HORSES : companionCount(layout.pets) >= MAX_PETS) return { valid: false, layout, instanceId: "", reason: "full" };
   const instanceId = nextPetInstanceId(layout, species.id);
   const pet: FarmPet = { instanceId, speciesId: species.id, name: cleanPetName(name) || species.title, profile: createPetProfile(species.id, random) };
   return { valid: true, layout: freezeLayout({ ...layout, pets: [...layout.pets, pet] }), instanceId, reason: "" };
@@ -613,7 +616,10 @@ export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean
     && first.clock.updatedAt === second.clock.updatedAt
     && first.clock.checkpointAt === second.clock.checkpointAt
     && first.clock.napBank === second.clock.napBank
+    && first.clock.animalMinutes === second.clock.animalMinutes
     && first.settings.awayGrowth === second.settings.awayGrowth
+    && first.settings.awayAnimals === second.settings.awayAnimals
+    && first.horseStockRefreshedAt === second.horseStockRefreshedAt
     && JSON.stringify(first.skills) === JSON.stringify(second.skills)
     && first.pets.length === second.pets.length
     && first.pets.every((pet, index) => {

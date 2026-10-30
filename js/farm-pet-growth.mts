@@ -57,8 +57,8 @@ export const GROWTH_GRADE_WEIGHTS: Readonly<Record<PetPaletteTier, readonly numb
 
 /** Life-stage boundaries as fractions of the species lifespan, with their growth weight. */
 export const GROWTH_STAGES = Object.freeze([
-  Object.freeze({ id: "youth", title: "Youth", until: 0.4, weight: 1.2 }),
-  Object.freeze({ id: "adult", title: "Adult", until: 0.75, weight: 0.8 }),
+  Object.freeze({ id: "youth", title: "Youth", until: 0.15, weight: 1.2 }),
+  Object.freeze({ id: "adult", title: "Adult", until: 0.9, weight: 0.8 }),
   Object.freeze({ id: "elder", title: "Elder", until: Infinity, weight: 0 }),
 ]);
 export const FAST_GROWER_YOUTH_BONUS = 1.25;

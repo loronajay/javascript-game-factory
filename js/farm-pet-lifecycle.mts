@@ -21,7 +21,10 @@ export function advancePetLifecycle(profile: PetProfile, speciesId: string, elap
   const livingDays = Math.min(elapsedDays, maxLifeDays - profile.ageDays);
   const growthMultiplier = profile.traits.includes("growth.fast") ? FAST_GROWTH_MULTIPLIER : 1;
   const ageDays = tidy(profile.ageDays + livingDays);
-  const current = tidy(Math.min(profile.size.max, profile.size.current + profile.size.growthPerDay * growthMultiplier * livingDays));
+  // Legacy pets also reach their full size by adulthood; their old 70-day size rate must not keep them tiny for most of life.
+  const maturity = Math.min(1, ageDays * growthMultiplier / (care.maxLifeDays * 0.15));
+  const ageSize = care.size.min + (profile.size.max - care.size.min) * maturity;
+  const current = tidy(Math.min(profile.size.max, Math.max(ageSize, profile.size.current + profile.size.growthPerDay * growthMultiplier * livingDays)));
   if (ageDays === profile.ageDays && current === profile.size.current) return profile;
   return Object.freeze({
     ...profile,

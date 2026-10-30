@@ -122,7 +122,7 @@ export const LIVESTOCK_CATALOG = Object.freeze([
         ],
         price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
         products: [
-            { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1, dayValue: 14 },
+            { itemId: "milk-sheep", title: "Sheep's Milk", everyDays: 1, dayValue: 14, onlyFrom: "female" },
             { itemId: "wool", title: "Wool", everyDays: 3, dayValue: 12 },
         ],
         meat: { itemId: "mutton", title: "Mutton", cuts: 4 },
@@ -156,7 +156,7 @@ export const LIVESTOCK_CATALOG = Object.freeze([
             { id: "highland", title: "Highland", weight: 5, colors: { White: "#b8672f", Black: "#7a3d17" } },
         ],
         price: 750, minLevel: 10, adultDays: 3, gestationDays: 3,
-        products: [{ itemId: "milk", title: "Milk", everyDays: 1, dayValue: 28 }],
+        products: [{ itemId: "milk", title: "Milk", everyDays: 1, dayValue: 28, onlyFrom: "female" }],
         meat: { itemId: "beef", title: "Beef", cuts: 8 },
         feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
         stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },

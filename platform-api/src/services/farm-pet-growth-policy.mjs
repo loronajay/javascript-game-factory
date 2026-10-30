@@ -20,7 +20,7 @@ const GRADES = Object.freeze([
 export const GRADE_WEIGHTS = Object.freeze({
     classic: [72, 21, 6, 1], uncommon: [64, 26, 8, 2], rare: [45, 33, 17, 5], "super-rare": [25, 35, 28, 12],
 });
-const STAGES = Object.freeze([{ id: "youth", until: 0.4, weight: 1.2 }, { id: "adult", until: 0.75, weight: 0.8 }, { id: "elder", until: Infinity, weight: 0 }]);
+const STAGES = Object.freeze([{ id: "youth", until: 0.15, weight: 1.2 }, { id: "adult", until: 0.9, weight: 0.8 }, { id: "elder", until: Infinity, weight: 0 }]);
 const FAST_GROWER_YOUTH_BONUS = 1.25;
 const GROWTH_BUDGET_SHARE = 0.9;
 const RATE_JITTER = Object.freeze({ min: 0.85, max: 1.15 });

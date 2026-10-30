@@ -14,6 +14,7 @@
 import { readJsonBody, writeJson } from "../http-utils.mjs";
 const POSTS = Object.freeze({
     "/games/farm/horses/purchases": "buyFarmHorse",
+    "/games/farm/horses/refresh": "refreshFarmHorses",
     "/games/farm/riding/runs": "submitFarmRidingRun",
     "/games/farm/downs/races": "postFarmRace",
 });
@@ -23,6 +24,7 @@ const RACE_SERVICES = Object.freeze({
 });
 // A refusal about the state of the farm, the race or the day rather than a malformed request.
 const CONFLICTS = new Set([
+    "refresh_cooldown", "horse_capacity_full",
     "farm_not_initialized", "already_bought", "farm_full", "level_too_low", "no_stall", "insufficient_tickets", "stock_changed",
     "no_horse", "replay_mismatch", "daily_run_limit",
     "races_unavailable", "too_many_races", "already_racing", "daily_spend_limit", "gate_closed", "race_full", "backed_this_race",

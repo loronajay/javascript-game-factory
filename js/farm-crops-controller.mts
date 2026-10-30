@@ -29,6 +29,7 @@ export type CropsControllerDeps = Readonly<{
   submitHarvest: ((plotId: string, cellId: SoilCellTarget["cellId"]) => Promise<any>) | null;
   setStatus: (text: string) => void;
   onAchievements: (achievements: readonly unknown[]) => void;
+  onLocalHarvest?: (quality: Quality) => void;
 }>;
 
 export type FarmCropsController = Readonly<{
@@ -124,6 +125,7 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
           return true;
         }
         action = harvestFarmCrop(layout.agriculture, plotId, cellId, now);
+        if (action.ok) deps.onLocalHarvest?.(state.quality);
       }
       else if (state.needsCare) action = tendFarmCrop(layout.agriculture, plotId, cellId, now);
       else if (state.thirsty) action = waterFarmCrop(layout.agriculture, plotId, cellId, now);

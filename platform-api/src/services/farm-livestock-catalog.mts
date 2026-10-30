@@ -12,6 +12,7 @@
 // page's (`js/farm-livestock-housing.mts`): `<instanceId>#stall-N`,
 // `<instanceId>#floor`, `<instanceId>#pen`, `<instanceId>#coop`.
 
+import { livestockSpace, occupiedSpace, freeYoungPlaces, type SpaceResident } from "./farm-livestock-space.mjs";
 export const LIVESTOCK_STATS = Object.freeze(["yield", "quality", "growth", "hardiness"] as const);
 export type LivestockStat = typeof LIVESTOCK_STATS[number];
 export type LivestockStats = Record<LivestockStat, number>;
@@ -75,7 +76,7 @@ export const FARM_LIVESTOCK_RULES: readonly LivestockRule[] = Object.freeze([
   }),
   rule("sheep", {
     title: "Sheep", price: 350, minLevel: 1, adultDays: 2, gestationDays: 2,
-    products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14 }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
+    products: [{ itemId: "milk-sheep", everyDays: 1, dayValue: 14, onlyFrom: "female" }, { itemId: "wool", everyDays: 3, dayValue: 12 }],
     meat: { itemId: "mutton", cuts: 4 },
     feeds: { supply: "food.hay", crops: ["cabbage", "carrot", "radish", "beetroot"] },
     stats: { yield: range(15, 60), quality: range(15, 60), growth: range(25, 70), hardiness: range(30, 75) },
@@ -93,7 +94,7 @@ export const FARM_LIVESTOCK_RULES: readonly LivestockRule[] = Object.freeze([
   }),
   rule("cow", {
     title: "Cow", price: 750, minLevel: 10, adultDays: 3, gestationDays: 3,
-    products: [{ itemId: "milk", everyDays: 1, dayValue: 28 }],
+    products: [{ itemId: "milk", everyDays: 1, dayValue: 28, onlyFrom: "female" }],
     meat: { itemId: "beef", cuts: 8 },
     feeds: { supply: "food.hay", crops: ["corn", "cabbage", "pumpkin"] },
     stats: { yield: range(15, 60), quality: range(15, 60), growth: range(20, 65), hardiness: range(35, 80) },
@@ -216,10 +217,9 @@ export function farmHerdHomes(layout: any): FarmLivestockHome[] {
  * and takes that species; null when the farm is full for it. `herdHomes` are
  * the homes the live herd names.
  */
-export function pickFarmLivestockHome(homes: readonly FarmLivestockHome[], herdHomes: readonly (string | null)[], wanted: unknown, speciesId: unknown): FarmLivestockHome | null {
-  const counts = new Map<string, number>();
-  for (const id of herdHomes) if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
-  const hasRoom = (entry: FarmLivestockHome): boolean => (counts.get(entry.id) ?? 0) < entry.slots && farmHomeTakes(entry, speciesId);
+export function pickFarmLivestockHome(homes: readonly FarmLivestockHome[], herdHomes: readonly (string | null | SpaceResident)[], wanted: unknown, speciesId: unknown): FarmLivestockHome | null {
+  const counts = occupiedSpace(homes, herdHomes.map((entry) => typeof entry === "object" && entry ? entry : { homeId: entry }));
+  const hasRoom = (entry: FarmLivestockHome): boolean => (counts.get(entry.id) ?? 0) + livestockSpace(entry.id, typeof speciesId === "string" ? speciesId : undefined) <= entry.slots && farmHomeTakes(entry, speciesId);
   if (typeof wanted === "string" && wanted) {
     const chosen = homes.find((entry) => entry.id === wanted);
     return chosen && hasRoom(chosen) ? chosen : null;
@@ -485,11 +485,8 @@ export type BreedingRefusal =
   | "not_together" | "pregnant" | "resting" | "hungry" | "no_room";
 
 /** Empty slots in standing homes that take `speciesId` (every home, without one), less the places other mothers' young are owed. */
-export function freePlacesForYoung(homes: readonly FarmLivestockHome[], herd: readonly { homeId: string | null; pregnant: boolean }[], speciesId?: string): number {
-  const counts = new Map<string, number>(homes.map((home) => [home.id, 0]));
-  for (const animal of herd) if (animal.homeId && counts.has(animal.homeId)) counts.set(animal.homeId, counts.get(animal.homeId)! + 1);
-  const empty = homes.filter((home) => speciesId === undefined || farmHomeTakes(home, speciesId)).reduce((sum, home) => sum + Math.max(0, home.slots - (counts.get(home.id) ?? 0)), 0);
-  return Math.max(0, empty - herd.filter((animal) => animal.pregnant).length);
+export function freePlacesForYoung(homes: readonly FarmLivestockHome[], herd: readonly (SpaceResident & { pregnant: boolean })[], speciesId?: string): number {
+  return freeYoungPlaces(homes, herd, speciesId);
 }
 
 /** Why this pair cannot be bred now, or null — the page's `breedingRefusal`, reason for reason, in the same order. */
@@ -586,7 +583,7 @@ export type LivestockArrivalRefusal = "husbandry_too_low" | "herd_full" | "no_ro
  */
 export function placeArrivingLivestock(input: Readonly<{
   homes: readonly FarmLivestockHome[];
-  herdHomes: readonly (string | null)[];
+  herdHomes: readonly (string | null | SpaceResident)[];
   level: number;
   arriving: readonly Readonly<{ speciesId: string }>[];
 }>): { ok: true; homeIds: string[] } | { ok: false; error: LivestockArrivalRefusal; speciesId: string } {
@@ -599,7 +596,7 @@ export function placeArrivingLivestock(input: Readonly<{
     if (input.level < rule.minLevel) return { ok: false, error: "husbandry_too_low", speciesId: rule.id };
     const home = pickFarmLivestockHome(input.homes, occupied, undefined, rule.id);
     if (!home) return { ok: false, error: "no_room", speciesId: rule.id };
-    occupied.push(home.id);
+    occupied.push({ homeId: home.id, speciesId: animal.speciesId });
     homeIds.push(home.id);
   }
   return { ok: true, homeIds };

@@ -30,7 +30,7 @@ const STRONG_LINE_SHARE = 0.25;
 const STRONG_LINE_BONUS = 0.1;
 const SIZE = Object.freeze({ min: 0.62, adultMin: 0.9, max: 1.12 });
 const SIZE_TRAIT_BAND = 0.3;
-const YOUTH_UNTIL = 0.4;
+const YOUTH_UNTIL = 0.15;
 /** The constants the parity test compares with the client's. */
 export const FARM_BREEDING_TUNING = Object.freeze({
     price: FARM_BREEDING_PRICE, restMinutes: FARM_BREED_REST_MINUTES, minHunger: BREED_MIN_HUNGER, minHappiness: BREED_MIN_HAPPINESS,
@@ -59,7 +59,7 @@ function parentRefusal(pet, farmMinutes) {
     if ((finite(profile.happiness) ?? 0) < BREED_MIN_HAPPINESS)
         return "unhappy";
     const bredAt = finite(pet.bredAt);
-    if (bredAt !== null && bredAt + FARM_BREED_REST_MINUTES > farmMinutes)
+    if (profile.gender !== "male" && bredAt !== null && bredAt + FARM_BREED_REST_MINUTES > farmMinutes)
         return "resting";
     return null;
 }

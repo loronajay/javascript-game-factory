@@ -134,8 +134,8 @@ test("a missing row is the empty v3 farm with a persisted clock and agriculture 
     pets: [],
     agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] },
     trees: [],
-    clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440 },
-    settings: { awayGrowth: 0.1 },
+    clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440, animalMinutes: 0 },
+    settings: { awayGrowth: 0.1, awayAnimals: 0 },
     skills: {
       farming: { xp: 0, harvests: 0, orders: 0, crops: {}, fruit: {} },
       woodcutting: { xp: 0, fellings: 0, trees: {} },
@@ -212,7 +212,7 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
     stressMinutes: 0,
     fertilized: false,
   }]);
-  assert.deepEqual(garage.clock, { farmMinutes: 612.5, updatedAt: 1_800_000_000_000, checkpointAt: 1_799_999_000_000, napBank: 1440 });
+  assert.deepEqual(garage.clock, { farmMinutes: 612.5, updatedAt: 1_800_000_000_000, checkpointAt: 1_799_999_000_000, napBank: 1440, animalMinutes: 0 });
 });
 
 test("a valid farm round-trips", () => {

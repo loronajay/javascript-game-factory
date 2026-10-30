@@ -156,7 +156,7 @@ export async function buyFarmLivestock(pool: any, input: any, random: () => numb
     if (herd.length >= MAX_HERD) return { ok: false, error: "herd_full" };
     const level = farmingLevelForXp(normalizeHusbandryRecord(farm.layout.skills?.husbandry).xp);
     if (level < species.minLevel) return { ok: false, error: "level_too_low", minLevel: species.minLevel, level };
-    const home = pickFarmLivestockHome(farmHerdHomes(farm.layout), herd.map((row) => row.home_id ?? null), input?.homeId, species.id);
+    const home = pickFarmLivestockHome(farmHerdHomes(farm.layout), herd.map((row) => ({ homeId: row.home_id ?? null, speciesId: row.species_id })), input?.homeId, species.id);
     if (!home) return { ok: false, error: input?.homeId ? "home_full" : "no_room" };
     const spend = await spendTicketsInTransaction(client, {
       playerId, transactionKey, amount: species.price, reason: "farm_livestock_purchase",
@@ -171,10 +171,10 @@ export async function buyFarmLivestock(pool: any, input: any, random: () => numb
       gender: rolled.gender,
       coat_id: rolled.coatId,
       stats: rolled.stats,
-      born_minute: Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0),
+      born_minute: (Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0) + Math.max(0, Number(farm.layout.clock?.animalMinutes) || 0)),
       home_id: home.id,
       // The Dealer's young arrive fed.
-      care: newLivestockCare(Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0)),
+      care: newLivestockCare((Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0) + Math.max(0, Number(farm.layout.clock?.animalMinutes) || 0))),
     };
     await client.query(
       `insert into farm_livestock (animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin)
@@ -202,7 +202,7 @@ export async function moveFarmLivestock(pool: any, input: any) {
     if (wanted !== null) {
       const homes = farmHerdHomes(farm.layout);
       if (!homes.some((entry) => entry.id === wanted)) return { ok: false, error: "unknown_home" };
-      const others = herd.filter((row) => row.animal_id !== animalId).map((row) => row.home_id ?? null);
+      const others = herd.filter((row) => row.animal_id !== animalId).map((row) => ({ homeId: row.home_id ?? null, speciesId: row.species_id }));
       if (!pickFarmLivestockHome(homes, others, wanted, animal.species_id)) return { ok: false, error: "home_full" };
     }
     await client.query(`update farm_livestock set home_id = $3, updated_at = now() where player_id = $1 and animal_id = $2`, [playerId, animalId, wanted]);
@@ -321,7 +321,7 @@ async function deliverYoung(client: any, playerId: string, layout: any, living: 
     if (!pregnancy || pregnancy.dueAt === null || living.length >= MAX_HERD) continue;
     const rule = farmLivestockRule(mother.species_id);
     if (!rule) continue;
-    const occupied = living.map((row) => row.home_id ?? null);
+    const occupied = living.map((row) => ({ homeId: row.home_id ?? null, speciesId: row.species_id }));
     const home = pickFarmLivestockHome(homes, occupied, mother.home_id ?? undefined, rule.id) ?? pickFarmLivestockHome(homes, occupied, undefined, rule.id);
     if (!home) continue;
     const bornAt = Math.min(clock, Math.max(pregnancy.dueAt, Number(mother.lastSettledAt) || 0));
@@ -381,7 +381,7 @@ export async function careFarmLivestock(pool: any, input: any, now: number = Dat
   return transaction(pool, async (client) => {
     const farm = await verifiedSubmittedFarm(client, playerId, input.layout, now);
     if (!farm) return { ok: false, error: "farm_not_initialized" };
-    const clock = Math.max(0, Number(farm.verified.clock?.farmMinutes) || 0);
+    const clock = (Math.max(0, Number(farm.verified.clock?.farmMinutes) || 0) + Math.max(0, Number(farm.verified.clock?.animalMinutes) || 0));
     const rows = await liveHerd(client, playerId, true);
     const settled = await settleHerd(client, playerId, farm.verified, rows, clock, random);
     let layout = settled.layout;
@@ -402,7 +402,7 @@ export async function careFarmLivestock(pool: any, input: any, now: number = Dat
       const level = farmingLevelForXp(normalizeHusbandryRecord(layout.skills?.husbandry).xp);
       const freePlaces = freePlacesForYoung(
         farmHerdHomes(layout),
-        settled.living.map((entry) => ({ homeId: entry.home_id ?? null, pregnant: Boolean(entry.care?.pregnancy) })),
+        settled.living.map((entry) => ({ homeId: entry.home_id ?? null, speciesId: entry.species_id, pregnant: Boolean(entry.care?.pregnancy) })),
         String(mother.species_id),
       );
       const refusal = breedingRefusal(breedingSubject(mother), breedingSubject(sire), { clock, level, freePlaces });
@@ -493,7 +493,7 @@ export async function butcherFarmLivestock(pool: any, input: any, random: () => 
   return transaction(pool, async (client) => {
     const farm = await lockedFarm(client, playerId);
     if (!farm || farm.layout.onboarding?.status !== "complete") return { ok: false, error: "farm_not_initialized" };
-    const clock = Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0);
+    const clock = (Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0) + Math.max(0, Number(farm.layout.clock?.animalMinutes) || 0));
     const settled = await settleHerd(client, playerId, farm.layout, await liveHerd(client, playerId, true), clock, random);
     let layout = settled.layout;
     const answer = async (result: any) => {

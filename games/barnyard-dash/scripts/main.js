@@ -12,12 +12,14 @@ import { CUPS, createGrandPrix, findCup, grandPrixCup, grandPrixFinished, grandP
 import { BARNYARD_ONLINE, createOnlineRace } from "./online-race.js?v=20260928-pet-online";
 import { createLevelPicker, fillCourseSelect, formatTime, ordinal, renderCupChoices, renderPodium, renderStandings } from "./menus.js?v=20260928-pet-online";
 import { createPetPicker } from "../../pet-games/shared/ui/pet-picker.js";
+import { createPetGameAudio } from "../../pet-games/shared/audio.js";
 import { createOnlinePanel } from "../../pet-games/shared/ui/online-panel.js";
 import { createPetLobbyClient } from "../../pet-games/shared/online/lobby-client.js";
 import { CPU_LEVELS, cpuLevelFromIndex, cpuLevelIndex, findCpuLevel } from "../../pet-games/shared/sim/levels.js";
 import { fetchCareer, fileResult, loadAccountGate, loadIdentity, newResultId, onlineResultId, recordLine } from "../../pet-games/shared/platform.js";
 
 const GAME_SLUG = "barnyard-dash";
+const sounds = createPetGameAudio();
 const TICK_SECONDS = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
 
@@ -59,6 +61,9 @@ const held = new Set();
 // ---------------------------------------------------------------- screens
 
 function show(name) {
+  sounds.setMenuActive(name !== "race");
+  if (["result", "podium", "cupBoard"].includes(name)) sounds.play("finish");
+  sounds.reset();
   screen = name;
   for (const [key, panel] of Object.entries(panels)) panel.hidden = key !== name;
   const racing = name === "race";
@@ -408,6 +413,7 @@ function hudFor(race, me) {
   $("#raceProgress").textContent = `Checkpoint ${Math.min(me.checkpoint, race.track.checkpoints.length)} / ${race.track.checkpoints.length}`;
   $("#raceTime").textContent = formatTime(race.elapsed);
   countdownLabel.textContent = race.countdown > 0 ? String(Math.ceil(race.countdown)) : race.elapsed < 0.7 ? "GO!" : "";
+  sounds.observe({ countdown: race.countdown > 0 ? Math.ceil(race.countdown) : 0, jumping: me.jumpHeight > 0, impact: me.lastImpact ? 1 : 0 });
 }
 
 function render(dt) {

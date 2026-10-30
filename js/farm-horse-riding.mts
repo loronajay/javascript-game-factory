@@ -57,6 +57,8 @@ export const HORSE_TRAINING_CAP = 12;
 export const HORSE_TRAINING_PER_DAY = 1.5;
 
 export type HorseRiding = Readonly<{
+  /** Earned by this horse's verified course runs, independently of the rider. */
+  xp: number;
   /** Rolled at birth, before any palette bonus; pinned for life. */
   base: Readonly<Record<RidingStatId, number>>;
   /** Points per farm day at perfect care; pinned for life. */
@@ -94,6 +96,7 @@ export function rollHorseRiding(gradeId: string, random: () => number): HorseRid
     base: Object.freeze({ stamina, agility }),
     rates: Object.freeze(rates),
     trained: ZERO_TRAINED,
+    xp: 0,
     trainedDay: 0,
     trainedToday: 0,
   });
@@ -116,6 +119,7 @@ export function normalizeHorseRiding(value: unknown, fallback: HorseRiding): Hor
     base: Object.freeze(base),
     rates: Object.freeze(rates),
     trained: Object.freeze(trained),
+    xp: Math.floor(clamp(finite(source.xp) ?? 0, 0, 1e9)),
     trainedDay: Math.floor(clamp(finite(source.trainedDay) ?? 0, 0, 1e7)),
     trainedToday: round(clamp(finite(source.trainedToday) ?? 0, 0, HORSE_TRAINING_PER_DAY), 4),
   });

@@ -22,6 +22,7 @@ import { findPetCare, petRideTraits } from "./farm-pet-care.mjs";
 import { growthStage } from "./farm-pet-growth.mjs";
 import { horseStats } from "./farm-horse-riding.mjs";
 import { rideProfile } from "./farm-ride-profile.mjs";
+import { createFarmSoundEffects } from "./farm-sound-effects.mjs";
 import { packRideInput, rideInputFromKeys } from "./farm-ride.mjs";
 import { createAwayRiding } from "./farm-riding-away.mjs";
 import { horseTravelQuery, ridingHorseFrom } from "./farm-riding-travel.mjs";
@@ -55,6 +56,8 @@ const status = requiredElement("#downsStatus");
 const backLink = requiredElement("#downsBackLink");
 const ticketChip = requiredElement("#downsTickets");
 const ridingChip = requiredElement("#downsRiding");
+const farmSounds = createFarmSoundEffects();
+window.addEventListener("pagehide", () => farmSounds.destroy(), { once: true });
 const musicButton = requiredElement("#toggleDownsMusic");
 const visitorsChip = requiredElement("#downsVisitors");
 const visitorsChipLabel = requiredElement("#downsVisitorsLabel");
@@ -78,10 +81,10 @@ if (!horse) {
 const ridingLevel = () => farmingLevelForXp(farm.skills.riding.xp);
 /** The horse's piloted numbers: its four stats, how it is kept, its traits, and the rider's perks. */
 function horseProfile(pet) {
-    const profile = pet.profile;
+    const profile = (farm.pets.find((entry) => entry.instanceId === pet.instanceId) ?? pet).profile;
     const care = findPetCare(pet.speciesId);
     const elder = care ? growthStage(profile.ageDays, care.maxLifeDays).id === "elder" : false;
-    return rideProfile(horseStats(profile), { hunger: profile.hunger, happiness: profile.happiness, elder }, petRideTraits(profile), ridingLevel());
+    return rideProfile(horseStats(profile), { hunger: profile.hunger, happiness: profile.happiness, elder }, petRideTraits(profile), farmingLevelForXp(profile.riding?.xp ?? 0));
 }
 // ---------------------------------------------------------------- tickets, riding, music
 const ticketClient = createTicketWalletClient();
@@ -206,7 +209,7 @@ const board = createDownsBoard({
 }, {
     bests: () => bests,
     ridingLevel,
-    ridingXp: () => skillLabel("Riding", farm.skills.riding.xp),
+    ridingXp: () => `${skillLabel("Your Riding", farm.skills.riding.xp)} · ${skillLabel(`${horse?.name ?? "Horse"}'s level`, farm.pets.find((pet) => pet.instanceId === horse?.instanceId)?.profile?.riding?.xp ?? 0)}`,
     horse: () => horse?.name ?? "",
     championship: () => championship,
     setChampionship,
@@ -305,28 +308,39 @@ function publishPresence() {
 }
 // ---------------------------------------------------------------- courses
 let run = null;
+let submittingRun = false;
 /** A finished run goes to the server to be ridden again from its reins; it pays Riding XP and trains the horse if it holds up. */
 async function submitRun(finished) {
-    if (!signedIn || !horse)
+    if (!signedIn || !horse || submittingRun)
         return;
-    const result = await api.submitFarmRidingRun({
-        horseId: horse.instanceId,
-        courseId: finished.courseId,
-        ticks: finished.ticks,
-        faults: finished.faults,
-        start: finished.start,
-        inputs: finished.inputs,
-    }).catch(() => null);
-    if (!result?.ok) {
-        if (result?.error === "replay_mismatch")
-            hud.toast("The stewards couldn't match that run.", "It stands as your own best, but earns no Riding XP.", 5);
-        return;
+    submittingRun = true;
+    try {
+        const result = await api.submitFarmRidingRun({
+            horseId: horse.instanceId,
+            courseId: finished.courseId,
+            ticks: finished.ticks,
+            faults: finished.faults,
+            start: finished.start,
+            inputs: finished.inputs,
+        }).catch(() => null);
+        if (!result?.ok) {
+            if (result?.error === "replay_mismatch")
+                hud.toast("The stewards couldn't match that run.", "It stands as your own best, but earns no Riding XP.", 5);
+            return;
+        }
+        if (result.layout)
+            farm = normalizeFarmLayout(result.layout);
+        farmSounds.result(result);
+        // The server just trained this horse. Riding on the old mount snapshot made
+        // later runs diverge from the server replay until the page was reloaded.
+        away.refreshProfile();
+        renderChips();
+        const levelUp = result.levelAfter > result.levelBefore ? ` · Riding ${result.levelAfter}!` : "";
+        hud.toast(`+${Number(result.xp).toLocaleString()} ${horse.name} XP${levelUp}`, `Also +${Number(result.xp).toLocaleString()} to your Riding skill. ${result.trainingNote || ""}`, 5);
     }
-    if (result.layout)
-        farm = normalizeFarmLayout(result.layout);
-    renderChips();
-    const levelUp = result.levelAfter > result.levelBefore ? ` · Riding ${result.levelAfter}!` : "";
-    hud.toast(`+${Number(result.xp).toLocaleString()} Riding XP${levelUp}`, result.trainingNote || "", 5);
+    finally {
+        submittingRun = false;
+    }
 }
 function keepCourse(before, after, input, events) {
     if (racing.racing())
@@ -393,7 +407,7 @@ function interact() {
     }
 }
 function updateRider(dt) {
-    if (!entered || leaving)
+    if (!entered || leaving || submittingRun)
         return;
     const held = rideInputFromKeys(keys);
     const input = panelOpen() ? rideInputFromKeys(new Set()) : jumpLatch && !held.jump ? { ...held, jump: true } : held;
@@ -482,6 +496,9 @@ window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
     if (panelOpen())
         return;
+    // In the saddle steering owns the camera, even when the mouse is captured.
+    if (away.state())
+        return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;
     const looked = lookWalker(player, event.movementX, event.movementY);
@@ -500,7 +517,7 @@ function applyCamera(dt) {
     }
     const eye = away.eye(riderClock);
     camera.position.set(eye.x, eye.y, eye.z);
-    if (!draggingLook && document.pointerLockElement !== canvas) {
+    if (away.state()) {
         // Without mouse look, keep the view over the horse's head.
         const delta = Math.atan2(Math.sin(ride.heading - player.yaw), Math.cos(ride.heading - player.yaw));
         player.yaw += delta * Math.min(1, dt * 4);

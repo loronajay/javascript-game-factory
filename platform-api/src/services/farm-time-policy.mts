@@ -86,6 +86,14 @@ export function offlineGrowthAllowance(elapsedSeconds: number, rate: number = OF
   return Math.min(Math.max(0, elapsedSeconds), OFFLINE_CATCH_UP_CAP_SECONDS) * ACTIVE_FARM_MINUTES_PER_SECOND * clampOfflineRate(rate);
 }
 
+/** Animal catch-up is a separate, monotone clock, bounded by server elapsed time and the prior animal setting. */
+export function boundAnimalMinutes(current: any, claimed: unknown, elapsedSeconds: number): number {
+  const previous = Math.max(0, finite(current?.clock?.animalMinutes, 0));
+  if (!current || !(current.clock?.checkpointAt > 0)) return previous;
+  const rate = clampOfflineRate(finite(current.settings?.awayAnimals, 0));
+  return Math.max(previous, Math.min(finite(claimed, previous), previous + offlineGrowthAllowance(elapsedSeconds, rate)));
+}
+
 const cropKey = (row: any): string => `${row.plotId}:${row.cellId}:${row.cropId}`;
 
 /**

@@ -53,6 +53,7 @@ import { freeHorseStalls, herdHomes, livestockHomes } from "./farm-livestock-hou
 import { createHorsePaddock, horseLineTitle } from "./farm-horse-paddock.mjs";
 import { horseStockLine } from "./farm-horse-stock.mjs";
 import { MAX_PETS } from "./farm-layout.mjs";
+import { MAX_HORSES, horseCount } from "./farm-resident-capacity.mjs";
 import { livestockKind, normalizeLivestockAnimal, normalizeLivestockHerd } from "./farm-livestock.mjs";
 import { findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { createAvatarThumbnails } from "./arcade-room-avatar-thumbnails.mjs";
@@ -320,6 +321,7 @@ let nearbyVisitor = null;
 function applyCamera() {
     if (away.mounted()) {
         const eye = away.eye(riderClock);
+        player.yaw = away.state().heading;
         camera.position.set(eye.x, eye.y, eye.z);
     }
     else {
@@ -547,19 +549,20 @@ const horseMessages = Object.freeze({
     insufficient_tickets: "Not enough tickets for that horse yet.",
     no_stall: "Every Stable stall at home is taken. Build another Stable, or free a stall, first.",
     farm_full: `Your farm has as many pets as it can keep (${MAX_PETS}).`,
+    horse_capacity_full: `Your horse capacity is full (${MAX_HORSES}), separately from pets.`,
     level_too_low: "Hollis keeps that one for a better rider — raise your Riding at Windrush Downs.",
     already_bought: "You already bought that horse today.",
     stock_changed: "Hollis has brought in new horses since you looked. Take another look.",
     farm_not_initialized: "Settle into your farm first — name your dog and step onto the field.",
 });
 /** One of Hollis's horses: the server rolls it from the day's seed and stables it (the pet lands in the farm document). */
-async function buyHorse(day, slot, name) {
-    const result = await livestockApi.buyFarmHorse({ day, slot, ...(name ? { name } : {}) }).catch(() => null);
+async function buyHorse(day, slot, name, roll = 0) {
+    const result = await livestockApi.buyFarmHorse({ day, slot, roll, ...(name ? { name } : {}) }).catch(() => null);
     takeStock(result?.layout);
     if (!result?.ok)
         return { ok: false, bought: result?.error === "already_bought", message: horseMessages[result?.error] ?? "The sale did not go through. Nothing was bought — try again in a moment." };
     takeBalance(result.balance);
-    const line = horseStockLine(day, slot);
+    const line = horseStockLine(day, slot, roll);
     const pet = result.pet;
     keeperSays(findMarketStall(LIVESTOCK_STALL_ID), `${pet?.name ?? "That one"}'s a fine horse. Ride ${pet?.profile?.gender === "male" ? "him" : "her"} well.`);
     return { ok: true, message: `${pet?.name ?? "Your horse"}${line ? `, the ${horseLineTitle(line).split(" · ")[0].toLowerCase()},` : ""} is on the way to your Stable — ${Number(result.price).toLocaleString()} tickets. Press P on the farm to see it, and E beside it to ride.` };
@@ -617,10 +620,16 @@ const horsePaddock = createHorsePaddock({
     room: () => ({
         freeStalls: freeHorseStalls(farm.decor, farm.pets, herd).length,
         stalls: livestockHomes(farm.decor).filter((home) => home.kind === "stall").length,
-        petRoom: MAX_PETS - farm.pets.length,
+        petRoom: MAX_HORSES - horseCount(farm.pets),
     }),
     ridingLevel: () => farmingLevelForXp(farm.skills.riding.xp),
     buy: buyHorse,
+    refreshedAt: () => farm.horseStockRefreshedAt ?? 0,
+    refresh: async () => {
+        const result = await livestockApi.refreshFarmHorses().catch(() => null);
+        takeStock(result?.layout);
+        return { ok: Boolean(result?.ok), message: result?.ok ? "New horses are in the paddock. You can refresh again in 24 hours." : result?.error === "refresh_cooldown" ? "The paddock can only be refreshed once every 24 hours." : "Could not refresh the paddock. Try again." };
+    },
     thumbnail: petPortraits.get,
 });
 // Hollis's feed shelf, under his young stock: hay, pig feed, chicken feed, into the farm's supplies.
@@ -1183,6 +1192,8 @@ canvas.addEventListener("pointerdown", () => { draggingLook = true; });
 window.addEventListener("pointerup", () => { draggingLook = false; });
 document.addEventListener("mousemove", (event) => {
     if (panelOpen())
+        return;
+    if (away.mounted())
         return;
     if (document.pointerLockElement !== canvas && !draggingLook)
         return;

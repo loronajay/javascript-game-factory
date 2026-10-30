@@ -135,6 +135,13 @@ export function createDownsRacing(options) {
     }
     function renderCompose() {
         const horse = options.horse();
+        // Polling updates the races, not the form under the player's hands.
+        const existing = elements.raceCompose.querySelector("button");
+        if (existing) {
+            existing.disabled = busy || !horse || !options.signedIn;
+            existing.textContent = !options.signedIn ? "Sign in to race" : horse ? `Post a race on ${horse.name}` : "Ride here on a horse to race";
+            return;
+        }
         const course = element("select", "");
         for (const id of ["gallop", "oval-1", "oval-2", "xc"]) {
             const option = element("option", "", COURSE_TITLES[id]);

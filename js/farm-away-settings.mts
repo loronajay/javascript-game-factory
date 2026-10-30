@@ -12,6 +12,7 @@ export type FarmAwaySettings = Readonly<{
 
 type Options = Readonly<{
   root: HTMLElement;
+  animals?: boolean;
   /** The owner chose a new rate; the page saves it and says how that went. */
   onChange: (rate: number) => Promise<string> | string | void;
 }>;
@@ -19,7 +20,7 @@ type Options = Readonly<{
 const STEP_PERCENT = 1;
 const percent = (rate: number): number => Math.round(rate * 100);
 
-export function createFarmAwaySettings({ root, onChange }: Options): FarmAwaySettings {
+export function createFarmAwaySettings({ root, onChange, animals = false }: Options): FarmAwaySettings {
   root.replaceChildren();
   root.classList.add("away-settings");
 
@@ -30,14 +31,14 @@ export function createFarmAwaySettings({ root, onChange }: Options): FarmAwaySet
   eyebrow.className = "eyebrow";
   eyebrow.textContent = "WHILE YOU'RE AWAY";
   const name = document.createElement("h3");
-  name.textContent = "Away growth";
+  name.textContent = animals ? "Animal progression" : "Crop & tree growth";
   title.append(eyebrow, name);
 
   const toggleLabel = document.createElement("label");
   toggleLabel.className = "away-settings__switch";
   const toggle = document.createElement("input");
   toggle.type = "checkbox";
-  toggle.setAttribute("aria-label", "Keep growing while I'm away");
+  toggle.setAttribute("aria-label", animals ? "Keep pets and livestock progressing while I'm away" : "Keep growing while I'm away");
   const toggleText = document.createElement("span");
   toggleLabel.append(toggle, toggleText);
   heading.append(title, toggleLabel);
@@ -51,7 +52,7 @@ export function createFarmAwaySettings({ root, onChange }: Options): FarmAwaySet
   slider.min = String(STEP_PERCENT);
   slider.max = String(percent(MAX_OFFLINE_PRODUCTION_RATE));
   slider.step = String(STEP_PERCENT);
-  slider.setAttribute("aria-label", "Away growth speed, percent of normal");
+  slider.setAttribute("aria-label", animals ? "Away animal speed, percent of normal" : "Away growth speed, percent of normal");
   const value = document.createElement("strong");
   rateRow.append(rateText, slider, value);
 
@@ -78,6 +79,9 @@ export function createFarmAwaySettings({ root, onChange }: Options): FarmAwaySet
     description.textContent = on
       ? `Crops and trees keep growing at ${percent(rate)}% of normal speed while you're away, for up to your first 24 hours. They can still get thirsty and wilt, but never die while you're gone.`
       : "Your farm waits for you: crops and trees stay exactly as you left them until you come back.";
+    if (animals) description.textContent = on
+      ? `Pets and livestock progress at ${percent(rate)}% of normal speed for up to 24 hours away. They age, get hungry, produce goods and progress through breeding; neglected animals can die. This setting is separate from crops and trees.`
+      : "Pets and livestock wait for you while you are away. Turn on their own progression speed here; crop and tree settings are separate.";
   }
 
   async function choose(rate: number): Promise<void> {

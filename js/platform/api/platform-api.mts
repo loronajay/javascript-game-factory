@@ -675,8 +675,11 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       return post("/games/farm/livestock/purchases", { purchaseId, speciesId, homeId, name }, "result", {}, true);
     },
     /** One of Hollis's horses for today (FARM_RIDING_PLAN.md): the server rolls it from the day's seed and stables it. */
-    buyFarmHorse({ day, slot, name }: { day: number; slot: number; name?: string }) {
-      return post("/games/farm/horses/purchases", { day, slot, name }, "result", {}, true);
+    buyFarmHorse({ day, slot, name, roll = 0 }: { day: number; slot: number; name?: string; roll?: number }) {
+      return post("/games/farm/horses/purchases", { day, slot, name, roll }, "result", {}, true);
+    },
+    refreshFarmHorses() {
+      return post("/games/farm/horses/refresh", {}, "result", {}, true);
     },
     /** A finished Windrush Downs course run: the server rides it again from its reins and pays Riding XP and training for what really happened. */
     submitFarmRidingRun(run: { horseId: string; courseId: string; ticks: number; faults: number; start: unknown; inputs: readonly number[] }) {

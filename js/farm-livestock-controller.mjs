@@ -131,12 +131,12 @@ export function createFarmLivestockController(options) {
         });
         options.setStatus(`${words.join(". ")}. Name ${births.length === 1 ? "it" : "them"} in the Herd panel (L).`);
     }
-    async function care(action, animalId, mateId) {
+    async function care(action, animalId, mateId, itemId) {
         if (!options.submit || !options.api || caring)
             return null;
         caring = true;
         try {
-            const result = await options.submit((sent) => options.api.careFarmLivestock({ layout: sent, action, animalId, mateId })).catch(() => null);
+            const result = await options.submit((sent) => options.api.careFarmLivestock({ layout: sent, action, animalId, mateId, itemId })).catch(() => null);
             absorb(result);
             tellDeaths(result);
             tellBirths(result);
@@ -166,6 +166,25 @@ export function createFarmLivestockController(options) {
         if (result?.error)
             return `${animal.name} ${CARE_ERRORS[result.error] ?? "could not be fed. Try again."}`;
         return result === null ? "" : `${animal.name} could not be fed. Try again.`;
+    }
+    async function collectAnimal(id, itemId) {
+        if (!options.submit || !options.api)
+            return "Sign in to collect livestock goods.";
+        const animal = current().find((entry) => entry.id === id);
+        if (!animal)
+            return "That animal is not on this farm.";
+        const result = await care("collect", id, undefined, itemId);
+        if (result?.ok) {
+            const good = findLivestockGood(result.itemId);
+            const xp = Number(result.xp) > 0 ? ` +${Number(result.xp).toLocaleString()} Husbandry XP.` : "";
+            const levelUp = Number(result.husbandry?.level) > Number(result.husbandry?.levelBefore) ? ` Husbandry level ${result.husbandry.level}!` : "";
+            if (Array.isArray(result.achievements) && result.achievements.length)
+                options.onAchievements?.(result.achievements);
+            return `${animal.name} gave ${result.quantity} ${QUALITY_TITLES[result.quality] ?? ""} ${good?.title ?? result.itemId}. It is in your basket.${xp}${levelUp}`;
+        }
+        if (result?.error)
+            return `${animal.name} ${CARE_ERRORS[result.error] ?? "could not be collected from. Try again."}`;
+        return "Collection could not finish. Try again.";
     }
     /** Replace one animal with the server's answer, or the whole herd when it sent one. */
     function absorb(result) {
@@ -265,18 +284,7 @@ export function createFarmLivestockController(options) {
             const animal = current().find((entry) => entry.id === id);
             const ready = animal ? goodsState(animal, animal.care).find((entry) => entry.ready) : null;
             if (ready && options.submit) {
-                void care("collect", id).then((result) => {
-                    if (result?.ok) {
-                        const good = findLivestockGood(result.itemId);
-                        const xp = Number(result.xp) > 0 ? ` +${Number(result.xp).toLocaleString()} Husbandry XP.` : "";
-                        const levelUp = Number(result.husbandry?.level) > Number(result.husbandry?.levelBefore) ? ` Husbandry level ${result.husbandry.level}!` : "";
-                        options.setStatus(`${animal.name} gave ${result.quantity} ${QUALITY_TITLES[result.quality] ?? ""} ${good?.title ?? result.itemId}. It is in your basket.${xp}${levelUp}`);
-                        if (Array.isArray(result.achievements) && result.achievements.length)
-                            options.onAchievements?.(result.achievements);
-                    }
-                    else if (result?.error)
-                        options.setStatus(`${animal.name} ${CARE_ERRORS[result.error] ?? "could not be collected from. Try again."}`);
-                });
+                void collectAnimal(id).then(options.setStatus);
             }
             bodies.showHeart(id);
             sim.attention(id);
@@ -299,6 +307,7 @@ export function createFarmLivestockController(options) {
             return true;
         },
         feedAnimal,
+        collectAnimal,
         async feedHerd() {
             if (!options.submit || !options.api)
                 return "Sign in to keep livestock.";

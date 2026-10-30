@@ -69,7 +69,7 @@ export const BREEDING_REFUSAL_WORDS = Object.freeze({
     not_grown: "Both must be past Youth.",
     hungry: "Both must be fed.",
     unhappy: `Both must be at least ${BREED_MIN_HAPPINESS}% happy.`,
-    resting: `Each pet rests ${BREED_REST_DAYS} farm days after breeding.`,
+    resting: `The mother rests ${BREED_REST_DAYS} farm days after breeding.`,
     farm_full: "The farm is full. Release a pet to make room for a young one.",
 });
 const unit = (value) => Number.isFinite(value) ? Math.min(0.999999, Math.max(0, value)) : 0;
@@ -77,6 +77,8 @@ const round = (value, places = 2) => Number(value.toFixed(places));
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 /** Farm minutes this pet still rests before it may breed again (0 = ready). */
 export function breedingRestMinutes(pet, farmMinutes) {
+    if (pet.profile?.gender === "male")
+        return 0;
     if (typeof pet.bredAt !== "number" || !Number.isFinite(pet.bredAt))
         return 0;
     return Math.max(0, pet.bredAt + BREED_REST_MINUTES - farmMinutes);

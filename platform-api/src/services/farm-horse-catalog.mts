@@ -57,6 +57,7 @@ export function rollFarmHorseRiding(gradeId: string, random: () => number): any 
     base: { stamina, agility },
     rates,
     trained: { speed: 0, strength: 0, stamina: 0, agility: 0 },
+    xp: 0,
     trainedDay: 0,
     trainedToday: 0,
   };
@@ -77,6 +78,7 @@ export function normalizeFarmHorseRiding(value: any): any | null {
   for (const id of HORSE_STATS) trained[id] = round(clamp(finite(value.trained?.[id]) ?? 0, 0, FARM_HORSE_TRAINING_CAP), 4);
   return {
     base, rates, trained,
+    xp: Math.floor(clamp(finite(value.xp) ?? 0, 0, 1e9)),
     trainedDay: Math.floor(clamp(finite(value.trainedDay) ?? 0, 0, 1e7)),
     trainedToday: round(clamp(finite(value.trainedToday) ?? 0, 0, FARM_HORSE_TRAINING_PER_DAY), 4),
   };
@@ -120,11 +122,11 @@ export function farmHorseStockDay(now: number): number {
 }
 
 /** The seed text of one of the day's horses (js/farm-horse-stock.mts `horseStockSeed`). */
-export function farmHorseStockSeed(day: number, slot: number): string {
-  return `farm-horses:v1:${day}:${slot}`;
+export function farmHorseStockSeed(day: number, slot: number, roll = 0): string {
+  return `farm-horses:v1:${day}:${slot}${roll ? `:refresh:${roll}` : ""}`;
 }
 
 /** The ticket-ledger key that makes each of the day's horses one sale per player. */
-export function farmHorseTransactionKey(day: number, slot: number): string {
-  return `farm:horse:${day}:${slot}`;
+export function farmHorseTransactionKey(day: number, slot: number, roll = 0): string {
+  return `farm:horse:${day}:${slot}${roll ? `:refresh:${roll}` : ""}`;
 }

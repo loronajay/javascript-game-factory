@@ -111,7 +111,7 @@ export async function adoptFarmPet(pool: any, input: any, random: () => number =
       const wallet = await client.query(`select balance from ticket_wallets where player_id = $1`, [playerId]);
       return { ok: true, duplicate: true, price: 0, balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
     }
-    if ((farm.layout.pets?.length ?? 0) >= MAX_PETS) return { ok: false, error: "farm_full" };
+    if ((farm.layout.pets ?? []).filter((pet: any) => pet.speciesId !== "pet.horse").length >= MAX_PETS) return { ok: false, error: "farm_full" };
     if (species.habitat === "water" && !(farm.layout.decor ?? []).some((row: any) => String(row.itemId).startsWith("decor.water."))) {
       return { ok: false, error: "needs_water" };
     }

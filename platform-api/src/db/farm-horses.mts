@@ -12,6 +12,7 @@
 // `farm:horse:<day>:<slot>` makes each of the day's horses one sale per player.
 
 import { spendTicketsInTransaction } from "./tickets.mjs";
+import { MAX_HORSES, horseCount } from "../services/farm-resident-capacity.mjs";
 import { lockedFarm, nextPetId, saveFarm, transaction } from "./farm-economy.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { createFarmPetProfile } from "../services/farm-economy-catalog.mjs";
@@ -27,9 +28,22 @@ import {
   farmHorseTransactionKey,
 } from "../services/farm-horse-catalog.mjs";
 
-const MAX_PETS = 12;
 const MAX_STACK = 99;
 const STARTER_OATS = 5;
+export const HORSE_REFRESH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+export async function refreshFarmHorses(pool: any, input: any, now = Date.now()) {
+  const playerId = required(input?.playerId, "playerId");
+  return transaction(pool, async (client) => {
+    const farm = await lockedFarm(client, playerId);
+    if (!farm || farm.layout.onboarding?.status !== "complete") return { ok: false, error: "farm_not_initialized" };
+    const previous = Number(farm.layout.horseStockRefreshedAt) || 0;
+    if (previous > 0 && now < previous + HORSE_REFRESH_COOLDOWN_MS) return { ok: false, error: "refresh_cooldown", availableAt: previous + HORSE_REFRESH_COOLDOWN_MS, layout: farm.layout };
+    const layout = { ...farm.layout, horseStockRefreshedAt: now };
+    await saveFarm(client, playerId, layout);
+    return { ok: true, layout, availableAt: now + HORSE_REFRESH_COOLDOWN_MS };
+  });
+}
 
 function required(value: unknown, field: string): string {
   const text = typeof value === "string" ? value.trim() : "";
@@ -44,8 +58,8 @@ function cleanName(value: unknown, fallback: string): string {
 }
 
 /** One of the day's horses, rolled from its seed: the same profile the Dealer's card shows. */
-export function rollFarmStockHorse(day: number, slot: number): any | null {
-  return createFarmPetProfile(FARM_HORSE_SPECIES_ID, farmSeededRandom(farmSeedFor(farmHorseStockSeed(day, slot))));
+export function rollFarmStockHorse(day: number, slot: number, roll = 0): any | null {
+  return createFarmPetProfile(FARM_HORSE_SPECIES_ID, farmSeededRandom(farmSeedFor(farmHorseStockSeed(day, slot, roll))));
 }
 
 /** The Stable stalls free for a horse: stalls the herd could use that no live animal names. */
@@ -61,16 +75,19 @@ export async function buyFarmHorse(pool: any, input: any, now: number = Date.now
   const today = farmHorseStockDay(now);
   if (!Number.isSafeInteger(slot) || slot < 0 || slot >= FARM_HORSE_STOCK_SIZE) return { ok: false, error: "unknown_horse" };
   if (day !== today) return { ok: false, error: "stock_changed", day: today };
-  const profile = rollFarmStockHorse(day, slot);
-  if (!profile?.growth) return { ok: false, error: "unknown_horse" };
-  const rule = FARM_HORSE_GRADE_RULES[profile.growth.grade] ?? FARM_HORSE_GRADE_RULES.steady!;
-  const transactionKey = farmHorseTransactionKey(day, slot);
   return transaction(pool, async (client) => {
     const farm = await lockedFarm(client, playerId);
     if (!farm || farm.layout.onboarding?.status !== "complete") return { ok: false, error: "farm_not_initialized" };
+    const refreshedAt = Number(farm.layout.horseStockRefreshedAt) || 0;
+    const roll = farmHorseStockDay(refreshedAt) === today ? refreshedAt : 0;
+    if ((Number(input?.roll) || 0) !== roll) return { ok: false, error: "stock_changed", layout: farm.layout };
+    const profile = rollFarmStockHorse(day, slot, roll);
+    if (!profile?.growth) return { ok: false, error: "unknown_horse" };
+    const rule = FARM_HORSE_GRADE_RULES[profile.growth.grade] ?? FARM_HORSE_GRADE_RULES.steady!;
+    const transactionKey = farmHorseTransactionKey(day, slot, roll);
     const bought = await client.query(`select 1 from ticket_transactions where player_id = $1 and transaction_key = $2`, [playerId, transactionKey]);
     if (bought.rows?.length) return { ok: false, error: "already_bought", layout: farm.layout };
-    if ((farm.layout.pets?.length ?? 0) >= MAX_PETS) return { ok: false, error: "farm_full" };
+    if (horseCount(farm.layout.pets ?? []) >= MAX_HORSES) return { ok: false, error: "horse_capacity_full" };
     const skills = normalizeFarmSkillRecords(farm.layout.skills);
     const level = farmingLevelForXp(skills.riding.xp);
     if (level < rule.minRidingLevel) return { ok: false, error: "level_too_low", minLevel: rule.minRidingLevel, level };

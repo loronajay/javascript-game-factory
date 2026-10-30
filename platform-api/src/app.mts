@@ -366,6 +366,7 @@ export function createApp(options: any = {}) {
   const careFarmLivestock = typeof options?.careFarmLivestock === "function" ? options.careFarmLivestock : null;
   const butcherFarmLivestock = typeof options?.butcherFarmLivestock === "function" ? options.butcherFarmLivestock : null;
   const buyFarmHorse = typeof options?.buyFarmHorse === "function" ? options.buyFarmHorse : null;
+  const refreshFarmHorses = typeof options?.refreshFarmHorses === "function" ? options.refreshFarmHorses : null;
   const ridingService = (name: string) => (typeof options?.[name] === "function" ? options[name] : null);
   const castFarmLine = typeof options?.castFarmLine === "function" ? options.castFarmLine : null;
   const landFarmCast = typeof options?.landFarmCast === "function" ? options.landFarmCast : null;
@@ -715,6 +716,7 @@ export function createApp(options: any = {}) {
   const farmLivestockServices = { getFarmLivestock, getFarmLivestockCards, buyFarmLivestock, moveFarmLivestock, renameFarmLivestock, careFarmLivestock, butcherFarmLivestock };
   const farmRidingServices = {
     buyFarmHorse,
+    refreshFarmHorses,
     submitFarmRidingRun: ridingService("submitFarmRidingRun"),
     listFarmRaces: ridingService("listFarmRaces"),
     postFarmRace: ridingService("postFarmRace"),

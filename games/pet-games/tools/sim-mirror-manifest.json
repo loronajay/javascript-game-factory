@@ -2,7 +2,7 @@
   "generator": "games/pet-games/tools/mirror-sim.mjs",
   "files": {
     "games/pet-games/shared/sim/levels.js": "4d9b1941fa5c8eda22162ae87463813184f7012a6040094dd6a16a052bfe1cb3",
-    "games/pet-games/shared/sim/rivals.js": "a607c27bbaae0674fb008a71ffab866d8be3ba2e290ad10807d053920fe727f5",
+    "games/pet-games/shared/sim/rivals.js": "60fbbf968ab47d7417a41f6be1e64decebb5b77dab8e9175ef89b78fa0f616e7",
     "games/barnyard-dash/scripts/sim/balance.js": "ed8fd2c3aa8593e2d430c2e4b9c8c2708fd2f98402e11b9805c4d21ed5bdee64",
     "games/barnyard-dash/scripts/sim/courses.js": "538799bab7fa142980997ab516a06564cc190344d3d2eedf86ce1e57f3aad606",
     "games/barnyard-dash/scripts/sim/cpu.js": "d1cb268f3e56bfc5bddd983358c9a8a66d33be4ded474fe3aecc0b44f75f5660",

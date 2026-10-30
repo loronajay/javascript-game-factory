@@ -579,9 +579,27 @@ kbd, .farm-button kbd {
 /* ---------------------------------------------------------------- livestock (L) */
 
 .livestock-panel { --sheet-width: 500px; }
+.pet-release-confirm { padding: 10px; border: 1px solid var(--hud-danger); border-radius: 10px; background: var(--hud-danger-soft); }
+.pet-release-confirm p { margin: 0 0 8px; font-size: 13px; }
+.pet-release-confirm button { margin: 0 6px 6px 0; }
 .livestock-panel.is-busy .livestock-list { opacity: .6; pointer-events: none; }
 .livestock-panel .farm-button:disabled { opacity: .45; cursor: not-allowed; }
 .livestock-list { display: grid; gap: 10px; }
+.livestock-panel__body { min-width: 0; }
+.livestock-list, .livestock-row, .livestock-row > *, .livestock-tools { min-width: 0; max-width: 100%; }
+.livestock-row { overflow-wrap: anywhere; }
+.livestock-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.livestock-tools[hidden] { display: none; }
+.livestock-tools label { display: grid; min-width: 0; gap: 4px; color: var(--hud-text-soft); font: 700 12px var(--hud-font); }
+.livestock-tools__search { grid-column: 1 / -1; }
+.livestock-tools__input { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--hud-line-strong); border-radius: 8px; color: var(--hud-text); background: var(--hud-surface-sunken); font: 600 12px var(--hud-font); }
+.livestock-results { margin: 0; color: var(--hud-text-muted); font-size: 12px; }
+.livestock-feed-section { min-width: 0; }
+.livestock-feed-section > summary { padding: 10px 12px; border: 1px solid var(--hud-line); border-radius: 10px; color: var(--hud-text-soft); font: 700 12px var(--hud-font); cursor: pointer; overflow-wrap: anywhere; }
+.livestock-feed-section[open] > summary { margin-bottom: 8px; }
+.livestock-good--collect { border: 1px solid var(--hud-leaf); min-height: 32px; cursor: pointer; white-space: normal; text-align: left; }
+.livestock-good--collect:hover { filter: brightness(1.12); }
+.livestock-row__feed, .livestock-feed__head { flex-wrap: wrap; }
 .livestock-empty { margin: 4px 0; color: var(--hud-text-soft); font-size: 13px; line-height: 1.45; }
 .livestock-row { display: grid; gap: 8px; padding: 12px 13px; border: 1px solid var(--hud-line); border-radius: var(--hud-r-lg); background: var(--hud-surface-raised); }
 .livestock-row--young { border-color: rgba(158,226,122,.28); }
@@ -621,7 +639,7 @@ kbd, .farm-button kbd {
 .livestock-stat dd { margin: 0; color: var(--hud-heading); font: 800 12px var(--hud-mono); }
 .livestock-stat__bar { grid-column: 1 / -1; display: block; height: 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
 .livestock-stat__fill { display: block; height: 100%; border-radius: inherit; background: var(--hud-leaf); }
-.livestock-row__home { width: 100%; padding: 6px 8px; font: 600 12.5px var(--hud-font); }
+.livestock-row__home { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; padding: 6px 8px; font: 600 12.5px var(--hud-font); }
 .livestock-care { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .livestock-care__label { color: var(--hud-text-soft); font: 700 12px var(--hud-font); }
 .livestock-care__bar { flex: 1 1 120px; display: block; height: 6px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.1); }
@@ -637,7 +655,7 @@ kbd, .farm-button kbd {
 .livestock-breed--expecting { color: #f5b8d8; }
 .livestock-breed--due { color: var(--hud-warn); }
 .livestock-breed__label { color: var(--hud-text-muted); font: 700 10px var(--hud-mono); text-transform: uppercase; }
-.livestock-breed__mate { flex: 1 1 180px; padding: 5px 8px; font: 600 12px var(--hud-font); }
+.livestock-breed__mate { box-sizing: border-box; flex: 1 1 180px; width: 100%; min-width: 0; max-width: 100%; padding: 5px 8px; font: 600 12px var(--hud-font); }
 .livestock-breed__go { flex: 0 0 auto; padding: 5px 12px; border: 1px solid rgba(245,184,216,.55); border-radius: 9px; color: #2a1622; background: #f5b8d8; font: 800 12px var(--hud-font); cursor: pointer; }
 .livestock-breed__go:disabled { opacity: .45; cursor: not-allowed; }
 .livestock-panel__note { margin: 12px 0 0; color: var(--hud-text-muted); font-size: 12px; line-height: 1.45; }

@@ -305,7 +305,7 @@ test("farm time advances age and growth without losing partial days", () => {
   });
   const halfDay = advancePetLifecycle(profile, "pet.corgi", 720);
   assert.equal(halfDay.ageDays, 12.75);
-  assert.equal(halfDay.size.current, 0.703);
+  assert.equal(halfDay.size.current, 0.943, "legacy slow-growing pets catch up toward adult size at 15% of lifespan");
 
   const checkpoint = advancePetProfile(profile, "pet.corgi", 720);
   assert.equal(checkpoint.ageDays, halfDay.ageDays, "the persisted needs checkpoint owns lifecycle time too");
