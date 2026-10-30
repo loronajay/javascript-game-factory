@@ -60,3 +60,31 @@ test('ready-to-breed filter respects food, shared housing, level and space', () 
   assert.deepEqual(pick([cow,{...sire,homeId:'other'}]),[]);
   assert.deepEqual(pick([cow,{...sire,care:{...sire.care,hunger:30}}]),[]);
 });
+
+test('a fifty-animal herd stays complete across compact pages and shrinking filters', async () => {
+  const {livestockOverview,livestockPage}=await import('../farm-livestock-list.mjs');
+  const flock=Array.from({length:50},(_,i)=>animal(`Hen${String(i).padStart(3,'0')}`,'chicken','female',{
+    homeId:i===49?null:'pen', care:{...newLivestockCare(0),hunger:i<20?30:100,progress:{egg:i<12?1440:0}}
+  }));
+  const overview=livestockOverview(flock,homes,0,10);
+  assert.equal(overview.total,50);
+  assert.equal(overview.readyAnimals,12);
+  assert.equal(overview.readyGoods,12);
+  assert.equal(overview.needsFeed,20);
+  assert.equal(overview.unhoused,1);
+  assert.equal(overview.species.length,1);
+  assert.equal(overview.species[0].females,50);
+  const ordered=queryLivestock(flock,homes,0,10,query);
+  const pages=Array.from({length:5},(_,i)=>livestockPage(ordered,i));
+  assert.ok(pages.every(p=>p.animals.length===10&&p.pages===5));
+  assert.deepEqual(pages.flatMap(p=>p.animals.map(a=>a.id)),ordered.map(a=>a.id));
+  const ready=queryLivestock(flock,homes,0,10,{...query,status:'ready'});
+  const clamped=livestockPage(ready,4);
+  assert.equal(clamped.page,1);
+  assert.equal(clamped.start,11);
+  assert.equal(clamped.end,12);
+  assert.equal(livestockPage([],100).start,0);
+  assert.equal(livestockPage([],100).page,0);
+  assert.equal(queryLivestock(flock,homes,0,10,{...query,status:'needs_feed'}).length,20);
+  assert.equal(queryLivestock(flock,homes,0,10,{...query,status:'unhoused'})[0].id,flock[49].id);
+});

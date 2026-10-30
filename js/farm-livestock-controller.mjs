@@ -308,6 +308,30 @@ export function createFarmLivestockController(options) {
         },
         feedAnimal,
         collectAnimal,
+        async collectHerd() {
+            if (!options.submit || !options.api)
+                return "Sign in to collect livestock goods.";
+            const ready = current().flatMap((animal) => goodsState(animal, animal.care).filter((good) => good.ready).map((good) => ({ id: animal.id, itemId: good.product.itemId })));
+            if (!ready.length)
+                return "Nothing is ready to collect yet.";
+            let collected = 0, quantity = 0, xp = 0, skipped = 0;
+            // Each collection adopts the authoritative farm before the next request.
+            for (const good of ready) {
+                const result = await care("collect", good.id, undefined, good.itemId);
+                if (result?.ok) {
+                    collected++;
+                    quantity += Number(result.quantity) || 0;
+                    xp += Number(result.xp) || 0;
+                    if (Array.isArray(result.achievements) && result.achievements.length)
+                        options.onAchievements?.(result.achievements);
+                }
+                else if (result?.error === "not_ready" || result?.error === "not_found")
+                    skipped++;
+                else
+                    return `Collected ${quantity} goods from ${collected} collections.${result?.error === "basket_full" ? " Your basket is full." : " Collection stopped; try again for the remaining animals."}`;
+            }
+            return `Collected ${quantity} goods from ${collected} collections.${xp ? ` +${xp.toLocaleString()} Husbandry XP.` : ""}${skipped ? ` ${skipped} were not ready when checked.` : ""}`;
+        },
         async feedHerd() {
             if (!options.submit || !options.api)
                 return "Sign in to keep livestock.";

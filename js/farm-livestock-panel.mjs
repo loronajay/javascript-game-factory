@@ -18,7 +18,7 @@ import { homeOccupancy, homeTakes, totalLivestockSlots } from "./farm-livestock-
 import { LIVESTOCK_NAME_MAX } from "./farm-catalog/livestock.mjs";
 import { FULL, SERVING, goodsState, livestockNeed, wantsFood } from "./farm-livestock-care.mjs";
 import { QUALITY_TITLES } from "./farm-quality.mjs";
-import { queryLivestock } from "./farm-livestock-list.mjs";
+import { queryLivestock, livestockOverview, livestockPage } from "./farm-livestock-list.mjs";
 import { livestockSpace } from "./farm-livestock-space.mjs";
 /** The Feed bin buys in these amounts (the supply route takes up to 20 at once). */
 export const FEED_BUY_QUANTITIES = Object.freeze([5, 10]);
@@ -40,7 +40,45 @@ export function createLivestockPanel(elements, actions, options = {}) {
     let view = null;
     let busy = false;
     let feedOpen = false;
-    const query = { search: "", species: "", gender: "", status: "", sort: "species" };
+    const sections = [
+        { id: "overview", title: "Overview" }, { id: "animals", title: "Animals" },
+        { id: "care", title: "Care" }, { id: "breeding", title: "Breeding" }, { id: "housing", title: "Housing" },
+    ];
+    let section = "overview";
+    let selectedId = null;
+    let selectedHome = null;
+    let page = 0;
+    let resetScroll = true;
+    const queries = Object.fromEntries(sections.map((entry) => [entry.id, { search: "", species: "", gender: "", status: "", sort: entry.id === "breeding" ? "grade" : entry.id === "care" ? "ready" : "species" }]));
+    let query = queries.overview;
+    const navigation = element("nav", "livestock-nav");
+    navigation.setAttribute("role", "tablist");
+    navigation.setAttribute("aria-label", "Livestock sections");
+    const tabButtons = new Map();
+    const fields = new Map();
+    for (const entry of sections) {
+        const button = element("button", "livestock-nav__tab", entry.title);
+        button.type = "button";
+        button.id = `${elements.root.id || "livestock"}-${entry.id}-tab`;
+        button.setAttribute("role", "tab");
+        if (elements.list.id)
+            button.setAttribute("aria-controls", elements.list.id);
+        button.addEventListener("click", () => chooseSection(entry.id));
+        button.addEventListener("keydown", (event) => {
+            const direction = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+            if (!direction && event.key !== "Home" && event.key !== "End")
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const index = sections.findIndex((candidate) => candidate.id === section);
+            const next = event.key === "Home" ? 0 : event.key === "End" ? sections.length - 1 : (index + direction + sections.length) % sections.length;
+            chooseSection(sections[next].id);
+            tabButtons.get(section)?.focus();
+        });
+        navigation.append(button);
+        tabButtons.set(entry.id, button);
+    }
+    elements.list.setAttribute("role", "tabpanel");
     const tools = element("section", "livestock-tools");
     tools.setAttribute("aria-label", "Organize livestock");
     tools.addEventListener("keydown", (event) => { if (event.key !== "Escape")
@@ -50,7 +88,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
     search.type = "search";
     search.placeholder = "Name, kind, coat or home";
     searchLabel.append(search);
-    search.addEventListener("input", () => { query.search = search.value; draw(); });
+    search.addEventListener("input", () => { query.search = search.value; page = 0; resetScroll = true; draw(); });
     tools.append(searchLabel);
     const speciesChoices = [["", "All species"]];
     // Species options come from the catalog so the filter stays stable during server refreshes.
@@ -59,7 +97,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
     for (const [key, title, choices] of [
         ["species", "Species", speciesChoices],
         ["gender", "Sex", [["", "Both sexes"], ["female", "Female"], ["male", "Male"]]],
-        ["status", "Show", [["", "All animals"], ["ready", "Ready to collect"], ["hungry", "Hungry"], ["breed", "Ready to breed"], ["expecting", "Expecting"], ["young", "Young"]]],
+        ["status", "Show", [["", "All animals"], ["ready", "Ready to collect"], ["needs_feed", "Needs a serving"], ["hungry", "Hungry"], ["breed", "Ready to breed"], ["expecting", "Expecting"], ["resting", "Resting"], ["young", "Young"], ["unhoused", "Needs a home"]]],
         ["sort", "Sort by", [["species", "Species"], ["name", "Name A–Z"], ["home", "Home"], ["grade", "Highest grade"], ["hunger", "Hungriest first"], ["ready", "Ready goods first"]]],
     ]) {
         const label = element("label", "livestock-tools__field", title);
@@ -71,26 +109,52 @@ export function createLivestockPanel(elements, actions, options = {}) {
             select.append(option);
         }
         select.value = query[key];
-        select.addEventListener("change", () => { query[key] = select.value; draw(); });
+        select.addEventListener("change", () => { query[key] = select.value; page = 0; resetScroll = true; draw(); });
         label.append(select);
         tools.append(label);
+        fields.set(key, select);
     }
     // Keep the controls mounted: typing and server refreshes must not steal focus.
-    elements.list.before(tools);
+    elements.list.before(navigation, tools);
+    function chooseSection(next) {
+        section = next;
+        query = queries[next];
+        selectedId = null;
+        selectedHome = null;
+        page = 0;
+        resetScroll = true;
+        search.value = query.search;
+        for (const [key, control] of fields)
+            control.value = query[key];
+        draw();
+    }
+    function showAnimals(next, species = "", status = "") {
+        Object.assign(queries[next], { search: "", species, gender: "", status });
+        chooseSection(next);
+    }
+    function actionButton(words, action, className = "") {
+        const button = element("button", `farm-button ${className}`, words);
+        button.type = "button";
+        button.addEventListener("click", action);
+        return button;
+    }
     function setStatus(text) {
         elements.status.textContent = text;
     }
-    async function run(work) {
+    async function run(work, pending = "Working…") {
         if (busy)
             return;
         busy = true;
         elements.root.classList.add("is-busy");
+        elements.list.setAttribute("aria-busy", "true");
+        setStatus(pending);
         try {
             setStatus(await work());
         }
         finally {
             busy = false;
             elements.root.classList.remove("is-busy");
+            elements.list.setAttribute("aria-busy", "false");
             // The answer is drawn now, whatever had focus when it was asked.
             if (elements.root.contains(document.activeElement))
                 document.activeElement.blur?.();
@@ -321,14 +385,142 @@ export function createLivestockPanel(elements, actions, options = {}) {
         card.append(head, line, ...(lineage ? [lineage] : []), care, ...(feeding ? [feeding] : []), ...(pairing ? [pairing] : []), stats, homeSelect(animal, current.homes, occupancy, current.canManage));
         return card;
     }
-    function draw() {
+    function heading(title, copy) {
+        const header = element("header", "livestock-section-head");
+        header.append(element("h3", "", title), element("p", "", copy));
+        return header;
+    }
+    function openAnimal(id) {
+        selectedId = id;
+        resetScroll = true;
+        draw();
+    }
+    function careActions(current) {
+        const overview = livestockOverview(current.herd, current.homes, current.clockMinutes, current.husbandryLevel);
+        const actionsBar = element("div", "livestock-bulk");
+        if (!current.canBreed)
+            return actionsBar;
+        const collect = actionButton(`Collect all ready · ${overview.readyGoods}`, () => void run(actions.collectHerd, "Collecting ready goods across your herd…"), "farm-button--accent");
+        collect.disabled = busy || !overview.readyGoods;
+        collect.title = `Collect ready goods from ${overview.readyAnimals} animals across the whole herd`;
+        const feed = actionButton(`Feed the herd · ${overview.needsFeed}`, () => void run(actions.feedHerd, "Feeding the herd…"));
+        feed.disabled = busy || !overview.needsFeed;
+        actionsBar.append(collect, feed);
+        return actionsBar;
+    }
+    function overviewScreen(current) {
+        const summary = livestockOverview(current.herd, current.homes, current.clockMinutes, current.husbandryLevel);
+        elements.list.append(heading("Your herd at a glance", "Choose a group to manage. Open an animal only when you need its full details."), careActions(current));
+        const tasks = element("div", "livestock-overview-tasks");
+        for (const [title, count, next, status] of [
+            ["Ready to collect", summary.readyAnimals, "care", "ready"],
+            ["Need a serving", summary.needsFeed, "care", "needs_feed"],
+            ["Ready to pair", summary.breedReady, "breeding", "breed"],
+            ["Expecting", summary.expecting, "breeding", "expecting"],
+        ]) {
+            const button = actionButton("", () => showAnimals(next, "", status), "livestock-task");
+            button.append(element("strong", "", String(count)), element("span", "", title));
+            tasks.append(button);
+        }
+        elements.list.append(tasks, element("h4", "livestock-section-label", "Browse by species"));
+        const groups = element("div", "livestock-species-grid");
+        const titles = { "livestock.chicken": "Chickens", "livestock.cow": "Cattle", "livestock.sheep": "Sheep", "livestock.pig": "Pigs", "livestock.llama": "Llamas" };
+        for (const species of summary.species) {
+            const button = actionButton("", () => showAnimals("animals", species.id), "livestock-species-card");
+            const top = element("span", "livestock-species-card__top");
+            top.append(element("strong", "", titles[species.id] ?? species.title), element("b", "", String(species.total)));
+            button.append(top, element("span", "livestock-species-card__sex", `${species.females} female · ${species.males} male${species.young ? ` · ${species.young} young` : ""}`), element("small", "", `${species.ready} ready to collect · ${species.needsFeed} need a serving`));
+            groups.append(button);
+        }
+        elements.list.append(groups);
+        if (summary.unhoused) {
+            const homeless = actionButton(`${summary.unhoused} animals need a home →`, () => { chooseSection("housing"); selectedHome = "__unhoused__"; draw(); }, "livestock-housing-alert");
+            elements.list.append(homeless);
+        }
+    }
+    function breedingWords(animal, current) {
+        const pregnancy = pregnancyView(animal, current.clockMinutes);
+        if (pregnancy?.stage === "expecting")
+            return `Expecting · ${pregnancy.percent}%`;
+        if (pregnancy?.stage === "due")
+            return "Due · needs a free place";
+        if (pregnancy?.stage === "resting")
+            return `Resting · ${pregnancy.hours}h left`;
+        if (livestockSummary(animal, current.clockMinutes).stage !== "adult")
+            return "Still growing";
+        const males = current.herd.filter((other) => other.speciesId === animal.speciesId && other.gender === "male");
+        if (!males.length)
+            return "Needs a male of the same species";
+        const context = { clock: current.clockMinutes, level: current.husbandryLevel, freePlaces: freePlacesForYoung(current.homes, current.herd, animal.speciesId) };
+        const refusals = males.map((male) => breedingRefusal(animal, male, context));
+        return refusals.includes(null) ? "Ready to pair" : BREEDING_REFUSAL_WORDS[refusals[0]];
+    }
+    function rosterRow(animal, current) {
+        const summary = livestockSummary(animal, current.clockMinutes);
+        const ready = goodsState(animal, animal.care).filter((good) => good.ready);
+        const home = current.homes.find((entry) => entry.id === animal.homeId);
+        const item = element("article", "livestock-roster-row");
+        item.dataset.animalId = animal.id;
+        const open = actionButton("", () => openAnimal(animal.id), "livestock-roster-row__open");
+        open.setAttribute("aria-label", `Details for ${animal.name}`);
+        const name = element("span", "livestock-roster-row__name");
+        name.append(element("strong", "", animal.name), element("span", "livestock-roster-row__grade", summary.stars));
+        const status = section === "breeding" ? breedingWords(animal, current) : [ready.length ? `${ready.map((good) => good.product.title).join(" & ")} ready` : "", wantsServing(animal.care.hunger) ? `Feed · ${Math.round(animal.care.hunger)}%` : "", animal.care.pregnancy ? "Expecting" : ""].filter(Boolean).join(" · ") || `Fed · ${Math.round(animal.care.hunger)}%`;
+        open.append(name, element("small", "livestock-roster-row__kind", `${summary.kind} ${summary.gender} · ${home?.title ?? "Needs a home"}`), element("span", `livestock-roster-row__status${ready.length && section !== "breeding" ? " is-ready" : ""}`, status));
+        item.append(open);
+        if (section === "care" && current.canBreed) {
+            const controls = element("div", "livestock-roster-row__actions");
+            if (ready.length) {
+                const good = ready[0];
+                const collect = actionButton(`Collect ${good.product.title}`, () => void run(() => actions.collect(animal.id, good.product.itemId)), "farm-button--accent");
+                collect.setAttribute("aria-label", `Collect ${good.product.title} from ${animal.name}`);
+                controls.append(collect);
+            }
+            if (wantsServing(animal.care.hunger)) {
+                const feed = actionButton("Feed", () => void run(() => actions.feed(animal.id)));
+                feed.setAttribute("aria-label", `Feed ${animal.name}`);
+                feed.disabled = !current.feedWords(animal);
+                controls.append(feed);
+            }
+            item.append(controls);
+        }
+        else
+            item.append(actionButton(section === "breeding" ? "Manage →" : "Details →", () => openAnimal(animal.id), "livestock-roster-row__details"));
+        return item;
+    }
+    function housingScreen(current) {
+        const occupancy = homeOccupancy(current.homes, current.herd);
+        const homeless = current.herd.filter((animal) => !animal.homeId || !current.homes.some((home) => home.id === animal.homeId));
+        elements.list.append(heading("Homes & groups", "Choose a home to see its residents. Four chickens share one pen place; other homes keep their usual capacity."));
+        const groups = element("div", "livestock-species-grid");
+        for (const home of current.homes) {
+            const residents = current.herd.filter((animal) => animal.homeId === home.id);
+            const taken = occupancy.get(home.id) ?? 0;
+            const button = actionButton("", () => { selectedHome = home.id; page = 0; resetScroll = true; draw(); }, "livestock-species-card");
+            const top = element("span", "livestock-species-card__top");
+            top.append(element("strong", "", home.title), element("b", "", String(residents.length)));
+            button.append(top, element("span", "livestock-species-card__sex", `${taken} / ${home.slots} space used`), element("small", "", `${Math.max(0, home.slots - taken)} space free${home.species ? " · chickens only" : ""}`));
+            groups.append(button);
+        }
+        const field = actionButton("", () => { selectedHome = "__unhoused__"; page = 0; resetScroll = true; draw(); }, "livestock-species-card");
+        field.append(element("strong", "", "Out on the field / needs a home"), element("b", "", String(homeless.length)));
+        groups.append(field);
+        elements.list.append(groups);
+    }
+    function drawContent() {
         if (!view)
             return;
         const occupancy = homeOccupancy(view.homes, view.herd);
         const places = totalLivestockSlots(view.homes);
         elements.count.textContent = `${view.herd.length} head · ${places} ${places === 1 ? "place" : "places"}`;
         elements.list.replaceChildren();
-        tools.hidden = Boolean(view.note) || !view.herd.length;
+        for (const [id, button] of tabButtons) {
+            button.setAttribute("aria-selected", String(section === id));
+            button.tabIndex = section === id ? 0 : -1;
+        }
+        elements.list.setAttribute("aria-labelledby", tabButtons.get(section).id);
+        tools.hidden = Boolean(view.note) || !view.herd.length || selectedId !== null || section === "overview" || (section === "housing" && selectedHome === null);
+        fields.get("gender").parentElement.hidden = section === "breeding";
         if (view.note) {
             elements.list.append(element("p", "livestock-empty", view.note));
             return;
@@ -339,19 +531,80 @@ export function createLivestockPanel(elements, actions, options = {}) {
                 : "No livestock yet, and nowhere to keep them. Build a pen (or use the barn floor or a stable's stalls) first, then visit the Livestock Dealer in the Market Square."));
             return;
         }
-        const feedDetails = element("details", "livestock-feed-section");
-        feedDetails.open = feedOpen;
-        const hungry = view.herd.filter((animal) => wantsServing(animal.care.hunger)).length;
-        feedDetails.append(element("summary", "", `Feed & supplies${hungry ? ` · ${hungry} ready for a serving` : " · everyone is fed"}`), feedBin(view));
-        feedDetails.addEventListener("toggle", () => { if (feedDetails.isConnected)
-            feedOpen = feedDetails.open; });
-        elements.list.append(feedDetails);
-        const animals = queryLivestock(view.herd, view.homes, view.clockMinutes, view.husbandryLevel, query);
-        elements.list.append(element("p", "livestock-results", `Showing ${animals.length} of ${view.herd.length} animals`));
-        if (!animals.length)
-            elements.list.append(element("p", "livestock-empty", "No animals match these filters. Try another search or show all animals."));
-        for (const animal of animals)
-            elements.list.append(row(animal, view, occupancy));
+        if (selectedId) {
+            const animal = view.herd.find((entry) => entry.id === selectedId);
+            if (animal) {
+                elements.list.append(actionButton(`← Back to ${sections.find((entry) => entry.id === section).title.toLowerCase()}`, () => { selectedId = null; resetScroll = true; draw(); }, "livestock-back"), row(animal, view, occupancy));
+                return;
+            }
+            selectedId = null;
+            tools.hidden = section === "overview" || (section === "housing" && selectedHome === null);
+        }
+        if (section === "overview") {
+            overviewScreen(view);
+            return;
+        }
+        if (section === "housing" && selectedHome === null) {
+            housingScreen(view);
+            return;
+        }
+        let animals = queryLivestock(view.herd, view.homes, view.clockMinutes, view.husbandryLevel, query);
+        if (section === "care") {
+            const careHeader = element("div", "livestock-care-header");
+            careHeader.append(careActions(view));
+            const supplies = element("details", "livestock-feed-section");
+            supplies.open = feedOpen;
+            supplies.addEventListener("toggle", () => { if (supplies.isConnected)
+                feedOpen = supplies.open; });
+            supplies.append(element("summary", "", "Feed & supplies"), feedBin(view));
+            careHeader.append(supplies);
+            elements.list.append(careHeader);
+            if (!query.status)
+                animals = animals.filter((animal) => wantsServing(animal.care.hunger) || goodsState(animal, animal.care).some((good) => good.ready));
+        }
+        if (section === "breeding") {
+            animals = animals.filter((animal) => animal.gender === "female");
+            elements.list.append(heading("Breeding", "Readiness, pregnancies and recovery in one place. Select an animal to choose a mate."));
+        }
+        if (section === "housing") {
+            elements.list.append(actionButton("← All housing", () => { selectedHome = null; resetScroll = true; draw(); }, "livestock-back"));
+            const home = view.homes.find((entry) => entry.id === selectedHome);
+            animals = animals.filter((animal) => selectedHome === "__unhoused__" ? !animal.homeId || !view.homes.some((entry) => entry.id === animal.homeId) : animal.homeId === selectedHome);
+            elements.list.append(heading(home?.title ?? "Needs a home", "Select an animal to change where it lives."));
+        }
+        const slice = livestockPage(animals, page);
+        page = slice.page;
+        elements.list.append(element("p", "livestock-results", `${slice.start}–${slice.end} of ${animals.length} animals${section === "care" && !query.status ? " needing care" : ""}`));
+        if (!animals.length) {
+            elements.list.append(element("p", "livestock-empty", section === "care" && !query.search && !query.species && !query.status ? "All caught up — no goods to collect and nobody needs a serving." : "No animals match this view. Change the filters or clear them."), actionButton("Clear filters", () => { showAnimals(section); }));
+            return;
+        }
+        const roster = element("div", "livestock-roster");
+        for (const animal of slice.animals)
+            roster.append(rosterRow(animal, view));
+        elements.list.append(roster);
+        if (slice.pages > 1) {
+            const pager = element("nav", "livestock-pager");
+            pager.setAttribute("aria-label", "Animal pages");
+            const previous = actionButton("← Previous", () => { page--; resetScroll = true; draw(); });
+            const next = actionButton("Next →", () => { page++; resetScroll = true; draw(); });
+            previous.disabled = page === 0;
+            next.disabled = page === slice.pages - 1;
+            pager.append(previous, element("span", "", `Page ${page + 1} of ${slice.pages}`), next);
+            elements.list.append(pager);
+        }
+    }
+    function draw() {
+        if (!view)
+            return;
+        const scroll = resetScroll ? 0 : elements.list.scrollTop;
+        resetScroll = false;
+        try {
+            drawContent();
+        }
+        finally {
+            elements.list.scrollTop = scroll;
+        }
     }
     function setOpen(next) {
         if (next === open)
@@ -375,8 +628,10 @@ export function createLivestockPanel(elements, actions, options = {}) {
         isOpen: () => open,
         render(next) {
             view = next;
-            // A select mid-choice is not rebuilt under the player's hand.
-            if (open && (!elements.root.contains(document.activeElement) || tools.contains(document.activeElement)))
+            // Keep only an animal's editing fields stable; navigation and roster focus
+            // must not prevent a fifty-animal herd from receiving live updates.
+            const editing = elements.list.contains(document.activeElement) && document.activeElement?.matches("input, select, textarea");
+            if (open && !busy && !editing)
                 draw();
         },
         setStatus,

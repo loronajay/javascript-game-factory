@@ -1293,6 +1293,7 @@ const livestockPanel = createLivestockPanel({
     breed: (motherId, sireId) => livestock.breed(motherId, sireId),
     feed: (animalId) => livestock.feedAnimal(animalId),
     collect: (animalId, itemId) => livestock.collectAnimal(animalId, itemId),
+    collectHerd: () => livestock.collectHerd(),
     feedHerd: () => livestock.feedHerd(),
     buyFeed: async (itemId, quantity) => {
         if (!layoutStore.accountBacked)
