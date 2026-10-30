@@ -17,7 +17,7 @@ import { CPU_LEVELS, cpuLevelIndex, normalizeCpuLevel } from "../../pet-games/sh
 import { fetchCareer, fileResult, loadAccountGate, loadIdentity, newResultId, onlineResultId, recordLine } from "../../pet-games/shared/platform.js";
 
 const GAME_SLUG = "pondside-push";
-const sounds = createPetGameAudio();
+const sounds = createPetGameAudio({ game: "pondside-push" });
 const TICK_SECONDS = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
 
@@ -289,7 +289,7 @@ function loop(timestamp) {
     renderScoreboard(session.match, names);
     roundBanner.textContent = sessionBanner(session) || roundCall(session, names);
     impact = Math.max(0, ...session.match.players.map((player) => player.impact));
-    sounds.observe({ countdown: session.countdown?.phase === "countdown" ? Math.ceil(session.countdown.remaining) : 0, impact, out: session.match.players.filter((player) => player.eliminated).length });
+    sounds.observe({ countdown: session.countdown?.phase === "countdown" ? Math.ceil(session.countdown.remaining) : 0, bumping: session.match.players.find((player) => player.id === run.localId)?.bumpTimer > 0, impact, out: session.match.players.filter((player) => player.eliminated).length });
   }
   arena.render(timestamp, impact);
   requestAnimationFrame(loop);

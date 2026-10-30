@@ -19,7 +19,7 @@ import { CPU_LEVELS, cpuLevelFromIndex, cpuLevelIndex, findCpuLevel } from "../.
 import { fetchCareer, fileResult, loadAccountGate, loadIdentity, newResultId, onlineResultId, recordLine } from "../../pet-games/shared/platform.js";
 
 const GAME_SLUG = "barnyard-dash";
-const sounds = createPetGameAudio();
+const sounds = createPetGameAudio({ game: "barnyard-dash" });
 const TICK_SECONDS = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
 
