@@ -14,7 +14,9 @@ export const FARM_STARTER_IDS = new Set([
     // Every farm can make furniture (services/farm-carpentry-catalog).
     "decor.prop.workbench",
 ]);
+export const FARM_LOT_SIZES = Object.freeze({ "lot.smallholding": 40, "lot.estate": 56 });
 const prices = Object.freeze({
+    "lot.smallholding": 3500, "lot.estate": 8000,
     "ground.clover": 150, "ground.dry": 150, "ground.mud": 200, "ground.gravel": 250,
     "decor.fence.split-rail": 100, "decor.fence.wire": 125, "decor.fence.picket": 150,
     "decor.fence.hedge": 200, "decor.fence.stone-wall": 250,

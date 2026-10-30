@@ -207,11 +207,11 @@ export function createPetSim(options: PetSimOptions): PetSim {
   const keepOut = options.keepOut ?? (() => []);
   const water = options.water ?? (() => []);
   const pets: Pet[] = [];
-  const halfWidth = bounds.width / 2 - bounds.wallInset;
-  const halfDepth = bounds.depth / 2 - bounds.wallInset;
+  const halfWidth = () => bounds.width / 2 - bounds.wallInset;
+  const halfDepth = () => bounds.depth / 2 - bounds.wallInset;
 
   function inField(x: number, z: number, margin: number): boolean {
-    return Math.abs(x) <= halfWidth - margin && Math.abs(z) <= halfDepth - margin;
+    return Math.abs(x) <= halfWidth() - margin && Math.abs(z) <= halfDepth() - margin;
   }
 
   function blockedBySolid(x: number, z: number, radius: number): boolean {
@@ -311,12 +311,12 @@ export function createPetSim(options: PetSimOptions): PetSim {
       return ponds[0] ? { x: ponds[0].x, z: ponds[0].z } : { x: 0, z: 0 };
     }
     for (let attempt = 0; attempt < SPAWN_TRIES; attempt += 1) {
-      const x = (random() * 2 - 1) * (halfWidth - radius - 1);
-      const z = (random() * 2 - 1) * (halfDepth - radius - 1);
+      const x = (random() * 2 - 1) * (halfWidth() - radius - 1);
+      const z = (random() * 2 - 1) * (halfDepth() - radius - 1);
       if (standable(x, z, null, species, radius)) return { x, z };
     }
     // A crowded field: the middle of the south half is always open ground.
-    return { x: (random() - 0.5) * 4, z: halfDepth * 0.5 };
+    return { x: (random() - 0.5) * 4, z: halfDepth() * 0.5 };
   }
 
   /** A ground pet that stands inside a building's box was put there; the box is its room now, not a place to keep out of. */

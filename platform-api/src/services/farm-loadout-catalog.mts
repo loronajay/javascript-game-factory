@@ -1,3 +1,4 @@
+import { FARM_LOT_SIZES } from "./farm-ticket-catalog.mjs";
 // The farm's server-owned layout catalog: the trust boundary for what lives on
 // a player's farm.
 //
@@ -56,7 +57,7 @@ export const FARM_MAX_PETS = 24;
 const MAX_DECOR = 160;
 /** The field is 28 m; ±16 leaves margin for a wider farm without accepting nonsense. */
 const COORDINATE_LIMIT = 16;
-const LENGTH_LIMIT = 30;
+const LENGTH_LIMIT = 56;
 const SCALE_LIMIT = 5;
 const NAME_LIMIT = 20;
 const INSTANCE_ID_PATTERN = /^[a-z0-9-]{1,40}$/;
@@ -469,12 +470,12 @@ function mayUseCatalogId(id: string, context: any): boolean {
 }
 
 /** A placed item: the room's decor row shape, bounded the same way. Optional finish fields pass through when well-formed. */
-function normalizeDecorRow(raw: any): any | null {
+function normalizeDecorRow(raw: any, limit = COORDINATE_LIMIT): any | null {
   const source = raw && typeof raw === "object" ? raw : {};
   const instanceId = cleanText(source.instanceId, 40);
   const itemId = cleanText(source.itemId, 80);
-  const x = boundedNumber(source.x, COORDINATE_LIMIT);
-  const z = boundedNumber(source.z, COORDINATE_LIMIT);
+  const x = boundedNumber(source.x, limit);
+  const z = boundedNumber(source.z, limit);
   const rotationY = normalizeRotation(source.rotationY);
   if (!INSTANCE_ID_PATTERN.test(instanceId) || !DECOR_ID_PATTERN.test(itemId)) return null;
   if (x === null || z === null || rotationY === null) return null;
@@ -516,10 +517,12 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
     pets.push(row);
     if (pets.length >= FARM_MAX_PETS) break;
   }
+  const lot = typeof input.lot === "string" && FARM_LOT_SIZES[input.lot] && mayUseCatalogId(input.lot, context) ? input.lot : undefined;
   const submittedGround = cleanText(input.ground, 80);
   const garage: any = {
     ...(typeof input.horseStockRefreshedAt === "number" && input.horseStockRefreshedAt > 0 ? { horseStockRefreshedAt: Math.min(input.horseStockRefreshedAt, 1000000000000000) } : {}),
     version: LAYOUT_VERSIONS.has(input.version) ? input.version : LAYOUT_VERSION,
+    ...(lot ? { lot } : {}),
     ground: GROUND_ID_PATTERN.test(submittedGround) && mayUseCatalogId(submittedGround, context) ? submittedGround : "",
     pets,
   };
@@ -587,7 +590,7 @@ export function normalizeFarmGarage(value: any, context: any = {}): any {
     const decor: any[] = [];
     const mountedFish = new Set<string>();
     for (const raw of input.decor.slice(0, MAX_DECOR)) {
-      const row = normalizeDecorRow(raw);
+      const row = normalizeDecorRow(raw, lot ? FARM_LOT_SIZES[lot]! / 2 : COORDINATE_LIMIT);
       if (!row || seen.has(row.instanceId)) continue;
       // One fish, one plaque.
       if (row.fishId) {

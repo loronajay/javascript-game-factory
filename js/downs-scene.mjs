@@ -11,7 +11,7 @@
 //
 // x runs east, z south, y up; the Market Square's west gate is off the east
 // edge. The ground's height is `downs-terrain.mts`.
-import { DOWNS_BOUNDS, DOWNS_EARTHWORKS, DOWNS_HALF_DEPTH, DOWNS_HALF_WIDTH, DOWNS_ZONES, downsGround } from "./downs-terrain.mjs";
+import { DOWNS_BOUNDS, DOWNS_JUMP_PADS, DOWNS_EARTHWORKS, DOWNS_HALF_DEPTH, DOWNS_HALF_WIDTH, DOWNS_ZONES, downsGround } from "./downs-terrain.mjs";
 export { DOWNS_BOUNDS } from "./downs-terrain.mjs";
 /** Everyone at the Downs shares one presence room on the arcade-room bridge. */
 export const DOWNS_PRESENCE_ROOM = "farm:downs";
@@ -126,8 +126,22 @@ export function ovalRails() {
             const b = ovalPoint((index + 1) / steps, offset);
             const outer = offset > 0;
             const onNorth = Math.abs(a.z - (OVAL.cz - OVAL.radius - offset)) < 0.01 && Math.abs(b.z - a.z) < 0.01;
-            if (outer && onNorth && OVAL_GAPS.some((gap) => Math.max(a.x, b.x) > gap.from && Math.min(a.x, b.x) < gap.to))
+            if (outer && onNorth) {
+                let spans = [{ from: Math.min(a.x, b.x), to: Math.max(a.x, b.x) }];
+                for (const gap of OVAL_GAPS) {
+                    spans = spans.flatMap((span) => {
+                        if (span.to <= gap.from || span.from >= gap.to)
+                            return [span];
+                        return [
+                            ...(span.from < gap.from ? [{ from: span.from, to: gap.from }] : []),
+                            ...(span.to > gap.to ? [{ from: gap.to, to: span.to }] : []),
+                        ];
+                    });
+                }
+                for (const span of spans)
+                    add(point(span.from, a.z), point(span.to, a.z));
                 continue;
+            }
             add(a, b);
         }
     }
@@ -138,7 +152,7 @@ export function ovalRails() {
 export const XC_TRAIL = Object.freeze([
     point(66, -8), point(40, -10), point(10, -11), point(-12, -16), point(-28, -20), point(-48, -14), point(-68, -18),
     point(-84, -26), point(-86, -12), point(-86, 6), point(-86, 22), point(-88, 38), point(-90, 52), point(-88, 66),
-    point(-76, 74), point(-50, 74), point(-20, 74), point(10, 74), point(40, 74), point(62, 70), point(66, 56),
+    point(-76, 72), point(-50, 72), point(-20, 72), point(10, 72), point(40, 72), point(62, 70), point(66, 56),
     point(66, 40), point(67, 26),
 ]);
 export const XC_START = line("xc-start", 60, -8.5, WEST, 10);
@@ -151,19 +165,23 @@ function xcFences(championship) {
     const drop = earthwork("xc-drop");
     const ditch = earthwork("xc-ditch");
     const splash = earthwork("xc-splash");
+    const jump = (id, kind, number, clearance) => {
+        const pad = DOWNS_JUMP_PADS.find((entry) => entry.id === id);
+        return fence(id, kind, pad.x, pad.z, pad.heading, number, clearance, pad.width);
+    };
     return [
-        fence("xc-1", "log", 34, -10.2, WEST, 1, 0.6 + up, 4),
-        fence("xc-2", "hedge", -2, -13.5, WEST, 2, 0.85 + up, 4.5),
+        jump("xc-1", "log", 1, 0.6 + up),
+        jump("xc-2", "hedge", 2, 0.85 + up),
         fence("xc-3", "ditch", ditch.x, ditch.z, WEST, 3, 0.25, ditch.width, ditch.depth),
-        fence("xc-4", "brush", -58, -16, WEST, 4, 1.0 + up, 4.5),
+        jump("xc-4", "brush", 4, 1.0 + up),
         fence("xc-5", "bank", bank.x, bank.z, SOUTH, 5, 0, bank.width, 2),
-        fence("xc-6", "log", -86, 8, SOUTH, 6, 0.7 + up, 4),
+        jump("xc-6", "log", 6, 0.7 + up),
         fence("xc-7", "drop", drop.x, drop.z, SOUTH, 7, 0, drop.width, 2),
         fence("xc-8", "splash", splash.x, splash.z, SOUTH, 8, 0, splash.width, 3),
-        fence("xc-9", "hedge", -36, 74, EAST, 9, 0.9 + up, 5),
-        fence("xc-10", "log", 0, 74, EAST, 10, 0.75 + up, 4),
-        fence("xc-11", "wall", 28, 74, EAST, 11, 0.95 + up, 4.5),
-        fence("xc-12", "brush", 66, 48, NORTH, 12, 1.05 + up, 4.5),
+        jump("xc-9", "hedge", 9, 0.9 + up),
+        jump("xc-10", "log", 10, 0.75 + up),
+        jump("xc-11", "wall", 11, 0.95 + up),
+        jump("xc-12", "brush", 12, 1.05 + up),
     ];
 }
 export const XC_FENCES = Object.freeze(xcFences(false));

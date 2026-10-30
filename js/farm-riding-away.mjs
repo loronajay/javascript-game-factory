@@ -139,6 +139,9 @@ export function createAwayRiding(THREE, scene, options) {
                 }));
             }
             bodies.sync([...tether.bodies(), ...theirs], dt);
+            // sync creates/recreates bodies: hide the local mount tag after it exists.
+            if (horse)
+                bodies.setTagVisible(horse.instanceId, !riding.mounted());
             for (const body of theirs)
                 bodies.setTagVisible(body.instanceId, false);
             riderView.update(ride ? {

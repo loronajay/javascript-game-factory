@@ -23,7 +23,7 @@ import { createSurfaceMaterial, applySurfaceMaterial } from "./arcade-room-surfa
 import type { SurfaceStyle } from "./arcade-room-catalog/surfaces.mjs";
 import { DEFAULT_GROUND_ID, findGround } from "./farm-catalog/ground.mjs";
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
-import { FARM_BOUNDS, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { MAX_PONDS, pondRegions, type PondRegion } from "./farm-pond.mjs";
 import { decorBaseHeight } from "./farm-scene.mjs";
 import { createFarmDecorModel, type BarnDoors } from "./farm-props.mjs";
@@ -352,6 +352,8 @@ export function createFarmWorld(THREE: ThreeNamespace, scene: any, options: Farm
   }
 
   function sync(layout: FarmLayout): void {
+    const bounds = farmLotBounds(layout);
+    ground.scale.set(bounds.width / width, bounds.depth / depth, 1);
     const wanted = new Set<string>();
     const ponds = pondRegions(layout);
     cutHoles(ponds);

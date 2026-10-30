@@ -319,7 +319,7 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.doesNotMatch(editorSource, /localStorage/);
   assert.match(editorSource, /persist\(layout\)/);
   // Stretch from one end with the far end anchored; a typed length grows about the middle; both are preview/commit gestures.
-  assert.match(editorSource, /stretchFarmDecorEnd\(layout, row\.instanceId, handleDrag\.end, point, FARM_BOUNDS, snapThreshold\(event\)\)/);
+  assert.match(editorSource, /stretchFarmDecorEnd\(layout, row\.instanceId, handleDrag\.end, point, farmLotBounds\(layout\), snapThreshold\(event\)\)/);
   assert.match(editorSource, /editLength\(result, "preview"\)/);
   assert.match(panelSource, /addEventListener\("input", \(event\) => lengthEdit\(event, "preview"\)\)/);
   assert.match(panelSource, /addEventListener\("change", \(event\) => lengthEdit\(event, "commit"\)\)/);

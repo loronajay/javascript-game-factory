@@ -26,7 +26,7 @@
 //   it (the move is refused if one of them would not fit where it lands), and
 //   a pond that is removed takes them with it.
 import { clampFarmDecorLength, farmDecorFootprint, findFarmDecor } from "./farm-catalog/decor.mjs";
-import { FARM_BOUNDS, MAX_DECOR, farmHabitats, waterPets, withFarmDecor } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS, MAX_DECOR, farmHabitats, waterPets, withFarmDecor } from "./farm-layout.mjs";
 import { FARM_SPAWN, buildingLocalToWorld, farmObstacles } from "./farm-scene.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 import { MAX_PONDS, aquaticFits, homePond, pondRegions } from "./farm-pond.mjs";
@@ -152,7 +152,7 @@ export function buildingContents(layout, building) {
     });
 }
 /** Why a box may not stand where it is asked to, or "ok". */
-export function judgePlacement(layout, instanceId, definition, box, bounds = FARM_BOUNDS) {
+export function judgePlacement(layout, instanceId, definition, box, bounds = farmLotBounds(layout)) {
     if (!insideFieldBox(box, box.footprint, bounds))
         return "outside";
     if ((definition.solid || definition.keepOut) && obstacleBlocks(FARM_SPAWN, box, SPAWN_CLEARANCE))
@@ -232,14 +232,14 @@ function tryPlace(layout, item, definition, wanted, bounds) {
     return { valid: true, layout: placed, instanceId: item.instanceId, reason: "" };
 }
 /** Move (and turn) a placed item; the spot is clamped to the field and refused when taken. */
-export function placeFarmDecor(layout, instanceId, wanted, bounds = FARM_BOUNDS) {
+export function placeFarmDecor(layout, instanceId, wanted, bounds = farmLotBounds(layout)) {
     const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     const definition = item && definitionOf(item);
     if (!item || !definition)
         return { valid: false, layout, instanceId, reason: "missing" };
     return tryPlace(layout, item, definition, wanted, bounds);
 }
-export function rotateFarmDecor(layout, instanceId, direction, bounds = FARM_BOUNDS) {
+export function rotateFarmDecor(layout, instanceId, direction, bounds = farmLotBounds(layout)) {
     const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     const definition = item && definitionOf(item);
     if (!item || !definition)
@@ -278,7 +278,7 @@ function fitLength(layout, item, definition, anchor, direction, wanted, bounds) 
     return low;
 }
 /** Set a stretchable item's length about its centre, shrinking until it fits. */
-export function setFarmDecorLength(layout, instanceId, length, bounds = FARM_BOUNDS) {
+export function setFarmDecorLength(layout, instanceId, length, bounds = farmLotBounds(layout)) {
     const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     const definition = item && definitionOf(item);
     if (!item || !definition)
@@ -334,7 +334,7 @@ function otherFenceEnds(layout, instanceId) {
  * stays put; the length is what the hand asks for, snapped to a neighbouring
  * fence end within `snap` metres, then shrunk until the run fits.
  */
-export function stretchFarmDecorEnd(layout, instanceId, end, point, bounds = FARM_BOUNDS, snap = 0) {
+export function stretchFarmDecorEnd(layout, instanceId, end, point, bounds = farmLotBounds(layout), snap = 0) {
     const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     const definition = item && definitionOf(item);
     if (!item || !definition)
@@ -437,8 +437,8 @@ function guideSpan(first, second) {
 /** Edge/centre snapping for plots, buildings, plants and props, matching the room editor's alignment language. */
 function alignFarmDecorBox(layout, item, definition, wanted, snap) {
     const mine = decorSpans(wanted, farmDecorFootprint(definition, item));
-    const limitX = FARM_BOUNDS.width / 2 - FARM_BOUNDS.wallInset;
-    const limitZ = FARM_BOUNDS.depth / 2 - FARM_BOUNDS.wallInset;
+    const limitX = farmLotBounds(layout).width / 2 - FARM_BOUNDS.wallInset;
+    const limitZ = farmLotBounds(layout).depth / 2 - FARM_BOUNDS.wallInset;
     const fullX = [-limitX, limitX];
     const fullZ = [-limitZ, limitZ];
     const xCandidates = [
@@ -491,7 +491,7 @@ export function farmDecorHandles(layout, instanceId) {
     ];
 }
 /** Add a catalog item near a point: the point itself, then rings of spots around it until one is free. */
-export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
+export function addFarmDecor(layout, definition, near, bounds = farmLotBounds(layout)) {
     // A mounted fish stands on one plaque at a time.
     if (near.fishId && layout.decor.some((row) => row.fishId === near.fishId))
         return { valid: false, layout, instanceId: "", reason: "blocked" };
@@ -571,7 +571,7 @@ export function addFarmDecor(layout, definition, near, bounds = FARM_BOUNDS) {
     }
     return { valid: false, layout, instanceId: "", reason: "blocked" };
 }
-export function duplicateFarmDecor(layout, instanceId, bounds = FARM_BOUNDS) {
+export function duplicateFarmDecor(layout, instanceId, bounds = farmLotBounds(layout)) {
     const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
     const definition = item && definitionOf(item);
     if (!item || !definition)

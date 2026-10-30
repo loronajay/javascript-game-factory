@@ -41,8 +41,19 @@ export const DOWNS_EARTHWORKS = Object.freeze([
     Object.freeze({ id: "xc-ditch", kind: "ditch", x: -28, z: -20, heading: Math.PI / 2, width: 9, depth: 2, height: 0.9 }),
     Object.freeze({ id: "xc-splash", kind: "splash", x: -90, z: 52, heading: Math.PI, width: 12, depth: 12, height: 0.45 }),
 ]);
-/** The stream along the Downs' south side (a shallow wade, never deep). */
-export const DOWNS_STREAM = Object.freeze({ z: 77, halfWidth: 1.6, depth: 0.35 });
+/** Level take-off/landing pads shared with the cross-country fence positions. */
+export const DOWNS_JUMP_PADS = Object.freeze([
+    { id: "xc-1", x: 34, z: -10.2, heading: Math.PI / 2, width: 4 },
+    { id: "xc-2", x: -2, z: -13.5, heading: Math.PI / 2, width: 4.5 },
+    { id: "xc-4", x: -58, z: -16, heading: Math.PI / 2, width: 4.5 },
+    { id: "xc-6", x: -86, z: 8, heading: Math.PI, width: 4 },
+    { id: "xc-9", x: -36, z: 72, heading: -Math.PI / 2, width: 5 },
+    { id: "xc-10", x: 0, z: 72, heading: -Math.PI / 2, width: 4 },
+    { id: "xc-11", x: 28, z: 72, heading: -Math.PI / 2, width: 4.5 },
+    { id: "xc-12", x: 66, z: 48, heading: 0, width: 4.5 },
+]);
+/** The scenic stream beyond the southern boundary; the course stays on dry land. */
+export const DOWNS_STREAM = Object.freeze({ z: 84, halfWidth: 1.6, depth: 0.35 });
 const smooth = (edge0, edge1, value) => {
     const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
     return t * t * (3 - 2 * t);
@@ -97,20 +108,38 @@ function earthworkLift(work, x, z) {
     const reach = Math.hypot(along / (work.depth / 2), across / (work.width / 2));
     return -work.height * 1.6 * (1 - smooth(0.6, 1.15, reach));
 }
-/** The ground's height at a point. */
-export function downsGround(point) {
+/** Natural land before obstacle pads and earthworks. */
+function baseGround(point) {
     const { x, z } = point;
     let height = rolling(x, z);
     for (const rise of RISES) {
         const distance = Math.hypot(x - rise.x, z - rise.z);
         height += rise.height * Math.exp(-(distance * distance) / (2 * rise.radius * rise.radius));
     }
-    height *= 1 - downsFlatness(x, z);
+    return height * (1 - downsFlatness(x, z));
+}
+const GRADED_PADS = [...DOWNS_JUMP_PADS, ...DOWNS_EARTHWORKS].map((pad) => ({
+    ...pad, height: baseGround(pad), cosine: Math.cos(pad.heading), sine: Math.sin(pad.heading),
+    halfDepth: "depth" in pad ? pad.depth / 2 : 2,
+}));
+/** Ground shared by the terrain mesh, horse simulation and placed obstacles. */
+export function downsGround(point) {
+    const { x, z } = point;
+    let height = baseGround(point);
+    // Broad smooth approaches, level across each jump so neither end floats or buries.
+    for (const pad of GRADED_PADS) {
+        const dx = x - pad.x, dz = z - pad.z;
+        const along = -dx * pad.sine - dz * pad.cosine;
+        const across = dx * pad.cosine - dz * pad.sine;
+        const blend = (1 - smooth(pad.width / 2 + 1.2, pad.width / 2 + 6, Math.abs(across)))
+            * (1 - smooth(pad.halfDepth + 1, pad.halfDepth + 9, Math.abs(along)));
+        height += (pad.height - height) * blend;
+    }
     for (const work of DOWNS_EARTHWORKS)
         height += earthworkLift(work, x, z);
     // The stream cuts a shallow bed along the south side.
     const stream = Math.abs(z - DOWNS_STREAM.z);
-    height -= DOWNS_STREAM.depth * 1.8 * (1 - smooth(DOWNS_STREAM.halfWidth, DOWNS_STREAM.halfWidth + 2.5, stream));
+    height -= DOWNS_STREAM.depth * 1.8 * (1 - smooth(DOWNS_STREAM.halfWidth, DOWNS_STREAM.halfWidth + 0.8, stream));
     return height;
 }
 /** The water's surface where there is water (the splash, the stream), or null. */
@@ -119,8 +148,8 @@ export function downsWaterSurface(point) {
     const { along, across } = localTo(splash, point.x, point.z);
     if (Math.hypot(along / (splash.depth / 2), across / (splash.width / 2)) < 1)
         return downsGround({ x: splash.x, z: splash.z }) + splash.height;
-    if (Math.abs(point.z - DOWNS_STREAM.z) < DOWNS_STREAM.halfWidth + 1.2)
-        return -DOWNS_STREAM.depth * 0.8;
+    if (Math.abs(point.z - DOWNS_STREAM.z) < DOWNS_STREAM.halfWidth)
+        return downsGround({ x: point.x, z: DOWNS_STREAM.z }) + DOWNS_STREAM.depth;
     return null;
 }
 /** How much water stands over a point (the ride sim slows a horse in it; none is ever deep enough to stop one). */

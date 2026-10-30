@@ -20,7 +20,7 @@
 // young one is minted by the server at the settle after it comes due — so when
 // the page's own sums say a mother is due, it asks for a checkup (once, until
 // the homes change), exactly as it does for a death.
-import { FARM_BOUNDS } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS } from "./farm-layout.mjs";
 import { findPetInReach } from "./farm-interaction.mjs";
 import { createLivestockBodies, livestockPaletteId } from "./farm-livestock-bodies.mjs";
 import { createHerdSim } from "./farm-livestock-sim.mjs";
@@ -51,7 +51,7 @@ export function createFarmLivestockController(options) {
     /** Mothers whose due birth has been asked for; cleared when the homes change (a new place may have opened). */
     const askedBirth = new Set();
     const sim = createHerdSim({
-        bounds: FARM_BOUNDS,
+        bounds: { get width() { return farmLotBounds(options.layout()).width; }, get depth() { return farmLotBounds(options.layout()).depth; }, wallInset: FARM_BOUNDS.wallInset },
         random: Math.random,
         obstacles: options.obstacles,
         keepOut: options.keepOut,

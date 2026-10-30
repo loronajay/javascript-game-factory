@@ -24,7 +24,7 @@ import { GROUNDED_BODY, bodyObstacles, createFarmBody, eyeHeight, grabLadder, is
 import { getRidingPrompt } from "./farm-interaction.mjs";
 import { BED_PROMPT, CLIMBING_PROMPT, SEAT_PROMPT, SEATED_PROMPT, canWorkDoor, findBedInReach, findLadderInReach, findPetInReach, findSeatInReach, getDoorPrompt, findPutDownSpot, getLadderPrompt, getPetInteraction, getPetInteractionPrompt, getPutDownPrompt, putDownSpot, type BedRow, type LadderInReach, type PetInteractionId, type SeatInReach } from "./farm-interaction.mjs";
 import { canNap, formatNapMinutes, napBankReadyIn } from "./farm-nap-bank.mjs";
-import { FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withFarmTrees, withAwayGrowth, withNapTaken, withProductionCheckpoint, type FarmLayout } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS, FARM_LAYOUT_SPEC, addPet, farmNapBank, normalizeFarmLayout, removePet, renamePet, withFarmAgriculture, withFarmClock, withFarmPets, withFarmTrees, withAwayGrowth, withNapTaken, withProductionCheckpoint, type FarmLayout } from "./farm-layout.mjs";
 import { createFarmEditor } from "./farm-editor.mjs";
 import { createFarmDecorThumbnails } from "./farm-decor-thumbnails.mjs";
 import { createPetSim } from "./farm-pets.mjs";
@@ -315,7 +315,7 @@ let livestockSync: () => void = () => undefined;
 const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
 let body: FarmBody = createFarmBody();
-const walkerBounds = { halfWidth: FARM_BOUNDS.width / 2, halfDepth: FARM_BOUNDS.depth / 2, margin: FARM_BOUNDS.wallInset };
+const walkerBounds = { get halfWidth() { return farmLotBounds(layout).width / 2; }, get halfDepth() { return farmLotBounds(layout).depth / 2; }, margin: FARM_BOUNDS.wallInset };
 // Solid things change when a door or a gate swings: a shut one is an obstacle, an open one is not.
 // Keyed by door id: a building or gate under its instance id, a stall half-door under `<instanceId>-<fixture>`.
 const openDoors = new Set<string>();
@@ -343,7 +343,7 @@ let draggingLook = false;
 // The pets: a pure sim decides, bodies draw. The sim shares the walker's obstacle list, keeps
 // its destinations outside every building's box, and keeps the swimmers inside the ponds.
 const petSim = createPetSim({
-  bounds: FARM_BOUNDS,
+  bounds: { get width() { return farmLotBounds(layout).width; }, get depth() { return farmLotBounds(layout).depth; }, wallInset: FARM_BOUNDS.wallInset },
   random: Math.random,
   // Animals live on the ground: the solids that cross an animal's height, never a loft over its head.
   obstacles: () => obstaclesForSpan(obstacles, 0.05, 1.2),
@@ -533,7 +533,7 @@ function updateInteraction(): void {
     }
     const horseName = petSim.find(riding.mounted())?.name ?? "your horse";
     if (doorInReach) {
-      const road = perimeterGates(layout.decor, FARM_BOUNDS).some((gate) => gate.instanceId === doorInReach!.doorId);
+      const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach!.doorId);
       setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · ride out to the Market Square" : " · a horse does not go indoors"));
       return;
     }
@@ -596,7 +596,7 @@ function updateInteraction(): void {
     return;
   }
   if (doorInReach) {
-    const road = perimeterGates(layout.decor, FARM_BOUNDS).some((gate) => gate.instanceId === doorInReach!.doorId);
+    const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach!.doorId);
     setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · the road to the Market Square" : ""));
     return;
   }
@@ -872,6 +872,7 @@ function toggleDoors(): void {
  */
 function applyLayout(next: FarmLayout): void {
   layout = next;
+  grid.scale.setScalar(farmLotBounds(layout).width / FARM_BOUNDS.width);
   world.applyGround(layout.ground);
   world.sync(layout);
   cropsView.sync(layout, layout.agriculture, clockMinutes);
@@ -1575,7 +1576,7 @@ liveNeedsCheckpoint = () => {
 let leavingForMarket = false;
 function checkGateway(): void {
   if (!farmEntered || leavingForMarket || farmEditor.isEditing() || body.mode !== "walking") return;
-  if (!gatewayAt(layout.decor, openDoors, player, FARM_BOUNDS)) return;
+  if (!gatewayAt(layout.decor, openDoors, player, farmLotBounds(layout))) return;
   if (carrying) {
     setPrompt(`Set ${petSim.find(carrying)?.name ?? "your pet"} down before heading to the market`);
     return;

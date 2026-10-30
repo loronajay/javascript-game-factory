@@ -33,6 +33,8 @@ import { MAX_HORSES, companionCount, horseCount } from "./farm-resident-capacity
 export const FARM_LAYOUT_STORAGE_KEY = "jgf.player-farm.layout.v1";
 export const FARM_LAYOUT_VERSION = 3;
 /** The walkable field. The inset is how far in from the field's edge anything may stand. */
+export { farmLotBounds } from "./farm-catalog/lots.mjs";
+import { farmLotBounds, FARM_LOTS } from "./farm-catalog/lots.mjs";
 export const FARM_BOUNDS = Object.freeze({ width: 28, depth: 28, wallInset: 0.3 });
 export const MAX_PETS = 12;
 export const MAX_DECOR = 120;
@@ -236,7 +238,7 @@ function wrapRotation(value) {
     const turn = Math.PI * 2;
     return Number((((value % turn) + turn) % turn).toFixed(4));
 }
-export function normalizeFarmDecorRow(value) {
+export function normalizeFarmDecorRow(value, bounds = FARM_BOUNDS) {
     if (!value || typeof value !== "object")
         return null;
     const source = value;
@@ -247,8 +249,8 @@ export function normalizeFarmDecorRow(value) {
         return null;
     if (!finiteNumber(source.x) || !finiteNumber(source.z))
         return null;
-    const limitX = FARM_BOUNDS.width / 2;
-    const limitZ = FARM_BOUNDS.depth / 2;
+    const limitX = bounds.width / 2;
+    const limitZ = bounds.depth / 2;
     const memorialId = definition.id === "decor.prop.pet-tombstone" && typeof source.memorialId === "string" && /^[a-z0-9-]{1,40}$/.test(source.memorialId) ? source.memorialId : undefined;
     // A crafted piece is the piece it was made as: without its stars it is not one.
     const crafted = definition.unlock.type === "crafted";
@@ -322,7 +324,7 @@ export function normalizeFarmLayout(value) {
     else {
         decor = [];
         for (const raw of source.decor) {
-            const item = normalizeFarmDecorRow(raw);
+            const item = normalizeFarmDecorRow(raw, farmLotBounds(source));
             if (!item || seen.has(item.instanceId))
                 continue;
             seen.add(item.instanceId);
@@ -392,7 +394,7 @@ export function normalizeFarmLayout(value) {
         napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
     };
     const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-    return freezeLayout({ version: 3, onboarding, ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
+    return freezeLayout({ version: 3, onboarding, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
 }
 export function parseFarmLayout(serialized) {
     if (!serialized)
@@ -511,6 +513,7 @@ export function farmDecorRowsEqual(first, second) {
 export function farmLayoutsEqual(first, second) {
     return first.onboarding.status === second.onboarding.status
         && first.onboarding.introSeen === second.onboarding.introSeen
+        && first.lot === second.lot
         && first.ground === second.ground
         && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
         && JSON.stringify(first.trees) === JSON.stringify(second.trees)
@@ -540,3 +543,30 @@ export const FARM_LAYOUT_SPEC = Object.freeze({
     normalize: normalizeFarmLayout,
     createDefault: createDefaultFarmLayout,
 });
+/** Expand existing boundary runs and their gateway while keeping the homesite intact. */
+export function expandFarmLot(layout, lot) {
+    const before = farmLotBounds(layout);
+    const after = farmLotBounds({ lot });
+    if (after.width <= before.width)
+        return layout;
+    const oldEdge = before.width / 2 - before.wallInset - 0.07;
+    const edge = after.width / 2 - after.wallInset - 0.07;
+    const delta = edge - oldEdge;
+    const decor = layout.decor.map((row) => {
+        const definition = findFarmDecor(row.itemId);
+        if (definition?.category !== "fence")
+            return row;
+        const horizontal = Math.abs(Math.sin(row.rotationY)) < 0.01;
+        const vertical = Math.abs(Math.cos(row.rotationY)) < 0.01;
+        if (horizontal && Math.abs(Math.abs(row.z) - oldEdge) < 0.15) {
+            const x = row.length > 0 && Math.abs(row.x) > 0.1 ? row.x + Math.sign(row.x) * delta / 2 : row.x;
+            const length = row.length > 0 ? row.length + (Math.abs(row.x) > 0.1 ? delta : delta * 2) : 0;
+            return { ...row, x, z: Math.sign(row.z) * edge, length };
+        }
+        if (vertical && Math.abs(Math.abs(row.x) - oldEdge) < 0.15) {
+            return { ...row, x: Math.sign(row.x) * edge, length: row.length > 0 ? row.length + delta * 2 : 0 };
+        }
+        return row;
+    });
+    return normalizeFarmLayout({ ...layout, lot, decor });
+}

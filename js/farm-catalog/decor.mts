@@ -214,7 +214,7 @@ function item(variant: string, spec: Spec): FarmDecorDefinition {
 }
 
 /** How long a fence run may be: a single panel up to the whole side of the field. */
-const FENCE_LENGTH = Object.freeze({ min: 1, max: 28, default: 4 });
+const FENCE_LENGTH = Object.freeze({ min: 1, max: 56, default: 4 });
 
 /** Shells. A door's reach is how close the player must be to work it; wide doors are worked from further off. */
 function walls(wallHeight: number, door: BuildingDoor, wallThickness = 0.2): BuildingShell {

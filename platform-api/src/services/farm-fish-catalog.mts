@@ -273,6 +273,10 @@ export const COVE_DOCK_DECKS: readonly Rect[] = Object.freeze([
   rect(-11.2, -8.8, -2, SHORE_Z + 0.8),
   rect(9.8, 12.2, -7, SHORE_Z + 0.8),
   rect(7.6, 14.4, -11, -7),
+  rect(-17.2, -14.8, -10, SHORE_Z + 0.8),
+  rect(-18.4, -13.6, -13, -9),
+  rect(1.2, 7, -3.2, -0.8),
+  rect(5.8, 8.2, -6, 1),
 ]);
 
 function insideRect(point: Readonly<{ x: number; z: number }>, box: Rect, margin = 0): boolean {

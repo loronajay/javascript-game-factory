@@ -313,7 +313,7 @@ test("decor rows are validated per field: catalog id, clean instance id, finite 
   assert.equal(row.x, 14);
   assert.equal(row.z, -3.5);
   assert.ok(row.rotationY > 4.7 && row.rotationY < 4.72);
-  assert.equal(row.length, 28, "clamped to the catalog's range");
+  assert.equal(row.length, 56, "clamped to the catalog's range");
   assert.equal(normalizeFarmDecorRow({ instanceId: "oak-1", itemId: "decor.plant.oak", x: 1, z: 1, rotationY: 0, length: 5 }).length, 0, "a tree has no length");
   assert.equal(normalizeFarmDecorRow({ instanceId: "post-rail-1", itemId: "decor.fence.post-rail", x: 1, z: 1 }).length, 4, "a fence without a length gets the default");
   assert.equal(normalizeFarmDecorRow({ instanceId: "cab-1", itemId: "cabinet.bird-duty.standard", x: 1, z: 1, rotationY: 0 }), null);

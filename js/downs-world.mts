@@ -66,7 +66,8 @@ function createSkyDome(THREE: ThreeNamespace): any {
 function createTerrain(THREE: ThreeNamespace): any {
   const width = DOWNS_BOUNDS.width + APRON * 2;
   const depth = DOWNS_BOUNDS.depth + APRON * 2;
-  const step = 2.5;
+  // Metre samples preserve narrow ditches and reduce track/ground intersections.
+  const step = 1;
   const geometry = new THREE.PlaneGeometry(width, depth, Math.round(width / step), Math.round(depth / step));
   geometry.rotateX(-Math.PI / 2);
   const position = geometry.attributes.position;
@@ -90,6 +91,8 @@ function createRibbon(THREE: ThreeNamespace, points: readonly DownsPoint[], widt
   const positions: number[] = [];
   const indices: number[] = [];
   const count = points.length;
+  const acrossSteps = Math.max(2, Math.ceil(width));
+  const stride = acrossSteps + 1;
   for (let index = 0; index < count; index += 1) {
     const prev = points[closed ? (index - 1 + count) % count : Math.max(0, index - 1)]!;
     const next = points[closed ? (index + 1) % count : Math.min(count - 1, index + 1)]!;
@@ -98,15 +101,19 @@ function createRibbon(THREE: ThreeNamespace, points: readonly DownsPoint[], widt
     const length = Math.hypot(dx, dz) || 1;
     const nx = -dz / length;
     const nz = dx / length;
-    for (const side of [-1, 1]) {
+    // Sample across as well as along: a wide ribbon must follow dips and banks.
+    for (let across = 0; across <= acrossSteps; across += 1) {
+      const side = across / acrossSteps * 2 - 1;
       const x = points[index]!.x + nx * side * width / 2;
       const z = points[index]!.z + nz * side * width / 2;
       positions.push(x, downsGround({ x, z }) + lift, z);
     }
     if (index < count - 1 || closed) {
-      const a = index * 2;
-      const b = ((index + 1) % count) * 2;
-      indices.push(a, b, a + 1, a + 1, b, b + 1);
+      for (let across = 0; across < acrossSteps; across += 1) {
+        const a = index * stride + across;
+        const b = ((index + 1) % count) * stride + across;
+        indices.push(a, b, a + 1, a + 1, b, b + 1);
+      }
     }
   }
   const geometry = new THREE.BufferGeometry();
@@ -162,9 +169,17 @@ function createWater(THREE: ThreeNamespace): any {
   disc.scale.set(splash.width / 2, splash.depth / 2, 1);
   disc.position.set(splash.x, (downsWaterSurface(splash) ?? 0) + 0.01, splash.z);
   group.add(disc);
-  const stream = new THREE.Mesh(new THREE.PlaneGeometry(DOWNS_BOUNDS.width + APRON * 2, DOWNS_STREAM.halfWidth * 2 + 1.6), material);
-  stream.rotation.x = -Math.PI / 2;
-  stream.position.set(0, (downsWaterSurface({ x: 0, z: DOWNS_STREAM.z }) ?? 0) + 0.01, DOWNS_STREAM.z);
+  const streamWidth = DOWNS_BOUNDS.width + APRON * 2;
+  const geometry = new THREE.PlaneGeometry(streamWidth, DOWNS_STREAM.halfWidth * 2, Math.ceil(streamWidth), 1);
+  geometry.rotateX(-Math.PI / 2);
+  const positions = geometry.attributes.position;
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    positions.setZ(index, positions.getZ(index) + DOWNS_STREAM.z);
+    positions.setY(index, (downsWaterSurface({ x, z: DOWNS_STREAM.z }) ?? 0) + 0.01);
+  }
+  geometry.computeVertexNormals();
+  const stream = new THREE.Mesh(geometry, material);
   group.add(stream);
   return group;
 }

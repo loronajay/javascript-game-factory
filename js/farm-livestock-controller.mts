@@ -21,7 +21,7 @@
 // the page's own sums say a mother is due, it asks for a checkup (once, until
 // the homes change), exactly as it does for a death.
 
-import { FARM_BOUNDS } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS } from "./farm-layout.mjs";
 import type { FarmLayout } from "./farm-layout.mjs";
 import type { FloorObstacle } from "./arcade-room-layout.mjs";
 import type { PondRegion } from "./farm-pond.mjs";
@@ -116,7 +116,7 @@ export function createFarmLivestockController(options: Readonly<{
   /** Mothers whose due birth has been asked for; cleared when the homes change (a new place may have opened). */
   const askedBirth = new Set<string>();
   const sim = createHerdSim({
-    bounds: FARM_BOUNDS,
+    bounds: { get width() { return farmLotBounds(options.layout()).width; }, get depth() { return farmLotBounds(options.layout()).depth; }, wallInset: FARM_BOUNDS.wallInset },
     random: Math.random,
     obstacles: options.obstacles,
     keepOut: options.keepOut,

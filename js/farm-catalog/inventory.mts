@@ -1,3 +1,4 @@
+import { FARM_LOTS } from "./lots.mjs";
 import { FARM_DECOR_CATALOG } from "./decor.mjs";
 import { GROUND_CATALOG, DEFAULT_GROUND_ID, findGround } from "./ground.mjs";
 
@@ -13,6 +14,7 @@ export function createFarmInventory(options: FarmInventoryOptions = {}): FarmInv
   const definitions = [...GROUND_CATALOG, ...FARM_DECOR_CATALOG];
   // Achievement props and crafted furniture are never "owned": the one is placed by an outcome, the other is counted stock.
   const known = new Set(definitions.filter((row) => row.unlock.type !== "achievement" && row.unlock.type !== "crafted").map((row) => row.id));
+  for (const lot of FARM_LOTS) known.add(lot.id);
   const starter = new Set(definitions.filter((row) => row.unlock.type === "starter").map((row) => row.id));
   const granted = new Set((options.ownedIds ?? []).filter((id) => known.has(id)));
   const owns = (id: string): boolean => known.has(id) && (starter.has(id) || granted.has(id));

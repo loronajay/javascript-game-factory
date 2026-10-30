@@ -159,7 +159,10 @@ function drawFence(THREE: ThreeNamespace, fence: DownsFence): any {
       break;
   }
   markings(THREE, group, fence, Math.max(h, 1));
-  group.position.set(fence.x, downsGround(fence), fence.z);
+  const base = fence.kind === "ditch"
+    ? downsGround({ x: fence.x + Math.sin(fence.heading) * (fence.depth / 2 + 0.7), z: fence.z + Math.cos(fence.heading) * (fence.depth / 2 + 0.7) })
+    : downsGround(fence);
+  group.position.set(fence.x, base, fence.z);
   group.rotation.y = fence.heading;
   group.traverse((node: any) => { if (node.isMesh) node.castShadow = true; });
   return group;

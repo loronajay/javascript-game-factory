@@ -11,7 +11,7 @@
 // Every position comes from a seeded generator, so the same farm looks the
 // same on every load. No art assets, and nothing here is saved.
 import { standard } from "./arcade-room-decor-primitives.mjs";
-import { FARM_BOUNDS } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS } from "./farm-layout.mjs";
 import { groundCoverExclusions } from "./farm-scene.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 export const SCENERY = Object.freeze({
@@ -19,7 +19,7 @@ export const SCENERY = Object.freeze({
     tufts: 2600,
     flowers: 320,
     /** Where the treeline and the hills stand from the field's centre. */
-    treelineRadius: Object.freeze({ min: 24, max: 40 }),
+    treelineRadius: Object.freeze({ min: 46, max: 62 }),
     // Even the widest randomized hill stays beyond the property's corners.
     hillRadius: Object.freeze({ min: 78, max: 112 }),
     hillWidth: Object.freeze({ min: 22, max: 52 }),
@@ -221,11 +221,13 @@ export function createFarmScenery(THREE, scene, options = {}) {
             mesh.instanceColor.needsUpdate = true;
     }
     function rescatter(layout) {
+        const scale = farmLotBounds(layout).width / FARM_BOUNDS.width;
+        const scaled = (spots) => spots.map((spot) => ({ ...spot, x: spot.x * scale, z: spot.z * scale }));
         const exclusions = groundCoverExclusions(layout);
         const blocked = (spot) => exclusions.some((box) => obstacleBlocks(spot, box, 0.15));
-        lay(tufts, tuftSpots, blocked, tuftTones, (spot) => [spot.scale, spot.scale, spot.scale]);
-        lay(flowers, flowerSpots, blocked, flowerTones, (spot) => [spot.scale * 0.8, spot.scale * 0.6, spot.scale * 0.8]);
-        lay(stems, flowerSpots, blocked, [new THREE.Color("#4f9a3a")], (spot) => [1, spot.scale, 1]);
+        lay(tufts, scaled(tuftSpots), blocked, tuftTones, (spot) => [spot.scale, spot.scale, spot.scale]);
+        lay(flowers, scaled(flowerSpots), blocked, flowerTones, (spot) => [spot.scale * 0.8, spot.scale * 0.6, spot.scale * 0.8]);
+        lay(stems, scaled(flowerSpots), blocked, [new THREE.Color("#4f9a3a")], (spot) => [1, spot.scale, 1]);
     }
     function update(dt) {
         for (const cloud of clouds) {

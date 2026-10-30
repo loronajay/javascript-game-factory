@@ -159,6 +159,18 @@ function placeDock(THREE: ThreeNamespace, root: any, loader: any, dock: CoveDock
     });
     return;
   }
+  if (width > depth) {
+    loader.load(assetUrl("dock-long-no-rope.glb"), (gltf: any) => {
+      const model = gltf.scene;
+      const across = (depth + 0.25) / DOCK_MODEL.width;
+      model.scale.set(across, across, width / DOCK_MODEL.length);
+      model.rotation.y = Math.PI / 2;
+      model.position.set((dock.deck.minX + dock.deck.maxX) / 2, -DOCK_MODEL.deck * across, (dock.deck.minZ + dock.deck.maxZ) / 2);
+      shade(model);
+      root.add(model);
+    });
+    return;
+  }
   const sections = Math.max(1, Math.round(depth / SECTION_LENGTH));
   const along = depth / sections / DOCK_MODEL.length;
   const across = (width + 0.25) / DOCK_MODEL.width;

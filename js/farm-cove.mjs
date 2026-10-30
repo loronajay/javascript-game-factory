@@ -61,6 +61,10 @@ export const COVE_DOCKS = Object.freeze([
     dock("lagoon-jetty", "pier", rect(-11.2, -8.8, -2, SHORE_Z + 0.8)),
     dock("sea-pier", "pier", rect(9.8, 12.2, -7, SHORE_Z + 0.8)),
     dock("sea-pier-head", "head", rect(7.6, 14.4, -11, -7)),
+    dock("lagoon-west-jetty", "pier", rect(-17.2, -14.8, -10, SHORE_Z + 0.8)),
+    dock("lagoon-west-head", "head", rect(-18.4, -13.6, -13, -9)),
+    dock("spit-reef-walk", "pier", rect(1.2, 7, -3.2, -0.8)),
+    dock("spit-reef-head", "head", rect(5.8, 8.2, -6, 1)),
 ]);
 export function insideRect(point, box, margin = 0) {
     return point.x >= box.minX - margin && point.x <= box.maxX + margin && point.z >= box.minZ - margin && point.z <= box.maxZ + margin;

@@ -38,8 +38,8 @@ export function createHerdSim(options) {
     const keepOut = options.keepOut ?? (() => []);
     const water = options.water ?? (() => []);
     const herd = [];
-    const halfWidth = bounds.width / 2 - bounds.wallInset;
-    const halfDepth = bounds.depth / 2 - bounds.wallInset;
+    const halfWidth = () => bounds.width / 2 - bounds.wallInset;
+    const halfDepth = () => bounds.depth / 2 - bounds.wallInset;
     function homeOf(animal) {
         return animal.homeId ? options.homes().find((entry) => entry.id === animal.homeId) ?? null : null;
     }
@@ -51,7 +51,7 @@ export function createHerdSim(options) {
         return herd.some((other) => other !== self && Math.hypot(other.x - x, other.z - z) < (other.radius + radius) * 0.85);
     }
     function inField(x, z, margin) {
-        return Math.abs(x) <= halfWidth - margin && Math.abs(z) <= halfDepth - margin;
+        return Math.abs(x) <= halfWidth() - margin && Math.abs(z) <= halfDepth() - margin;
     }
     /** Where this animal may stand: inside its home if it has one, else on the open field. */
     function allowed(animal, x, z, home) {
@@ -83,7 +83,7 @@ export function createHerdSim(options) {
         for (let attempt = 0; attempt < SPAWN_TRIES; attempt += 1) {
             const spot = home
                 ? homeToWorld(home, { x: (random() - 0.5) * home.width, z: (random() - 0.5) * home.depth })
-                : { x: (random() * 2 - 1) * (halfWidth - animal.radius - 1), z: (random() * 2 - 1) * (halfDepth - animal.radius - 1) };
+                : { x: (random() * 2 - 1) * (halfWidth() - animal.radius - 1), z: (random() * 2 - 1) * (halfDepth() - animal.radius - 1) };
             if (!allowed(animal, spot.x, spot.z, home) || blockedByOther(spot.x, spot.z, animal, animal.radius))
                 continue;
             animal.x = spot.x;
@@ -93,7 +93,7 @@ export function createHerdSim(options) {
             return;
         }
         // A crowded home: its middle, shoulder to shoulder with whoever is there.
-        const fallback = home ? homeToWorld(home, { x: 0, z: 0 }) : { x: (random() - 0.5) * 4, z: halfDepth * 0.5 };
+        const fallback = home ? homeToWorld(home, { x: 0, z: 0 }) : { x: (random() - 0.5) * 4, z: halfDepth() * 0.5 };
         animal.x = fallback.x;
         animal.z = fallback.z;
         startIdle(animal);

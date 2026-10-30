@@ -1,3 +1,4 @@
+import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // The farm's build mode: what a pointer and a keyboard do to the layout while
 // the player is building, and nothing about what the layout means.
 //
@@ -15,7 +16,7 @@
 // preview-then-commit gesture, and a click on nothing deselects.
 import { farmDecorTab, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { addFarmDecor, alignFarmDecorPlacement, duplicateFarmDecor, farmDecorHandles, placeFarmDecor, removeFarmDecor, rotateFarmDecor, setFarmDecorLength, stretchFarmDecorEnd } from "./farm-decor-layout.mjs";
-import { FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets } from "./farm-layout.mjs";
+import { expandFarmLot, farmLotBounds, FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets } from "./farm-layout.mjs";
 import { farmObstacles } from "./farm-scene.mjs";
 import { bestOnShelf, shelfHas } from "./farm-workshop.mjs";
 import { createFarmEditorPanel } from "./farm-editor-panel.mjs";
@@ -67,7 +68,7 @@ export function createFarmEditor(options) {
         THREE,
         camera,
         canvas,
-        bounds: FARM_BOUNDS,
+        bounds: { get width() { return farmLotBounds(layout).width; }, get depth() { return farmLotBounds(layout).depth; }, wallInset: FARM_BOUNDS.wallInset },
         viewButtons: elements.viewButtons,
         offsetBlocks: () => (elements.panel.hidden ? [] : [elements.tabs, elements.drawer ?? elements.tabs, elements.inspector]),
         onPose: () => gizmos.update(camera),
@@ -77,6 +78,11 @@ export function createFarmEditor(options) {
         setGround: (id) => {
             if (!inventory.owns(id)) {
                 setStatus("You do not own that ground yet.", "error");
+                return;
+            }
+            if (id.startsWith("lot.")) {
+                if (farmLotBounds({ lot: id }).width > farmLotBounds(layout).width)
+                    commit(expandFarmLot(layout, id), "Farm expanded · unsaved");
                 return;
             }
             const result = setFarmGround(layout, id);
@@ -153,8 +159,10 @@ export function createFarmEditor(options) {
         }
         if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0)
             ticketBalance = Number(result.balance);
+        if (FARM_LOTS.some((lot) => lot.id === itemId) && farmLotBounds({ lot: itemId }).width > farmLotBounds(layout).width)
+            commit(expandFarmLot(layout, itemId), "Farm expanded · unsaved");
         renderPanel();
-        setStatus(result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
+        setStatus(itemId.startsWith("lot.") ? "Lot unlocked - save the farm to keep the expanded layout." : result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
     }
     async function purchaseSeeds(cropId, quantity) {
         if (!options.purchaseSeeds || purchasingItemId) {
@@ -498,7 +506,7 @@ export function createFarmEditor(options) {
         const point = groundPoint(event);
         if (!point)
             return;
-        const result = stretchFarmDecorEnd(layout, row.instanceId, handleDrag.end, point, FARM_BOUNDS, snapThreshold(event));
+        const result = stretchFarmDecorEnd(layout, row.instanceId, handleDrag.end, point, farmLotBounds(layout), snapThreshold(event));
         editLength(result, "preview");
         gizmos.setGuides(result.valid ? result.guides : []);
     }
@@ -587,7 +595,7 @@ export function createFarmEditor(options) {
     elements.resetButton.addEventListener("click", () => {
         if (!confirm("Reset the field to the starter farm? Fences, buildings, plants and ponds go back; your pets stay (swimmers need a pond to stay)."))
             return;
-        const starter = normalizeFarmLayout({ ...createDefaultFarmLayout(), ground: layout.ground, pets: layout.pets });
+        const starter = normalizeFarmLayout({ ...createDefaultFarmLayout(), ground: layout.ground, lot: layout.lot, pets: layout.pets });
         selection = "";
         commit(starter, "Starter field restored. Save to keep it.");
     });

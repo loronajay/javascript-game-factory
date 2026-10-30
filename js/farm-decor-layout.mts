@@ -27,7 +27,7 @@
 //   a pond that is removed takes them with it.
 
 import { clampFarmDecorLength, farmDecorFootprint, findFarmDecor, type FarmDecorDefinition } from "./farm-catalog/decor.mjs";
-import { FARM_BOUNDS, MAX_DECOR, farmHabitats, waterPets, withFarmDecor, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS, MAX_DECOR, farmHabitats, waterPets, withFarmDecor, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 import { FARM_SPAWN, buildingLocalToWorld, farmObstacles } from "./farm-scene.mjs";
 import { obstacleBlocks } from "./arcade-room-walker.mjs";
 import { MAX_PONDS, aquaticFits, homePond, pondRegions } from "./farm-pond.mjs";
@@ -159,7 +159,7 @@ export function buildingContents(layout: FarmLayout, building: FarmDecorRow): Fa
 }
 
 /** Why a box may not stand where it is asked to, or "ok". */
-export function judgePlacement(layout: FarmLayout, instanceId: string, definition: FarmDecorDefinition, box: FloorObstacle, bounds: RoomBounds = FARM_BOUNDS): PlacementVerdict {
+export function judgePlacement(layout: FarmLayout, instanceId: string, definition: FarmDecorDefinition, box: FloorObstacle, bounds: RoomBounds = farmLotBounds(layout)): PlacementVerdict {
   if (!insideFieldBox(box, box.footprint, bounds)) return "outside";
   if ((definition.solid || definition.keepOut) && obstacleBlocks(FARM_SPAWN, box, SPAWN_CLEARANCE)) return "spawn";
   let hasInteriorHome = !definition.interior;
@@ -232,14 +232,14 @@ function tryPlace(layout: FarmLayout, item: FarmDecorRow, definition: FarmDecorD
 }
 
 /** Move (and turn) a placed item; the spot is clamped to the field and refused when taken. */
-export function placeFarmDecor(layout: FarmLayout, instanceId: string, wanted: RoomPlacement, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
+export function placeFarmDecor(layout: FarmLayout, instanceId: string, wanted: RoomPlacement, bounds: RoomBounds = farmLotBounds(layout)): FarmDecorResult {
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && definitionOf(item);
   if (!item || !definition) return { valid: false, layout, instanceId, reason: "missing" };
   return tryPlace(layout, item, definition, wanted, bounds);
 }
 
-export function rotateFarmDecor(layout: FarmLayout, instanceId: string, direction: -1 | 1, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
+export function rotateFarmDecor(layout: FarmLayout, instanceId: string, direction: -1 | 1, bounds: RoomBounds = farmLotBounds(layout)): FarmDecorResult {
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && definitionOf(item);
   if (!item || !definition) return { valid: false, layout, instanceId, reason: "missing" };
@@ -275,7 +275,7 @@ function fitLength(layout: FarmLayout, item: FarmDecorRow, definition: FarmDecor
 }
 
 /** Set a stretchable item's length about its centre, shrinking until it fits. */
-export function setFarmDecorLength(layout: FarmLayout, instanceId: string, length: number, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
+export function setFarmDecorLength(layout: FarmLayout, instanceId: string, length: number, bounds: RoomBounds = farmLotBounds(layout)): FarmDecorResult {
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && definitionOf(item);
   if (!item || !definition) return { valid: false, layout, instanceId, reason: "missing" };
@@ -327,7 +327,7 @@ function otherFenceEnds(layout: FarmLayout, instanceId: string): Array<{ x: numb
  * stays put; the length is what the hand asks for, snapped to a neighbouring
  * fence end within `snap` metres, then shrunk until the run fits.
  */
-export function stretchFarmDecorEnd(layout: FarmLayout, instanceId: string, end: -1 | 1, point: Readonly<{ x: number; z: number }>, bounds: RoomBounds = FARM_BOUNDS, snap = 0): FarmStretchResult {
+export function stretchFarmDecorEnd(layout: FarmLayout, instanceId: string, end: -1 | 1, point: Readonly<{ x: number; z: number }>, bounds: RoomBounds = farmLotBounds(layout), snap = 0): FarmStretchResult {
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && definitionOf(item);
   if (!item || !definition) return { valid: false, layout, instanceId, reason: "missing", guides: [] };
@@ -428,8 +428,8 @@ function guideSpan(first: readonly [number, number], second: readonly [number, n
 /** Edge/centre snapping for plots, buildings, plants and props, matching the room editor's alignment language. */
 function alignFarmDecorBox(layout: FarmLayout, item: FarmDecorRow, definition: FarmDecorDefinition, wanted: RoomPlacement, snap: number): FarmDecorAligned<RoomPlacement> {
   const mine = decorSpans(wanted, farmDecorFootprint(definition, item));
-  const limitX = FARM_BOUNDS.width / 2 - FARM_BOUNDS.wallInset;
-  const limitZ = FARM_BOUNDS.depth / 2 - FARM_BOUNDS.wallInset;
+  const limitX = farmLotBounds(layout).width / 2 - FARM_BOUNDS.wallInset;
+  const limitZ = farmLotBounds(layout).depth / 2 - FARM_BOUNDS.wallInset;
   const fullX: readonly [number, number] = [-limitX, limitX];
   const fullZ: readonly [number, number] = [-limitZ, limitZ];
   const xCandidates: AxisCandidate[] = [
@@ -481,7 +481,7 @@ export function farmDecorHandles(layout: FarmLayout, instanceId: string): readon
 }
 
 /** Add a catalog item near a point: the point itself, then rings of spots around it until one is free. */
-export function addFarmDecor(layout: FarmLayout, definition: FarmDecorDefinition, near: Readonly<{ x: number; z: number; rotationY?: number; stars?: 1 | 2 | 3; fishId?: string }>, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
+export function addFarmDecor(layout: FarmLayout, definition: FarmDecorDefinition, near: Readonly<{ x: number; z: number; rotationY?: number; stars?: 1 | 2 | 3; fishId?: string }>, bounds: RoomBounds = farmLotBounds(layout)): FarmDecorResult {
   // A mounted fish stands on one plaque at a time.
   if (near.fishId && layout.decor.some((row) => row.fishId === near.fishId)) return { valid: false, layout, instanceId: "", reason: "blocked" };
   if (layout.decor.length >= MAX_DECOR) return { valid: false, layout, instanceId: "", reason: "full" };
@@ -552,7 +552,7 @@ export function addFarmDecor(layout: FarmLayout, definition: FarmDecorDefinition
   return { valid: false, layout, instanceId: "", reason: "blocked" };
 }
 
-export function duplicateFarmDecor(layout: FarmLayout, instanceId: string, bounds: RoomBounds = FARM_BOUNDS): FarmDecorResult {
+export function duplicateFarmDecor(layout: FarmLayout, instanceId: string, bounds: RoomBounds = farmLotBounds(layout)): FarmDecorResult {
   const item = layout.decor.find((candidate) => candidate.instanceId === instanceId);
   const definition = item && definitionOf(item);
   if (!item || !definition) return { valid: false, layout, instanceId, reason: "missing" };
