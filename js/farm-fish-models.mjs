@@ -19,6 +19,27 @@ export function fishAssetUrl(file) {
 function isDetail(material) {
     return /eye|black|teeth|tooth|white_eye|pupil/i.test(String(material?.name ?? ""));
 }
+/** Species paint is applied before rare specimen variants; eyes and teeth remain intact. */
+export function paintSpecies(model, appearance) {
+    if (!appearance)
+        return;
+    model.scale.x *= appearance.width;
+    model.scale.y *= appearance.height;
+    model.traverse((node) => {
+        if (!node.isMesh)
+            return;
+        const paint = (material) => {
+            if (isDetail(material))
+                return material;
+            const next = material.clone();
+            const name = String(material.name ?? "");
+            const key = /light|belly/i.test(name) ? "light" : /fin/i.test(name) ? "fins" : /dark/i.test(name) ? "dark" : "main";
+            next.color.set(appearance.colors[key]);
+            return next;
+        };
+        node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
+    });
+}
 /**
  * Colour a fish for its variant. Shiny turns its colours round the wheel and
  * lifts them; Golden plates it in gold. Eyes and teeth stay as they are.
@@ -81,6 +102,7 @@ export function loadFish(THREE, speciesId, lengthM, variant = "normal") {
                     node.frustumCulled = false;
                 }
             });
+            paintSpecies(inner, species.appearance);
             paintVariant(THREE, inner, variant);
             const root = new THREE.Group();
             const turn = new THREE.Group();

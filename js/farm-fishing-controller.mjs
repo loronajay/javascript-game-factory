@@ -65,11 +65,11 @@ export function createFishingController(deps) {
         token += 1;
     }
     function release(pose) {
-        const origin = castOrigin(pose);
+        const origin = (deps.castOrigin ?? castOrigin)(pose);
         const tackle = deps.tackle();
         const power = castPower(held);
         const point = castLanding(pose, power, tackle.rod.castRange);
-        const where = coveZoneAt(point);
+        const where = (deps.zoneAt ?? coveZoneAt)(point);
         if (!origin || !where) {
             deps.onEvent({ kind: "notice", text: origin ? "The cast fell on the bank. Face open water and try again." : "Face the water to cast." });
             reset();
@@ -195,7 +195,7 @@ export function createFishingController(deps) {
     return Object.freeze({
         primary(down, pose) {
             if (phase === "idle" && down) {
-                if (!castOrigin(pose)) {
+                if (!(deps.castOrigin ?? castOrigin)(pose)) {
                     deps.onEvent({ kind: "notice", text: "Walk to the water's edge (or out on a dock) and face the water to cast." });
                     return;
                 }

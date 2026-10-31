@@ -997,3 +997,18 @@ kbd, .farm-button kbd {
   .pets-panel, .inventory-panel { animation: none; }
   .farm-prompt, .hud-toast, .hud-scrim { transition: none; }
 }
+
+/* The Market's property office sells new homes, with views of their actual settings. */
+.properties-panel { width: min(1000px, calc(100vw - 32px)); max-height: calc(100dvh - 100px); }
+.properties-panel__body { overflow: auto; padding: 20px; }
+.properties-panel__intro { max-width: 75ch; line-height: 1.6; color: #d7ddc8; }
+.properties-panel__balance { color: #eedb97; font-weight: 700; }
+.property-card { display: grid; grid-template-columns: 46% 1fr; border: 1px solid #62755d; border-radius: 16px; overflow: hidden; margin: 20px 0; background: #21382b; }
+.property-card__preview { width: 100%; height: 100%; min-height: 320px; object-fit: cover; background: #406248; }
+.property-card__copy { padding: 24px; }
+.property-card__copy h2 { margin: 8px 0 12px; font-size: 28px; color: #fff5d7; }
+.property-card__copy p, .property-card__copy li { line-height: 1.6; color: #d8dfcf; }
+.property-card__copy ul { padding-left: 20px; }
+.property-card__buy { margin-top: 12px; width: 100%; justify-content: center; min-height: 46px; }
+.properties-panel__status { padding: 0 20px 20px; color: #eedb97; }
+@media (max-width: 700px) { .property-card { grid-template-columns: 1fr; } .property-card__preview { height: 200px; min-height: 0; } .property-card__copy { padding: 18px; } }

@@ -1,4 +1,3 @@
-import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // The farm's build mode: what a pointer and a keyboard do to the layout while
 // the player is building, and nothing about what the layout means.
 //
@@ -16,7 +15,7 @@ import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // preview-then-commit gesture, and a click on nothing deselects.
 import { farmDecorTab, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { addFarmDecor, alignFarmDecorPlacement, duplicateFarmDecor, farmDecorHandles, placeFarmDecor, removeFarmDecor, rotateFarmDecor, setFarmDecorLength, stretchFarmDecorEnd } from "./farm-decor-layout.mjs";
-import { expandFarmLot, farmLotBounds, FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets } from "./farm-layout.mjs";
+import { farmLotBounds, FARM_BOUNDS, createDefaultFarmLayout, farmLayoutsEqual, normalizeFarmLayout, setFarmGround, waterPets } from "./farm-layout.mjs";
 import { farmObstacles } from "./farm-scene.mjs";
 import { bestOnShelf, shelfHas } from "./farm-workshop.mjs";
 import { createFarmEditorPanel } from "./farm-editor-panel.mjs";
@@ -78,11 +77,6 @@ export function createFarmEditor(options) {
         setGround: (id) => {
             if (!inventory.owns(id)) {
                 setStatus("You do not own that ground yet.", "error");
-                return;
-            }
-            if (id.startsWith("lot.")) {
-                if (farmLotBounds({ lot: id }).width > farmLotBounds(layout).width)
-                    commit(expandFarmLot(layout, id), "Farm expanded · unsaved");
                 return;
             }
             const result = setFarmGround(layout, id);
@@ -159,10 +153,8 @@ export function createFarmEditor(options) {
         }
         if (Number.isSafeInteger(result.balance) && Number(result.balance) >= 0)
             ticketBalance = Number(result.balance);
-        if (FARM_LOTS.some((lot) => lot.id === itemId) && farmLotBounds({ lot: itemId }).width > farmLotBounds(layout).width)
-            commit(expandFarmLot(layout, itemId), "Farm expanded · unsaved");
         renderPanel();
-        setStatus(itemId.startsWith("lot.") ? "Lot unlocked - save the farm to keep the expanded layout." : result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
+        setStatus(result.alreadyOwned ? "Already owned · ready to use." : "Unlocked permanently · ready to use.");
     }
     async function purchaseSeeds(cropId, quantity) {
         if (!options.purchaseSeeds || purchasingItemId) {

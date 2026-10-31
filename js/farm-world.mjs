@@ -1,3 +1,4 @@
+import { createPropertyScenery } from "./farm-property-scenery.mjs";
 // The farm's world — sky, sun, the field, and every placed thing on it — built
 // once and kept in step with the layout.
 //
@@ -21,7 +22,7 @@
 import { createSurfaceMaterial, applySurfaceMaterial } from "./arcade-room-surfaces.mjs";
 import { DEFAULT_GROUND_ID, findGround } from "./farm-catalog/ground.mjs";
 import { findFarmDecor } from "./farm-catalog/decor.mjs";
-import { farmLotBounds, FARM_BOUNDS } from "./farm-layout.mjs";
+import { farmLotBounds } from "./farm-layout.mjs";
 import { MAX_PONDS, pondRegions } from "./farm-pond.mjs";
 import { decorBaseHeight } from "./farm-scene.mjs";
 import { createFarmDecorModel } from "./farm-props.mjs";
@@ -208,9 +209,9 @@ function disposeModel(group) {
     group.parent?.remove(group);
 }
 export function createFarmWorld(THREE, scene, options = {}) {
-    const { width, depth } = FARM_BOUNDS;
+    const { width, depth } = farmLotBounds({ lot: options.propertyId });
     scene.background = new THREE.Color(SKY.horizon);
-    scene.fog = new THREE.Fog(SKY.horizon, SKY.fog.near, SKY.fog.far);
+    scene.fog = new THREE.Fog(SKY.horizon, options.propertyId ? 50 : SKY.fog.near, options.propertyId ? 190 : SKY.fog.far);
     const sky = createSkyDome(THREE);
     const stars = createStars(THREE);
     const sunVisual = createCelestialSprite(THREE, createSunTexture(THREE), 15, "farm-sun", true);
@@ -249,7 +250,7 @@ export function createFarmWorld(THREE, scene, options = {}) {
     ground.receiveShadow = true;
     scene.add(ground);
     // Wide enough that its edge is past the fog's far plane from anywhere on the field.
-    const apronSize = SKY.fog.far * 2 + width;
+    const apronSize = (options.propertyId ? 210 : SKY.fog.far) * 2 + width;
     const apronSpan = { u: apronSize, v: apronSize };
     const apron = new THREE.Mesh(new THREE.PlaneGeometry(apronSize, apronSize, 1, 1), createSurfaceMaterial(THREE, groundStyle(DEFAULT_GROUND_ID), apronSpan));
     const holes = {
@@ -270,6 +271,8 @@ export function createFarmWorld(THREE, scene, options = {}) {
     }
     // The countryside past the fence and the tufts underfoot — nothing the player places.
     const scenery = createFarmScenery(THREE, scene, options);
+    const propertyScenery = createPropertyScenery(THREE, scene, options.propertyId ?? "");
+    let propertyClock = 0;
     const decorRoot = new THREE.Group();
     decorRoot.name = "farm-decor";
     scene.add(decorRoot);
@@ -335,6 +338,8 @@ export function createFarmWorld(THREE, scene, options = {}) {
         scenery.rescatter(layout);
     }
     function update(dt) {
+        propertyClock += dt;
+        propertyScenery.update(propertyClock);
         scenery.update(dt);
         for (const entry of placed.values()) {
             entry.doors?.update(dt);

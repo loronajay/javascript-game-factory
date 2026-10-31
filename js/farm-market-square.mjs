@@ -123,6 +123,7 @@ export const SEED_STALL_ID = "seeds";
 export const EXCHANGE_BOARD_ID = "exchange";
 export const LIVESTOCK_STALL_ID = "livestock";
 export const BUTCHER_STALL_ID = "butcher";
+export const PROPERTY_OFFICE_ID = "properties";
 /**
  * The square's stalls. The Produce Merchant (v1, paying the day's prices), the
  * Order Board (Phase 4), the Kitchen (Phase 6, buying cooked dishes), the
@@ -183,6 +184,12 @@ export const MARKET_STALLS = Object.freeze([
         closedNote: "",
         notices: Object.freeze(["For sale", "For sale", "Bargain", "For sale", "Tickets"]),
     }),
+    stall({
+        id: PROPERTY_OFFICE_ID, kind: "board", title: "Property Office", open: true,
+        x: -11.2, z: -4.4, rotationY: QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
+        colors: ["#346756", "#f4ecd6"], keeper: null, closedNote: "",
+        notices: Object.freeze(["Cedar Hollow", "Sunwater Estate", "New homes", "For sale", "Own your future"]),
+    }),
 ]);
 export function findMarketStall(id) {
     return MARKET_STALLS.find((entry) => entry.id === id);
@@ -238,6 +245,8 @@ export function findStallInReach(pose, stalls = MARKET_STALLS) {
     return best;
 }
 export function stallPrompt(entry, signedIn) {
+    if (entry.id === PROPERTY_OFFICE_ID)
+        return "Press E to browse new farm properties";
     if (!entry.open)
         return `${entry.title} · closed for now · Press E to read the notice`;
     if (entry.id === EXCHANGE_BOARD_ID)

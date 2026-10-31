@@ -1,3 +1,5 @@
+import { propertyWalkBounds, propertyObstacles, propertyPlatforms, propertyRoutes, PROPERTY_GATE_ID } from "./farm-property-scene.mjs";
+import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // The farm page: the composition root for `/farm/`.
 //
 // The arcade room's sibling. It loads the farm's layout through the same
@@ -185,6 +187,8 @@ const canManageFarm = !visiting;
 // copy or starter layout. Signed-out owners, however, save normally on-device.
 const canPersistFarm = canManageFarm && (!layoutStore.ownerPlayerId || (layoutStore.accountBacked && loaded.source === "account"));
 let layout: FarmLayout = loaded.layout;
+const homeProperty = FARM_LOTS.find((property) => property.id === layout.lot);
+if (homeProperty && !visiting) { farmTitle.textContent = homeProperty.title; farmEyebrow.textContent = homeProperty.setting; document.title = `${homeProperty.title} | Farm`; }
 const showFarmIntro = canManageFarm && layout.onboarding.status === "needs_name" && !layout.onboarding.introSeen;
 let onboardingInitialization: ReturnType<typeof layoutStore.save> | null = null;
 const resumedClock = resumeFarmClock(layout.clock, Date.now());
@@ -282,7 +286,7 @@ renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 200);
 camera.rotation.order = "YXZ";
-const world = createFarmWorld(THREE, scene);
+const world = createFarmWorld(THREE, scene, { propertyId: layout.lot });
 world.applyGround(layout.ground);
 world.sync(layout);
 // Match the arcade room's build tool: half-metre cells make plots and paths easy to line up.
@@ -312,20 +316,26 @@ let workshopSync: () => void = () => undefined;
 // Livestock (farm-livestock-controller.mts): homes move with their buildings on every layout change.
 let livestockSync: () => void = () => undefined;
 
-const player = { x: FARM_SPAWN.x, z: FARM_SPAWN.z, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
+const player = { x: FARM_SPAWN.x, z: farmLotBounds(layout).depth / 2 - 2.2, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
+const returningRoute = propertyRoutes(layout).find((route) => route.target === new URLSearchParams(location.search).get("from"));
+if (returningRoute) Object.assign(player, { x: returningRoute.x - (returningRoute.target === "estate-lake" ? 3 : 0), z: returningRoute.z + (returningRoute.target === "estate-lake" ? 0 : 3), yaw: returningRoute.target === "estate-lake" ? Math.PI / 2 : Math.PI });
+
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
 let body: FarmBody = createFarmBody();
-const walkerBounds = { get halfWidth() { return farmLotBounds(layout).width / 2; }, get halfDepth() { return farmLotBounds(layout).depth / 2; }, margin: FARM_BOUNDS.wallInset };
+const walkerBounds = { get halfWidth() { return propertyWalkBounds(layout).width / 2; }, get halfDepth() { return propertyWalkBounds(layout).depth / 2; }, margin: FARM_BOUNDS.wallInset };
 // Solid things change when a door or a gate swings: a shut one is an obstacle, an open one is not.
 // Keyed by door id: a building or gate under its instance id, a stall half-door under `<instanceId>-<fixture>`.
 const openDoors = new Set<string>();
-let obstacles = farmObstacles(layout, { openDoors });
-let platforms = farmPlatforms(layout);
+let obstacles = farmObstacles(layout, { openDoors }).concat(propertyObstacles(layout));
+let platforms = farmPlatforms(layout).concat(propertyPlatforms(layout));
 let ladders = farmLadders(layout);
 let seats = farmSeats(layout);
 // The ponds dug into the field: what the feet stand on in them and when the eyes are under water.
 let ponds: readonly PondRegion[] = waterRegions(layout);
-const groundAt = (point: Readonly<{ x: number; z: number }>): number => groundHeightAt(ponds, point);
+const groundAt = (point: Readonly<{ x: number; z: number }>): number => {
+  const deck = propertyPlatforms(layout).find((entry) => Math.abs(point.x - entry.x) <= entry.width / 2 && Math.abs(point.z - entry.z) <= entry.depth / 2);
+  return deck ? deck.top : groundHeightAt(ponds, point);
+};
 const waterAt = (point: Readonly<{ x: number; z: number }>): number => waterDepthAt(ponds, point);
 const underwaterOverlay = document.querySelector<HTMLElement>(".farm-underwater");
 // What E would do right now: the door, ladder or seat the player is at, or null.
@@ -533,11 +543,12 @@ function updateInteraction(): void {
     }
     const horseName = petSim.find(riding.mounted())?.name ?? "your horse";
     if (doorInReach) {
-      const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach!.doorId);
+      const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach!.doorId && gate.instanceId !== PROPERTY_GATE_ID && (!layout.lot || gate.z > farmLotBounds(layout).depth / 2 - 2));
       setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · ride out to the Market Square" : " · a horse does not go indoors"));
       return;
     }
-    setPrompt(getRidingPrompt(horseName));
+    const trail = propertyRoutes(layout).find((route) => Math.hypot(player.x - route.x, player.z - route.z) < 6);
+    setPrompt(trail ? `Follow the trail: ${trail.title}` : getRidingPrompt(horseName));
     return;
   }
   const handsFree = walking && !carrying;
@@ -596,7 +607,7 @@ function updateInteraction(): void {
     return;
   }
   if (doorInReach) {
-    const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach!.doorId);
+    const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach!.doorId && gate.instanceId !== PROPERTY_GATE_ID && (!layout.lot || gate.z > farmLotBounds(layout).depth / 2 - 2));
     setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · the road to the Market Square" : ""));
     return;
   }
@@ -642,7 +653,8 @@ function updateInteraction(): void {
     setPrompt(livestock.prompt());
     return;
   }
-  setPrompt("");
+  const trail = propertyRoutes(layout).find((route) => Math.hypot(player.x - route.x, player.z - route.z) < 6);
+  setPrompt(trail ? trail.horse ? "Mount your horse to take the estate trail to Windrush Downs" : `Follow the path: ${trail.title}` : "");
 }
 
 /** Apply a body step: the pose and the body move together or not at all. */
@@ -860,7 +872,7 @@ function toggleDoors(): void {
   doors.setOpen(open);
   if (open) openDoors.add(doorInReach.doorId);
   else openDoors.delete(doorInReach.doorId);
-  obstacles = farmObstacles(layout, { openDoors });
+  obstacles = farmObstacles(layout, { openDoors }).concat(propertyObstacles(layout));
 }
 
 /**
@@ -878,8 +890,8 @@ function applyLayout(next: FarmLayout): void {
   cropsView.sync(layout, layout.agriculture, clockMinutes);
   treesView.sync(layout, clockMinutes);
   for (const doorId of [...openDoors]) if (!world.doorsFor(doorId)) openDoors.delete(doorId);
-  obstacles = farmObstacles(layout, { openDoors });
-  platforms = farmPlatforms(layout);
+  obstacles = farmObstacles(layout, { openDoors }).concat(propertyObstacles(layout));
+  platforms = farmPlatforms(layout).concat(propertyPlatforms(layout));
   ladders = farmLadders(layout);
   seats = farmSeats(layout);
   ponds = waterRegions(layout);
@@ -1574,9 +1586,27 @@ liveNeedsCheckpoint = () => {
 // The farm is saved first (the square reads the produce the account holds), then
 // the page goes; the pagehide save still runs behind it as it always does.
 let leavingForMarket = false;
+let blockedPropertyTrail = "";
 function checkGateway(): void {
   if (!farmEntered || leavingForMarket || farmEditor.isEditing() || body.mode !== "walking") return;
-  if (!gatewayAt(layout.decor, openDoors, player, farmLotBounds(layout))) return;
+  const route = propertyRoutes(layout).find((entry) => Math.hypot(player.x - entry.x, player.z - entry.z) < 1.8);
+  if (!route) blockedPropertyTrail = "";
+  if (route && blockedPropertyTrail === route.target) return;
+  if (route && (!route.horse || riding.mounted())) {
+    if (carrying) { setPrompt("Set your pet down before leaving the property"); return; }
+    leavingForMarket = true; keys.clear(); document.exitPointerLock?.();
+    setPrompt(`Taking the path to ${route.title}...`);
+    const departure = canPersistFarm ? layoutStore.save(stampPresence(progressedLayout())) : Promise.resolve(null);
+    void departure.then((result) => {
+      if (canPersistFarm && !result?.ok) { blockedPropertyTrail = route.target; leavingForMarket = false; setPrompt("Your farm could not be saved. Step back and try again."); return; }
+      const query = new URLSearchParams(horseTravelQuery(visiting ? layoutStore.ownerPlayerId : "", riding.mounted()));
+      if (route.target === "downs") { query.set("via", "estate"); location.href = `downs/index.html?${query}`; }
+      else { query.set("area", route.target); location.href = `cove/index.html?${query}`; }
+    }).catch(() => { blockedPropertyTrail = route.target; leavingForMarket = false; setPrompt("Your farm could not be saved. Step back and try again."); });
+    return;
+  }
+  const exit = gatewayAt(layout.decor, openDoors, player, farmLotBounds(layout));
+  if (!exit || exit.instanceId === PROPERTY_GATE_ID || (layout.lot && exit.z < farmLotBounds(layout).depth / 2 - 2)) return;
   if (carrying) {
     setPrompt(`Set ${petSim.find(carrying)?.name ?? "your pet"} down before heading to the market`);
     return;

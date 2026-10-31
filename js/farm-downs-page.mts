@@ -76,8 +76,12 @@ const farmLoad = await farmStore.load();
 const signedIn = farmStore.accountBacked && farmLoad.source === "account";
 let farm = farmLoad.layout;
 const horse: FarmPet | null = ridingHorseFrom(farm, params.get("horse"));
-const backUrl = (riding: boolean): string => `../market/index.html?from=downs${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "") ? `&${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "")}` : ""}`;
+const estateTrail = params.get("via") === "estate" && farm.lot === "lot.estate";
+const backUrl = (riding: boolean): string => estateTrail
+  ? `../index.html?from=downs${fromFarm ? `&id=${encodeURIComponent(fromFarm)}` : ""}${riding && horse ? `&horse=${encodeURIComponent(horse.instanceId)}` : ""}`
+  : `../market/index.html?from=downs${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "") ? `&${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "")}` : ""}`;
 backLink.href = backUrl(true);
+if (estateTrail) { const words = backLink.querySelector(".back-link__words"); if (words) words.textContent = "Sunwater Estate"; }
 
 if (!horse) {
   requiredElement<HTMLElement>("#startTitle").textContent = "For riders only.";

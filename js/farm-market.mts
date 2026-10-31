@@ -1,3 +1,5 @@
+import { createPropertiesPanel } from "./farm-properties-panel.mjs";
+import { expandFarmLot } from "./farm-layout.mjs";
 // The Market Square page: the shared square at the end of the farm's road.
 //
 // It is the farm's stack by import. The square's paving, walls, well, lamps and
@@ -61,6 +63,7 @@ import {
   LIVESTOCK_STALL_ID,
   BUTCHER_STALL_ID,
   EXCHANGE_BOARD_ID,
+  PROPERTY_OFFICE_ID,
   findMarketStall,
   findStallInReach,
   keeperPose,
@@ -937,11 +940,31 @@ hud.sheet("trade", { root: requiredElement<HTMLElement>("#tradePanel"), close: (
 for (const id of ["#salePanel", "#kitchenPanel", "#dealerPanel"]) wireSheetTabs(requiredElement<HTMLElement>(id));
 
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
+const properties = createPropertiesPanel({
+  canBuy: canSell, farm: () => farm, balance: () => balance,
+  shop: () => ticketClient.getShop("farm"),
+  purchase: (id) => ticketClient.purchaseShopItem("farm", id),
+  takeBalance,
+  move: async (id) => {
+    // Re-read before relocation so recent market trades and purchases are preserved.
+    const latest = await farmStore.load();
+    if (latest.source !== "account") return { ok: false, error: "unavailable" };
+    const next = expandFarmLot(latest.layout, id);
+    const result = await farmStore.save(next);
+    if (result.ok) takeStock(next);
+    return result;
+  },
+  onClose: () => canvas.focus(),
+});
+hud.sheet("properties", { root: properties.root, close: () => properties.close() });
+requiredElement<HTMLButtonElement>("#openProperties").addEventListener("click", () => { void properties.open(); });
+
 function panelOpen(): boolean {
   return hud.anyOpen();
 }
 
 function workStall(stall: MarketStall): void {
+  if (stall.id === PROPERTY_OFFICE_ID) { void properties.open(); return; }
   if (!stall.open) {
     notice(stall.closedNote);
     return;

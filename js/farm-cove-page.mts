@@ -1,3 +1,6 @@
+import * as cove from "./farm-cove.mjs";
+import { FISHING_REGIONS, findFishingRegion, regionZoneAt } from "./farm-fishing-regions.mjs";
+import { fishingRegionScene, createFishingRegionWorld, createCoveTrailheads } from "./farm-fishing-region-world.mjs";
 // The Cove page: the shared fishing hub at the bottom of the Market Square's
 // north path (planning-docs/FARM_FISHING_PLAN.md).
 //
@@ -42,23 +45,10 @@ import { riderReach } from "./farm-ride.mjs";
 import { findStallInReach, keeperPose, stallObstacles, type MarketStall } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import {
-  COVE_BOUNDS,
-  COVE_MARKET_GATE,
-  COVE_PRESENCE_ROOM,
-  COVE_SPAWN,
-  COVE_RAIL_ID,
-  COVE_STALLS,
-  coveGroundAt,
-  coveWaterDepthAt,
   FISHMONGER_STALL_ID,
   RECORDS_BOARD_ID,
   TACKLE_STALL_ID,
-  castOrigin,
-  coveLayout,
-  coveObstacles,
-  covePlatforms,
   coveStallPrompt,
-  coveWaterDistance,
   findCoveStall,
 } from "./farm-cove.mjs";
 import { createCoveTerrain } from "./farm-cove-terrain.mjs";
@@ -84,6 +74,13 @@ import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
 import { createFarmHud } from "./farm-hud.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
+
+const destinationQuery = new URLSearchParams(location.search);
+const region = findFishingRegion(destinationQuery.get("area"));
+const areaId = region?.id ?? "cove";
+const areaTitle = region?.title ?? "The Cove";
+const areaScene = region ? fishingRegionScene(region) : cove;
+const { COVE_BOUNDS, COVE_MARKET_GATE, COVE_PRESENCE_ROOM, COVE_SPAWN, COVE_RAIL_ID, COVE_STALLS, coveGroundAt, coveWaterDepthAt, castOrigin, coveLayout, coveObstacles, covePlatforms, coveWaterDistance } = areaScene;
 
 const THREE: Record<string, any> = THREE_VENDOR;
 
@@ -118,9 +115,23 @@ farmHud.fullscreen.bind(requiredElement<HTMLButtonElement>("#fullscreenCove"));
 // Back up the path: to the Market Square's north gate, carrying the farm to come home to.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const marketUrl = `../market/index.html?from=cove${fromFarm ? `&farm=${encodeURIComponent(fromFarm)}` : ""}`;
-backLink.href = marketUrl;
+backLink.href = region?.requiredProperty ? `../index.html?from=${region.id}${fromFarm ? `&id=${encodeURIComponent(fromFarm)}` : ""}` : region ? `index.html?from=${region.id}${fromFarm ? `&farm=${encodeURIComponent(fromFarm)}` : ""}` : marketUrl;
+if (region) {
+  document.title = `${region.title} - Farm`;
+  requiredElement<HTMLElement>(".hud-place__name h1").textContent = region.title;
+  requiredElement<HTMLElement>(".hud-place__name .eyebrow").textContent = region.requiredProperty ? "YOUR PROPERTY / PRIVATE FISHING" : `${region.direction.toUpperCase()} OF THE COVE`;
+  requiredElement<HTMLElement>("#coveBackLink .back-link__words").textContent = region.requiredProperty ? "Your farm" : "The Cove";
+  requiredElement<HTMLElement>(".start-card h2").textContent = region.title;
+  requiredElement<HTMLElement>(".start-card p").textContent = `${region.description} Fishing level ${region.minLevel} to keep catches here. Return to the Cove for bait, sales and records.`;
+  enterButton.textContent = "Explore the pools";
+}
 
 const inventoryFarm = await createLayoutStore(FARM_LAYOUT_SPEC).load();
+if (region?.requiredProperty && inventoryFarm.layout.lot !== region.requiredProperty) {
+  enterButton.disabled = true; enterButton.textContent = "Property ownership required";
+  requiredElement<HTMLElement>(".start-card p").textContent = `This fishing area belongs to ${region.requiredProperty === "lot.estate" ? "Sunwater Estate" : "Cedar Hollow"}. Visit the Property Office in the Market to make it your home.`;
+}
+
 const inventorySummary = createFarmInventorySummary({
   root: requiredElement<HTMLElement>("#inventoryPanel"),
   openButton: requiredElement<HTMLButtonElement>("#openInventory"),
@@ -216,7 +227,8 @@ world.sync(layout);
 // Like the farm and square, the Cove uses this client's paused farm clock;
 // people fishing together can therefore see different skies. `?time=` is QA.
 world.setTime(resolveFarmSceneTime(inventoryFarm.layout.clock.farmMinutes, new URLSearchParams(location.search).get("time")));
-const terrain = createCoveTerrain(THREE, scene);
+const terrain = region ? createFishingRegionWorld(THREE, scene, region) : createCoveTerrain(THREE, scene);
+if (!region) createCoveTrailheads(THREE, scene);
 const STOCK = { [FISHMONGER_STALL_ID]: fishmongerStock(THREE), [TACKLE_STALL_ID]: tackleStock(THREE) } as const;
 for (const stall of COVE_STALLS) scene.add(createMarketStallModel(THREE, stall, STOCK[stall.id as keyof typeof STOCK]));
 
@@ -247,7 +259,7 @@ async function loadShadows(): Promise<void> {
   const answer: any = await api.fetchFarmFishShadows().catch(() => null);
   const list = Array.isArray(answer?.shadows) ? answer.shadows.map(normalizePublicShadow).filter(Boolean) as PublicShadow[] : null;
   if (list) {
-    shadows = list;
+    shadows = list.filter((shadow) => region ? shadow.zone === region.id : ["lagoon", "reef", "deep"].includes(shadow.zone));
     shadowsView.sync(shadows);
   }
 }
@@ -260,6 +272,8 @@ const player = { x: COVE_SPAWN.x, z: COVE_SPAWN.z, yaw: COVE_SPAWN.yaw, pitch: -
 // `?at=pier|jetty|spit` stands the player at a fishing spot, facing the water — a QA seam like the market's `?at=`.
 const QA_SPOTS: Readonly<Record<string, Readonly<{ x: number; z: number; yaw: number }>>> = Object.freeze({
   pier: { x: 11, z: -10.2, yaw: 0 },
+  "west-trail": { x: -17.8, z: 9.5, yaw: Math.PI / 2 },
+  "east-trail": { x: 17.8, z: 9.5, yaw: -Math.PI / 2 },
   jetty: { x: -10, z: -1.4, yaw: 0 },
   spit: { x: -1.2, z: -8, yaw: Math.PI / 2 },
   // At the counters, which face north: stand in front and look south at them.
@@ -268,7 +282,11 @@ const QA_SPOTS: Readonly<Record<string, Readonly<{ x: number; z: number; yaw: nu
   records: { x: -17.2, z: 13, yaw: Math.PI / 2 },
 });
 const qaSpot = QA_SPOTS[new URLSearchParams(location.search).get("at") ?? ""];
-if (qaSpot) Object.assign(player, qaSpot);
+if (qaSpot && !region) Object.assign(player, qaSpot);
+if (!region && destinationQuery.get("from") === "grotto") Object.assign(player, { x: -17.8, z: 9.5, yaw: -Math.PI / 2 });
+if (!region && destinationQuery.get("from") === "volcanic") Object.assign(player, { x: 17.8, z: 9.5, yaw: Math.PI / 2 });
+if (region && destinationQuery.get("at") === "shore") Object.assign(player, region.id === "grotto" ? { x: -9, z: 12.5, yaw: 0 } : region.id === "cedar-creek" ? { x: 0, z: 23.5, yaw: 0 } : { x: -10, z: 20, yaw: 0 });
+if (region && destinationQuery.get("at") === "return") Object.assign(player, { x: region.exit.x - Math.sign(region.exit.x) * 3, z: region.exit.z, yaw: region.exit.x > 0 ? -Math.PI / 2 : Math.PI / 2 });
 let body: FarmBody = createFarmBody();
 const walkerBounds = { halfWidth: COVE_BOUNDS.width / 2, halfDepth: COVE_BOUNDS.depth / 2, margin: COVE_BOUNDS.wallInset };
 const openDoors = new Set<string>();
@@ -338,11 +356,11 @@ function renderVisitorsChip(): void {
   const state = presence.status();
   visitorsChip.hidden = !(state === "full" || members.length > 0);
   if (state === "full") {
-    visitorsChipLabel.textContent = "COVE FULL";
-    visitorsChipNames.textContent = "Too many people are at the Cove right now.";
+    visitorsChipLabel.textContent = `${areaTitle.toUpperCase()} FULL`;
+    visitorsChipNames.textContent = `Too many people are at ${areaTitle} right now.`;
     return;
   }
-  visitorsChipLabel.textContent = `AT THE COVE · ${members.length}`;
+  visitorsChipLabel.textContent = `AT ${areaTitle.toUpperCase()} · ${members.length}`;
   visitorsChipNames.textContent = members.map((member) => member.pose.activity ? `${member.displayName} (${member.pose.activity})` : member.displayName).join(", ");
 }
 
@@ -379,7 +397,7 @@ const achievements = createAchievementToaster();
 const fishing = createFishingController({
   api: signedIn ? {
     cast: async (request) => {
-      const result: any = await api.castFarmLine(request);
+      const result: any = await api.castFarmLine({ ...request, areaId });
       return result?.ok ? result : { ok: false, error: String(result?.error ?? "unavailable"), ...result };
     },
     land: async (castId, outcome, grade) => {
@@ -387,6 +405,8 @@ const fishing = createFishingController({
       return result?.ok ? result : { ok: false, error: String(result?.error ?? "unavailable"), ...result };
     },
   } : null,
+  castOrigin,
+  zoneAt: region ? (point) => regionZoneAt(region, point) : cove.coveZoneAt,
   random: Math.random,
   now: () => Date.now(),
   tackle: () => ({ rod: findFishingRod(rodId) ?? findFishingRod(STARTER_ROD_ID)!, bait: baitId, level: angler.level }),
@@ -403,6 +423,7 @@ const hud = createFishingHud(requiredElement<HTMLElement>("#fishingHud"), requir
 
 const REFUSALS: Readonly<Record<string, string>> = Object.freeze({
   zone_locked: "",
+  property_required: "This private fishing area requires ownership of its farm property.",
   no_bait: "You're out of that bait. Press Q to switch, or buy more at Bait & Tackle.",
   creel_full: "Your creel is full. Sell some at the Fishmonger or let some go (C).",
   too_many_casts: "Take a breather — that's a lot of casting for one hour.",
@@ -418,7 +439,7 @@ function onFishingEvent(event: FishingEvent): void {
     case "refused": {
       const detail: any = event.detail;
       const text = event.error === "zone_locked"
-        ? `${ZONE_TITLES[detail.zone as keyof typeof ZONE_TITLES] ?? "That water"} opens at Fishing level ${detail.minLevel}. Try the Lagoon, west of the spit.`
+        ? `${ZONE_TITLES[detail.zone as keyof typeof ZONE_TITLES] ?? "That water"} opens at Fishing level ${detail.minLevel}. Explore the Cove until your Fishing level is high enough.`
         : REFUSALS[event.error] ?? "The cast didn't go through. Try again in a moment.";
       notice(text, 5);
       if (detail?.tackle) takeTackle(detail.tackle);
@@ -631,6 +652,10 @@ function updateInteraction(): void {
     const tie = away.action(pose);
     return setPrompt(tie ? tie.prompt : getRidingPrompt(away.horseName(), "away"));
   }
+  if (free && !away.mounted() && !fishing.busy()) {
+    if (region && Math.hypot(player.x - region.exit.x, player.z - region.exit.z) < 6) return setPrompt(region.requiredProperty ? "Follow the path back to your farm" : "Follow the path back to the Cove");
+    if (!region && Math.abs(player.z - 9.5) < 3 && Math.abs(player.x) > 15.5) return setPrompt(player.x < 0 ? "West path: Fernfall Grotto - waterfall pools (Fishing 8)" : "East path: Emberglass Lagoon - volcanic pools (Fishing 20)");
+  }
   const untie = free ? away.action(pose) : null;
   if (untie && !doorInReach && entered && !panelOpen()) {
     stallInReach = null;
@@ -727,9 +752,33 @@ function updatePlayer(dt: number): void {
   body = step.body;
 }
 
+function trailDestination(): string | null {
+  if (region) return Math.abs(player.x - region.exit.x) < 2.2 && Math.abs(player.z - region.exit.z) < 2.6 ? region.requiredProperty ? "farm" : "cove" : null;
+  if (Math.abs(player.z - 9.5) > 2.1) return null;
+  if (player.x < -18.6) return "grotto";
+  if (player.x > 18.6) return "volcanic";
+  return null;
+}
+
+function followTrail(destination: string): void {
+  leaving = true; keys.clear(); document.exitPointerLock?.(); presence.disconnect();
+  const horse = away.mounted() ? away.horseId() : "";
+  const params = new URLSearchParams(horseTravelQuery(fromFarm, horse));
+  if (destination === "farm") {
+    params.delete("farm"); if (fromFarm) params.set("id", fromFarm); params.set("from", region!.id);
+    location.href = `../index.html?${params}`; return;
+  }
+  if (destination === "cove") params.set("from", region!.id);
+  else params.set("area", destination);
+  location.href = `index.html?${params}`;
+}
+
 function checkGateway(): void {
   if (!entered || leaving || body.mode !== "walking") return;
-  if (!gatewayAt(layout.decor, openDoors, player, COVE_BOUNDS)) return;
+  if (fishing.busy() || panelOpen()) return;
+  const destination = trailDestination();
+  if (destination) { followTrail(destination); return; }
+  if (region || !gatewayAt(layout.decor, openDoors, player, COVE_BOUNDS)) return;
   leaving = true;
   keys.clear();
   document.exitPointerLock?.();

@@ -70,8 +70,16 @@ const farmLoad = await farmStore.load();
 const signedIn = farmStore.accountBacked && farmLoad.source === "account";
 let farm = farmLoad.layout;
 const horse = ridingHorseFrom(farm, params.get("horse"));
-const backUrl = (riding) => `../market/index.html?from=downs${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "") ? `&${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "")}` : ""}`;
+const estateTrail = params.get("via") === "estate" && farm.lot === "lot.estate";
+const backUrl = (riding) => estateTrail
+    ? `../index.html?from=downs${fromFarm ? `&id=${encodeURIComponent(fromFarm)}` : ""}${riding && horse ? `&horse=${encodeURIComponent(horse.instanceId)}` : ""}`
+    : `../market/index.html?from=downs${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "") ? `&${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "")}` : ""}`;
 backLink.href = backUrl(true);
+if (estateTrail) {
+    const words = backLink.querySelector(".back-link__words");
+    if (words)
+        words.textContent = "Sunwater Estate";
+}
 if (!horse) {
     requiredElement("#startTitle").textContent = "For riders only.";
     requiredElement("#startWords").textContent = "Windrush Downs is ridden, not walked. Ride out here on your horse from the Market Square's west gate — Hollis the Livestock Dealer sells horses, and a horse lives in a Stable stall on your farm.";

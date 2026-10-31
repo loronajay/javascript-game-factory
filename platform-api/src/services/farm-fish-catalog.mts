@@ -1,3 +1,4 @@
+import { findFishingRegion, regionZoneAt, FISHING_REGIONS } from "./farm-fishing-regions.mjs";
 // The Cove's fish, server side: the species and tackle, the specimen maths, the
 // bite odds, the shadows and the Cove's waters. It mirrors four pure browser
 // modules — js/farm-catalog/fish.mts, js/farm-fish.mts, js/farm-cove.mts and
@@ -11,7 +12,7 @@ import { farmSeedFor, farmSeededRandom } from "./farm-seeded-random.mjs";
 
 // ---------------------------------------------------------------- species and tackle
 
-export const FISH_ZONES = Object.freeze(["lagoon", "reef", "deep"] as const);
+export const FISH_ZONES = Object.freeze(["lagoon", "reef", "deep", "grotto", "volcanic", "cedar-creek", "estate-lake"] as const);
 export type FishZone = (typeof FISH_ZONES)[number];
 export const FISH_RARITIES = Object.freeze(["common", "uncommon", "rare", "epic", "legendary"] as const);
 export type FishRarity = (typeof FISH_RARITIES)[number];
@@ -35,15 +36,15 @@ const rule = (key: string, rarity: FishRarity, zones: readonly FishZone[], weigh
   Object.freeze({ id: `fish.${key}`, rarity, zones: Object.freeze([...zones]), weightKg: Object.freeze({ min: weight[0], avg: weight[1], max: weight[2] }), lengthM, fight, strength, value });
 
 export const FARM_FISH_RULES: readonly FishRule[] = Object.freeze([
-  rule("goldfish", "common", ["lagoon"], [0.05, 0.2, 0.9], 0.18, "darter", 0.12, 3),
+  rule("goldfish", "common", ["lagoon", "cedar-creek"], [0.05, 0.2, 0.9], 0.18, "darter", 0.12, 3),
   rule("tetra", "common", ["lagoon"], [0.02, 0.06, 0.2], 0.09, "darter", 0.08, 2),
-  rule("armored-catfish", "common", ["lagoon"], [0.3, 1.2, 4], 0.45, "sulker", 0.22, 4),
+  rule("armored-catfish", "common", ["lagoon", "cedar-creek"], [0.3, 1.2, 4], 0.45, "sulker", 0.22, 4),
   rule("cardinal-fish", "common", ["reef"], [0.03, 0.1, 0.3], 0.1, "darter", 0.1, 2),
   rule("butterfly-fish", "common", ["reef"], [0.1, 0.35, 1], 0.18, "leaper", 0.14, 3),
   rule("tang", "common", ["reef"], [0.2, 0.6, 1.6], 0.25, "darter", 0.16, 3),
   rule("cowfish", "common", ["reef"], [0.2, 0.7, 2], 0.3, "sulker", 0.14, 4),
   rule("flatfish", "common", ["reef", "deep"], [0.4, 1.5, 6], 0.4, "sulker", 0.2, 4),
-  rule("blue-goldfish", "uncommon", ["lagoon"], [0.05, 0.25, 1], 0.19, "darter", 0.14, 6),
+  rule("blue-goldfish", "uncommon", ["lagoon", "estate-lake"], [0.05, 0.25, 1], 0.19, "darter", 0.14, 6),
   rule("betta", "uncommon", ["lagoon"], [0.01, 0.04, 0.12], 0.07, "thrasher", 0.12, 7),
   rule("piranha", "uncommon", ["lagoon"], [0.3, 1.2, 3.5], 0.3, "thrasher", 0.3, 8),
   rule("clownfish", "uncommon", ["reef"], [0.05, 0.15, 0.4], 0.11, "darter", 0.12, 6),
@@ -53,14 +54,14 @@ export const FARM_FISH_RULES: readonly FishRule[] = Object.freeze([
   rule("royal-gramma", "uncommon", ["reef"], [0.02, 0.06, 0.15], 0.08, "darter", 0.1, 6),
   rule("red-snapper", "uncommon", ["reef", "deep"], [1, 4, 15], 0.6, "diver", 0.36, 9),
   rule("turbot", "uncommon", ["deep"], [1, 5, 25], 0.6, "sulker", 0.34, 9),
-  rule("koi", "rare", ["lagoon"], [1, 4, 20], 0.6, "sulker", 0.3, 18),
+  rule("koi", "rare", ["lagoon", "cedar-creek"], [1, 4, 20], 0.6, "sulker", 0.3, 18),
   rule("zebra-clown-fish", "rare", ["reef"], [0.06, 0.18, 0.45], 0.12, "darter", 0.14, 16),
   rule("moorish-idol", "rare", ["reef"], [0.2, 0.5, 1.2], 0.22, "leaper", 0.2, 17),
   rule("parrot-fish", "rare", ["reef"], [1, 4, 20], 0.6, "diver", 0.36, 20),
   rule("lionfish", "rare", ["reef"], [0.3, 1, 2.5], 0.35, "thrasher", 0.26, 18),
   rule("coral-grouper", "rare", ["reef", "deep"], [2, 8, 30], 0.75, "diver", 0.44, 22),
   rule("tuna", "rare", ["deep"], [20, 80, 400], 1.6, "diver", 0.58, 25),
-  rule("flower-horn", "epic", ["lagoon"], [0.3, 1, 3], 0.3, "thrasher", 0.3, 50),
+  rule("flower-horn", "epic", ["lagoon", "estate-lake"], [0.3, 1, 3], 0.3, "thrasher", 0.3, 50),
   rule("mandarin-fish", "epic", ["reef"], [0.02, 0.06, 0.15], 0.07, "darter", 0.14, 48),
   rule("black-lion-fish", "epic", ["reef"], [0.4, 1.2, 3], 0.38, "thrasher", 0.3, 55),
   rule("humphead", "epic", ["reef"], [20, 70, 190], 1.5, "sulker", 0.6, 60),
@@ -70,6 +71,27 @@ export const FARM_FISH_RULES: readonly FishRule[] = Object.freeze([
   rule("anglerfish", "legendary", ["deep"], [2, 10, 50], 0.7, "thrasher", 0.5, 220),
   rule("goblin-shark", "legendary", ["deep"], [50, 180, 700], 3, "diver", 0.7, 260),
   rule("shark", "legendary", ["deep"], [80, 300, 1100], 3.5, "diver", 0.75, 300),
+  rule("jade-barb", "common", ["grotto"], [0.03, 0.12, 0.5], 0.14, "darter", 0.16, 5),
+  rule("glass-tetra", "common", ["grotto", "cedar-creek"], [0.01, 0.04, 0.14], 0.08, "darter", 0.1, 4),
+  rule("orchid-betta", "uncommon", ["grotto"], [0.01, 0.05, 0.16], 0.09, "thrasher", 0.2, 10),
+  rule("scarlet-discus", "uncommon", ["grotto"], [0.15, 0.6, 1.8], 0.22, "sulker", 0.25, 12),
+  rule("moon-koi", "rare", ["grotto", "estate-lake"], [1, 5, 24], 0.75, "sulker", 0.4, 26),
+  rule("mossback-pleco", "rare", ["grotto"], [0.5, 2.5, 10], 0.65, "sulker", 0.42, 28),
+  rule("rainbow-arowana", "epic", ["grotto", "cedar-creek"], [2, 8, 30], 1.15, "leaper", 0.62, 80),
+  rule("royal-arapaima", "legendary", ["grotto", "estate-lake"], [30, 110, 260], 2.6, "diver", 0.78, 280),
+  rule("ember-clownfish", "common", ["volcanic"], [0.05, 0.18, 0.5], 0.14, "darter", 0.18, 6),
+  rule("sapphire-butterfly", "common", ["volcanic"], [0.1, 0.4, 1.2], 0.23, "leaper", 0.22, 7),
+  rule("sunset-tang", "uncommon", ["volcanic"], [0.2, 0.8, 2.2], 0.32, "darter", 0.28, 14),
+  rule("ember-puffer", "uncommon", ["volcanic"], [0.4, 1.5, 5], 0.4, "sulker", 0.32, 16),
+  rule("violet-lionfish", "rare", ["volcanic"], [0.4, 1.5, 4], 0.48, "thrasher", 0.4, 30),
+  rule("ghost-flounder", "rare", ["volcanic"], [1, 4, 18], 0.75, "sulker", 0.45, 34),
+  rule("opal-grouper", "epic", ["volcanic"], [4, 18, 70], 1.2, "diver", 0.65, 95),
+  rule("dusk-sailfish", "legendary", ["volcanic"], [25, 90, 220], 2.7, "leaper", 0.82, 310),
+  // Private property waters.
+  rule("amber-chub", "common", ["cedar-creek"], [0.05, 0.25, 1], 0.22, "darter", 0.16, 5),
+  rule("cedar-trout", "rare", ["cedar-creek"], [0.3, 1.6, 7], 0.48, "leaper", 0.36, 23),
+  rule("golden-perch", "common", ["estate-lake"], [0.1, 0.6, 2.5], 0.29, "thrasher", 0.23, 6),
+  rule("pearl-carp", "rare", ["estate-lake"], [1, 6, 28], 0.8, "sulker", 0.42, 30),
 ]);
 
 const FISH_BY_ID = new Map(FARM_FISH_RULES.map((entry) => [entry.id, entry]));
@@ -97,12 +119,12 @@ export type LureRule = Readonly<{ id: string; minLevel: number; price: number; r
 const lure = (index: number, minLevel: number, price: number, rarity: Partial<Record<FishRarity, number>>, favors: readonly string[]): LureRule =>
   Object.freeze({ id: `lure.${index}`, minLevel, price, rarity: Object.freeze({ ...rarity }), favors: Object.freeze([...favors]) });
 export const FARM_LURES: readonly LureRule[] = Object.freeze([
-  lure(1, 3, 60, { uncommon: 1.5 }, ["fish.blue-goldfish", "fish.betta", "fish.piranha", "fish.koi"]),
-  lure(5, 8, 140, { uncommon: 1.3, rare: 1.2 }, ["fish.yellow-tang", "fish.blue-tang", "fish.clownfish", "fish.royal-gramma"]),
-  lure(3, 14, 260, { rare: 1.3 }, ["fish.zebra-clown-fish", "fish.lionfish", "fish.moorish-idol", "fish.black-lion-fish"]),
-  lure(2, 22, 420, { rare: 1.5, epic: 1.3 }, ["fish.red-snapper", "fish.coral-grouper", "fish.parrot-fish"]),
-  lure(4, 30, 700, { epic: 1.6, legendary: 1.3 }, ["fish.mandarin-fish", "fish.flower-horn", "fish.humphead"]),
-  lure(6, 42, 1200, { epic: 1.5, legendary: 1.8 }, ["fish.swordfish", "fish.tuna", "fish.anglerfish", "fish.goblin-shark", "fish.shark"]),
+  lure(1, 3, 60, { uncommon: 1.5 }, ["fish.blue-goldfish", "fish.betta", "fish.piranha", "fish.koi", "fish.jade-barb", "fish.glass-tetra", "fish.orchid-betta", "fish.moon-koi"]),
+  lure(5, 8, 140, { uncommon: 1.3, rare: 1.2 }, ["fish.yellow-tang", "fish.blue-tang", "fish.clownfish", "fish.royal-gramma", "fish.ember-clownfish", "fish.sapphire-butterfly", "fish.sunset-tang"]),
+  lure(3, 14, 260, { rare: 1.3 }, ["fish.zebra-clown-fish", "fish.lionfish", "fish.moorish-idol", "fish.black-lion-fish", "fish.violet-lionfish"]),
+  lure(2, 22, 420, { rare: 1.5, epic: 1.3 }, ["fish.red-snapper", "fish.coral-grouper", "fish.parrot-fish", "fish.opal-grouper", "fish.mossback-pleco"]),
+  lure(4, 30, 700, { epic: 1.6, legendary: 1.3 }, ["fish.mandarin-fish", "fish.flower-horn", "fish.humphead", "fish.rainbow-arowana"]),
+  lure(6, 42, 1200, { epic: 1.5, legendary: 1.8 }, ["fish.swordfish", "fish.tuna", "fish.anglerfish", "fish.goblin-shark", "fish.shark", "fish.royal-arapaima", "fish.dusk-sailfish"]),
 ]);
 
 export function farmLureRule(id: unknown): LureRule | undefined {
@@ -115,7 +137,7 @@ export const STARTER_WORMS = 20;
 export const MAX_WORMS = 200;
 export const MAX_LURES_EACH = 9;
 export const CREEL_CAPACITY = 40;
-export const ZONE_MIN_LEVEL: Readonly<Record<FishZone, number>> = Object.freeze({ lagoon: 1, reef: 3, deep: 15 });
+export const ZONE_MIN_LEVEL: Readonly<Record<FishZone, number>> = Object.freeze({ lagoon: 1, reef: 3, deep: 15, grotto: 8, volcanic: 20, "cedar-creek": 1, "estate-lake": 1 });
 
 // ---------------------------------------------------------------- the specimen
 
@@ -273,10 +295,6 @@ export const COVE_DOCK_DECKS: readonly Rect[] = Object.freeze([
   rect(-11.2, -8.8, -2, SHORE_Z + 0.8),
   rect(9.8, 12.2, -7, SHORE_Z + 0.8),
   rect(7.6, 14.4, -11, -7),
-  rect(-17.2, -14.8, -10, SHORE_Z + 0.8),
-  rect(-18.4, -13.6, -13, -9),
-  rect(1.2, 7, -3.2, -0.8),
-  rect(5.8, 8.2, -6, 1),
 ]);
 
 function insideRect(point: Readonly<{ x: number; z: number }>, box: Rect, margin = 0): boolean {
@@ -309,11 +327,12 @@ export function farmCoveZoneAt(point: Readonly<{ x: number; z: number }>): FishZ
 // ---------------------------------------------------------------- the shadows
 
 export const SHADOW_WINDOW_MS = 5 * 60 * 1000;
-export const SHADOWS_PER_ZONE: Readonly<Record<FishZone, number>> = Object.freeze({ lagoon: 5, reef: 4, deep: 3 });
+export const SHADOWS_PER_ZONE: Readonly<Record<FishZone, number>> = Object.freeze({ lagoon: 5, reef: 4, deep: 3, grotto: 7, volcanic: 7, "cedar-creek": 6, "estate-lake": 7 });
 export const SHADOW_REACH = 2.2;
 export const SHADOW_SLACK = 1.4;
 
 export const SHADOW_WATERS: Readonly<Record<FishZone, readonly Rect[]>> = Object.freeze({
+  ...Object.fromEntries(FISHING_REGIONS.map((region) => [region.id, region.shadowWaters])) as Record<"grotto" | "volcanic" | "cedar-creek" | "estate-lake", readonly Rect[]>,
   lagoon: Object.freeze([rect(-18.5, -12.4, -18.5, 2.6), rect(-8, -3.8, -18.5, 2.6), rect(-12.4, -8, -18.5, -3.4)]),
   reef: Object.freeze([rect(3.6, 8.6, -6.6, 3), rect(13.4, 18.5, -6.6, 3)]),
   deep: Object.freeze([rect(3.6, 18.5, -18.5, -12.4), rect(3.6, 6.4, -12.4, -8.6), rect(15.6, 18.5, -12.4, -8.6)]),
@@ -356,7 +375,7 @@ function loopInside(box: Rect, random: () => number): ShadowPath {
 export function generateShadows(window: number, paths: () => number, fish: () => number): Shadow[] {
   const start = window * SHADOW_WINDOW_MS;
   const out: Shadow[] = [];
-  for (const zone of ["lagoon", "reef", "deep"] as const) {
+  for (const zone of FISH_ZONES) {
     const waters = SHADOW_WATERS[zone];
     for (let slot = 0; slot < SHADOWS_PER_ZONE[zone]; slot += 1) {
       const box = waters[Math.floor(paths() * waters.length) % waters.length]!;
@@ -411,7 +430,7 @@ export function farmShadowInReach(shadows: readonly Shadow[], shadowId: string, 
   return Math.hypot(at.x - point.x, at.z - point.z) <= SHADOW_REACH + SHADOW_SLACK ? shadow : null;
 }
 
-const SHADOW_ID = /^s(\d{1,12})-(lagoon|reef|deep)-(\d{1,2})$/;
+const SHADOW_ID = /^s(\d{1,12})-(lagoon|reef|deep|grotto|volcanic|cedar-creek|estate-lake)-(\d{1,2})$/;
 export function parseShadowId(value: unknown): Readonly<{ window: number; zone: FishZone }> | null {
   if (typeof value !== "string") return null;
   const match = SHADOW_ID.exec(value);
@@ -506,3 +525,10 @@ export const FISH_ID = /^fish-[A-Za-z0-9-]{8,64}$/;
 export const MAX_MOUNTED_FISH = 30;
 export const MOUNT_FEE = 25;
 export const TROPHY_MOUNT_ITEM_ID = "decor.prop.trophy-mount";
+
+/** Missing areaId preserves legacy Cove clients; unknown destinations admit no casts. */
+export function farmFishingZoneAt(point: Readonly<{ x: number; z: number }>, areaId: unknown = "cove"): FishZone | null {
+  if (areaId === "cove" || areaId === undefined) return farmCoveZoneAt(point);
+  const region = findFishingRegion(areaId);
+  return region ? regionZoneAt(region, point) : null;
+}

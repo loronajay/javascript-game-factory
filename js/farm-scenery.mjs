@@ -164,7 +164,7 @@ function sprinkle(count, random) {
 }
 export function createFarmScenery(THREE, scene, options = {}) {
     const random = seeded(2026);
-    const keepClear = options.keepClear ?? (() => false);
+    const keepClear = options.propertyId ? () => true : options.keepClear ?? (() => false);
     createHills(THREE, scene, random, keepClear);
     createTreeline(THREE, scene, random, keepClear);
     const clouds = createClouds(THREE, scene, random);

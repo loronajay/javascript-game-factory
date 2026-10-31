@@ -1,3 +1,4 @@
+import { findFishingRegion } from "../services/farm-fishing-regions.mjs";
 // Fishing at the Cove, on the database (migration 056). Every fish is decided
 // here: a cast rolls the bite (from a shadow's pre-drawn fish, or from the
 // zone's odds for a blind cast), a landing measures and mints the specimen,
@@ -31,7 +32,7 @@ import {
   WORM_ID,
   WORM_TUB,
   ZONE_MIN_LEVEL,
-  farmCoveZoneAt,
+  farmFishingZoneAt,
   farmFishRule,
   farmFishStrength,
   farmFishValue,
@@ -316,7 +317,7 @@ export async function castFarmLine(pool: any, input: any, now: number = Date.now
   const castId = required(input?.castId, "castId");
   if (!ID.test(castId)) throw new TypeError("invalid castId");
   const point = { x: Number(input?.point?.x), z: Number(input?.point?.z) };
-  const zone = farmCoveZoneAt(point);
+  const zone = farmFishingZoneAt(point, input?.areaId);
   if (!zone) return { ok: false, error: "not_water" };
   const rod = farmRodRule(input?.rodId);
   if (!rod) return { ok: false, error: "unknown_rod" };
@@ -324,6 +325,11 @@ export async function castFarmLine(pool: any, input: any, now: number = Date.now
   const lure = bait === WORM_ID ? null : farmLureRule(bait);
   if (bait !== WORM_ID && !lure) return { ok: false, error: "unknown_bait" };
   return transaction(pool, async (client) => {
+    const property = findFishingRegion(input?.areaId)?.requiredProperty;
+    if (property) {
+      const access = await client.query("select 1 from game_entitlements where player_id = $1 and game_slug = 'farm' and entitlement_id = $2 and quantity > 0", [playerId, property]);
+      if (!access.rows.length) return { ok: false, error: "property_required", property };
+    }
     const angler = await lockedAngler(client, playerId);
     const level = fishingLevel(angler.fishing);
     if (level < ZONE_MIN_LEVEL[zone]) return { ok: false, error: "zone_locked", zone, minLevel: ZONE_MIN_LEVEL[zone], level };

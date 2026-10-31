@@ -30,6 +30,8 @@ import {
   findFishSpecies,
   type FishRarity,
   type FishSpecies,
+  FISH_ZONES,
+  ZONE_TITLES,
   type FishZone,
   type FishingLure,
 } from "./farm-catalog/fish.mjs";
@@ -230,7 +232,7 @@ export function rollBite(zone: FishZone, lure: FishingLure | null, kind: "blind"
 
 /** Each window lasts five minutes; a shadow is born some way into it and swims off before the next. */
 export const SHADOW_WINDOW_MS = 5 * 60 * 1000;
-export const SHADOWS_PER_ZONE: Readonly<Record<FishZone, number>> = Object.freeze({ lagoon: 5, reef: 4, deep: 3 });
+export const SHADOWS_PER_ZONE: Readonly<Record<FishZone, number>> = Object.freeze({ lagoon: 5, reef: 4, deep: 3, grotto: 7, volcanic: 7, "cedar-creek": 6, "estate-lake": 7 });
 /** A lure that lands this close to a shadow is seen, and the shadow comes to it. */
 export const SHADOW_REACH = 2.2;
 /** The server's slack for the shadow having swum on while the cast was in flight. */
@@ -330,7 +332,7 @@ function loopInside(box: Rect, random: () => number): ShadowPath {
 export function generateShadows(window: number, paths: () => number, fish: () => number): Shadow[] {
   const start = window * SHADOW_WINDOW_MS;
   const out: Shadow[] = [];
-  for (const zone of ["lagoon", "reef", "deep"] as const) {
+  for (const zone of FISH_ZONES) {
     const waters = SHADOW_WATERS[zone];
     for (let slot = 0; slot < SHADOWS_PER_ZONE[zone]; slot += 1) {
       const box = waters[Math.floor(paths() * waters.length) % waters.length]!;
@@ -362,7 +364,7 @@ export function publicShadow(shadow: Shadow): PublicShadow {
   return Object.freeze({ id: shadow.id, zone: shadow.zone, size: shadow.size, fin: shadow.fin, path: shadow.path, bornAt: shadow.bornAt, goneAt: shadow.goneAt });
 }
 
-const SHADOW_ID = /^s(\d{1,12})-(lagoon|reef|deep)-(\d{1,2})$/;
+const SHADOW_ID = /^s(\d{1,12})-(lagoon|reef|deep|grotto|volcanic|cedar-creek|estate-lake)-(\d{1,2})$/;
 
 /** A public shadow as the server sent it, or null when it is not shaped like one. */
 export function normalizePublicShadow(value: unknown): PublicShadow | null {
@@ -394,7 +396,7 @@ export function normalizePublicShadow(value: unknown): PublicShadow | null {
 export type FishNeed = Readonly<{ species?: string; zone?: FishZone; rarity?: FishRarity; size?: SizeClass }>;
 
 const NEED_PART = /^(species|zone|rarity|size)=([a-z0-9.-]+)$/;
-const ZONES: readonly string[] = ["lagoon", "reef", "deep"];
+const ZONES: readonly string[] = FISH_ZONES;
 const RARITIES: readonly FishRarity[] = ["common", "uncommon", "rare", "epic", "legendary"];
 
 export function parseFishNeed(key: unknown): FishNeed | null {
@@ -441,7 +443,7 @@ export function fishNeedValue(need: FishNeed): number {
 export function fishNeedTitle(need: FishNeed): string {
   const size = need.size && need.size !== "tiny" ? `${SIZE_TITLES[need.size]}${need.size === "record" || need.size === "trophy" ? "" : "+"} ` : "";
   if (need.species) return `${size}${findFishSpecies(need.species)?.title ?? need.species}`;
-  if (need.zone) return `${size}${need.zone === "lagoon" ? "Lagoon" : need.zone === "reef" ? "Reef" : "Deep"} fish`;
+  if (need.zone) return `${size}${ZONE_TITLES[need.zone]} fish`;
   const rarity = need.rarity!;
   return `${size}${rarity === "common" ? "Any fish" : `${rarity[0]!.toUpperCase()}${rarity.slice(1)} fish${rarity === "legendary" ? "" : " or better"}`}`;
 }

@@ -334,6 +334,7 @@ export function normalizeFarmLayout(value) {
         }
         decor = migrateStarterHomesite(decor);
     }
+    decor = propertyEntrance(decor, source.lot);
     const habitats = farmHabitats({ decor });
     const pets = [];
     const petIds = new Set();
@@ -564,9 +565,24 @@ export function expandFarmLot(layout, lot) {
             return { ...row, x, z: Math.sign(row.z) * edge, length };
         }
         if (vertical && Math.abs(Math.abs(row.x) - oldEdge) < 0.15) {
-            return { ...row, x: Math.sign(row.x) * edge, length: row.length > 0 ? row.length + delta * 2 : 0 };
+            return { ...row, x: Math.sign(row.x) * edge, z: row.length > 0 && Math.abs(row.z) > 0.1 ? row.z + Math.sign(row.z) * delta / 2 : row.z, length: row.length > 0 ? row.length + (Math.abs(row.z) > 0.1 ? delta : delta * 2) : 0 };
         }
         return row;
     });
     return normalizeFarmLayout({ ...layout, lot, decor });
+}
+/** Give the original perimeter a side gate to the new property's surrounding land. */
+function propertyEntrance(decor, lot) {
+    if (!FARM_LOTS.some((property) => property.id === lot) || decor.some((row) => row.instanceId === "property-gate-east") || decor.length > MAX_DECOR - 3)
+        return decor;
+    const edge = farmLotBounds({ lot }).width / 2 - 0.37;
+    const rail = decor.find((row) => row.instanceId === "post-rail-3" && Math.abs(row.x - edge) < 0.15 && Math.abs(row.z) < 0.1 && Math.abs(row.length - (edge * 2 + 0.14)) < 0.2);
+    if (!rail)
+        return decor;
+    const northEnd = 5.8, southStart = 8.2;
+    return decor.filter((row) => row !== rail).concat([
+        { ...rail, instanceId: "property-fence-east-n", z: (-edge + northEnd) / 2, length: edge + northEnd + 0.07 },
+        { ...rail, instanceId: "property-fence-east-s", z: (southStart + edge) / 2, length: edge - southStart + 0.07 },
+        { instanceId: "property-gate-east", itemId: "decor.fence.gate", x: edge, z: 7, rotationY: 1.5708, length: 0 },
+    ]);
 }

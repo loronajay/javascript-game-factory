@@ -76,6 +76,8 @@ export type FishingEvent =
   | Readonly<{ kind: "landing-refused"; error: string }>;
 
 export type FishingDeps = Readonly<{
+  castOrigin?: typeof castOrigin;
+  zoneAt?: typeof coveZoneAt;
   /** Null when signed out: practice, and nothing is kept. */
   api: FishingApi | null;
   random: () => number;
@@ -181,11 +183,11 @@ export function createFishingController(deps: FishingDeps): FishingController {
   }
 
   function release(pose: Pose): void {
-    const origin = castOrigin(pose);
+    const origin = (deps.castOrigin ?? castOrigin)(pose);
     const tackle = deps.tackle();
     const power = castPower(held);
     const point = castLanding(pose, power, tackle.rod.castRange);
-    const where = coveZoneAt(point);
+    const where = (deps.zoneAt ?? coveZoneAt)(point);
     if (!origin || !where) {
       deps.onEvent({ kind: "notice", text: origin ? "The cast fell on the bank. Face open water and try again." : "Face the water to cast." });
       reset();
@@ -310,7 +312,7 @@ export function createFishingController(deps: FishingDeps): FishingController {
   return Object.freeze({
     primary(down, pose) {
       if (phase === "idle" && down) {
-        if (!castOrigin(pose)) {
+        if (!(deps.castOrigin ?? castOrigin)(pose)) {
           deps.onEvent({ kind: "notice", text: "Walk to the water's edge (or out on a dock) and face the water to cast." });
           return;
         }

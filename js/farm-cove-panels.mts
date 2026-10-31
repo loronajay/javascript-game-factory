@@ -94,6 +94,7 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
   const status = root.querySelector<HTMLElement>("[data-status]")!;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>("[data-tab]")];
   let tab: "creel" | "mounted" | "dex" = "creel";
+  let dexWater = "all";
   for (const button of tabs) button.addEventListener("click", () => {
     tab = button.dataset.tab === "dex" ? "dex" : button.dataset.tab === "mounted" ? "mounted" : "creel";
     draw();
@@ -177,8 +178,13 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
   function drawDex(angler: Angler): void {
     const progress = dexProgress(angler);
     heading.textContent = `Fishdex · ${progress.caught} / ${progress.total}`;
+    const waters = element("select", "farm-button"); waters.setAttribute("aria-label", "Fishdex water");
+    for (const [id, title] of [["all", "All waters"], ...Object.entries(ZONE_TITLES)]) {
+      const option = element("option", "", title); option.value = id; option.selected = id === dexWater; waters.append(option);
+    }
+    waters.addEventListener("change", () => { dexWater = waters.value; draw(); }); body.append(waters);
     const grid = element("ol", "dex-grid");
-    for (const species of FISH_CATALOG) {
+    for (const species of FISH_CATALOG.filter((species) => dexWater === "all" || species.zones.some((zone) => zone === dexWater))) {
       const entry = angler.dex[species.id];
       const known = Boolean(entry && entry.caught > 0);
       const card = element("li", `dex-card${known ? "" : " dex-card--unknown"}`);
@@ -189,6 +195,7 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
         ? `Best ${formatWeight(entry!.bestG)} · ${entry!.caught} landed`
         : `${RARITY_TITLES[species.rarity]} · ${species.zones.map((zone) => ZONE_TITLES[zone]).join(", ")}`);
       card.append(facts);
+      if (known) card.append(element("small", "dex-card__lore", species.blurb));
       if (entry?.shiny || entry?.golden) card.append(element("em", "dex-card__variants", [entry.shiny ? "✦ Shiny" : "", entry.golden ? "★ Golden" : ""].filter(Boolean).join(" · ")));
       grid.append(card);
     }

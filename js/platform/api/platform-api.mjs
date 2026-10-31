@@ -621,8 +621,8 @@ export function createPlatformApiClient(options = {}) {
             return get("/games/farm/fishing", "fishing");
         },
         /** Put a line in the water. The server decides the water, the bite and when it comes. */
-        castFarmLine({ castId, point, shadowId, rodId, bait }) {
-            return post("/games/farm/fishing/casts", { castId, point, shadowId, rodId, bait }, "result", {}, true);
+        castFarmLine({ castId, point, shadowId, rodId, bait, areaId }) {
+            return post("/games/farm/fishing/casts", { castId, point, shadowId, rodId, bait, areaId }, "result", {}, true);
         },
         /** How a cast ended: landed (with its grade), escaped, snapped or missed. */
         landFarmCast({ castId, outcome, grade }) {

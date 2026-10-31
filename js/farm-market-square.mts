@@ -159,6 +159,7 @@ export const SEED_STALL_ID = "seeds";
 export const EXCHANGE_BOARD_ID = "exchange";
 export const LIVESTOCK_STALL_ID = "livestock";
 export const BUTCHER_STALL_ID = "butcher";
+export const PROPERTY_OFFICE_ID = "properties";
 
 /**
  * The square's stalls. The Produce Merchant (v1, paying the day's prices), the
@@ -219,6 +220,12 @@ export const MARKET_STALLS: readonly MarketStall[] = Object.freeze([
     colors: ["#2f5f8a", "#f4ecd6"], keeper: null,
     closedNote: "",
     notices: Object.freeze(["For sale", "For sale", "Bargain", "For sale", "Tickets"]),
+  }),
+  stall({
+    id: PROPERTY_OFFICE_ID, kind: "board", title: "Property Office", open: true,
+    x: -11.2, z: -4.4, rotationY: QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
+    colors: ["#346756", "#f4ecd6"], keeper: null, closedNote: "",
+    notices: Object.freeze(["Cedar Hollow", "Sunwater Estate", "New homes", "For sale", "Own your future"]),
   }),
 ]);
 
@@ -282,6 +289,7 @@ export function findStallInReach(
 }
 
 export function stallPrompt(entry: MarketStall, signedIn: boolean): string {
+  if (entry.id === PROPERTY_OFFICE_ID) return "Press E to browse new farm properties";
   if (!entry.open) return `${entry.title} · closed for now · Press E to read the notice`;
   if (entry.id === EXCHANGE_BOARD_ID) return signedIn ? `Press E to buy and sell at the ${entry.title}` : `${entry.title} · sign in to buy and sell`;
   if (entry.kind === "board") return signedIn ? `Press E to read the ${entry.title}` : `${entry.title} · sign in to fill orders`;

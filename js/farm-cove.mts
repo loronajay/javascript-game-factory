@@ -1,3 +1,4 @@
+import { FISHING_REGIONS } from "./farm-fishing-regions.mjs";
 // The Cove, as data. PURE — no THREE, no DOM, no storage.
 //
 // The Cove is the third shared place down the farm road: out of the Market
@@ -82,10 +83,6 @@ export const COVE_DOCKS: readonly CoveDock[] = Object.freeze([
   dock("lagoon-jetty", "pier", rect(-11.2, -8.8, -2, SHORE_Z + 0.8)),
   dock("sea-pier", "pier", rect(9.8, 12.2, -7, SHORE_Z + 0.8)),
   dock("sea-pier-head", "head", rect(7.6, 14.4, -11, -7)),
-  dock("lagoon-west-jetty", "pier", rect(-17.2, -14.8, -10, SHORE_Z + 0.8)),
-  dock("lagoon-west-head", "head", rect(-18.4, -13.6, -13, -9)),
-  dock("spit-reef-walk", "pier", rect(1.2, 7, -3.2, -0.8)),
-  dock("spit-reef-head", "head", rect(5.8, 8.2, -6, 1)),
 ]);
 
 export function insideRect(point: Readonly<{ x: number; z: number }>, box: Rect, margin = 0): boolean {
@@ -224,6 +221,7 @@ export function coveWaterDepthAt(point: Readonly<{ x: number; z: number }>): num
  * box, so it never swims up the bank or under a deck.
  */
 export const SHADOW_WATERS: Readonly<Record<FishZone, readonly Rect[]>> = Object.freeze({
+  ...Object.fromEntries(FISHING_REGIONS.map((region) => [region.id, region.shadowWaters])) as Record<"grotto" | "volcanic" | "cedar-creek" | "estate-lake", readonly Rect[]>,
   lagoon: Object.freeze([rect(-18.5, -12.4, -18.5, 2.6), rect(-8, -3.8, -18.5, 2.6), rect(-12.4, -8, -18.5, -3.4)]),
   reef: Object.freeze([rect(3.6, 8.6, -6.6, 3), rect(13.4, 18.5, -6.6, 3)]),
   deep: Object.freeze([rect(3.6, 18.5, -18.5, -12.4), rect(3.6, 6.4, -12.4, -8.6), rect(15.6, 18.5, -12.4, -8.6)]),
@@ -252,8 +250,10 @@ export const COVE_DECOR: readonly FarmDecorRow[] = Object.freeze([
   row("cove-wall-sw", "decor.fence.stone-wall", -(GATE_WIDTH / 2 + SOUTH_RUN / 2), WALL, 0, SOUTH_RUN),
   row("cove-wall-se", "decor.fence.stone-wall", GATE_WIDTH / 2 + SOUTH_RUN / 2, WALL, 0, SOUTH_RUN),
   row(COVE_MARKET_GATE, "decor.fence.gate", 0, WALL, 0),
-  row("cove-wall-w", "decor.fence.stone-wall", -WALL, SHORE_Z + SIDE_RUN / 2, QUARTER, SIDE_RUN),
-  row("cove-wall-e", "decor.fence.stone-wall", WALL, SHORE_Z + SIDE_RUN / 2, QUARTER, SIDE_RUN),
+  row("cove-wall-w-north", "decor.fence.stone-wall", -WALL, 6.75, QUARTER, 1.5),
+  row("cove-wall-w-south", "decor.fence.stone-wall", -WALL, 15.6, QUARTER, 7.5),
+  row("cove-wall-e-north", "decor.fence.stone-wall", WALL, 6.75, QUARTER, 1.5),
+  row("cove-wall-e-south", "decor.fence.stone-wall", WALL, 15.6, QUARTER, 7.5),
   row("cove-signpost", "decor.prop.signpost", 2.1, WALL - 1.1, 0),
   row("cove-lamp-gate-w", "decor.prop.lamp-post", -1.8, WALL - 1.1),
   row(COVE_RAIL_ID, "decor.prop.hitching-rail", -4.4, WALL - 3.2, 0),
@@ -268,11 +268,11 @@ export const COVE_DECOR: readonly FarmDecorRow[] = Object.freeze([
   row("cove-lamp-3", "decor.prop.lamp-post", -13, 8.2),
   row("cove-lamp-4", "decor.prop.lamp-post", 14.2, 8.2),
   // A picnic table and chairs by the lagoon; the anglers' odds and ends by the pier.
-  row("cove-picnic", "decor.furniture.picnic-table", -15.4, 10.4),
+  row("cove-picnic", "decor.furniture.picnic-table", -14.5, 15.2),
   row("cove-rocker", "decor.furniture.rocking-chair", -12.2, 12.6, Math.PI * 0.8),
   row("cove-barrel-1", "decor.prop.barrel", 13.8, 8.4),
   row("cove-barrel-2", "decor.prop.barrel", 14.5, 9.1),
-  row("cove-crates", "decor.prop.crates", 16.2, 8.6, 0.3),
+  row("cove-crates", "decor.prop.crates", 16.2, 14.6, 0.3),
   row("cove-anchor", "decor.prop.old-anchor", 8, 8.3, 0.6),
   row("cove-logs", "decor.prop.log-pile", -17.2, 16.6, QUARTER),
   // Trees along the shore's back, clear of the path; willows lean over the lagoon.

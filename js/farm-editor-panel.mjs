@@ -13,7 +13,6 @@
 // THE RAIL IS THE CATALOG'S TABLE OF CONTENTS: one button for the ground and
 // one per decor category. The active button is the drawer's handle — press it
 // to tuck the catalog away, press it again to bring it back.
-import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 import { GROUND_CATALOG } from "./farm-catalog/ground.mjs";
 import { FARM_DECOR_CATEGORIES, FARM_DECOR_CATEGORY_TITLES, farmDecorByCategory, farmDecorFootprint, farmDecorTab, findFarmDecor } from "./farm-catalog/decor.mjs";
 import { CROP_CATALOG } from "./farm-crops.mjs";
@@ -113,7 +112,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
         groundBuilt = true;
         const balance = element("small", "ticket-shop-balance");
         balance.dataset.ticketShopBalance = "true";
-        elements.groundPicker.replaceChildren(balance, ...[...GROUND_CATALOG, ...FARM_LOTS.map((lot) => ({ ...lot, style: { pattern: "grass" }, swatch: ["#5f9a3c", "#3f7228"] }))].map((ground) => {
+        elements.groundPicker.replaceChildren(balance, ...GROUND_CATALOG.map((ground) => {
             const swatch = element("button", "swatch");
             swatch.type = "button";
             swatch.dataset.groundId = ground.id;
@@ -147,7 +146,7 @@ export function createFarmEditorPanel(elements, actions, options = {}) {
                 swatch.dataset.buyItem = id;
             else
                 delete swatch.dataset.buyItem;
-            swatch.setAttribute("aria-pressed", String(swatch.dataset.groundId === (swatch.dataset.groundId?.startsWith("lot.") ? state.layout.lot : state.layout.ground)));
+            swatch.setAttribute("aria-pressed", String(swatch.dataset.groundId === state.layout.ground));
         }
     }
     /** The Furniture tab: made, not bought. Each card is a pattern with what is on the shelf. */

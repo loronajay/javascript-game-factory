@@ -1,3 +1,5 @@
+import { createPropertiesPanel } from "./farm-properties-panel.mjs";
+import { expandFarmLot } from "./farm-layout.mjs";
 // The Market Square page: the shared square at the end of the farm's road.
 //
 // It is the farm's stack by import. The square's paving, walls, well, lamps and
@@ -43,7 +45,7 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, MARKET_DOWNS_GATE, MARKET_DOWNS_SPAWN, MARKET_RAIL_IDS, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, PROPERTY_OFFICE_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, MARKET_DOWNS_GATE, MARKET_DOWNS_SPAWN, MARKET_RAIL_IDS, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
@@ -894,10 +896,34 @@ hud.sheet("trade", { root: requiredElement("#tradePanel"), close: () => trading.
 for (const id of ["#salePanel", "#kitchenPanel", "#dealerPanel"])
     wireSheetTabs(requiredElement(id));
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
+const properties = createPropertiesPanel({
+    canBuy: canSell, farm: () => farm, balance: () => balance,
+    shop: () => ticketClient.getShop("farm"),
+    purchase: (id) => ticketClient.purchaseShopItem("farm", id),
+    takeBalance,
+    move: async (id) => {
+        // Re-read before relocation so recent market trades and purchases are preserved.
+        const latest = await farmStore.load();
+        if (latest.source !== "account")
+            return { ok: false, error: "unavailable" };
+        const next = expandFarmLot(latest.layout, id);
+        const result = await farmStore.save(next);
+        if (result.ok)
+            takeStock(next);
+        return result;
+    },
+    onClose: () => canvas.focus(),
+});
+hud.sheet("properties", { root: properties.root, close: () => properties.close() });
+requiredElement("#openProperties").addEventListener("click", () => { void properties.open(); });
 function panelOpen() {
     return hud.anyOpen();
 }
 function workStall(stall) {
+    if (stall.id === PROPERTY_OFFICE_ID) {
+        void properties.open();
+        return;
+    }
     if (!stall.open) {
         notice(stall.closedNote);
         return;

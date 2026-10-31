@@ -9,7 +9,7 @@
 // load — the browser's cache makes every load after the first free.
 
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
-import { findFishSpecies } from "./farm-catalog/fish.mjs";
+import { findFishSpecies, type FishSpecies } from "./farm-catalog/fish.mjs";
 import type { FishVariant } from "./farm-fish.mjs";
 import { createModelThumbnails } from "./space-editor/model-thumbnails.mjs";
 
@@ -36,6 +36,25 @@ export type LoadedFish = Readonly<{
 /** Materials that are the fish's eyes, teeth or outline keep their colour whatever the fish's colouring. */
 function isDetail(material: any): boolean {
   return /eye|black|teeth|tooth|white_eye|pupil/i.test(String(material?.name ?? ""));
+}
+
+/** Species paint is applied before rare specimen variants; eyes and teeth remain intact. */
+export function paintSpecies(model: any, appearance: FishSpecies["appearance"]): void {
+  if (!appearance) return;
+  model.scale.x *= appearance.width;
+  model.scale.y *= appearance.height;
+  model.traverse((node: any) => {
+    if (!node.isMesh) return;
+    const paint = (material: any): any => {
+      if (isDetail(material)) return material;
+      const next = material.clone();
+      const name = String(material.name ?? "");
+      const key = /light|belly/i.test(name) ? "light" : /fin/i.test(name) ? "fins" : /dark/i.test(name) ? "dark" : "main";
+      next.color.set(appearance.colors[key]);
+      return next;
+    };
+    node.material = Array.isArray(node.material) ? node.material.map(paint) : paint(node.material);
+  });
 }
 
 /**
@@ -97,6 +116,7 @@ export function loadFish(THREE: ThreeNamespace, speciesId: string, lengthM: numb
           node.frustumCulled = false;
         }
       });
+      paintSpecies(inner, species.appearance);
       paintVariant(THREE, inner, variant);
       const root = new THREE.Group();
       const turn = new THREE.Group();

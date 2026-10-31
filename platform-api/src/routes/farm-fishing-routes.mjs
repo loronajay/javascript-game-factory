@@ -25,7 +25,7 @@ const POSTS = Object.freeze({
 });
 // A refusal about the state of the world rather than a malformed request.
 const CONFLICTS = new Set([
-    "zone_locked", "rod_not_owned", "no_bait", "creel_full", "too_many_casts", "duplicate_cast", "cast_closed",
+    "property_required", "zone_locked", "rod_not_owned", "no_bait", "creel_full", "too_many_casts", "duplicate_cast", "cast_closed",
     "cast_expired", "too_soon", "already_caught", "not_in_creel", "fish_locked", "already_owned", "level_too_low",
     "tackle_full", "insufficient_tickets", "not_mounted", "already_mounted", "too_many_mounted",
 ]);
@@ -80,7 +80,7 @@ export async function handleFarmFishingRoute(context) {
         const outcome = landing
             ? await service({ playerId, castId: decodeURIComponent(landing[1]), outcome: value.outcome, grade: value.grade })
             : serviceName === "castFarmLine"
-                ? await service({ playerId, castId: value.castId, point: value.point, shadowId: value.shadowId, rodId: value.rodId, bait: value.bait })
+                ? await service({ playerId, castId: value.castId, point: value.point, areaId: value.areaId, shadowId: value.shadowId, rodId: value.rodId, bait: value.bait })
                 : serviceName === "sellFarmFish"
                     ? await service({ playerId, saleId: value.saleId, fishIds: value.fishIds })
                     : serviceName === "releaseFarmFish"

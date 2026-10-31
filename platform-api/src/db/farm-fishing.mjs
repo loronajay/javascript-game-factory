@@ -1,3 +1,4 @@
+import { findFishingRegion } from "../services/farm-fishing-regions.mjs";
 // Fishing at the Cove, on the database (migration 056). Every fish is decided
 // here: a cast rolls the bite (from a shadow's pre-drawn fish, or from the
 // zone's odds for a blind cast), a landing measures and mints the specimen,
@@ -13,7 +14,7 @@ import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
 import { transaction } from "./farm-economy.mjs";
 import { farmingLevelForXp, farmingSummary, FARMING_MAX_XP } from "../services/farm-skill-catalog.mjs";
-import { CREEL_CAPACITY, ESCAPE_XP, FISH_ID as FISH_ROW_ID, MAX_MOUNTED_FISH, MOUNT_FEE, FARM_FISH_IDS, FARM_LURES, FARM_RODS, MAX_LURES_EACH, MAX_WORMS, SHADOW_WINDOW_MS, STARTER_ROD_ID, STARTER_WORMS, WORM_ID, WORM_TUB, ZONE_MIN_LEVEL, farmCoveZoneAt, farmFishRule, farmFishStrength, farmFishValue, farmFishXp, farmLureRule, farmRodRule, farmShadowInReach, farmShadowsForWindow, isFishGrade, lengthMmForWeight, minimumFightSeconds, parseShadowId, publicShadow, rollFarmBite, shadowSizeForLength, shadowWindow, sizeClassForRank, weightGramsAtRank, } from "../services/farm-fish-catalog.mjs";
+import { CREEL_CAPACITY, ESCAPE_XP, FISH_ID as FISH_ROW_ID, MAX_MOUNTED_FISH, MOUNT_FEE, FARM_FISH_IDS, FARM_LURES, FARM_RODS, MAX_LURES_EACH, MAX_WORMS, SHADOW_WINDOW_MS, STARTER_ROD_ID, STARTER_WORMS, WORM_ID, WORM_TUB, ZONE_MIN_LEVEL, farmFishingZoneAt, farmFishRule, farmFishStrength, farmFishValue, farmFishXp, farmLureRule, farmRodRule, farmShadowInReach, farmShadowsForWindow, isFishGrade, lengthMmForWeight, minimumFightSeconds, parseShadowId, publicShadow, rollFarmBite, shadowSizeForLength, shadowWindow, sizeClassForRank, weightGramsAtRank, } from "../services/farm-fish-catalog.mjs";
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
 const FISH_ID = /^fish-[A-Za-z0-9-]{8,64}$/;
 /** A cast left in the water this long is gone. */
@@ -238,7 +239,7 @@ export async function castFarmLine(pool, input, now = Date.now(), random = Math.
     if (!ID.test(castId))
         throw new TypeError("invalid castId");
     const point = { x: Number(input?.point?.x), z: Number(input?.point?.z) };
-    const zone = farmCoveZoneAt(point);
+    const zone = farmFishingZoneAt(point, input?.areaId);
     if (!zone)
         return { ok: false, error: "not_water" };
     const rod = farmRodRule(input?.rodId);
@@ -249,6 +250,12 @@ export async function castFarmLine(pool, input, now = Date.now(), random = Math.
     if (bait !== WORM_ID && !lure)
         return { ok: false, error: "unknown_bait" };
     return transaction(pool, async (client) => {
+        const property = findFishingRegion(input?.areaId)?.requiredProperty;
+        if (property) {
+            const access = await client.query("select 1 from game_entitlements where player_id = $1 and game_slug = 'farm' and entitlement_id = $2 and quantity > 0", [playerId, property]);
+            if (!access.rows.length)
+                return { ok: false, error: "property_required", property };
+        }
         const angler = await lockedAngler(client, playerId);
         const level = fishingLevel(angler.fishing);
         if (level < ZONE_MIN_LEVEL[zone])
