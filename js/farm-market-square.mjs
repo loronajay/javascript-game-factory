@@ -186,7 +186,7 @@ export const MARKET_STALLS = Object.freeze([
     }),
     stall({
         id: PROPERTY_OFFICE_ID, kind: "board", title: "Property Office", open: true,
-        x: -11.2, z: -4.4, rotationY: QUARTER, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
+        x: -3.8, z: -8.8, rotationY: 0, footprint: Object.freeze({ width: 2.6, depth: 0.5 }),
         colors: ["#346756", "#f4ecd6"], keeper: null, closedNote: "",
         notices: Object.freeze(["Cedar Hollow", "Sunwater Estate", "New homes", "For sale", "Own your future"]),
     }),

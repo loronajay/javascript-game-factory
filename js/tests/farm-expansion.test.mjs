@@ -216,3 +216,24 @@ test("fishing arrivals and return-path approaches do not start inside a fixture"
     }
   }
 });
+
+import { findMarketStall, PROPERTY_OFFICE_ID, MARKET_DECOR, MARKET_COVE_GATE, MARKET_DOWNS_GATE, marketSquareLayout, stallLocalToWorld, MARKET_STALLS, stallObstacles } from "../farm-market-square.mjs";
+import { findFarmTicketItem } from "../../platform-api/src/services/farm-ticket-catalog.mjs";
+test("property prices match the server and the office has a clear approach away from trees and gates", () => {
+  assert.deepEqual(FARM_LOTS.map((lot) => lot.price), [25000, 100000]);
+  for (const lot of FARM_LOTS) assert.equal(findFarmTicketItem(lot.id).price, lot.price);
+  const office = findMarketStall(PROPERTY_OFFICE_ID);
+  for (const item of MARKET_DECOR.filter((item) => /decor.plant.(oak|birch|pine|willow)$/.test(item.itemId))) assert.ok(Math.hypot(office.x-item.x,office.z-item.z)>4.5, item.instanceId);
+  for (const id of [MARKET_COVE_GATE,MARKET_DOWNS_GATE]) {
+    const gate=MARKET_DECOR.find((item)=>item.instanceId===id);
+    assert.ok(Math.hypot(office.x-gate.x,office.z-gate.z)>3.5,id);
+  }
+  for (const stall of MARKET_STALLS.filter((entry)=>entry.id!==office.id)) {
+    const sideways=Math.abs(Math.sin(stall.rotationY))>.5;
+    const width=sideways?stall.footprint.depth:stall.footprint.width;
+    const depth=sideways?stall.footprint.width:stall.footprint.depth;
+    assert.equal(Math.abs(office.x-stall.x)<(office.footprint.width+width)/2+.25 && Math.abs(office.z-stall.z)<(office.footprint.depth+depth)/2+.25,false,stall.id);
+  }
+  const approach=stallLocalToWorld(office,{x:0,z:1.25});
+  assert.equal(bodyObstacles(farmObstacles(marketSquareLayout()).concat(stallObstacles(MARKET_STALLS.filter((entry)=>entry.id!==office.id))),0).some((solid)=>obstacleBlocks(approach,solid,.3)),false);
+});
