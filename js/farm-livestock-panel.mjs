@@ -48,7 +48,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
     let selectedId = null;
     let selectedHome = null;
     let movingAnimal = null;
-    let draggingAnimal = false;
+    let housingSearch = "";
     let page = 0;
     let resetScroll = true;
     const queries = Object.fromEntries(sections.map((entry) => [entry.id, { search: "", species: "", gender: "", status: "", sort: entry.id === "breeding" ? "grade" : entry.id === "care" ? "ready" : "species" }]));
@@ -501,138 +501,70 @@ export function createLivestockPanel(elements, actions, options = {}) {
         return item;
     }
     function housingScreen(current) {
-        housingMap(current);
         const occupancy = homeOccupancy(current.homes, current.herd);
-        const homeless = current.herd.filter((animal) => !animal.homeId || !current.homes.some((home) => home.id === animal.homeId));
-        elements.list.append(heading("Homes & groups", "Choose a home to see its residents. Four chickens share one pen place; other homes keep their usual capacity."));
-        const groups = element("div", "livestock-species-grid");
-        for (const home of current.homes) {
-            const residents = current.herd.filter((animal) => animal.homeId === home.id);
-            const taken = occupancy.get(home.id) ?? 0;
-            const button = actionButton("", () => { selectedHome = home.id; page = 0; resetScroll = true; draw(); }, "livestock-species-card");
-            const top = element("span", "livestock-species-card__top");
-            top.append(element("strong", "", home.title), element("b", "", String(residents.length)));
-            button.append(top, element("span", "livestock-species-card__sex", `${taken} / ${home.slots} space used`), element("small", "", `${Math.max(0, home.slots - taken)} space free${home.species ? " · chickens only" : ""}`));
-            groups.append(button);
-        }
-        const field = actionButton("", () => { selectedHome = "__unhoused__"; page = 0; resetScroll = true; draw(); }, "livestock-species-card");
-        field.append(element("strong", "", "Out on the field / needs a home"), element("b", "", String(homeless.length)));
-        groups.append(field);
-        elements.list.append(groups);
-    }
-    function housingMap(current) {
-        const occupancy = homeOccupancy(current.homes, current.herd);
-        const picked = current.herd.find((animal) => animal.id === movingAnimal);
-        const help = element("p", "livestock-map-help", picked
-            ? `Moving ${picked.name}: choose a home or the field. Select the animal again to cancel.`
-            : "Drag an animal to a home, or select its tile and then a destination. Tiles show sex, grade and breeding status. Scroll to explore your farm layout.");
-        help.setAttribute("aria-live", "polite");
-        elements.list.append(heading("Farm housing organizer", "Homes follow their position, size and rotation on your farm. Changes save immediately."), help);
-        const scroll = element("div", "livestock-map-scroll");
-        const map = element("div", "livestock-map");
-        const scale = 60;
-        const radius = (home) => Math.hypot(home.width, home.depth) / 2;
-        const minX = Math.min(0, ...current.homes.map((home) => home.x - radius(home))) - 1;
-        const minZ = Math.min(0, ...current.homes.map((home) => home.z - radius(home))) - 1;
-        const maxX = Math.max(0, ...current.homes.map((home) => home.x + radius(home))) + 1;
-        const maxZ = Math.max(0, ...current.homes.map((home) => home.z + radius(home))) + 1;
-        map.style.width = `${(maxX - minX) * scale}px`;
-        map.style.height = `${(maxZ - minZ) * scale}px`;
-        const allowed = (animal, home) => current.canManage && !busy && (!home ||
-            homeTakes(home, animal.speciesId) && ((occupancy.get(home.id) ?? 0) + (animal.homeId === home.id ? 0 : livestockSpace(home.id, animal.speciesId)) <= home.slots));
-        const move = (id, home) => {
-            const animal = current.herd.find((entry) => entry.id === id);
-            if (!animal || !allowed(animal, home)) {
-                setStatus("That home cannot take this animal: check species and available space.");
-                return;
-            }
-            movingAnimal = null;
-            if (animal.homeId === (home?.id ?? null)) {
-                draw();
-                return;
-            }
-            void run(() => actions.move(id, home?.id ?? null), `Moving ${animal.name}…`).catch(() => setStatus("Could not move the animal. Please try again."));
-        };
-        const icons = { chicken: "🐔", sheep: "🐑", pig: "🐖", cow: "🐄", goat: "🐐", alpaca: "🦙" };
-        const target = (home) => {
-            const box = element("section", "livestock-map-home");
-            box.setAttribute("aria-label", home?.title ?? "Out on the field");
-            const destination = actionButton(home ? `${home.title} · ${occupancy.get(home.id) ?? 0}/${home.slots}` : "Out on the field", () => {
-                if (movingAnimal)
-                    move(movingAnimal, home);
-            }, "livestock-map-destination");
-            destination.disabled = !picked || !allowed(picked, home);
-            if (picked)
-                box.classList.add(allowed(picked, home) ? "is-available" : "is-unavailable");
-            box.append(destination);
-            box.addEventListener("dragover", (event) => {
-                const animal = current.herd.find((entry) => entry.id === movingAnimal);
-                if (animal && allowed(animal, home)) {
-                    event.preventDefault();
-                    if (event.dataTransfer)
-                        event.dataTransfer.dropEffect = "move";
-                }
-            });
-            box.addEventListener("drop", (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                draggingAnimal = false;
-                if (movingAnimal)
-                    move(movingAnimal, home);
-            });
-            const tiles = element("div", "livestock-map-animals");
-            const residents = current.herd.filter((animal) => home ? animal.homeId === home.id : !current.homes.some((entry) => entry.id === animal.homeId));
-            for (const animal of residents) {
-                const tile = actionButton("", () => { movingAnimal = movingAnimal === animal.id ? null : animal.id; draw(); }, "livestock-map-animal");
+        const picked = current.herd.find(animal => animal.id === movingAnimal);
+        elements.list.append(heading("Housing", "Select an animal, then choose its home. Changes save immediately."));
+        const organizer = element("div", "livestock-housing");
+        const roster = element("section", "livestock-housing-roster");
+        roster.setAttribute("aria-label", "Choose an animal");
+        const search = element("input", "livestock-tools__input");
+        search.type = "search";
+        search.placeholder = "Find an animal…";
+        search.setAttribute("aria-label", "Find an animal to move");
+        search.value = housingSearch;
+        const animals = element("div", "livestock-housing-animals");
+        animals.dataset.scrollKey = "animals";
+        const fillAnimals = () => {
+            animals.replaceChildren();
+            const needle = housingSearch.trim().toLowerCase();
+            for (const animal of current.herd) {
+                const species = findLivestockSpecies(animal.speciesId)?.title ?? animal.speciesId;
+                const home = current.homes.find(entry => entry.id === animal.homeId);
+                if (needle && ![animal.name, species, home?.title ?? "Out on the field"].join(" ").toLowerCase().includes(needle))
+                    continue;
+                const tile = actionButton("", () => { movingAnimal = animal.id; draw(); }, "livestock-housing-animal");
                 tile.dataset.animalId = animal.id;
                 tile.disabled = !current.canManage || busy;
-                tile.draggable = current.canManage && !busy;
                 tile.setAttribute("aria-pressed", String(movingAnimal === animal.id));
-                const status = breedingWords(animal, current);
-                tile.title = `${animal.name} · ${findLivestockSpecies(animal.speciesId)?.title ?? animal.speciesId} · ${status}`;
-                tile.append(element("span", "livestock-map-icon", `${icons[animal.speciesId.replace("livestock.", "")] ?? "🐾"} ${animal.gender === "female" ? "♀" : "♂"}`), element("strong", "", animal.name), element("small", "", gradeStars(livestockGrade(animal.stats))), element("small", "", status));
-                tile.addEventListener("dragstart", (event) => {
-                    if (!current.canManage || busy) {
-                        event.preventDefault();
-                        return;
-                    }
-                    movingAnimal = animal.id;
-                    draggingAnimal = true;
-                    if (event.dataTransfer) {
-                        event.dataTransfer.setData("text/plain", animal.id);
-                        event.dataTransfer.effectAllowed = "move";
-                    }
-                    help.textContent = `Moving ${animal.name}: drop into a home with room.`;
-                });
-                tile.addEventListener("dragend", () => { draggingAnimal = false; movingAnimal = null; draw(); });
-                tiles.append(tile);
+                tile.append(element("strong", "", animal.name), element("span", "", species + " · " + (animal.gender === "female" ? "♀" : "♂") + " · " + gradeStars(livestockGrade(animal.stats))), element("small", "", home?.title ?? "Out on the field"), element("small", "", breedingWords(animal, current)));
+                animals.append(tile);
             }
-            box.append(tiles);
-            return box;
+            if (!animals.childElementCount)
+                animals.append(element("p", "livestock-empty", "No animals match your search."));
         };
-        for (const home of current.homes) {
-            const box = target(home);
-            // Rotate only the footprint. Controls and residents stay upright and clickable.
-            const cosine = Math.abs(Math.cos(home.rotationY)), sine = Math.abs(Math.sin(home.rotationY));
-            box.style.left = `${(home.x - minX) * scale}px`;
-            box.style.top = `${(home.z - minZ) * scale}px`;
-            box.style.width = `${(home.width * cosine + home.depth * sine) * scale}px`;
-            box.style.height = `${(home.width * sine + home.depth * cosine) * scale}px`;
-            box.style.transform = "translate(-50%, -50%)";
-            const footprint = element("div", "livestock-map-footprint");
-            footprint.setAttribute("aria-hidden", "true");
-            footprint.style.width = `${home.width * scale}px`;
-            footprint.style.height = `${home.depth * scale}px`;
-            footprint.style.transform = `translate(-50%, -50%) rotate(${-home.rotationY}rad)`;
-            footprint.style.left = box.style.left;
-            footprint.style.top = box.style.top;
-            map.append(footprint);
-            map.append(box);
+        search.addEventListener("input", () => { housingSearch = search.value; fillAnimals(); });
+        fillAnimals();
+        roster.append(search, animals);
+        const destinations = element("section", "livestock-housing-destinations");
+        destinations.setAttribute("aria-label", "Choose a destination");
+        const title = element("strong", "livestock-housing-prompt", picked ? "Move " + picked.name + " to:" : "Select an animal to see available homes");
+        title.setAttribute("aria-live", "polite");
+        destinations.append(title);
+        const homes = element("div", "livestock-housing-homes");
+        homes.dataset.scrollKey = "homes";
+        for (const home of [...current.homes, null]) {
+            const here = picked && (home ? picked.homeId === home.id : !current.homes.some(entry => entry.id === picked.homeId));
+            const taken = home ? occupancy.get(home.id) ?? 0 : 0;
+            const reason = here ? "Current home" : home && picked && !homeTakes(home, picked.speciesId) ? "Incompatible species"
+                : home && picked && taken + livestockSpace(home.id, picked.speciesId) > home.slots ? "Not enough space" : "";
+            const button = actionButton("", () => {
+                if (!picked || !view || busy || reason || !view.canManage)
+                    return;
+                void run(() => actions.move(picked.id, home?.id ?? null), "Moving " + picked.name + "…")
+                    .catch(() => setStatus("Could not move the animal. Please try again."));
+            }, "livestock-housing-destination");
+            button.dataset.homeId = home?.id ?? "field";
+            button.disabled = !picked || !current.canManage || busy || Boolean(reason);
+            button.append(element("strong", "", home?.title ?? "Out on the field"), element("small", "", home ? taken + " / " + home.slots + " space used" : "No housing assigned"));
+            if (reason)
+                button.append(element("small", "", reason));
+            if (here)
+                button.setAttribute("aria-current", "true");
+            homes.append(button);
         }
-        scroll.append(map);
-        const field = target(null);
-        field.classList.add("livestock-map-field");
-        elements.list.append(scroll, field);
+        destinations.append(homes);
+        organizer.append(roster, destinations);
+        elements.list.append(organizer);
     }
     function drawContent() {
         if (!view)
@@ -724,8 +656,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
     function draw() {
         if (!view)
             return;
-        const mapScroll = elements.list.querySelector(".livestock-map-scroll");
-        const mapPosition = mapScroll ? { x: mapScroll.scrollLeft, y: mapScroll.scrollTop } : null;
+        const positions = Array.from(elements.list.querySelectorAll("[data-scroll-key]")).map(node => ({ key: node.dataset.scrollKey, top: node.scrollTop }));
         const focusedAnimal = document.activeElement?.dataset.animalId;
         const scroll = resetScroll ? 0 : elements.list.scrollTop;
         resetScroll = false;
@@ -734,10 +665,10 @@ export function createLivestockPanel(elements, actions, options = {}) {
         }
         finally {
             elements.list.scrollTop = scroll;
-            const nextMap = elements.list.querySelector(".livestock-map-scroll");
-            if (nextMap && mapPosition) {
-                nextMap.scrollLeft = mapPosition.x;
-                nextMap.scrollTop = mapPosition.y;
+            for (const position of positions) {
+                const node = elements.list.querySelector('[data-scroll-key="' + position.key + '"]');
+                if (node)
+                    node.scrollTop = position.top;
             }
             if (focusedAnimal) {
                 const tile = Array.from(elements.list.querySelectorAll("[data-animal-id]")).find((entry) => entry.dataset.animalId === focusedAnimal);
@@ -745,7 +676,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
             }
         }
     }
-    // Clock/care ticks must not replace the DOM under a pointer or reset the map.
+    // Clock/care ticks must not replace the organizer during selection.
     // Include everything displayed by the organizer, including breeding readiness.
     function housingKey(current) {
         return JSON.stringify([current.homes, current.canManage, current.note,
@@ -779,7 +710,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
             // Keep only an animal's editing fields stable; navigation and roster focus
             // must not prevent a fifty-animal herd from receiving live updates.
             const editing = elements.list.contains(document.activeElement) && document.activeElement?.matches("input, select, textarea");
-            if (open && !busy && !editing && !draggingAnimal && !unchangedHousing)
+            if (open && !busy && !editing && !unchangedHousing)
                 draw();
         },
         setStatus,

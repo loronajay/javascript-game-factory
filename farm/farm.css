@@ -1020,21 +1020,13 @@ kbd, .farm-button kbd {
 .properties-panel__status { padding: 0 20px 20px; color: #eedb97; }
 @media (max-width: 700px) { .property-card { grid-template-columns: 1fr; } .property-card__preview { height: 200px; min-height: 0; } .property-card__copy { padding: 18px; } }
 
-/* Housing organizer: world coordinates share one scale, including rotated homes. */
-.livestock-map-scroll { overflow: auto; max-height: 550px; min-height: 300px; border: 1px solid #718966; border-radius: 12px; background: #243c2b; }
-.livestock-map { position: relative; background-image: linear-gradient(#ffffff0c 1px, transparent 1px), linear-gradient(90deg, #ffffff0c 1px, transparent 1px); background-size: 60px 60px; }
-.livestock-map-home { position: absolute; box-sizing: border-box; padding: 5px; border: 2px solid #bda47a; border-radius: 5px; background: #253227f5; overflow: auto; }
-.livestock-map-destination { width: 100%; font-size: 11px; padding: 5px; white-space: normal; }
-.livestock-map-destination:disabled { opacity: 1 !important; }
-.livestock-map-animals { display: flex; flex-wrap: wrap; gap: 4px; align-content: start; margin-top: 5px; }
-.livestock-map-animal { width: 76px; height: 76px; flex: 0 0 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px; font-size: 10px; overflow: hidden; cursor: grab; }
-.livestock-map-animal > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.livestock-map-icon { font-size: 20px; }
-.livestock-map-animal[aria-pressed="true"] { outline: 3px solid #f2cd72; outline-offset: -3px; }
-.livestock-map-home.is-available { border-color: #8dd992; }
-.livestock-map-home.is-unavailable { border-color: #a8736d; }
-.livestock-map-field { position: relative; transform: none; min-height: 105px; }
-.livestock-map-help { font-size: 12px; margin: 0; }
-.livestock-map-footprint { position: absolute; box-sizing: border-box; border: 2px dashed #c4b287; background: #a58a5426; pointer-events: none; }
-.livestock-map-home { border-color: #bda47a80; background: #253227e8; }
-.livestock-map-home > * { position: relative; }
+/* Compact housing: animal selection and destinations remain side by side. */
+.livestock-housing { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.livestock-housing-roster, .livestock-housing-destinations { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.livestock-housing-animals, .livestock-housing-homes { max-height: 360px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding: 3px; overscroll-behavior: contain; }
+.livestock-housing-animal, .livestock-housing-destination { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; min-height: 58px; text-align: left; flex-shrink: 0; white-space: normal; overflow-wrap: anywhere; padding: 9px; }
+.livestock-housing-animal[aria-pressed="true"] { outline: 2px solid #f2cd72; background: #4c5831; }
+.livestock-housing-destination[aria-current="true"] { border-color: #8dd992; }
+.livestock-housing-prompt { min-height: 38px; display: flex; align-items: center; overflow-wrap: anywhere; }
+.livestock-housing small { font-size: 11px; }
+@media (max-width: 480px) { .livestock-housing { gap: 6px; } .livestock-housing-animal, .livestock-housing-destination { padding: 6px; font-size: 12px; } }
