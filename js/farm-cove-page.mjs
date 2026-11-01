@@ -46,8 +46,8 @@ import { createMarketStallModel } from "./farm-market-props.mjs";
 import { FISHMONGER_STALL_ID, RECORDS_BOARD_ID, TACKLE_STALL_ID, coveStallPrompt, findCoveStall, } from "./farm-cove.mjs";
 import { createCoveTerrain } from "./farm-cove-terrain.mjs";
 import { fishmongerStock, tackleStock } from "./farm-cove-props.mjs";
-import { findFishSpecies, findFishingRod, MOUNT_FEE, STARTER_ROD_ID, ZONE_MIN_LEVEL, ZONE_TITLES } from "./farm-catalog/fish.mjs";
-import { normalizePublicShadow, specimenTitle, formatWeight } from "./farm-fish.mjs";
+import { findFishSpecies, findFishingRod, MOUNT_FEE, STARTER_ROD_ID, WORM_ID, ZONE_MIN_LEVEL, ZONE_TITLES } from "./farm-catalog/fish.mjs";
+import { generateShadows, publicShadow, shadowWindow, normalizePublicShadow, specimenTitle, formatWeight } from "./farm-fish.mjs";
 import { createShadowsView } from "./farm-fish-shadows-view.mjs";
 import { createFishingController } from "./farm-fishing-controller.mjs";
 import { createFishingView } from "./farm-fishing-view.mjs";
@@ -63,13 +63,15 @@ import { createTicketWalletClient, formatTicketBalance, publishTicketBalance } f
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { createFarmMusic } from "./farm-music.mjs";
 import { createFarmSoundEffects, catchEffect } from "./farm-sound-effects.mjs";
-import { FARM_LAYOUT_SPEC } from "./farm-layout.mjs";
+import { FARM_LAYOUT_SPEC, createDefaultFarmLayout } from "./farm-layout.mjs";
 import { createFarmInventorySummary } from "./farm-inventory-summary.mjs";
 import { createFarmStatsPanel } from "./farm-stats-panel.mjs";
 import { createFarmHud } from "./farm-hud.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
 const destinationQuery = new URLSearchParams(location.search);
 const region = findFishingRegion(destinationQuery.get("area"));
+// A public practice visit never loads or modifies the farmer's actual account.
+const preview = destinationQuery.get("preview") === "1" && Boolean(region?.requiredProperty);
 const areaId = region?.id ?? "cove";
 const areaTitle = region?.title ?? "The Cove";
 const areaScene = region ? fishingRegionScene(region) : cove;
@@ -114,8 +116,16 @@ if (region) {
     requiredElement(".start-card p").textContent = `${region.description} Fishing level ${region.minLevel} to keep catches here. Return to the Cove for bait, sales and records.`;
     enterButton.textContent = "Explore the pools";
 }
-const inventoryFarm = await createLayoutStore(FARM_LAYOUT_SPEC).load();
-if (region?.requiredProperty && inventoryFarm.layout.lot !== region.requiredProperty) {
+const inventoryFarm = preview ? { layout: createDefaultFarmLayout(() => .5) } : await createLayoutStore(FARM_LAYOUT_SPEC).load();
+if (preview) {
+    backLink.href = `../tour.html?property=${encodeURIComponent(region.requiredProperty)}&from=${region.id}`;
+    requiredElement("#coveBackLink .back-link__words").textContent = "Farm preview";
+    requiredElement(".start-card p").textContent = `${region.description} Try the full fishing minigame with a borrowed rod and bait. Practice catches are not saved; no tickets or ownership changes.`;
+    requiredElement(".start-card__tag").textContent = "FREE FISHING PRACTICE";
+    requiredElement(".hud-place__name .eyebrow").textContent = "PROPERTY PREVIEW / PRACTICE FISHING";
+    enterButton.textContent = "Start fishing";
+}
+if (!preview && region?.requiredProperty && inventoryFarm.layout.lot !== region.requiredProperty) {
     enterButton.disabled = true;
     enterButton.textContent = "Property ownership required";
     requiredElement(".start-card p").textContent = `This fishing area belongs to ${region.requiredProperty === "lot.estate" ? "Sunwater Estate" : "Cedar Hollow"}. Visit the Property Office in the Market to make it your home.`;
@@ -133,12 +143,12 @@ const statsPanel = createFarmStatsPanel({
     summary: requiredElement("#statsSummary"),
     grid: requiredElement("#statsGrid"),
 }, {
-    loadTrades: () => api.fetchCurrentFarmTrade(true),
+    loadTrades: () => preview ? Promise.resolve(null) : api.fetchCurrentFarmTrade(true),
     onClose: () => canvas.focus(),
 });
 // ---------------------------------------------------------------- the angler
 const api = createPlatformApiClient();
-const signedIn = readFactoryAccountSession().authenticated && api.isConfigured !== false;
+const signedIn = !preview && readFactoryAccountSession().authenticated && api.isConfigured !== false;
 let angler = PRACTICE_ANGLER;
 let accountLoaded = false;
 async function loadAngler() {
@@ -166,8 +176,9 @@ function takeTackle(value) {
     }
 }
 const equipmentStore = createFishingEquipmentStore(signedIn ? loadFactoryProfile().playerId : "practice");
-let { rodId, baitId } = equipmentStore.load();
-function saveEquipment() { equipmentStore.save({ rodId, baitId }); }
+let { rodId, baitId } = preview ? { rodId: STARTER_ROD_ID, baitId: WORM_ID } : equipmentStore.load();
+function saveEquipment() { if (!preview)
+    equipmentStore.save({ rodId, baitId }); }
 const ticketClient = createTicketWalletClient();
 let balance = null;
 function renderTickets() {
@@ -215,7 +226,7 @@ const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 260);
 camera.rotation.order = "YXZ";
 scene.add(camera);
 const layout = coveLayout();
-const world = createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => region?.id === "grotto" || coveWaterDistance({ x, z }) > -4 });
+const world = createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => Boolean(region?.requiredProperty) || region?.id === "grotto" || coveWaterDistance({ x, z }) > -4 });
 world.sync(layout);
 // Like the farm and square, the Cove uses this client's paused farm clock;
 // people fishing together can therefore see different skies. `?time=` is QA.
@@ -249,6 +260,13 @@ function keeperSays(stall, text, now = performance.now()) {
 const shadowsView = createShadowsView(THREE, scene);
 let shadows = [];
 async function loadShadows() {
+    if (preview) {
+        let seed = 4271;
+        const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+        shadows = generateShadows(shadowWindow(Date.now()), random, random).filter(shadow => shadow.zone === region.id).map(shadow => ({ ...publicShadow(shadow), bornAt: Date.now() - 30_000, goneAt: Date.now() + 300_000 }));
+        shadowsView.sync(shadows);
+        return;
+    }
     const answer = await api.fetchFarmFishShadows().catch(() => null);
     const list = Array.isArray(answer?.shadows) ? answer.shadows.map(normalizePublicShadow).filter(Boolean) : null;
     if (list) {
@@ -280,9 +298,9 @@ if (!region && destinationQuery.get("from") === "grotto")
 if (!region && destinationQuery.get("from") === "volcanic")
     Object.assign(player, { x: 17.8, z: 9.5, yaw: Math.PI / 2 });
 if (region && destinationQuery.get("at") === "shore")
-    Object.assign(player, region.id === "grotto" ? { x: -9, z: 12.5, yaw: 0 } : region.id === "cedar-creek" ? { x: 0, z: 23.5, yaw: 0 } : { x: -10, z: 20, yaw: 0 });
+    Object.assign(player, region.fishingSpot ?? (region.id === "grotto" ? { x: -9, z: 12.5, yaw: 0 } : { x: -10, z: 20, yaw: 0 }));
 if (region && destinationQuery.get("at") === "return")
-    Object.assign(player, { x: region.exit.x - Math.sign(region.exit.x) * 3, z: region.exit.z, yaw: region.exit.x > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    Object.assign(player, region.entry ? { ...region.entry, yaw: region.entry.yaw + Math.PI } : { x: region.exit.x - Math.sign(region.exit.x) * 3, z: region.exit.z, yaw: region.exit.x > 0 ? -Math.PI / 2 : Math.PI / 2 });
 let body = createFarmBody();
 const walkerBounds = { halfWidth: COVE_BOUNDS.width / 2, halfDepth: COVE_BOUNDS.depth / 2, margin: COVE_BOUNDS.wallInset };
 const openDoors = new Set();
@@ -334,15 +352,16 @@ function notice(text, seconds = 5) {
 }
 // ---------------------------------------------------------------- the others at the Cove
 const visitors = createRoomVisitors(THREE, scene, { mountSeat: (mount) => away.seatFor(mount) });
-const factoryProfile = loadFactoryProfile();
+const factoryProfile = preview ? { playerId: "", profileName: "Practice angler" } : loadFactoryProfile();
 const presenceName = factoryProfile.profileName || "Player";
 const presence = createRoomPresence({
-    roomId: COVE_PRESENCE_ROOM,
+    roomId: region?.requiredProperty ? `${COVE_PRESENCE_ROOM}:${fromFarm || factoryProfile.playerId || "guest"}` : COVE_PRESENCE_ROOM,
     identity: { playerId: factoryProfile.playerId, displayName: presenceName, avatarId: "" },
 });
-void createRoomLayoutStore().loadSelfAvatarId().then((avatarId) => {
-    presence.setIdentity({ playerId: factoryProfile.playerId, displayName: presenceName, avatarId });
-}).catch(() => undefined);
+if (!preview)
+    void createRoomLayoutStore().loadSelfAvatarId().then((avatarId) => {
+        presence.setIdentity({ playerId: factoryProfile.playerId, displayName: presenceName, avatarId });
+    }).catch(() => undefined);
 function renderVisitorsChip() {
     const members = presence.members();
     const state = presence.status();
@@ -374,7 +393,8 @@ presence.onChange(() => {
     chat.noteRoster(presence.members(), presence.status() === "online");
 });
 window.addEventListener("pagehide", () => presence.disconnect());
-window.addEventListener("pageshow", () => presence.connect());
+window.addEventListener("pageshow", () => { if (!preview)
+    presence.connect(); });
 const ACTIVITY = Object.freeze({
     charging: "casting", flight: "casting", waiting: "fishing", fighting: "reeling one in!", netting: "netting a fish!", settling: "landing a fish", reveal: "admiring a catch",
 });
@@ -456,7 +476,7 @@ function onFishingEvent(event) {
             const news = catchNews(angler, fish.speciesId, fish.weightG);
             const answer = event.answer;
             const levelUp = answer?.fishing && Number(answer.fishing.level) > Number(answer.fishing.levelBefore) ? Number(answer.fishing.level) : null;
-            hud.showCatch(fish, { xp: event.xp, practice: event.practice, firstOfKind: news.firstOfKind, personalBest: news.personalBest, levelUp });
+            hud.showCatch(fish, { xp: event.xp, practice: event.practice, preview, firstOfKind: news.firstOfKind, personalBest: news.personalBest, levelUp });
             if (answer?.tackle)
                 takeTackle(answer.tackle);
             if (Array.isArray(answer?.achievements) && answer.achievements.length)
@@ -548,7 +568,7 @@ const tacklePanel = createTacklePanel(requiredElement("#tacklePanel"), {
     onClose: () => canvas.focus(),
 });
 const recordsPanel = createRecordsPanel(requiredElement("#recordsPanel"), {
-    load: async () => normalizeRecords(await api.fetchFarmFishRecords().catch(() => null)),
+    load: async () => normalizeRecords(preview ? null : await api.fetchFarmFishRecords().catch(() => null)),
     thumbs,
     onClose: () => canvas.focus(),
 });
@@ -639,8 +659,10 @@ function updateInteraction() {
         return setPrompt(tie ? tie.prompt : getRidingPrompt(away.horseName(), "away"));
     }
     if (free && !away.mounted() && !fishing.busy()) {
-        if (region && Math.hypot(player.x - region.exit.x, player.z - region.exit.z) < 6)
-            return setPrompt(region.requiredProperty ? "Follow the path back to your farm" : "Follow the path back to the Cove");
+        if (region && Math.hypot(player.x - region.exit.x, player.z - region.exit.z) < 6) {
+            const facingExit = pose.forward.x * (region.exit.x - player.x) + pose.forward.z * (region.exit.z - player.z) > 0;
+            return setPrompt(region.requiredProperty ? facingExit ? "Follow the path back to your farm" : "Follow the path through the entrance to the fishing bank" : "Follow the path back to the Cove");
+        }
         if (!region && Math.abs(player.z - 9.5) < 3 && Math.abs(player.x) > 15.5)
             return setPrompt(player.x < 0 ? "West path: Fernfall Grotto - waterfall pools (Fishing 8)" : "East path: Emberglass Lagoon - volcanic pools (Fishing 20)");
     }
@@ -681,7 +703,7 @@ function updateInteraction() {
     if (atWater) {
         if (baitCount(angler, baitId) <= 0)
             return setPrompt("Out of bait — press Q to switch, or visit Bait & Tackle");
-        return setPrompt(`Hold Space to cast · ${baitTitle(baitId)} on the hook${signedIn ? "" : " · practice (sign in to keep your catch)"}`);
+        return setPrompt(`Hold Space to cast · ${baitTitle(baitId)} on the hook${preview ? " · practice; catches are not saved" : signedIn ? "" : " · practice (sign in to keep your catch)"}`);
     }
     setPrompt("");
 }
@@ -771,6 +793,10 @@ function followTrail(destination) {
     const horse = away.mounted() ? away.horseId() : "";
     const params = new URLSearchParams(horseTravelQuery(fromFarm, horse));
     if (destination === "farm") {
+        if (preview) {
+            location.href = backLink.href;
+            return;
+        }
         params.delete("farm");
         if (fromFarm)
             params.set("id", fromFarm);
@@ -957,6 +983,8 @@ function resize() {
     camera.updateProjectionMatrix();
 }
 function publishPresence() {
+    if (preview)
+        return;
     const snapshot = fishing.state();
     const phase = snapshot.phase;
     const rod = presenceRodFor(phase, snapshot.landing, rodId);
@@ -971,7 +999,8 @@ function publishPresence() {
     });
 }
 publishPresence();
-presence.connect();
+if (!preview)
+    presence.connect();
 void loadShadows();
 repaintPanels();
 void loadAngler();

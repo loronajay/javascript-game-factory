@@ -136,9 +136,9 @@ export function createFishingHud(root, card) {
           <div><dt>Size</dt><dd>${SIZE_TITLES[size] ?? size}</dd></div>
           <div><dt>Landed</dt><dd>${GRADE_TITLES[fish.grade]}</dd></div>
         </dl>
-        <p class="catch-card__worth"><strong>${fish.value.toLocaleString()}</strong> tickets at the Fishmonger · <strong>+${notes.xp}</strong> Fishing XP${notes.levelUp ? ` · <b>Fishing level ${notes.levelUp}!</b>` : ""}</p>
+        <p class="catch-card__worth">${notes.preview ? "Practice only · no tickets or XP awarded" : `<strong>${fish.value.toLocaleString()}</strong> tickets at the Fishmonger · <strong>+${notes.xp}</strong> Fishing XP${notes.levelUp ? ` · <b>Fishing level ${notes.levelUp}!</b>` : ""}`}</p>
         ${species ? `<p class="catch-card__blurb">${escapeHtml(species.blurb)}</p>` : ""}
-        <small>${notes.practice ? "Sign in to keep what you catch." : "It's in your creel."} <kbd>Space</kbd> to carry on</small>
+        <small>${notes.preview ? "Preview catches are not saved." : notes.practice ? "Sign in to keep what you catch." : "It's in your creel."} <kbd>Space</kbd> to carry on</small>
       `;
             card.dataset.rarity = rarity;
             card.hidden = false;

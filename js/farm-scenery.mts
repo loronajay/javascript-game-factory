@@ -181,6 +181,8 @@ export type FarmSceneryOptions = Readonly<{
   /** The tufts and flowers underfoot. Off for a paved ground (the Market Square); the hills, trees and sky stay. */
   groundCover?: boolean;
   propertyId?: string;
+  /** Clear sky for property inspection from above the cloud layer. */
+  clouds?: boolean;
   /** The flat field and its apron. Off where a place brings its own ground (the Cove's shore and seabed). */
   field?: boolean;
   /** Places the countryside leaves open (the Cove's water): no hill or tree of the treeline stands there. */
@@ -192,7 +194,7 @@ export function createFarmScenery(THREE: ThreeNamespace, scene: any, options: Fa
   const keepClear = options.propertyId ? () => true : options.keepClear ?? (() => false);
   createHills(THREE, scene, random, keepClear);
   createTreeline(THREE, scene, random, keepClear);
-  const clouds = createClouds(THREE, scene, random);
+  const clouds = options.clouds === false ? [] : createClouds(THREE, scene, random);
 
   // Ground cover: one instanced mesh of tufts, one of flowers. A tuft is a clump of
   // five thin blades leaning apart — cheap, and from eye height it reads as grass.

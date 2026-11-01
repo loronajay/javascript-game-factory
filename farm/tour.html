@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Free property walkthrough · Farm</title>
+  <link rel="stylesheet" href="tour.css">
+</head>
+<body>
+  <canvas id="tourCanvas" aria-label="3D property walkthrough"></canvas>
+  <header class="tour-panel">
+    <span class="eyebrow">THE PROPERTY OFFICE · FREE WALKTHROUGH</span>
+    <h1 id="propertyTitle">Country properties</h1>
+    <details id="tourControls" open>
+    <summary>Properties, views and fishing</summary>
+    <p id="propertyDescription"></p>
+    <nav id="properties" aria-label="Choose a property"></nav>
+    <p>Explore a sample farm. Your farm, ownership and tickets stay unchanged.</p>
+    <nav aria-label="Viewpoints">
+      <button type="button" data-view="field">Walk the field</button>
+      <button type="button" data-view="grounds">Go to fishing gate</button>
+      <button type="button" data-view="overview">See the whole property</button>
+    </nav>
+    <a href="market/index.html">Return to the Property Office</a>
+    <a href="index.html">Return to my farm</a>
+    </details>
+  </header>
+  <footer class="tour-panel tour-controls">
+    <button id="walk" type="button">Click to walk</button>
+    <p id="tourStatus" role="status">Loading the property…</p>
+  </footer>
+  <script type="module" src="../js/farm-property-tour.mjs"></script>
+</body>
+</html>

@@ -42,7 +42,9 @@ export function createPropertiesPanel(deps: Readonly<{
       const button = element("button", "farm-button property-card__buy", home ? "Your current home" : smaller ? "Your farm has outgrown this property" : owned.has(property.id) ? "Move your farm here" : `Buy & move here - ${price.toLocaleString()} tickets`);
       button.type = "button"; button.disabled = busy || !ready || !deps.canBuy || home || smaller;
       button.addEventListener("click", () => { void buy(property.id); });
-      copy.append(button); card.append(image, copy); body.append(card);
+      const tour = element("a", "farm-button", "Free walkthrough");
+      tour.href = new URL(`../farm/tour.html?property=${encodeURIComponent(property.id)}`, import.meta.url).toString();
+      copy.append(tour, button); card.append(image, copy); body.append(card);
     }
   }
   async function buy(id: string): Promise<void> {

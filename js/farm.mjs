@@ -1,5 +1,5 @@
 import { findMemorialInReach, memorialDetails } from "./farm-memorial.mjs";
-import { propertyWalkBounds, propertyObstacles, propertyPlatforms, propertyRoutes, PROPERTY_GATE_ID } from "./farm-property-scene.mjs";
+import { propertyWalkBounds, propertyObstacles, propertyPlatforms, propertyGroundHeight, propertyRoutes, PROPERTY_GATE_ID } from "./farm-property-scene.mjs";
 import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // The farm page: the composition root for `/farm/`.
 //
@@ -312,7 +312,7 @@ let livestockSync = () => undefined;
 const player = { x: FARM_SPAWN.x, z: farmLotBounds(layout).depth / 2 - 2.2, yaw: FARM_SPAWN.yaw, pitch: -0.03 };
 const returningRoute = propertyRoutes(layout).find((route) => route.target === new URLSearchParams(location.search).get("from"));
 if (returningRoute)
-    Object.assign(player, { x: returningRoute.x - (returningRoute.target === "estate-lake" ? 3 : 0), z: returningRoute.z + (returningRoute.target === "estate-lake" ? 0 : 3), yaw: returningRoute.target === "estate-lake" ? Math.PI / 2 : Math.PI });
+    Object.assign(player, returningRoute.returnPoint);
 // How high the player is and what they are doing with it: on the ground, up a ladder, on a loft, on a bench.
 let body = createFarmBody();
 const walkerBounds = { get halfWidth() { return propertyWalkBounds(layout).width / 2; }, get halfDepth() { return propertyWalkBounds(layout).depth / 2; }, margin: FARM_BOUNDS.wallInset };
@@ -326,8 +326,7 @@ let seats = farmSeats(layout);
 // The ponds dug into the field: what the feet stand on in them and when the eyes are under water.
 let ponds = waterRegions(layout);
 const groundAt = (point) => {
-    const deck = propertyPlatforms(layout).find((entry) => Math.abs(point.x - entry.x) <= entry.width / 2 && Math.abs(point.z - entry.z) <= entry.depth / 2);
-    return deck ? deck.top : groundHeightAt(ponds, point);
+    return propertyGroundHeight(layout, point) ?? groundHeightAt(ponds, point);
 };
 const waterAt = (point) => waterDepthAt(ponds, point);
 const underwaterOverlay = document.querySelector(".farm-underwater");
@@ -557,11 +556,12 @@ function updateInteraction() {
         const horseName = petSim.find(riding.mounted())?.name ?? "your horse";
         if (doorInReach) {
             const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach.doorId && gate.instanceId !== PROPERTY_GATE_ID && (!layout.lot || gate.z > farmLotBounds(layout).depth / 2 - 2));
-            setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · ride out to the Market Square" : " · a horse does not go indoors"));
+            const destination = propertyRoutes(layout).find(route => route.gateId === doorInReach.doorId);
+            setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (destination ? ` · ride through to ${destination.title}` : road ? " · ride out to the Market Square" : " · a horse does not go indoors"));
             return;
         }
-        const trail = propertyRoutes(layout).find((route) => Math.hypot(player.x - route.x, player.z - route.z) < 6);
-        setPrompt(trail ? `Follow the trail: ${trail.title}` : getRidingPrompt(horseName));
+        const trail = propertyRoutes(layout).find((route) => Math.hypot(player.x - route.x, player.z - route.z) < 3);
+        setPrompt(trail ? `Open the gate with E, then ride through to ${trail.title}` : getRidingPrompt(horseName));
         return;
     }
     const handsFree = walking && !carrying;
@@ -623,7 +623,8 @@ function updateInteraction() {
     }
     if (doorInReach) {
         const road = perimeterGates(layout.decor, farmLotBounds(layout)).some((gate) => gate.instanceId === doorInReach.doorId && gate.instanceId !== PROPERTY_GATE_ID && (!layout.lot || gate.z > farmLotBounds(layout).depth / 2 - 2));
-        setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (road ? " · the road to the Market Square" : ""));
+        const destination = propertyRoutes(layout).find(route => route.gateId === doorInReach.doorId);
+        setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (destination ? ` · ${destination.horse ? "ride" : "walk"} through to ${destination.title}` : road ? " · the road to the Market Square" : ""));
         return;
     }
     if (ladderInReach) {
@@ -673,8 +674,8 @@ function updateInteraction() {
         setPrompt(livestock.prompt());
         return;
     }
-    const trail = propertyRoutes(layout).find((route) => Math.hypot(player.x - route.x, player.z - route.z) < 6);
-    setPrompt(trail ? trail.horse ? "Mount your horse to take the estate trail to Windrush Downs" : `Follow the path: ${trail.title}` : "");
+    const trail = propertyRoutes(layout).find((route) => Math.hypot(player.x - route.x, player.z - route.z) < 3);
+    setPrompt(trail ? trail.horse ? "Mount your horse to ride through the Downs gate" : `Open the gate with E, then walk through to ${trail.title}` : "");
 }
 /** Apply a body step: the pose and the body move together or not at all. */
 function applyBodyStep(step) {
@@ -1666,7 +1667,8 @@ let blockedPropertyTrail = "";
 function checkGateway() {
     if (!farmEntered || leavingForMarket || farmEditor.isEditing() || body.mode !== "walking")
         return;
-    const route = propertyRoutes(layout).find((entry) => Math.hypot(player.x - entry.x, player.z - entry.z) < 1.8);
+    const exit = gatewayAt(layout.decor, openDoors, player, farmLotBounds(layout));
+    const route = exit ? propertyRoutes(layout).find(entry => entry.gateId === exit.instanceId) : undefined;
     if (!route)
         blockedPropertyTrail = "";
     if (route && blockedPropertyTrail === route.target)
@@ -1700,7 +1702,10 @@ function checkGateway() {
         }).catch(() => { blockedPropertyTrail = route.target; leavingForMarket = false; setPrompt("Your farm could not be saved. Step back and try again."); });
         return;
     }
-    const exit = gatewayAt(layout.decor, openDoors, player, farmLotBounds(layout));
+    if (route?.horse) {
+        setPrompt("Ride through this gate on your horse to enter Windrush Downs");
+        return;
+    }
     if (!exit || exit.instanceId === PROPERTY_GATE_ID || (layout.lot && exit.z < farmLotBounds(layout).depth / 2 - 2))
         return;
     if (carrying) {

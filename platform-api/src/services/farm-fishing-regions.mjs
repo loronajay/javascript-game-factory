@@ -14,16 +14,21 @@ export const FISHING_REGIONS = Object.freeze([
         shadowWaters: [{ minX: -19, maxX: -2, minZ: -16, maxZ: 8 }, { minX: 9, maxX: 21, minZ: -18, maxZ: -3 }, { minX: 15, maxX: 22, minZ: 9, maxZ: 17 }],
     },
     { id: "cedar-creek", title: "Cedar Creek", direction: "west", minLevel: 1, requiredProperty: "lot.smallholding",
-        description: "Your own woodland fishing retreat, reached across the bridge at Cedar Hollow. Follow the winding stream between the trees and fish for Cedar Trout and Amber Chub.",
+        description: "Step through Cedar Hollow's fishing gate into a sheltered woodland creek. A short bank path leads from the entrance to the pools, home to Cedar Trout and Amber Chub.",
         water: "#4caaad", ground: "#536d48", rock: "#67736c", accent: "#b7d6b0",
         pools: [{ x: -13, z: -12, rx: 11, rz: 21 }, { x: 0, z: 8, rx: 13, rz: 14 }, { x: 12, z: -10, rx: 10, rz: 17 }],
-        spawn: { x: 29, z: 23, yaw: Math.PI / 3 }, exit: { x: 35, z: 23 },
+        entry: { x: 24, z: 15, yaw: Math.atan2(9.6, 6) },
+        spawn: { x: 25.696, z: 16.06, yaw: Math.atan2(9.6, 6) }, exit: { x: 28.24, z: 17.65 },
+        fishingSpot: { x: 14.4, z: 9, yaw: Math.PI / 2 },
         shadowWaters: [{ minX: -18, maxX: -8, minZ: -23, maxZ: -2 }, { minX: -6, maxX: 6, minZ: 2, maxZ: 14 }, { minX: 7, maxX: 17, minZ: -19, maxZ: -2 }],
     },
     { id: "estate-lake", title: "Sunwater Private Lake", direction: "east", minLevel: 1, requiredProperty: "lot.estate",
         description: "The estate's private lake: quiet banks, broad water and your own fishing pavilion. Golden Perch and Pearl Carp live here, with heavier visitors cruising beneath the surface.",
         water: "#4f91b1", ground: "#7e9553", rock: "#a09c82", accent: "#eadcb0",
-        pools: [{ x: 0, z: -4, rx: 28, rz: 25 }], spawn: { x: -30, z: 24, yaw: -Math.PI / 3 }, exit: { x: -35, z: 24 },
+        pools: [{ x: 0, z: -4, rx: 28, rz: 25 }],
+        entry: { x: 0, z: 29, yaw: 0 },
+        spawn: { x: 0, z: 31, yaw: 0 }, exit: { x: 0, z: 35 },
+        fishingSpot: { x: 0, z: 22, yaw: 0 },
         shadowWaters: [{ minX: -19, maxX: -3, minZ: -17, maxZ: 8 }, { minX: 3, maxX: 19, minZ: -17, maxZ: 8 }],
     },
 ]);
@@ -47,6 +52,10 @@ export function regionGroundAt(region, point) {
 }
 /** Trees on the playable banks, shared by scenery and trunk collision. */
 export function regionShoreTrees(region) {
+    if (region.id === "cedar-creek")
+        return [[-29, -18], [-27, 12], [29, -7], [30, 25], [-12, 29], [4, -32]].map(([x, z]) => ({ x: x, z: z }));
+    if (region.id === "estate-lake")
+        return [[-32, -12], [-28, 18], [32, -10], [30, 19], [-15, -32], [12, -32]].map(([x, z]) => ({ x: x, z: z }));
     const points = region.id !== "volcanic"
         ? [[-31, -12], [-29, 16], [27, -8], [27, 8], [-14, 25], [8, -31]]
         : [[-31, -12], [-28, 24], [-16, 23], [4, 23], [30, -22], [30, 5], [30, 24], [-8, -30]];

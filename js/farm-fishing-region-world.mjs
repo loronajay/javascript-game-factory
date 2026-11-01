@@ -1,4 +1,6 @@
 import { createFernfallScenery, fernfallRockFace } from "./farm-fernfall-scenery.mjs";
+import { createPrivateFishingWorld } from "./farm-private-fishing-world.mjs";
+import { privateFishingLayout } from "./farm-private-fishing-layout.mjs";
 import { createSurfaceMaterial } from "./arcade-room-surfaces.mjs";
 import { normalizeFarmLayout } from "./farm-layout.mjs";
 import { createTree, createWillow, createPine } from "./farm-props-plants.mjs";
@@ -34,13 +36,14 @@ export function fishingRegionScene(region) {
         { instanceId: `${region.id}-lamp`, itemId: "decor.prop.lamp-post", x: side * 13, z: 24, rotationY: 0, length: 0 },
         { instanceId: `${region.id}-camp`, itemId: "decor.prop.campfire", x: side * 18, z: 24, rotationY: 0, length: 0 },
     ];
-    if (region.id === "estate-lake")
-        decor.push({ instanceId: "lake-pavilion", itemId: "decor.building.gazebo", x: -31.5, z: -1, rotationY: Math.PI / 2, length: 0 });
+    if (region.requiredProperty) {
+        decor.splice(0, decor.length, ...privateFishingLayout(region).decor);
+    }
     const base = normalizeFarmLayout({ version: 3, pets: [], decor: [], ground: "ground.meadow" });
     return {
         COVE_BOUNDS: REGION_BOUNDS, COVE_SPAWN: region.spawn, COVE_PRESENCE_ROOM: `farm:fishing:${region.id}`,
         COVE_MARKET_GATE: "", COVE_RAIL_ID: rail, COVE_STALLS: [],
-        coveLayout: () => ({ ...base, decor }), coveObstacles: () => regionWaterObstacles(region).concat(regionShoreTrees(region).map((tree, index) => ({ instanceId: `region-tree-${index}`, x: tree.x, z: tree.z, rotationY: 0, footprint: { width: 0.75, depth: 0.75 }, bottom: 0, top: Infinity }))),
+        coveLayout: () => ({ ...base, decor }), coveObstacles: () => regionWaterObstacles(region).concat(regionShoreTrees(region).map((tree, index) => ({ instanceId: `region-tree-${index}`, x: tree.x, z: tree.z, rotationY: 0, footprint: { width: 0.75, depth: 0.75 }, bottom: 0, top: Infinity })), region.requiredProperty ? privateFishingLayout(region).obstacles : []),
         covePlatforms: () => [], coveGroundAt: (point) => regionGroundAt(region, point),
         coveWaterDepthAt: (point) => Math.max(0, -0.3 - regionGroundAt(region, point)),
         coveWaterDistance: (point) => regionWaterDistance(region, point),
@@ -54,7 +57,7 @@ export function fishingRegionScene(region) {
         },
     };
 }
-export function destinationSign(THREE, root, text, x, z, rotationY = 0, twoSided = false) {
+export function destinationSign(THREE, root, text, x, z, rotationY = 0, twoSided = false, reverseText = text, scale = 1) {
     const canvas = document.createElement("canvas");
     canvas.width = 768;
     canvas.height = 192;
@@ -74,18 +77,36 @@ export function destinationSign(THREE, root, text, x, z, rotationY = 0, twoSided
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.rotation.y = rotationY;
-    const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.65, 0.16), new THREE.MeshStandardMaterial({ color: "#614c39", roughness: 1 }));
-    board.position.y = 1.7;
+    const height = 1.375 + .325 * scale;
+    const board = new THREE.Mesh(new THREE.BoxGeometry(2.6 * scale, 0.65 * scale, 0.16), new THREE.MeshStandardMaterial({ color: "#614c39", roughness: 1 }));
+    board.position.y = height;
     board.castShadow = true;
     group.add(board);
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(2.54, 0.61), new THREE.MeshStandardMaterial({ map: texture, roughness: 1 }));
-    face.position.set(0, 1.7, 0.081);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(2.54 * scale, 0.61 * scale), new THREE.MeshStandardMaterial({ map: texture, roughness: 1 }));
+    face.position.set(0, height, 0.081);
     group.add(face);
     if (twoSided) {
         const reverse = face.clone();
         reverse.rotation.y = Math.PI;
         reverse.position.z = -0.081;
         group.add(reverse);
+        if (reverseText !== text) {
+            const backCanvas = document.createElement("canvas");
+            backCanvas.width = canvas.width;
+            backCanvas.height = canvas.height;
+            const back = backCanvas.getContext("2d");
+            back.drawImage(canvas, 0, 0);
+            back.fillStyle = "#1b302b";
+            back.fillRect(16, 16, 736, 160);
+            back.fillStyle = "#f8ecd2";
+            back.font = context.font;
+            back.textAlign = "center";
+            back.textBaseline = "middle";
+            back.fillText(reverseText, 384, 96, 710);
+            const backTexture = new THREE.CanvasTexture(backCanvas);
+            backTexture.colorSpace = THREE.SRGBColorSpace;
+            reverse.material = new THREE.MeshStandardMaterial({ map: backTexture, roughness: 1 });
+        }
     }
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 1.4, 7), new THREE.MeshStandardMaterial({ color: "#614c39" }));
     post.position.set(0, 0.7, -0.12);
@@ -102,6 +123,14 @@ export function createCoveTrailheads(THREE, scene) {
 }
 /** Complete destinations: real banks, several pools, cliffs and animated scenery. */
 export function createFishingRegionWorld(THREE, scene, region) {
+    if (region.requiredProperty) {
+        const world = createPrivateFishingWorld(THREE, scene, region);
+        const signs = new THREE.Group();
+        scene.add(signs);
+        const { sign } = privateFishingLayout(region);
+        destinationSign(THREE, signs, region.title.toUpperCase(), sign.x, sign.z, sign.yaw, true, "RETURN TO YOUR FARM", sign.scale);
+        return { update: world.update, dispose() { world.dispose(); signs.removeFromParent(); } };
+    }
     const root = new THREE.Group();
     root.name = `fishing-region-${region.id}`;
     scene.add(root);

@@ -51,7 +51,9 @@ export function createPropertiesPanel(deps) {
             button.type = "button";
             button.disabled = busy || !ready || !deps.canBuy || home || smaller;
             button.addEventListener("click", () => { void buy(property.id); });
-            copy.append(button);
+            const tour = element("a", "farm-button", "Free walkthrough");
+            tour.href = new URL(`../farm/tour.html?property=${encodeURIComponent(property.id)}`, import.meta.url).toString();
+            copy.append(tour, button);
             card.append(image, copy);
             body.append(card);
         }

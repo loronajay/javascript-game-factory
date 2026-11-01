@@ -15,7 +15,8 @@ test("larger lots persist, expand the perimeter and admit placement in the added
   assert.deepEqual(normalizeFarmLayout(big), big);
   assert.equal(big.decor.find((row) => row.instanceId === "barn-1").x, starter.decor.find((row) => row.instanceId === "barn-1").x);
   assert.ok(big.decor.find((row) => row.instanceId === "gate-1").z > 27);
-  assert.ok(big.decor.find((row) => row.instanceId === "post-rail-1").length > 55);
+  assert.ok(big.decor.filter(row => row.instanceId.startsWith("property-fence-north-")).reduce((length, row) => length + row.length, 0) > 52);
+  assert.ok(big.decor.some(row => row.instanceId === "property-gate-downs"));
   assert.equal(expandFarmLot(big, "lot.smallholding"), big);
   const box = { x: 23, z: 0, rotationY: 0 };
   assert.equal(insideFieldBox(box, { width: 2, depth: 2 }, farmLotBounds(big)), true);
@@ -159,10 +160,12 @@ test("farm properties name distinct settings and keep every existing possession 
 });
 
 import { propertyWalkBounds, propertyPlatforms, propertyObstacles, PROPERTY_GATE_ID } from "../farm-property-scene.mjs";
-test("new properties have accessible grounds, side gates and solid water with usable decks", () => {
+test("new properties keep fishing outside the farm and expose direct side gates", () => {
   for (const property of FARM_LOTS) {
     const layout = expandFarmLot(createDefaultFarmLayout(), property.id);
-    assert.ok(propertyWalkBounds(layout).width > farmLotBounds(layout).width);
+    assert.deepEqual(propertyWalkBounds(layout), farmLotBounds(layout));
+    assert.deepEqual(propertyPlatforms(layout), []);
+    assert.deepEqual(propertyObstacles(layout), []);
     assert.ok(layout.decor.some((row) => row.instanceId === PROPERTY_GATE_ID));
     for (const deck of propertyPlatforms(layout)) {
       assert.ok(Math.abs(deck.x) < propertyWalkBounds(layout).width / 2);

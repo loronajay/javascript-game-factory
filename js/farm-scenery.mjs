@@ -167,7 +167,7 @@ export function createFarmScenery(THREE, scene, options = {}) {
     const keepClear = options.propertyId ? () => true : options.keepClear ?? (() => false);
     createHills(THREE, scene, random, keepClear);
     createTreeline(THREE, scene, random, keepClear);
-    const clouds = createClouds(THREE, scene, random);
+    const clouds = options.clouds === false ? [] : createClouds(THREE, scene, random);
     // Ground cover: one instanced mesh of tufts, one of flowers. A tuft is a clump of
     // five thin blades leaning apart — cheap, and from eye height it reads as grass.
     const tuftGeometry = createTuftGeometry(THREE);
