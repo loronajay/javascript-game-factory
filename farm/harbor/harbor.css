@@ -1,43 +1,5 @@
-* { box-sizing: border-box; }
-:root { font-family: "Trebuchet MS", system-ui, sans-serif; color: #253e43; background: #c6e1e4; }
-body { margin: 0; }
-button, a { -webkit-tap-highlight-color: transparent; }
-button { font: inherit; cursor: pointer; }
-button:disabled { cursor: default; opacity: .5; }
-button:focus-visible, a:focus-visible, canvas:focus-visible { outline: 3px solid #c78a32; outline-offset: 4px; }
-.harbor-shell, #harborCanvas { position: fixed; inset: 0; width: 100%; height: 100%; height: 100dvh; }
-#harborCanvas { touch-action: none; }
-.harbor-header { position: absolute; top: max(22px, env(safe-area-inset-top)); left: 28px; right: 28px; display: flex; align-items: center; gap: 25px; }
-.harbor-header a { color: #294b50; text-decoration: none; font-size: 14px; background: #faf7eee8; padding: 12px 16px; border: 1px solid #ffffff80; border-radius: 12px; }
-.eyebrow { display: block; font-size: 10px; font-weight: 800; letter-spacing: .18em; color: #5c7372; }
-h1 { margin: 4px 0 0; font-size: 22px; letter-spacing: -.04em; }
-.trial-tag { margin-left: auto; font-size: 11px; border-radius: 30px; padding: 8px 13px; background: #f7f1ddc9; color: #665a39; }
-.voyage-card { position: absolute; top: 116px; left: 28px; width: 260px; padding: 24px; background: #f8f6eddc; border: 1px solid #fff9; border-radius: 18px; box-shadow: 0 16px 60px #1a484514; backdrop-filter: blur(15px); }
-h2 { margin: 13px 0; font-family: Georgia, serif; font-size: 30px; line-height: 1.12; font-weight: 400; letter-spacing: -.04em; }
-p { font-size: 13px; line-height: 1.6; color: #5c7272; }
-#harborChart { display: block; width: 100%; margin: 20px 0 12px; background: #d6e7e2; border: 1px solid #bccfc5; border-radius: 10px; }
-#chartBoat { fill: #be6739; stroke: #faf3dc; stroke-width: .6; }
-.chart-key { display: flex; justify-content: space-between; font-size: 10px; color: #5a7562; }
-.trial-note { border-top: 1px solid #d7ddd0; padding-top: 13px; margin: 17px 0 0; font-size: 11px; }
-.helm { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: min(610px, calc(100% - 40px)); background: #f8f6edf0; border: 1px solid #ffffff90; border-radius: 18px; padding: 17px 22px; box-shadow: 0 10px 50px #1f4b4b26; backdrop-filter: blur(15px); }
-.helm-reading { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #5b7775; }
-.helm-reading strong { color: #294f51; font-size: 25px; font-weight: 400; }
-.helm-reading small { font-size: 11px; }
-.helm p { margin: 9px 0 13px; min-height: 21px; color: #3a595b; }
-.helm-actions { display: flex; gap: 8px; }
-.helm-actions button, .touch-helm button { border: 1px solid #becfc4; padding: 11px 13px; border-radius: 9px; background: #fffdf7; color: #345754; font-size: 12px; }
-.helm-actions button:first-child { background: #315d56; color: #fff9e9; border-color: #315d56; }
-kbd { font: inherit; opacity: .65; margin-left: 7px; }
-.helm > small { display: block; margin-top: 13px; font-size: 10px; color: #738683; }
-.harbor-status { position: absolute; top: 100px; right: 28px; font-size: 12px; background: #fff8e6ec; border-radius: 10px; padding: 12px 17px; max-width: 350px; }
-.harbor-status:empty { display: none; }
-.touch-helm { display: none; gap: 8px; margin-top: 12px; justify-content: center; }
-@media (pointer: coarse) { .touch-helm { display: flex; } .touch-helm button { min-width: 45px; min-height: 45px; touch-action: none; } }
-@media (max-width: 760px) {
-  .harbor-header { left: 16px; right: 16px; gap: 12px; } h1 { font-size: 17px; } .trial-tag { display: none; }
-  .voyage-card { top: 100px; left: 16px; width: 148px; padding: 12px; } .voyage-card h2, .voyage-card > p:not(.trial-note), .chart-key { display: none; }
-  #harborChart { margin: 12px 0 0; } .trial-note { margin-top: 9px; padding-top: 8px; font-size: 9px; }
-  .helm { width: calc(100% - 24px); bottom: max(12px, env(safe-area-inset-bottom)); padding: 14px; } .helm-actions button { padding: 10px 8px; font-size: 11px; } kbd { display: none; }
-  .harbor-status { top: 91px; right: 12px; max-width: calc(100% - 192px); font-size: 11px; }
-}
-@media (max-height: 650px) { .voyage-card { width: 145px; padding: 12px; } .voyage-card h2, .voyage-card > p:not(.trial-note), .chart-key { display: none; } #harborChart { margin: 10px 0 0; } }
+.boat-controls { position: absolute; left: 50%; bottom: 105px; transform: translateX(-50%); z-index: 12; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; width: min(740px, calc(100% - 24px)); padding: 12px 16px; border-radius: 14px; border: 1px solid #667b45; background: #172515ef; color: #f4edcf; box-shadow: 0 10px 40px #0005; }
+.boat-controls[hidden] { display: none; }
+.boat-controls small { flex-basis: 100%; text-align: center; color: #c5cdb2; font-size: 12px; }
+.boat-controls > span { font-size: 13px; }
+@media (max-width: 600px) { .boat-controls { bottom: 100px; padding: 10px; gap: 6px; } .boat-controls .farm-button { font-size: 11px; padding: 7px 9px; } .boat-controls small { font-size: 10px; } }

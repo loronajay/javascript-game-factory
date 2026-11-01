@@ -40,7 +40,7 @@ function silhouette(THREE: ThreeNamespace): any {
   return group;
 }
 
-export function createFishingView(THREE: ThreeNamespace, scene: any, camera: any): FishingView {
+export function createFishingView(THREE: ThreeNamespace, scene: any, camera: any, waterLevel = COVE_WATER_LEVEL): FishingView {
   // The rod lives in the camera's frame: bottom right, leaning out over the water.
   const rodMount = new THREE.Group();
   rodMount.position.set(0.36, -0.42, -0.62);
@@ -94,7 +94,7 @@ export function createFishingView(THREE: ThreeNamespace, scene: any, camera: any
   ringGeometry.rotateX(-Math.PI / 2);
   function splash(point: Readonly<{ x: number; z: number }>, size = 0.4, life = 0.9): void {
     const mesh = new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({ color: "#e8f7ff", transparent: true, opacity: 0.8, depthWrite: false }));
-    mesh.position.set(point.x, COVE_WATER_LEVEL + 0.01, point.z);
+    mesh.position.set(point.x, waterLevel + 0.01, point.z);
     mesh.scale.setScalar(size * 0.3);
     mesh.renderOrder = 3;
     scene.add(mesh);
@@ -175,13 +175,13 @@ export function createFishingView(THREE: ThreeNamespace, scene: any, camera: any
       line.visible = false;
       if (phase === "flight" && landing) {
         const t = snapshot.flight;
-        const point = { x: tip.x + (landing.x - tip.x) * t, y: tip.y + (COVE_WATER_LEVEL - tip.y) * t + Math.sin(t * Math.PI) * 2.2, z: tip.z + (landing.z - tip.z) * t };
+        const point = { x: tip.x + (landing.x - tip.x) * t, y: tip.y + (waterLevel - tip.y) * t + Math.sin(t * Math.PI) * 2.2, z: tip.z + (landing.z - tip.z) * t };
         bobber.position.set(point.x, point.y, point.z);
         bobber.visible = true;
         drawLine(tip, point, 0.05);
       } else if ((phase === "waiting" || (phase === "flight" && snapshot.flight >= 1)) && landing) {
         const dip = snapshot.plan ? bobberDip(snapshot.plan, snapshot.waited) : 0;
-        const y = COVE_WATER_LEVEL + 0.02 - dip * 0.12 + Math.sin(seconds * 2.2) * 0.012;
+        const y = waterLevel + 0.02 - dip * 0.12 + Math.sin(seconds * 2.2) * 0.012;
         bobber.position.set(landing.x, y, landing.z);
         bobber.visible = true;
         drawLine(tip, bobber.position, 0.35);
@@ -202,13 +202,13 @@ export function createFishingView(THREE: ThreeNamespace, scene: any, camera: any
         const z = snapshot.from.z + uz * Math.max(0.8, fight.distance) + ux * lateral;
         const leaping = fight.elapsed < fight.leapUntil;
         const leapT = leaping ? 1 - (fight.leapUntil - fight.elapsed) / 0.75 : 0;
-        const y = leaping ? COVE_WATER_LEVEL + Math.sin(Math.max(0, Math.min(1, leapT)) * Math.PI) * 0.9 : COVE_WATER_LEVEL - 0.25;
+        const y = leaping ? waterLevel + Math.sin(Math.max(0, Math.min(1, leapT)) * Math.PI) * 0.9 : waterLevel - 0.25;
         const size = SHADOW_LENGTH[(snapshot.hint as keyof typeof SHADOW_LENGTH)] ?? 0.55;
         hooked.scale.setScalar(size);
         hooked.position.set(x, y, z);
         hooked.rotation.y = Math.atan2(-(x - snapshot.from.x), -(z - snapshot.from.z)) + Math.PI + Math.sin(seconds * 9) * 0.25;
         hooked.visible = true;
-        drawLine(tip, { x, y: Math.max(y, COVE_WATER_LEVEL), z }, Math.max(0, 0.35 - fight.tension * 0.4));
+        drawLine(tip, { x, y: Math.max(y, waterLevel), z }, Math.max(0, 0.35 - fight.tension * 0.4));
         if ((leapPending(fight) || fight.effort > 1.4 || phase === "netting") && seconds - lastSplash > 0.18) {
           splash({ x, z }, 0.25 + size * 0.4, 0.6);
           lastSplash = seconds;

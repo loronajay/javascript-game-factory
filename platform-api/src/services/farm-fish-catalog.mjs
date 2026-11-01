@@ -1,4 +1,5 @@
 import { findFishingRegion, regionZoneAt, FISHING_REGIONS } from "./farm-fishing-regions.mjs";
+import { harborFishingZoneAt } from "./farm-harbor-geometry.mjs";
 // The Cove's fish, server side: the species and tackle, the specimen maths, the
 // bite odds, the shadows and the Cove's waters. It mirrors four pure browser
 // modules — js/farm-catalog/fish.mts, js/farm-fish.mts, js/farm-cove.mts and
@@ -451,6 +452,8 @@ export const MOUNT_FEE = 25;
 export const TROPHY_MOUNT_ITEM_ID = "decor.prop.trophy-mount";
 /** Missing areaId preserves legacy Cove clients; unknown destinations admit no casts. */
 export function farmFishingZoneAt(point, areaId = "cove") {
+    if (areaId === "harbor")
+        return harborFishingZoneAt(point);
     if (areaId === "cove" || areaId === undefined)
         return farmCoveZoneAt(point);
     const region = findFishingRegion(areaId);

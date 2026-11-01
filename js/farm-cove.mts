@@ -254,7 +254,8 @@ export const COVE_DECOR: readonly FarmDecorRow[] = Object.freeze([
   row("cove-wall-w-north", "decor.fence.stone-wall", -WALL, 6.75, QUARTER, 1.5),
   row("cove-wall-w-south", "decor.fence.stone-wall", -WALL, 15.6, QUARTER, 7.5),
   row("cove-wall-e-north", "decor.fence.stone-wall", WALL, 6.75, QUARTER, 1.5),
-  row("cove-wall-e-south", "decor.fence.stone-wall", WALL, 15.6, QUARTER, 7.5),
+  row("cove-wall-e-south", "decor.fence.stone-wall", WALL, 13.8, QUARTER, 3.9),
+  row("cove-wall-e-tail", "decor.fence.stone-wall", WALL, 19.05, QUARTER, 0.6),
   row("cove-signpost", "decor.prop.signpost", 2.1, WALL - 1.1, 0),
   row("cove-lamp-gate-w", "decor.prop.lamp-post", -1.8, WALL - 1.1),
   row(COVE_RAIL_ID, "decor.prop.hitching-rail", -4.4, WALL - 3.2, 0),
@@ -279,7 +280,6 @@ export const COVE_DECOR: readonly FarmDecorRow[] = Object.freeze([
   // Trees along the shore's back, clear of the path; willows lean over the lagoon.
   row("cove-willow-1", "decor.plant.willow", -18, 7.6),
   row("cove-willow-2", "decor.plant.willow", -4.4, 8),
-  row("cove-pine-1", "decor.plant.pine", 18, 17.6),
   row("cove-pine-2", "decor.plant.pine", -18.4, 17.8),
   row("cove-flowers-1", "decor.plant.flower-bed", -6.2, 18.2),
   row("cove-flowers-2", "decor.plant.flower-bed", 6.2, 18.2),

@@ -1,16 +1,10 @@
 /** Deterministic local boat handling. This grants no ownership, travel, fish, or rewards. */
-export type SeaPoint = Readonly<{ x: number; z: number }>;
+import { HARBOR_BOUNDS, HARBOR_DOCKS, HARBOR_ISLANDS, type SeaPoint } from "./farm-harbor-geometry.mjs";
+export { HARBOR_BOUNDS, HARBOR_DOCKS, HARBOR_ISLANDS, type HarborDock, type SeaPoint } from "./farm-harbor-geometry.mjs";
+import type { HarborDock } from "./farm-harbor-geometry.mjs";
 export type BoatState = Readonly<{ x: number; z: number; yaw: number; speed: number; mode: "docked" | "sailing" | "anchored"; dockId: string | null }>;
-export type HarborDock = Readonly<{ id: string; title: string; x: number; z: number; yaw: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
-export const HARBOR_BOUNDS = Object.freeze({ minX: -70, maxX: 70, minZ: -95, maxZ: 22 });
-export const HARBOR_ISLANDS = Object.freeze([
-  Object.freeze({ x: -28, z: -36, radius: 12, title: "Gull Island" }),
-  Object.freeze({ x: 29, z: -56, radius: 15, title: "The Pines" }),
-]);
-export const HARBOR_DOCKS: readonly HarborDock[] = Object.freeze([
-  Object.freeze({ id: "mainland-harbor", title: "Mainland Harbor", x: 8, z: 12, yaw: 0, minX: -4, maxX: 4, minZ: 8, maxZ: 22 }),
-  Object.freeze({ id: "gull-landing", title: "Gull Landing", x: -22, z: -18, yaw: Math.PI, minX: -31, maxX: -25, minZ: -26, maxZ: -16 }),
-]);
+/** The GLB's pointed bow faces +z; the game's forward direction is -z. */
+export const BOAT_MODEL_YAW_OFFSET = Math.PI;
 export const BOAT_HANDLING = Object.freeze({ maxSpeed: 5, reverseSpeed: 1.8, acceleration: 1.8, drag: 0.25, turnRate: 0.85, hullRadius: 1, hullSampleOffset: 1.2, dockRadius: 4, dockingSpeed: 0.9 });
 
 export function dockedBoat(dockId = HARBOR_DOCKS[0]!.id): BoatState {

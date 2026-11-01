@@ -1,6 +1,50 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOAT_HANDLING, HARBOR_DOCKS, boatFitsWater, dockedBoat, stepBoat, toggleBoatAnchor, useBoatDock } from '../farm-boating.mjs';
+import { BOAT_MODEL_YAW_OFFSET } from '../farm-boating.mjs';
+import { harborDockFoot, harborWalkHeight, harborFishingZoneAt } from '../farm-harbor-geometry.mjs';
+import { stepHarborWalker } from '../farm-harbor-scene.mjs';
+import * as server from '../../platform-api/src/services/farm-harbor-geometry.mjs';
+import { farmFishingZoneAt } from '../../platform-api/src/services/farm-fish-catalog.mjs';
+import { readFileSync } from 'node:fs';
+
+test('the real model bow is aligned to movement rather than the stern', () => {
+  const buffer = readFileSync(new URL('../../farm/assets/fishing/boat.glb', import.meta.url));
+  const length = buffer.readUInt32LE(12), gltf = JSON.parse(buffer.subarray(20, 20 + length));
+  const accessor = gltf.accessors[gltf.meshes[0].primitives[0].attributes.POSITION], view = gltf.bufferViews[accessor.bufferView];
+  const positions = new Float32Array(buffer.buffer, buffer.byteOffset + 28 + length + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0), accessor.count * 3);
+  let frontWidth = 0, backWidth = 0;
+  for (let i = 0; i < accessor.count; i++) {
+    if (positions[i * 3 + 2] > 2.5) frontWidth = Math.max(frontWidth, Math.abs(positions[i * 3]));
+    if (positions[i * 3 + 2] < -3) backWidth = Math.max(backWidth, Math.abs(positions[i * 3]));
+  }
+  assert.ok(frontWidth < backWidth / 2, 'the pointed bow in the asset faces +z');
+  assert.ok(Math.cos(BOAT_MODEL_YAW_OFFSET) < -0.99, 'rotate the bow to the game’s -z forward direction');
+});
+
+test('both docks have a safe disembarkation point with a walkable route onto land', () => {
+  for (const dock of HARBOR_DOCKS) {
+    const foot = harborDockFoot(dock);
+    assert.equal(harborWalkHeight(foot), 0.87);
+    assert.ok(Math.hypot(foot.x - dock.x, foot.z - dock.z) < 5.5);
+    let pose = { ...foot, yaw: dock.id === 'mainland-harbor' ? Math.PI : 0, pitch: 0 };
+    for (let i = 0; i < 500; i++) pose = stepHarborWalker(pose, new Set(['KeyW']), 1 / 60).pose;
+    assert.ok(Math.abs(pose.z - foot.z) > 15, dock.id + ' must permit walking away from the boat');
+    assert.notEqual(harborWalkHeight(pose), null);
+  }
+});
+
+test('boat fishing uses the same harbor geometry on the client and server', () => {
+  assert.deepEqual(server.HARBOR_DOCKS, HARBOR_DOCKS);
+  for (let x = -72; x <= 72; x += 3) for (let z = -98; z <= 30; z += 3) {
+    const point = { x, z };
+    assert.equal(harborFishingZoneAt(point), server.harborFishingZoneAt(point));
+    assert.equal(farmFishingZoneAt(point, 'harbor'), harborFishingZoneAt(point));
+  }
+  assert.equal(farmFishingZoneAt({ x: 8, z: 0 }, 'harbor'), 'reef');
+  assert.equal(farmFishingZoneAt({ x: 0, z: -60 }, 'harbor'), 'deep');
+  assert.equal(farmFishingZoneAt({ x: 0, z: 12 }, 'harbor'), null, 'casts cannot land on a pier');
+});
 
 const run = (state, input, seconds, hz = 60) => { for (let i = 0; i < seconds * hz; i++) state = stepBoat(state, input, 1 / hz).state; return state; };
 test('boats board, accelerate, brake, reverse and anchor without drifting', () => {

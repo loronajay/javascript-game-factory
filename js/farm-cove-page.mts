@@ -1,4 +1,8 @@
 import * as cove from "./farm-cove.mjs";
+import { harborScene, HARBOR_COVE_EXIT, stepHarborWalker } from "./farm-harbor-scene.mjs";
+import { HARBOR_DOCKS, harborDockFoot, harborFishingZoneAt, harborWalkHeight } from "./farm-harbor-geometry.mjs";
+import { BOAT_HANDLING, dockedBoat, nearbyBoatDock, stepBoat, toggleBoatAnchor, useBoatDock } from "./farm-boating.mjs";
+import { createHarborWorld } from "./farm-harbor-world.mjs";
 import { FISHING_REGIONS, findFishingRegion, regionZoneAt } from "./farm-fishing-regions.mjs";
 import { fishingRegionScene, createFishingRegionWorld, createCoveTrailheads } from "./farm-fishing-region-world.mjs";
 // The Cove page: the shared fishing hub at the bottom of the Market Square's
@@ -77,12 +81,15 @@ import { createFarmHud } from "./farm-hud.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
 
 const destinationQuery = new URLSearchParams(location.search);
+const harbor = /\/harbor\/(?:index\.html)?$/.test(location.pathname);
+let boatState = dockedBoat();
+let aboard = false;
 const region = findFishingRegion(destinationQuery.get("area"));
 // A public practice visit never loads or modifies the farmer's actual account.
 const preview = destinationQuery.get("preview") === "1" && Boolean(region?.requiredProperty);
-const areaId = region?.id ?? "cove";
-const areaTitle = region?.title ?? "The Cove";
-const areaScene = region ? fishingRegionScene(region) : cove;
+const areaId = harbor ? "harbor" : region?.id ?? "cove";
+const areaTitle = harbor ? "Mainland Harbor" : region?.title ?? "The Cove";
+const areaScene = harbor ? harborScene : region ? fishingRegionScene(region) : cove;
 const { COVE_BOUNDS, COVE_MARKET_GATE, COVE_PRESENCE_ROOM, COVE_SPAWN, COVE_RAIL_ID, COVE_STALLS, coveGroundAt, coveWaterDepthAt, castOrigin, coveLayout, coveObstacles, covePlatforms, coveWaterDistance } = areaScene;
 
 const THREE: Record<string, any> = THREE_VENDOR;
@@ -117,11 +124,19 @@ farmHud.fullscreen.bind(requiredElement<HTMLButtonElement>("#fullscreenCove"));
 
 // Back up the path: to the Market Square's north gate, carrying the farm to come home to.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
-const harborLink = requiredElement<HTMLAnchorElement>("#visitHarbor");
-harborLink.hidden = Boolean(region) || preview;
-harborLink.href = `../harbor/index.html?${horseTravelQuery(fromFarm, destinationQuery.get("horse") ?? "")}`;
 const marketUrl = `../market/index.html?from=cove&${horseTravelQuery(fromFarm, "")}`;
 backLink.href = region?.requiredProperty ? `../index.html?from=${region.id}&${horseTravelQuery(fromFarm, "", "id")}` : region ? `index.html?from=${region.id}&${horseTravelQuery(fromFarm, "")}` : marketUrl;
+if (harbor) {
+  backLink.href = `../cove/index.html?from=harbor&${horseTravelQuery(fromFarm, destinationQuery.get("horse") ?? "")}`;
+  backLink.querySelector(".back-link__words")!.textContent = "The Cove";
+  requiredElement<HTMLElement>(".hud-place__name h1").textContent = "Mainland Harbor";
+  requiredElement<HTMLElement>(".hud-place__name .eyebrow").textContent = "THE MAINLAND / COAST PATH";
+  requiredElement<HTMLElement>(".start-card h2").textContent = "Down to the harbor.";
+  requiredElement<HTMLElement>(".start-card p").textContent = "Walk down to the pier and press E by the boat to board. Row out, drop anchor with F, and fish with Space. Return to either landing and press E to step onto the pier and explore on foot.";
+  enterButton.textContent = "Walk into the harbor";
+  requiredElement<HTMLElement>(".start-card__tag").textContent = "MAINLAND HARBOR";
+  visitorsChipLabel.textContent = "AT THE HARBOR";
+}
 if (region) {
   document.title = `${region.title} - Farm`;
   requiredElement<HTMLElement>(".hud-place__name h1").textContent = region.title;
@@ -240,13 +255,16 @@ const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 260);
 camera.rotation.order = "YXZ";
 scene.add(camera);
 const layout = coveLayout();
-const world = createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => Boolean(region?.requiredProperty) || region?.id === "grotto" || coveWaterDistance({ x, z }) > -4 });
+const world = harbor ? { sync: (_layout: unknown) => {}, setTime: (_time: number) => {}, update: (_dt: number) => {}, doorsFor: (_id: string) => null }
+  : createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => Boolean(region?.requiredProperty) || region?.id === "grotto" || coveWaterDistance({ x, z }) > -4 });
 world.sync(layout);
 // Like the farm and square, the Cove uses this client's paused farm clock;
 // people fishing together can therefore see different skies. `?time=` is QA.
 world.setTime(resolveFarmSceneTime(inventoryFarm.layout.clock.farmMinutes, new URLSearchParams(location.search).get("time")));
-const terrain = region ? createFishingRegionWorld(THREE, scene, region) : createCoveTerrain(THREE, scene);
-if (!region) createCoveTrailheads(THREE, scene);
+const harborWorld = harbor ? createHarborWorld(THREE, scene, (ok) => { if (!ok) status.textContent = "The boat model could not load. Reload before boarding."; }) : null;
+const terrain = harborWorld ? { update: (_dt: number, seconds: number) => harborWorld.update(boatState, seconds) }
+  : region ? createFishingRegionWorld(THREE, scene, region) : createCoveTerrain(THREE, scene);
+if (!region && !harbor) createCoveTrailheads(THREE, scene);
 const STOCK = { [FISHMONGER_STALL_ID]: fishmongerStock(THREE), [TACKLE_STALL_ID]: tackleStock(THREE) } as const;
 for (const stall of COVE_STALLS) scene.add(createMarketStallModel(THREE, stall, STOCK[stall.id as keyof typeof STOCK]));
 
@@ -274,6 +292,7 @@ function keeperSays(stall: MarketStall, text: string, now = performance.now()): 
 const shadowsView = createShadowsView(THREE, scene);
 let shadows: readonly PublicShadow[] = [];
 async function loadShadows(): Promise<void> {
+  if (harbor) { shadows = []; shadowsView.sync(shadows); return; }
   if (preview) {
     let seed = 4271;
     const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -296,6 +315,7 @@ setInterval(() => { void loadShadows(); }, 60_000);
 const player = { x: COVE_SPAWN.x, z: COVE_SPAWN.z, yaw: COVE_SPAWN.yaw, pitch: -0.06 };
 // `?at=pier|jetty|spit` stands the player at a fishing spot, facing the water — a QA seam like the market's `?at=`.
 const QA_SPOTS: Readonly<Record<string, Readonly<{ x: number; z: number; yaw: number }>>> = Object.freeze({
+  "harbor-trail": { x: 17.2, z: 17.2, yaw: -Math.PI / 2 },
   pier: { x: 11, z: -10.2, yaw: 0 },
   "west-trail": { x: -17.8, z: 9.5, yaw: Math.PI / 2 },
   "east-trail": { x: 17.8, z: 9.5, yaw: -Math.PI / 2 },
@@ -307,12 +327,15 @@ const QA_SPOTS: Readonly<Record<string, Readonly<{ x: number; z: number; yaw: nu
   records: { x: -17.2, z: 13, yaw: Math.PI / 2 },
 });
 const qaSpot = QA_SPOTS[new URLSearchParams(location.search).get("at") ?? ""];
-if (qaSpot && !region) Object.assign(player, qaSpot);
+if (qaSpot && !region && !harbor) Object.assign(player, qaSpot);
+if (harbor && destinationQuery.get("at") === "dock") Object.assign(player, harborDockFoot(HARBOR_DOCKS[0]!));
+if (!region && !harbor && destinationQuery.get("from") === "harbor") Object.assign(player, { x: 17, z: 17.2, yaw: Math.PI / 2 });
 if (!region && destinationQuery.get("from") === "grotto") Object.assign(player, { x: -17.8, z: 9.5, yaw: -Math.PI / 2 });
 if (!region && destinationQuery.get("from") === "volcanic") Object.assign(player, { x: 17.8, z: 9.5, yaw: Math.PI / 2 });
 if (region && destinationQuery.get("at") === "shore") Object.assign(player, region.fishingSpot ?? (region.id === "grotto" ? { x: -9, z: 12.5, yaw: 0 } : { x: -10, z: 20, yaw: 0 }));
 if (region && destinationQuery.get("at") === "return") Object.assign(player, region.entry ? { ...region.entry, yaw: region.entry.yaw + Math.PI } : { x: region.exit.x - Math.sign(region.exit.x) * 3, z: region.exit.z, yaw: region.exit.x > 0 ? -Math.PI / 2 : Math.PI / 2 });
 let body: FarmBody = createFarmBody();
+if (harbor) body = { ...body, y: harborWalkHeight(player) ?? 0 };
 const walkerBounds = { halfWidth: COVE_BOUNDS.width / 2, halfDepth: COVE_BOUNDS.depth / 2, margin: COVE_BOUNDS.wallInset };
 const openDoors = new Set<string>();
 const water = coveObstacles();
@@ -323,7 +346,7 @@ const seats = farmSeats(layout);
 const doors = doorRows(layout);
 // A rider who came on horseback rides the shore (cosmetic riding) and ties up at the rail to fish.
 const away = createAwayRiding(THREE, scene, {
-  horse: ridingHorseFrom(inventoryFarm.layout, new URLSearchParams(location.search).get("horse")),
+  horse: harbor ? null : ridingHorseFrom(inventoryFarm.layout, new URLSearchParams(location.search).get("horse")),
   mode: "cosmetic",
   profile: () => cosmeticRideProfile(),
   world: () => ({ bounds: walkerBounds, solids: obstaclesForSpan(obstacles, 0.3, 2.4), ground: coveGroundAt, water: coveWaterDepthAt }),
@@ -344,6 +367,11 @@ let nearbyVisitor: RemoteMember | null = null;
 let atWater = false;
 
 function applyCamera(): void {
+  if (harbor && aboard && boatState.mode === "sailing" && !fishing.busy()) {
+    camera.position.set(boatState.x + Math.sin(boatState.yaw) * 8, 4.5, boatState.z + Math.cos(boatState.yaw) * 8);
+    camera.lookAt(boatState.x - Math.sin(boatState.yaw) * 4, 0.6, boatState.z - Math.cos(boatState.yaw) * 4);
+    return;
+  }
   if (away.mounted()) {
     const eye = away.eye(riderClock);
     player.yaw = away.state()!.heading;
@@ -431,7 +459,7 @@ const fishing = createFishingController({
     },
   } : null,
   castOrigin,
-  zoneAt: region ? (point) => regionZoneAt(region, point) : cove.coveZoneAt,
+  zoneAt: harbor ? harborFishingZoneAt : region ? (point) => regionZoneAt(region, point) : cove.coveZoneAt,
   random: Math.random,
   now: () => Date.now(),
   tackle: () => ({ rod: findFishingRod(rodId) ?? findFishingRod(STARTER_ROD_ID)!, bait: baitId, level: angler.level }),
@@ -440,7 +468,7 @@ const fishing = createFishingController({
   onEvent: onFishingEvent,
   newId,
 });
-const fishingView = createFishingView(THREE, scene, camera);
+const fishingView = createFishingView(THREE, scene, camera, harbor ? 0 : cove.COVE_WATER_LEVEL);
 fishingView.setRod(rodId);
 // Everyone else's lines: their rod, line and bobber, read off their presence poses.
 const anglersView = createCoveAnglersView(THREE, scene);
@@ -655,9 +683,68 @@ function workStall(stall: MarketStall): void {
 
 // ---------------------------------------------------------------- walking, E and the keys
 
+function boatWithinReach(): boolean {
+  return harbor && !aboard && boatState.mode === "docked" && Math.hypot(player.x - boatState.x, player.z - boatState.z) <= 5.5;
+}
+function boardOrDisembark(): boolean {
+  if (!harbor || fishing.busy() || !entered || panelOpen()) return false;
+  if (boatWithinReach()) {
+    aboard = true; boatState = useBoatDock(boatState);
+    Object.assign(player, { x: boatState.x, z: boatState.z, yaw: boatState.yaw, pitch: -0.06 });
+    body = { ...createFarmBody(), y: 0.6 }; keys.clear();
+    notice("W/S to row, A/D to steer. F drops anchor so you can fish with Space. E at a landing steps ashore.");
+    return true;
+  }
+  if (!aboard) return false;
+  const dock = nearbyBoatDock(boatState);
+  if (!dock || Math.abs(boatState.speed) > BOAT_HANDLING.dockingSpeed) {
+    notice("Approach a landing slowly. Hold Shift to brake, then press E to step onto the pier."); return true;
+  }
+  boatState = dockedBoat(dock.id); aboard = false;
+  Object.assign(player, harborDockFoot(dock)); body = { ...createFarmBody(), y: 0.87 }; keys.clear();
+  notice(`You stepped onto ${dock.title}. Walk along the pier to explore; your boat stays moored here.`);
+  return true;
+}
+function changeBoatAnchor(): void {
+  if (!aboard || fishing.busy() || panelOpen()) return;
+  boatState = toggleBoatAnchor(boatState); keys.clear();
+  player.yaw = boatState.yaw; player.pitch = -0.06;
+  notice(boatState.mode === "anchored" ? "Anchor down. Look toward open water and hold Space to cast." : "Anchor raised. W/S to row; Shift to brake.");
+}
+function refreshBoatControls(): void {
+  if (!harbor) return;
+  const controls = requiredElement<HTMLElement>("#boatControls");
+  controls.hidden = !entered || panelOpen() || fishing.busy() || (!aboard && !boatWithinReach());
+  requiredElement<HTMLElement>("#boatMode").textContent = !aboard ? "On the pier" : boatState.mode === "anchored" ? "At anchor · Space to fish" : "Under way";
+  requiredElement<HTMLElement>("#boatSpeed").textContent = Math.abs(boatState.speed).toFixed(1);
+  const use = requiredElement<HTMLButtonElement>("#useDock");
+  use.textContent = aboard ? "Disembark · E" : "Board boat · E";
+  use.disabled = aboard && (!nearbyBoatDock(boatState) || Math.abs(boatState.speed) > BOAT_HANDLING.dockingSpeed);
+  const anchor = requiredElement<HTMLButtonElement>("#toggleAnchor"); anchor.disabled = !aboard;
+  anchor.textContent = boatState.mode === "anchored" ? "Raise anchor · F" : "Drop anchor · F";
+}
+if (harbor) {
+  requiredElement<HTMLButtonElement>("#useDock").addEventListener("click", () => { boardOrDisembark(); });
+  requiredElement<HTMLButtonElement>("#toggleAnchor").addEventListener("click", changeBoatAnchor);
+  requiredElement<HTMLButtonElement>("#returnHarbor").addEventListener("click", () => {
+    if (fishing.busy()) return;
+    boatState = dockedBoat(); aboard = false; keys.clear();
+    Object.assign(player, harborDockFoot(HARBOR_DOCKS[0]!)); body = { ...createFarmBody(), y: 0.87 };
+    notice("Back on the mainland pier. Follow the coast path to walk back to the Cove.");
+  });
+}
+
 function updateInteraction(): void {
   const pose = { x: player.x, z: player.z, y: body.y, yaw: player.yaw, forward: forwardOf(player.yaw) };
   const free = entered && !leaving && !panelOpen() && body.mode === "walking" && !fishing.busy();
+  if (harbor && aboard) {
+    doorInReach = null; seatInReach = null; stallInReach = null; nearbyVisitor = null;
+    atWater = entered && !panelOpen() && boatState.mode === "anchored" && Boolean(castOrigin(pose));
+    if (!entered || panelOpen() || fishing.busy()) { setPrompt(""); return; }
+    if (nearbyBoatDock(boatState) && Math.abs(boatState.speed) <= BOAT_HANDLING.dockingSpeed) return setPrompt("Press E to disembark onto the pier · F to anchor and fish here");
+    return setPrompt(boatState.mode === "anchored" ? "At anchor · Hold Space to cast · F to raise anchor" : "W/S to row · A/D to steer · Shift to brake · F to anchor and fish");
+  }
+  if (free && boatWithinReach()) { atWater = false; return setPrompt("Press E to step into the boat"); }
   const ride = away.state();
   const reachFrom = ride ? riderReach(ride) : pose;
   doorInReach = free ? nearestDoor(doors, reachFrom, (entry) => canWorkDoor(reachFrom, entry.door, entry.reach)) : null;
@@ -683,7 +770,9 @@ function updateInteraction(): void {
       const facingExit = pose.forward.x * (region.exit.x - player.x) + pose.forward.z * (region.exit.z - player.z) > 0;
       return setPrompt(region.requiredProperty ? facingExit ? "Follow the path back to your farm" : "Follow the path through the entrance to the fishing bank" : "Follow the path back to the Cove");
     }
-    if (!region && Math.abs(player.z - 9.5) < 3 && Math.abs(player.x) > 15.5) return setPrompt(player.x < 0 ? "West path: Fernfall Grotto - waterfall pools (Fishing 8)" : "East path: Emberglass Lagoon - volcanic pools (Fishing 20)");
+    if (!region && !harbor && player.x > 15 && player.z > 15.7) return setPrompt("Coast path → Mainland Harbor · walk through the opening to the pier and boats");
+    if (!region && !harbor && Math.abs(player.z - 9.5) < 3 && Math.abs(player.x) > 15.5) return setPrompt(player.x < 0 ? "West path: Fernfall Grotto - waterfall pools (Fishing 8)" : "East path: Emberglass Lagoon - volcanic pools (Fishing 20)");
+    if (harbor && Math.hypot(player.x - HARBOR_COVE_EXIT.x, player.z - HARBOR_COVE_EXIT.z) < 6) return setPrompt("Follow the coast path back to the Cove");
   }
   const untie = free ? away.action(pose) : null;
   if (untie && !doorInReach && entered && !panelOpen()) {
@@ -721,6 +810,7 @@ function updateInteraction(): void {
 }
 
 function interact(): void {
+  if (boardOrDisembark()) return;
   if (!doorInReach && (away.mounted() || away.action(player)?.kind === "mount")) {
     const wasMounted = away.mounted();
     const spot = away.act(player);
@@ -765,6 +855,17 @@ function interact(): void {
 
 function updatePlayer(dt: number): void {
   if (!entered || leaving || panelOpen() || fishing.busy()) return;
+  if (harbor) {
+    if (aboard) {
+      const next = stepBoat(boatState, { throttle: Number(keys.has("KeyW") || keys.has("ArrowUp")) - Number(keys.has("KeyS") || keys.has("ArrowDown")), turn: Number(keys.has("KeyA") || keys.has("ArrowLeft")) - Number(keys.has("KeyD") || keys.has("ArrowRight")), brake: keys.has("ShiftLeft") || keys.has("ShiftRight") }, dt);
+      boatState = next.state; player.x = boatState.x; player.z = boatState.z;
+      if (boatState.mode === "sailing") player.yaw = boatState.yaw;
+    } else {
+      Object.assign(player, stepHarborWalker(player, keys, dt).pose);
+      body = { ...body, y: harborWalkHeight(player) ?? body.y };
+    }
+    return;
+  }
   if (away.mounted()) {
     away.step(dt, keys);
     const ride = away.state();
@@ -782,7 +883,9 @@ function updatePlayer(dt: number): void {
 }
 
 function trailDestination(): string | null {
+  if (harbor) return !aboard && Math.abs(player.x - HARBOR_COVE_EXIT.x) < 2.3 && player.z > HARBOR_COVE_EXIT.z - 1 ? "cove" : null;
   if (region) return Math.abs(player.x - region.exit.x) < 2.2 && Math.abs(player.z - region.exit.z) < 2.6 ? region.requiredProperty ? "farm" : "cove" : null;
+  if (player.x > 18.6 && player.z > 16 && player.z < 18.5) return "harbor";
   if (Math.abs(player.z - 9.5) > 2.1) return null;
   if (player.x < -18.6) return "grotto";
   if (player.x > 18.6) return "volcanic";
@@ -791,8 +894,10 @@ function trailDestination(): string | null {
 
 function followTrail(destination: string): void {
   leaving = true; keys.clear(); document.exitPointerLock?.(); presence.disconnect();
-  const horse = away.mounted() ? away.horseId() : "";
+  const horse = harbor ? destinationQuery.get("horse") ?? "" : away.mounted() ? away.horseId() : "";
   const params = new URLSearchParams(horseTravelQuery(fromFarm, horse));
+  if (destination === "harbor") { params.set("from", "cove"); location.href = `../harbor/index.html?${params}`; return; }
+  if (harbor && destination === "cove") { params.set("from", "harbor"); location.href = `../cove/index.html?${params}`; return; }
   if (destination === "farm") {
     if (preview) { location.href = backLink.href; return; }
     params.delete("farm"); if (fromFarm) params.set("id", fromFarm); params.set("from", region!.id);
@@ -808,7 +913,7 @@ function checkGateway(): void {
   if (fishing.busy() || panelOpen()) return;
   const destination = trailDestination();
   if (destination) { followTrail(destination); return; }
-  if (region || !gatewayAt(layout.decor, openDoors, player, COVE_BOUNDS)) return;
+  if (region || harbor || !gatewayAt(layout.decor, openDoors, player, COVE_BOUNDS)) return;
   leaving = true;
   keys.clear();
   document.exitPointerLock?.();
@@ -831,10 +936,16 @@ function steerFromKeys(): void {
 }
 
 window.addEventListener("keydown", (event) => {
+  if (event.code === "Escape" && fishing.busy() && !panelOpen()) {
+    event.preventDefault(); fishing.cancel(); keys.clear(); return;
+  }
   // I and K toggle (and switch) their sheets, Escape closes the top one, ? the controls card (farm-hud.mts).
   if (farmHud.handleKey(event)) {
     keys.clear();
     return;
+  }
+  if (harbor && aboard && entered && event.code === "KeyF" && !event.repeat && !fishing.busy() && !panelOpen() && !(event.target instanceof HTMLInputElement)) {
+    event.preventDefault(); changeBoatAnchor(); return;
   }
   if (entered && !event.repeat && (event.code === "KeyC" || event.code === "KeyF") && !fishing.busy() && !(event.target instanceof HTMLInputElement)) {
     event.preventDefault();
@@ -919,7 +1030,7 @@ canvas.addEventListener("click", () => {
   if (entered && !panelOpen()) canvas.requestPointerLock?.()?.catch?.(() => undefined);
 });
 enterButton.addEventListener("click", () => {
-  if (!entered) player.x += spawnOffsetForCompany({ x: player.x, z: player.z }, presence.members());
+  if (!entered && !harbor) player.x += spawnOffsetForCompany({ x: player.x, z: player.z }, presence.members());
   entered = true;
   music.start();
   startGate.classList.add("is-hidden");
@@ -1003,6 +1114,7 @@ function frame(now: number): void {
   fishingView.setRodVisible(atWater && !panelOpen());
   fishingView.update(snapshot, frameSeconds, seconds);
   hud.render(snapshot);
+  refreshBoatControls();
   world.update(frameSeconds);
   terrain.update(frameSeconds, seconds);
   keepers.update(frameSeconds, now, keeperMembers);
@@ -1025,6 +1137,8 @@ function frame(now: number): void {
   fishing: () => fishing.state(),
   angler: () => angler,
   accountLoaded: () => accountLoaded,
+  aboard: () => aboard,
+  boat: () => ({ ...boatState }),
   atWater: () => atWater,
   shadows: () => shadows,
   stallInReach: () => stallInReach?.id ?? "",
@@ -1033,4 +1147,6 @@ function frame(now: number): void {
 });
 
 applyCamera();
+if (harbor) enterButton.disabled = false;
 requestAnimationFrame(frame);
+if (harborWorld) window.addEventListener("pagehide", () => harborWorld.dispose(), { once: true });

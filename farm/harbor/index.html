@@ -1,35 +1,150 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Mainland Harbor · Farm</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mainland Harbor | Javascript Game Factory</title>
+  <link rel="stylesheet" href="../../css/space-presence.css">
+  <link rel="stylesheet" href="../farm.css">
+  <link rel="stylesheet" href="../market/market.css">
+  <link rel="stylesheet" href="../cove/cove.css">
   <link rel="stylesheet" href="harbor.css">
 </head>
 <body>
-  <main class="harbor-shell">
-    <canvas id="harborCanvas" tabindex="0" aria-label="Boat trials at Mainland Harbor"></canvas>
-    <header class="harbor-header">
-      <a id="backToCove" href="../cove/index.html">← The Cove</a>
-      <div><span class="eyebrow">THE MAINLAND</span><h1>Mainland Harbor</h1></div>
-      <span class="trial-tag">Boat trials</span>
+  <main class="farm-shell market-shell cove-shell">
+    <canvas id="coveCanvas" tabindex="0" aria-label="Mainland Harbor, in 3D"></canvas>
+
+    <header class="farm-header">
+      <nav class="hud-place" aria-label="Where you are">
+        <a id="coveBackLink" href="../market/index.html?from=cove" class="back-link" title="Back up the path to the Market Square"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg><span class="back-link__words">Market Square</span></a>
+        <div class="hud-place__name">
+          <span class="eyebrow">SHARED SPACE · DOWN THE MARKET PATH</span>
+          <h1>The Cove</h1>
+        </div>
+      </nav>
+      <div class="farm-header__actions" role="toolbar" aria-label="Cove tools">
+        <button id="openCreel" class="farm-button hud-tool" type="button" aria-pressed="false" title="Creel — the fish you are carrying (C)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c3-4.5 8.5-5.5 12.5-2L20 7v10l-4.5-3C11.5 17.5 6 16.5 3 12zM8 11.3h.01" /></svg><span class="hud-tool__label">Creel</span><kbd>C</kbd></button>
+        <button id="openFishdex" class="farm-button hud-tool" type="button" aria-pressed="false" title="Fishdex — every fish, and the ones still to find (F)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11" /></svg><span class="hud-tool__label">Fishdex</span></button>
+        <button id="openInventory" class="farm-button hud-tool" type="button" aria-pressed="false" title="Inventory — what your farm holds (I)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2zM9 8V6a3 3 0 0 1 6 0v2" /></svg><span class="hud-tool__label">Inventory</span><kbd>I</kbd></button>
+        <button id="openStats" class="farm-button hud-tool" type="button" aria-pressed="false" title="Stats — your skills and lifetime totals (K)"><svg class="hud-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20v-8M12 20V5M18 20v-5M3 20h18" /></svg><span class="hud-tool__label">Stats</span><kbd>K</kbd></button>
+        <span class="hud-toolbar__divider" aria-hidden="true"></span>
+        <span id="coveTickets" class="market-tickets" title="Your ticket balance" hidden><span>Tickets</span><strong>—</strong></span>
+        <button id="toggleCoveMusic" class="farm-button hud-icon-button farm-music" type="button" aria-pressed="false" aria-label="Mute music" title="Music (M)"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16.5 9.5l5 5M21.5 9.5l-5 5" /></svg></button>
+        <button id="fullscreenCove" class="farm-button hud-icon-button farm-fullscreen" type="button" aria-pressed="false" title="Fullscreen"><svg class="hud-icon hud-icon--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg><svg class="hud-icon hud-icon--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg><span class="hud-tool__label" data-label>Fullscreen</span></button>
+      </div>
     </header>
-    <aside class="voyage-card" aria-label="Coastal chart">
-      <span class="eyebrow">YOUR NEXT HORIZON</span>
-      <h2>A little farther<br>from shore.</h2>
-      <p>A borrowed rowboat, two quiet islands, and room to find your sea legs.</p>
-      <svg id="harborChart" viewBox="-75 -100 150 135" role="img" aria-label="Chart of the trial waters"><g id="chartLand"></g><path id="chartBoat" d="M0 -3 L2 2 L0 1 L-2 2 Z" /></svg>
-      <div class="chart-key"><span>● Mainland</span><span>● Gull Landing</span></div>
-      <p class="trial-note">Local boat trial. Island homes, sea routes, and fishing from boats are coming later.</p>
-    </aside>
-    <section class="helm" aria-label="Boat controls">
-      <div class="helm-reading"><span id="boatMode">At the dock</span><strong><span id="boatSpeed">0.0</span><small> m/s</small></strong><span id="boatHeading">N</span></div>
-      <p id="boatPrompt" aria-live="polite">Board your borrowed boat to explore the coast.</p>
-      <div class="helm-actions"><button id="useDock" type="button">Board boat <kbd>E</kbd></button><button id="toggleAnchor" type="button" disabled>Drop anchor <kbd>R</kbd></button><button id="returnHarbor" type="button">Return to harbor</button></div>
-      <small>W / S · Row &amp; reverse &nbsp; A / D · Steer &nbsp; Space · Brake &nbsp; Drag · Look around</small>
-      <div class="touch-helm" aria-label="Touch steering"><button type="button" data-control="KeyA" aria-label="Steer left">←</button><button type="button" data-control="KeyW" aria-label="Row forward">↑</button><button type="button" data-control="Space" aria-label="Brake">■</button><button type="button" data-control="KeyS" aria-label="Reverse">↓</button><button type="button" data-control="KeyD" aria-label="Steer right">→</button></div>
+
+    <section id="startGate" class="start-gate">
+      <div class="start-card">
+        <span class="start-card__tag">EVERYONE'S WATER</span>
+        <h2>Gone fishing.</h2>
+        <p>Freshwater in the Lagoon, the reef off the pier, and past the pier's end the Deep. Watch for shadows on the water — cast at one and whatever it is comes to look. Every fish is its own: two Koi are never the same weight. The west shore path leads to Fernfall Grotto and its waterfall pools; the east path reaches Emberglass Lagoon beyond the headland.</p>
+        <button id="enterCove" type="button" disabled>Walk down</button>
+        <small id="coveStatus">WASD to move · Space to cast, strike, reel and net · A/D to steer a fish · C creel · F Fishdex · Enter to chat</small>
+      </div>
     </section>
-    <div id="harborStatus" class="harbor-status" role="status"></div>
+
+    <div id="coveVisitors" class="visitors-chip" aria-live="polite" hidden>
+      <span id="coveVisitorsLabel" class="visitors-chip__label">AT THE COVE</span>
+      <span id="coveVisitorsNames" class="visitors-chip__names"></span>
+    </div>
+    <section id="coveChat" class="room-chat" data-open="false" aria-label="Cove chat" hidden>
+      <ol id="coveChatLog" class="room-chat__log" aria-live="polite"></ol>
+      <input id="coveChatInput" class="room-chat__input" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Say something to the Cove… (Enter to send, Esc to cancel)" aria-label="Chat message">
+    </section>
+
+    <aside id="boatControls" class="boat-controls" aria-label="Boat controls" hidden>
+      <span id="boatMode">On foot</span><strong><span id="boatSpeed">0.0</span> m/s</strong>
+      <button id="useDock" class="farm-button" type="button">Board boat · E</button>
+      <button id="toggleAnchor" class="farm-button" type="button" disabled>Anchor · F</button>
+      <button id="returnHarbor" class="farm-button" type="button">Recover to mainland dock</button>
+      <small>W/S row · A/D steer · Shift brake · F anchor · Space fish while anchored</small>
+    </aside>
+    <div id="covePrompt" class="farm-prompt" aria-live="polite"></div>
+    <div id="tackleBar" class="tackle-bar" aria-live="polite"></div>
+    <section id="fishingHud" class="fishing-hud" aria-live="polite" hidden></section>
+    <section id="catchCard" class="catch-card" aria-live="assertive" hidden></section>
+
+    <aside id="controlHint" class="control-hint" aria-label="Controls" data-expanded="false">
+      <div class="control-hint__keys">
+        <span><b>WASD</b> Move</span><span><b>Shift</b> Run</span>
+        <span><b>Space</b> Cast · strike · reel · net</span><span><b>A / D</b> Steer a fish</span>
+        <span><b>W</b> Bow the rod</span><span><b>E</b> Use · sit · wave</span>
+        <span><b>Q</b> Next bait</span><span><b>R</b> Next rod</span>
+        <span><b>C</b> Creel</span><span><b>F</b> Anchor aboard · Fishdex on foot</span>
+        <span><b>I</b> Inventory</span><span><b>K</b> Stats</span>
+        <span><b>Enter</b> Chat</span><span><b>M</b> Music</span>
+        <span><b>Esc</b> Close a menu</span><span><b>?</b> Hide this card</span>
+      </div>
+      <button class="control-hint__toggle" type="button" aria-expanded="false" title="Show or hide the controls (?)">Controls <kbd>?</kbd></button>
+    </aside>
+
+    <aside id="inventoryPanel" class="inventory-panel sale-panel cove-panel" aria-label="Farm inventory" hidden>
+      <header class="pets-panel__head"><div><span class="eyebrow">YOUR FARM</span><strong>Inventory</strong></div><button id="closeInventory" class="farm-button" type="button">Done <kbd>Esc</kbd></button></header>
+      <div id="inventorySummary" class="inventory-panel__body"></div>
+    </aside>
+
+    <aside id="statsPanel" class="inventory-panel stats-panel cove-panel" aria-label="Farm player stats" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">YOUR FARM LIFE</span><strong>Player stats</strong><small id="statsSummary" class="stats-panel__summary"></small></div>
+        <button id="closeStats" class="farm-button" type="button" title="Back to the Cove (K)">Done <kbd>K</kbd></button>
+      </header>
+      <div class="stats-panel__body"><div id="statsGrid" class="farm-stats-grid"></div></div>
+    </aside>
+
+    <aside id="creelPanel" class="inventory-panel sale-panel cove-panel" aria-label="Your creel" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">THE COVE</span><strong data-heading>Your creel</strong></div>
+        <button class="farm-button" type="button" data-close title="Close (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="exchange-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="creel" aria-selected="true">Creel <kbd>C</kbd></button>
+        <button type="button" role="tab" data-tab="mounted" aria-selected="false">Mounted</button>
+        <button type="button" role="tab" data-tab="dex" aria-selected="false">Fishdex <kbd>F</kbd></button>
+      </div>
+      <div class="inventory-panel__body" data-body></div>
+      <footer class="sale-footer"><p class="pets-status" data-status aria-live="polite"></p></footer>
+    </aside>
+
+    <aside id="fishmongerPanel" class="inventory-panel sale-panel cove-panel" aria-label="Fishmonger" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">FISHMONGER · CORAL</span><strong>Sell your catch</strong></div>
+        <button class="farm-button" type="button" data-close title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body" data-body></div>
+      <footer class="sale-footer">
+        <div class="sale-footer__total"><span>Total</span><strong data-total>0</strong><small>tickets</small></div>
+        <div class="sale-footer__actions">
+          <button class="farm-button" type="button" data-pick-common>Everyday fish</button>
+          <button class="farm-button" type="button" data-pick-all>Everything</button>
+          <button class="farm-button farm-button--accent sale-footer__sell" type="button" data-sell disabled>Pick fish to sell</button>
+        </div>
+        <p class="pets-status" data-status aria-live="polite"></p>
+      </footer>
+    </aside>
+
+    <aside id="tacklePanel" class="inventory-panel sale-panel cove-panel" aria-label="Bait and Tackle" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">BAIT &amp; TACKLE · OLD PIKE</span><strong>Rods, lures and worms</strong></div>
+        <button class="farm-button" type="button" data-close title="Step back from the counter (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="inventory-panel__body" data-body></div>
+      <footer class="sale-footer"><p class="pets-status" data-status aria-live="polite"></p></footer>
+    </aside>
+
+    <aside id="recordsPanel" class="inventory-panel sale-panel cove-panel" aria-label="Cove Records" hidden>
+      <header class="pets-panel__head">
+        <div><span class="eyebrow">COVE RECORDS</span><strong>The heaviest of every fish</strong></div>
+        <button class="farm-button" type="button" data-close title="Step back from the board (Esc)">Done <kbd>Esc</kbd></button>
+      </header>
+      <div class="exchange-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="today" aria-selected="true">Today</button>
+        <button type="button" role="tab" data-tab="allTime" aria-selected="false">All time</button>
+      </div>
+      <div class="inventory-panel__body" data-body></div>
+    </aside>
   </main>
-  <script type="module" src="../../js/farm-harbor-page.mjs"></script>
+  <script type="module" src="../../js/platform-config.mjs"></script>
+  <script type="module" src="../../js/farm-cove-page.mjs"></script>
 </body>
 </html>

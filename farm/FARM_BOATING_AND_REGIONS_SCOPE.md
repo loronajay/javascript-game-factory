@@ -5,11 +5,13 @@ Status: proposed scope, 2026-11-01. No implementation is implied by this documen
 Follow-up: independent properties were implemented locally first at the user's
 request. See `FARM_PROPERTIES.md` for actual behavior and deployment requirements.
 Its local inventories differ from this proposal's account-wide carried goods;
-transport between properties remains a future design decision. Boats, islands,
-regional markets, and island crop species remain proposed. A local borrowed-boat
-trial is now implemented at `/farm/harbor/`, linked from the Cove. See
-`harbor/README.md` for the delivered controls, region/crop foundation, and next
-slice. This trial does not provide boat ownership or inter-region travel.
+transport between properties remains a future design decision. Island travel,
+regional markets, and island crop species remain proposed. Mainland Harbor is
+implemented at `/farm/harbor/`, reached by walking the
+southeast coast path from the Cove. It now uses the Cove walking/fishing stack:
+board at a pier, row, anchor to fish into the existing creel, disembark to walk
+on land, and walk back to the Cove. See `harbor/README.md` for current controls
+and limits. Boat ownership and inter-region travel are still pending.
 
 ## Product direction
 

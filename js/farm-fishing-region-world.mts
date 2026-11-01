@@ -98,6 +98,8 @@ export function createCoveTrailheads(THREE: Three, scene: any): void {
   // Beyond the wall and records board, beside the trail rather than behind the board.
   destinationSign(THREE, scene, "← FERNFALL GROTTO", -23, 11.4, 0.2);
   destinationSign(THREE, scene, "EMBERGLASS LAGOON →", 23, 11.4, -0.2);
+  destinationSign(THREE, scene, "HARBOR / BOATS →", 16.4, 15.7, -0.3, true);
+  bankTrail(THREE, scene, 19, 17.2, 8, () => 0);
   for (const side of [-1, 1]) bankTrail(THREE, scene, side * 24, 9.5, 16, () => 0);
 }
 

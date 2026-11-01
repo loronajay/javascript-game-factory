@@ -1,33 +1,38 @@
-# Mainland Harbor boat trial
+# Mainland Harbor
 
-First boating slice, 2026-11-01. Enter through **Harbor** on the main Cove toolbar
-or open `/farm/harbor/`. This is a local trial with a borrowed boat; it does not
-modify farm saves, tickets, ownership, inventory, or fishing records.
+The harbor uses the same walking, fishing, tackle, creel and social page stack as
+the Cove. Walk through the signed opening in the Cove's southeast wall, beyond
+the shops, to take the coast path. The return path is behind the mainland pier.
 
-- E / Board: launch from the current dock; approach a marked mooring slowly
-  and use E again to moor. Mainland Harbor and Gull Landing are usable.
-- W/S or arrows: row forward / reverse; A/D: steer; Space: brake.
-- R: drop or raise the anchor. Anchoring stops propulsion and movement.
-- Drag the view to look around. Touch devices have steering buttons.
-- Return to harbor resets safely to the mainland. Reloads also start moored.
+- Arrive on foot. Walk down the pier, approach the boat, and press E to board.
+- W/S row forward/reverse; A/D steer; hold Shift to brake.
+- At a slow approach to Mainland Harbor or Gull Landing, press E to disembark.
+  You stand on the actual pier and can walk onto land. The boat stays moored.
+- F drops or raises the anchor. While anchored, look toward water and use Space
+  to cast, strike, reel and net through the normal fishing minigame.
+- Signed-in catches use the existing server cast/landing endpoints and land in
+  the account creel, with the usual tackle, bait, level and capacity checks.
+  Signed-out fishing remains practice. R changes rods; Q changes bait; C opens
+  the creel. F opens Fishdex while on foot; its toolbar button is always available.
+- The recovery button returns you to the mainland pier on foot. Reloads start
+  on the mainland. Boat ownership and persistent voyage positions are not yet
+  implemented; each session currently uses a local loan boat.
 
-The pure `js/farm-boating.mts` owns hull clearance, shallow water, piers, bounded
-trial waters, docking, anchoring, speed limits and swept movement. The scene
-uses the existing Quaternius `boat.glb`, fitted to a 4.4 m hull. The two nearby
-islets are trial scenery, not the planned Orchard Isle region.
+The GLB's pointed bow faces +z. Rendering rotates it by PI so the bow matches
+movement's -z forward convention. A regression checks the actual asset geometry.
 
-`js/farm-regions.mts` and the API's `services/farm-region-catalog.mts` establish
-stable mainland and planned Orchard Isle identities. All existing properties
-remain on the mainland. A crop may declare `regions`; planting checks the
-property's region in the browser and the API refuses new crop rows outside the
-declared regions. Existing stored plants are preserved. Existing crops retain
-their current availability; no new crop species are released in this slice.
+Harbor geometry is shared between walking, full-hull boat clearance and casting.
+The API validates harbor water, piers, island shorelines, and reef/deep zones
+against its matching catalog. This uses existing fish species and progression.
+Harbor fishing does not introduce another reward or inventory system.
 
-Next: build the first real island harbor/settlement and property template, add
-its crops and seed stock, then connect validated inter-region travel and boat
-ownership. Passenger boats, fish rewards from boats, open-sea sailing,
-regional player listings and cargo remain outside this trial.
+Regional crop foundations remain in js/farm-regions.mts and the API region
+catalog. Existing properties and crops remain on the mainland; new island homes,
+regional crop species, routes, boat ownership, passengers and synchronized boat
+presence are separate follow-up work.
 
-Validation covers frame-rate-independent handling, full hull collision,
-anchoring, safe moorings, property/crop catalog parity, default-home entry,
-browser rowing/recovery, loading the real GLB, and phone viewport layout.
+Validation includes an actual browser walk from the Cove to the harbor, boarding,
+disembarking and walking away, rowing bow-first, anchoring and casting, recovery,
+and walking back to the Cove with property context preserved. Pure tests cover
+walkable approaches at both landings, the real bow orientation, hull collision,
+and matching browser/API fishing geometry.

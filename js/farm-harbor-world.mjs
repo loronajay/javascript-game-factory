@@ -1,5 +1,7 @@
 import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
-import { HARBOR_BOUNDS, HARBOR_DOCKS, HARBOR_ISLANDS } from "./farm-boating.mjs";
+import { BOAT_MODEL_YAW_OFFSET, HARBOR_BOUNDS, HARBOR_DOCKS, HARBOR_ISLANDS } from "./farm-boating.mjs";
+import { destinationSign } from "./farm-fishing-region-world.mjs";
+import { harborWalkHeight } from "./farm-harbor-geometry.mjs";
 /** A coastal handling scene, independent of farm saves and paid travel. */
 export function createHarborWorld(THREE, scene, onModel) {
     scene.background = new THREE.Color("#c6e1e4");
@@ -27,6 +29,19 @@ export function createHarborWorld(THREE, scene, onModel) {
     water.rotation.x = -Math.PI / 2;
     mesh(new THREE.BoxGeometry(175, 4, 80), sand, 0, -1.5, 62);
     mesh(new THREE.BoxGeometry(175, 1, 77), grass, 0, 0.9, 64);
+    function groundStrip(width, depth, centerZ, surface, lift) {
+        const geometry = new THREE.PlaneGeometry(width, depth, 1, 24);
+        geometry.rotateX(-Math.PI / 2);
+        const positions = geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++)
+            positions.setY(i, (harborWalkHeight({ x: 0, z: centerZ + positions.getZ(i) }) ?? 0.5) + lift);
+        geometry.computeVertexNormals();
+        mesh(geometry, surface, 0, 0, centerZ);
+    }
+    groundStrip(175, 3.5, 23.75, sand, 0);
+    groundStrip(4, 24, 34, material("#bba57b"), 0.015);
+    destinationSign(THREE, scene, "THE COVE / COAST PATH", -3, 37, Math.PI, true);
+    destinationSign(THREE, scene, "HARBOR / BOAT PIER", -3, 25, 0, true);
     function pine(x, z, height, base = 1) {
         mesh(new THREE.CylinderGeometry(0.2, 0.3, height * 0.55, 6), darkWood, x, base + height * 0.25, z);
         for (let level = 0; level < 3; level++)
@@ -79,7 +94,8 @@ export function createHarborWorld(THREE, scene, onModel) {
         const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
         const scale = 4.4 / size.z;
         model.scale.setScalar(scale);
-        model.position.set(-center.x * scale, -box.min.y * scale + 0.04, -center.z * scale);
+        model.rotation.y = BOAT_MODEL_YAW_OFFSET;
+        model.position.set(center.x * scale, -box.min.y * scale + 0.04, center.z * scale);
         boat.remove(fallback);
         boat.add(model);
         onModel(true);
