@@ -130,7 +130,7 @@ export async function getFarmFishing(pool, input) {
             bool_or(variant = 'shiny') as shiny, bool_or(variant = 'golden') as golden
      from farm_fish where player_id = $1 group by species_id`, [playerId]);
     const mounted = await pool.query(`select fish_id, species_id, weight_g, length_mm, size_class, grade, variant, zone, state, locked, caught_at
-     from farm_fish where player_id = $1 and state = 'mounted' order by caught_at desc limit 100`, [playerId]);
+     from farm_fish where player_id = $1 and state = 'mounted' order by caught_at desc limit 1000`, [playerId]);
     const caughtShadows = await pool.query(`select shadow_id from farm_fish where player_id = $1 and shadow_id is not null and caught_at > $2`, [playerId, new Date(now - SHADOW_WINDOW_MS * 3)]);
     return {
         tackle,

@@ -893,7 +893,7 @@ hud.sheet("exchange", { root: requiredElement("#exchangePanel"), close: () => ex
 hud.sheet("mill", { root: requiredElement("#millPanel"), close: () => sawmill.close() });
 hud.sheet("furniture", { root: requiredElement("#furniturePanel"), close: () => sawmill.close() });
 hud.sheet("trade", { root: requiredElement("#tradePanel"), close: () => trading.escape(), escape: () => trading.escape(), dismissable: false });
-for (const id of ["#salePanel", "#kitchenPanel", "#dealerPanel"])
+for (const id of ["#salePanel", "#kitchenPanel", "#dealerPanel", "#butcherPanel"])
     wireSheetTabs(requiredElement(id));
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 const properties = createPropertiesPanel({

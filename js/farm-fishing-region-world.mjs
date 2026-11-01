@@ -66,25 +66,24 @@ export function destinationSign(THREE, root, text, x, z, rotationY = 0) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.rotation.y = rotationY;
-    const board = new THREE.Mesh(new THREE.BoxGeometry(5, 1.25, 0.16), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 }));
-    board.position.y = 2.1;
+    const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.65, 0.16), new THREE.MeshStandardMaterial({ color: "#614c39", roughness: 1 }));
+    board.position.y = 1.7;
+    board.castShadow = true;
     group.add(board);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 2.2, 7), new THREE.MeshStandardMaterial({ color: "#614c39" }));
-    post.position.y = 1.1;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(2.54, 0.61), new THREE.MeshStandardMaterial({ map: texture, roughness: 1 }));
+    face.position.set(0, 1.7, 0.081);
+    group.add(face);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 1.65, 7), new THREE.MeshStandardMaterial({ color: "#614c39" }));
+    post.position.set(0, 0.825, -0.12);
     group.add(post);
     root.add(group);
 }
 /** Visible trailheads at the Cove's western and eastern shore entrances. */
 export function createCoveTrailheads(THREE, scene) {
-    destinationSign(THREE, scene, "WEST  /  FERNFALL GROTTO", -17.5, 7.2, 0.2);
-    destinationSign(THREE, scene, "EAST  /  EMBERGLASS LAGOON", 17.5, 7.2, -0.2);
-    const material = new THREE.MeshStandardMaterial({ color: "#bba681", roughness: 1 });
-    for (const side of [-1, 1]) {
-        const path = new THREE.Mesh(new THREE.PlaneGeometry(14, 3.6), material);
-        path.rotation.x = -Math.PI / 2;
-        path.position.set(side * 24, 0.025, 9.5);
-        scene.add(path);
-    }
+    destinationSign(THREE, scene, "← FERNFALL GROTTO", -20, 11.4, 0.2);
+    destinationSign(THREE, scene, "EMBERGLASS LAGOON →", 20, 11.4, -0.2);
+    for (const side of [-1, 1])
+        bankTrail(THREE, scene, side * 24, 9.5, 16, () => 0);
 }
 /** Complete destinations: real banks, several pools, cliffs and animated scenery. */
 export function createFishingRegionWorld(THREE, scene, region) {
@@ -289,10 +288,7 @@ export function createFishingRegionWorld(THREE, scene, region) {
         root.add(plant);
     }
     // A broad dry path follows the southern bank to the Cove exit.
-    const trail = new THREE.Mesh(new THREE.PlaneGeometry(28, 3.2), new THREE.MeshStandardMaterial({ color: volcanic ? "#b89b87" : "#b9b58c", roughness: 1 }));
-    trail.rotation.x = -Math.PI / 2;
-    trail.position.set(region.exit.x > 0 ? 23 : -23, 0.025, 20);
-    root.add(trail);
+    bankTrail(THREE, root, region.exit.x > 0 ? 23 : -23, 20, 28, (point) => regionGroundAt(region, point));
     destinationSign(THREE, root, region.requiredProperty ? "YOUR FARM  /  RETURN PATH" : "THE COVE  / RETURN PATH", region.exit.x > 0 ? 32 : -32, 16, region.exit.x > 0 ? -0.2 : 0.2);
     // Arrival marker looks back toward the destination, away from the narrow exit.
     destinationSign(THREE, root, region.title.toUpperCase(), region.spawn.x * 0.72, 25);
@@ -307,4 +303,30 @@ export function createFishingRegionWorld(THREE, scene, region) {
             root.removeFromParent();
         },
     };
+}
+/** Textured, gently winding trail with irregular edges and tapered ends. */
+function bankTrail(THREE, root, centerX, centerZ, length, heightAt) {
+    const vertices = [], uv = [];
+    const steps = 48;
+    const at = (step, side) => {
+        const t = step / steps;
+        const x = centerX + (t - 0.5) * length;
+        const width = Math.pow(Math.sin(Math.PI * t), 0.35) * (1.15 + Math.sin(step * 2.1 + side) * 0.12);
+        const z = centerZ + Math.sin(t * Math.PI * 2) * 0.3 + side * width;
+        return [x, heightAt({ x, z }) + 0.018, z];
+    };
+    for (let step = 0; step < steps; step += 1) {
+        for (const [index, side] of [[step, -1], [step, 1], [step + 1, -1], [step, 1], [step + 1, 1], [step + 1, -1]]) {
+            vertices.push(...at(index, side));
+            uv.push(index / steps, (side + 1) / 2);
+        }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geometry.computeVertexNormals();
+    const material = createSurfaceMaterial(THREE, { pattern: "dirt", colors: ["#968365", "#a39170", "#786c51", "#b3a17d"], repeat: 3, roughness: 1, metalness: 0 }, { u: length, v: 2.4 });
+    const trail = new THREE.Mesh(geometry, material);
+    trail.receiveShadow = true;
+    root.add(trail);
 }

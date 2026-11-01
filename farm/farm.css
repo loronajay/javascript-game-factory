@@ -696,13 +696,19 @@ kbd, .farm-button kbd {
 .livestock-roster { display: grid; gap: 5px; }
 .livestock-roster-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 10px 0 0; border: 1px solid var(--hud-line); border-radius: 10px; background: var(--hud-surface-raised); }
 .livestock-roster-row:hover { border-color: var(--hud-line-strong); }
-.livestock-roster-row__open.farm-button { flex: 1 1 auto; display: grid; justify-content: stretch; align-content: center; gap: 4px; min-width: 0; min-height: 76px; padding: 11px 12px; border: 0; border-radius: 10px; text-align: left; white-space: normal; background: transparent; box-shadow: none; }
+.livestock-roster-row__open.farm-button { flex: 1 1 30%; display: grid; justify-content: stretch; align-content: center; gap: 4px; min-width: 0; min-height: 76px; padding: 11px 12px; border: 0; border-radius: 10px; text-align: left; white-space: normal; background: transparent; box-shadow: none; }
 .livestock-roster-row__name { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
 .livestock-roster-row__name strong { color: var(--hud-heading); font: 800 14px var(--hud-font); overflow-wrap: anywhere; }
 .livestock-roster-row__grade { flex: 0 0 auto; color: var(--hud-warn); font-size: 12px; letter-spacing: 1px; }
 .livestock-roster-row__kind { color: var(--hud-text-muted); font: 500 11px var(--hud-font); overflow-wrap: anywhere; }
 .livestock-roster-row__status { color: var(--hud-text-soft); font: 650 11.5px var(--hud-font); overflow-wrap: anywhere; }
 .livestock-roster-row__status.is-ready { color: var(--hud-leaf); }
+.livestock-roster-row__facts { flex: 1 1 55%; min-width: 0; padding: 10px 4px; }
+.livestock-roster-row__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.livestock-roster-row__stats dt { color: var(--hud-text-muted); font: 500 11px var(--hud-font); }
+.livestock-roster-row__stats dd { margin: 3px 0 0; color: var(--hud-heading); font: 800 15px var(--hud-font); }
+.livestock-roster-row__breeding { margin: 9px 0 0; color: var(--hud-text-soft); font: 600 11.5px var(--hud-font); overflow-wrap: anywhere; }
+.livestock-roster-row__breeding.is-ready { color: var(--hud-leaf); }
 .livestock-roster-row__actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 5px; max-width: 240px; }
 .livestock-roster-row__actions .farm-button, .livestock-roster-row__details.farm-button { flex: 0 0 auto; min-height: 32px; padding: 0 10px; font-size: 11px; }
 .livestock-roster-row__details.farm-button { border-color: transparent; color: var(--hud-leaf); background: transparent; }
@@ -725,6 +731,7 @@ kbd, .farm-button kbd {
   .livestock-species-card small { font-size: 10.5px; }
   .livestock-roster-row { flex-wrap: wrap; gap: 0; padding: 0 8px 6px; }
   .livestock-roster-row__open.farm-button { flex-basis: 100%; padding: 9px 3px; min-height: 72px; }
+  .livestock-roster-row__facts { flex-basis: 100%; padding: 0 3px 10px; }
   .livestock-roster-row__actions { width: 100%; max-width: none; justify-content: start; }
   .livestock-roster-row__details.farm-button { margin-left: auto; min-height: 26px; }
 }

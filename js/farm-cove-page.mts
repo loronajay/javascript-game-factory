@@ -168,7 +168,7 @@ async function loadAngler(): Promise<void> {
 /** Keep what an answer says about the tackle box without waiting for a full re-read. */
 function takeTackle(value: unknown): void {
   const next = normalizeAngler({ tackle: value, fishing: { xp: angler.xp, catches: angler.catches }, creel: angler.creel, capacity: angler.capacity, dex: angler.dex, caughtShadows: [...angler.caughtShadows], mounted: angler.mounted });
-  if (next) angler = next;
+  if (next) { angler = next; repaintPanels(); }
 }
 
 let rodId = STARTER_ROD_ID;
@@ -836,6 +836,11 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (fishing.busy()) {
+    if (event.code === "KeyE") {
+      event.preventDefault();
+      if (!event.repeat) fishing.net();
+      return;
+    }
     keys.add(event.code);
     if (event.code === "Escape") fishing.cancel();
     if (event.code === "KeyW" || event.code === "ArrowUp") fishing.bow();

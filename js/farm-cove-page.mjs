@@ -156,8 +156,10 @@ async function loadAngler() {
 /** Keep what an answer says about the tackle box without waiting for a full re-read. */
 function takeTackle(value) {
     const next = normalizeAngler({ tackle: value, fishing: { xp: angler.xp, catches: angler.catches }, creel: angler.creel, capacity: angler.capacity, dex: angler.dex, caughtShadows: [...angler.caughtShadows], mounted: angler.mounted });
-    if (next)
+    if (next) {
         angler = next;
+        repaintPanels();
+    }
 }
 let rodId = STARTER_ROD_ID;
 let baitId = WORM_ID;
@@ -847,6 +849,12 @@ window.addEventListener("keydown", (event) => {
         return;
     }
     if (fishing.busy()) {
+        if (event.code === "KeyE") {
+            event.preventDefault();
+            if (!event.repeat)
+                fishing.net();
+            return;
+        }
         keys.add(event.code);
         if (event.code === "Escape")
             fishing.cancel();

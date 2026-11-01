@@ -45,6 +45,10 @@ export function queryLivestock(herd, homes, clock, level, query) {
             order = (homeNames.get(a.homeId ?? "") ?? "Field").localeCompare(homeNames.get(b.homeId ?? "") ?? "Field");
         if (query.sort === "grade")
             order = livestockGrade(b.stats) - livestockGrade(a.stats);
+        if (query.sort === "youngest")
+            order = b.bornAt - a.bornAt;
+        if (query.sort === "oldest")
+            order = a.bornAt - b.bornAt;
         if (query.sort === "hunger")
             order = a.care.hunger - b.care.hunger;
         if (query.sort === "ready")

@@ -247,17 +247,18 @@ export function leapPending(state) {
 // ---------------------------------------------------------------- the net
 /** Seconds for the net's ring to close from wide to shut; the mark is where a press lands it. */
 export const NET_CLOSE_SECONDS = 1.3;
+export const NET_READY_SECONDS = 0.7;
 export const NET_MARK = 0.35;
 export const NET_PERFECT = 0.06;
 export const NET_GOOD = 0.16;
 /** The ring's size at `seconds` since the net began: 1 wide open, closing to 0, then opening again. */
 export function netRing(state, seconds) {
-    const phase = ((seconds - state.netStartedAt) / NET_CLOSE_SECONDS) % 2;
+    const phase = (Math.max(0, seconds - state.netStartedAt - NET_READY_SECONDS) / NET_CLOSE_SECONDS) % 2;
     return phase < 1 ? 1 - phase : phase - 1;
 }
 /** Press the net at `seconds`. A hit lands the fish; a miss gives it back some fight. */
 export function pressNet(state, seconds) {
-    if (state.phase !== "netting")
+    if (state.phase !== "netting" || seconds - state.netStartedAt < NET_READY_SECONDS)
         return state;
     const off = Math.abs(netRing(state, seconds) - NET_MARK);
     if (off <= NET_GOOD) {

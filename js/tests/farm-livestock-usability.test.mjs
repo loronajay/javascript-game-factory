@@ -88,3 +88,11 @@ test('a fifty-animal herd stays complete across compact pages and shrinking filt
   assert.equal(queryLivestock(flock,homes,0,10,{...query,status:'needs_feed'}).length,20);
   assert.equal(queryLivestock(flock,homes,0,10,{...query,status:'unhoused'})[0].id,flock[49].id);
 });
+
+test('age sorts use birth time across species and preserve the saved order', () => {
+  const animals = [animal('Young','cow','female',{bornAt:-100}), animal('Old','chicken','male',{bornAt:-30000}), animal('Middle','pig','female',{bornAt:-10000})];
+  const pick = sort => queryLivestock(animals,homes,0,10,{...query,sort}).map(a=>a.name);
+  assert.deepEqual(pick('youngest'), ['Young','Middle','Old']);
+  assert.deepEqual(pick('oldest'), ['Old','Middle','Young']);
+  assert.deepEqual(animals.map(a=>a.name), ['Young','Old','Middle']);
+});

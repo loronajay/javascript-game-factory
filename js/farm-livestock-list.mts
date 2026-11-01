@@ -41,6 +41,8 @@ export function queryLivestock(herd: readonly LivestockAnimal[], homes: readonly
     if (query.sort === "species") order = (findLivestockSpecies(a.speciesId)?.title ?? a.speciesId).localeCompare(findLivestockSpecies(b.speciesId)?.title ?? b.speciesId);
     if (query.sort === "home") order = (homeNames.get(a.homeId ?? "") ?? "Field").localeCompare(homeNames.get(b.homeId ?? "") ?? "Field");
     if (query.sort === "grade") order = livestockGrade(b.stats) - livestockGrade(a.stats);
+    if (query.sort === "youngest") order = b.bornAt - a.bornAt;
+    if (query.sort === "oldest") order = a.bornAt - b.bornAt;
     if (query.sort === "hunger") order = a.care.hunger - b.care.hunger;
     if (query.sort === "ready") order = Number(ready(b)) - Number(ready(a));
     return order || byName(a, b);

@@ -148,6 +148,11 @@ function placeDock(THREE: ThreeNamespace, root: any, loader: any, dock: CoveDock
     // The wide dock turned across the pier's end: its length runs east-west.
     loader.load(assetUrl("dock-wide.glb"), (gltf: any) => {
       const model = gltf.scene;
+      // The head is entered from the side: its rope rail crosses the walkway.
+      // Keep the timber deck/posts, but leave the fishing platform visibly open.
+      model.traverse((node: any) => {
+        if (node.isMesh && node.material?.name === "String") node.visible = false;
+      });
       const along = width / HEAD_MODEL.length;
       const across = (depth + 0.3) / HEAD_MODEL.width;
       const up = (along + across) / 2;

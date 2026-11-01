@@ -4,7 +4,7 @@
 // It builds its own markup inside the root it is handed and only ever moves
 // DOM to match a controller snapshot; the maths is farm-fishing.mts.
 
-import { NET_GOOD, NET_MARK, RED_LINE, leapPending, netRing } from "./farm-fishing.mjs";
+import { NET_READY_SECONDS, NET_GOOD, NET_MARK, RED_LINE, leapPending, netRing } from "./farm-fishing.mjs";
 import { findFishSpecies, RARITY_COLORS, RARITY_TITLES } from "./farm-catalog/fish.mjs";
 import { GRADE_TITLES, SIZE_TITLES, formatLength, formatWeight, specimenTitle, type SizeClass } from "./farm-fish.mjs";
 import type { CaughtFish, FishingSnapshot } from "./farm-fishing-controller.mjs";
@@ -70,7 +70,7 @@ export function createFishingHud(root: HTMLElement, card: HTMLElement): FishingH
         <circle r="44" class="fishing-net__ring" data-ring></circle>
       </svg>
       <strong>NET IT!</strong>
-      <small><kbd>Space</kbd> as the ring meets the mark</small>
+      <small>Release Space · press <kbd>E</kbd> as the ring meets the mark · wait for another pass if needed</small>
     </div>
   `;
   const part = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
@@ -129,6 +129,7 @@ export function createFishingHud(root: HTMLElement, card: HTMLElement): FishingH
         case "netting": {
           const state = snapshot.fight!;
           show(net);
+          net.querySelector("strong")!.textContent = state.elapsed - state.netStartedAt < NET_READY_SECONDS ? "GET YOUR NET READY · E" : "NET IT! · E";
           ring.setAttribute("r", String(Math.max(1, netRing(state, state.elapsed) * 44)));
           return;
         }

@@ -159,4 +159,4 @@ export const CREEL_CAPACITY = 40;
 export const ZONE_MIN_LEVEL = Object.freeze({ lagoon: 1, reef: 3, deep: 15, grotto: 8, volcanic: 20, "cedar-creek": 1, "estate-lake": 1 });
 /** Old Pike's fee to mount a fish on a plaque, and how many a player may keep mounted at once. */
 export const MOUNT_FEE = 25;
-export const MAX_MOUNTED_FISH = 30;
+export const MAX_MOUNTED_FISH = 1000;

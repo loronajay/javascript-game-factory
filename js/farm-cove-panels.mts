@@ -1,3 +1,4 @@
+import { inspectFish } from "./farm-fish-inspector.mjs";
 // The Cove's panels: the Creel and the Fishdex (C), the Fishmonger's counter,
 // Bait & Tackle's shelves and the Cove Records board. DOM only: every list is
 // drawn from an `Angler` the server answered with (farm-angler.mts), and every
@@ -141,7 +142,9 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
         const outcome = await deps.mount(fish, true);
         status.textContent = outcome.message;
       });
-      actions.append(lock, mount, release);
+      const view = element("button", "farm-button", "View 3D");
+      view.type = "button"; view.onclick = () => inspectFish(fish);
+      actions.append(view, lock, mount, release);
       row.append(portrait(deps.thumbs, fish), label, actions);
       list.append(row);
     }
@@ -168,7 +171,9 @@ export function createCreelPanel(root: HTMLElement, deps: Readonly<{
         status.textContent = outcome.message;
       });
       const actions = element("span", "fish-row__actions");
-      actions.append(down);
+      const view = element("button", "farm-button", "View 3D");
+      view.type = "button"; view.onclick = () => inspectFish(fish);
+      actions.append(view, down);
       row.append(portrait(deps.thumbs, fish), label, actions);
       list.append(row);
     }

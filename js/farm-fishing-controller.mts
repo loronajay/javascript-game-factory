@@ -123,6 +123,7 @@ const PRACTICE_BITE = Object.freeze({ blind: [3, 9], shadow: [1.2, 3.2] });
 export type FishingController = Readonly<{
   /** Space (or the primary button) went down or up. */
   primary: (down: boolean, pose: Pose) => void;
+  net: () => void;
   steer: (direction: number) => void;
   bow: () => void;
   /** Reel in and put the rod down: abandons a cast, never a fish already landed. */
@@ -334,7 +335,13 @@ export function createFishingController(deps: FishingDeps): FishingController {
         reeling = down;
         return;
       }
-      if (phase === "netting" && down && fight) {
+      if (phase === "reveal" && down) {
+        fish = null;
+        reset();
+      }
+    },
+    net() {
+      if (phase === "netting" && fight) {
         fight = pressNet(fight, fight.elapsed);
         if (fight.phase === "landed") landed(fight);
         else if (fight.phase === "fighting") {
@@ -342,10 +349,6 @@ export function createFishingController(deps: FishingDeps): FishingController {
           deps.onEvent({ kind: "notice", text: "Missed the net — it's found its second wind!" });
         }
         return;
-      }
-      if (phase === "reveal" && down) {
-        fish = null;
-        reset();
       }
     },
     steer(direction) {
@@ -379,7 +382,7 @@ export function createFishingController(deps: FishingDeps): FishingController {
         bowing = false;
         if (fight.phase === "snapped") lose("snapped");
         else if (fight.phase === "thrown") lose("thrown");
-        else if (fight.phase === "netting") phase = "netting";
+        else if (fight.phase === "netting") { phase = "netting"; reeling = false; }
       } else if (phase === "netting" && fight) {
         fight = holdNet(fight, dt);
       }

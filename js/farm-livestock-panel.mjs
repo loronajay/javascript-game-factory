@@ -11,7 +11,7 @@
 // player. Their FEED is here, at the head of the list (the Feed bin): what the
 // herd eats, how much is held, a Buy, and one button that feeds everyone with
 // room for a serving — so hunger always has an answer in the panel that shows it.
-import { livestockGrade, livestockSummary, gradeStars } from "./farm-livestock.mjs";
+import { livestockGrade, livestockSummary, livestockAgeDays, gradeStars } from "./farm-livestock.mjs";
 import { BREEDING_MIN_LEVEL, BREEDING_REFUSAL_WORDS, breedingRefusal, freePlacesForYoung, pregnancyView } from "./farm-livestock-breeding.mjs";
 import { LIVESTOCK_CATALOG, LIVESTOCK_FEEDS, LIVESTOCK_STATS, findLivestockSpecies } from "./farm-catalog/livestock.mjs";
 import { homeOccupancy, homeTakes, totalLivestockSlots } from "./farm-livestock-housing.mjs";
@@ -98,7 +98,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
         ["species", "Species", speciesChoices],
         ["gender", "Sex", [["", "Both sexes"], ["female", "Female"], ["male", "Male"]]],
         ["status", "Show", [["", "All animals"], ["ready", "Ready to collect"], ["needs_feed", "Needs a serving"], ["hungry", "Hungry"], ["breed", "Ready to breed"], ["expecting", "Expecting"], ["resting", "Resting"], ["young", "Young"], ["unhoused", "Needs a home"]]],
-        ["sort", "Sort by", [["species", "Species"], ["name", "Name A–Z"], ["home", "Home"], ["grade", "Highest grade"], ["hunger", "Hungriest first"], ["ready", "Ready goods first"]]],
+        ["sort", "Sort by", [["species", "Species"], ["name", "Name A–Z"], ["youngest", "Youngest–oldest"], ["oldest", "Oldest–youngest"], ["home", "Home"], ["grade", "Highest grade"], ["hunger", "Hungriest first"], ["ready", "Ready goods first"]]],
     ]) {
         const label = element("label", "livestock-tools__field", title);
         const select = element("select", "livestock-tools__input");
@@ -448,11 +448,11 @@ export function createLivestockPanel(elements, actions, options = {}) {
             return `Resting · ${pregnancy.hours}h left`;
         if (livestockSummary(animal, current.clockMinutes).stage !== "adult")
             return "Still growing";
-        const males = current.herd.filter((other) => other.speciesId === animal.speciesId && other.gender === "male");
-        if (!males.length)
-            return "Needs a male of the same species";
+        const mates = current.herd.filter((other) => other.speciesId === animal.speciesId && other.gender !== animal.gender);
+        if (!mates.length)
+            return `Needs a ${animal.gender === "female" ? "male" : "female"} of the same species`;
         const context = { clock: current.clockMinutes, level: current.husbandryLevel, freePlaces: freePlacesForYoung(current.homes, current.herd, animal.speciesId) };
-        const refusals = males.map((male) => breedingRefusal(animal, male, context));
+        const refusals = mates.map((mate) => animal.gender === "female" ? breedingRefusal(animal, mate, context) : breedingRefusal(mate, animal, context));
         return refusals.includes(null) ? "Ready to pair" : BREEDING_REFUSAL_WORDS[refusals[0]];
     }
     function rosterRow(animal, current) {
@@ -465,9 +465,21 @@ export function createLivestockPanel(elements, actions, options = {}) {
         open.setAttribute("aria-label", `Details for ${animal.name}`);
         const name = element("span", "livestock-roster-row__name");
         name.append(element("strong", "", animal.name), element("span", "livestock-roster-row__grade", summary.stars));
-        const status = section === "breeding" ? breedingWords(animal, current) : [ready.length ? `${ready.map((good) => good.product.title).join(" & ")} ready` : "", wantsServing(animal.care.hunger) ? `Feed · ${Math.round(animal.care.hunger)}%` : "", animal.care.pregnancy ? "Expecting" : ""].filter(Boolean).join(" · ") || `Fed · ${Math.round(animal.care.hunger)}%`;
+        const status = [ready.length ? `${ready.map((good) => good.product.title).join(" & ")} ready` : "", wantsServing(animal.care.hunger) ? `Feed · ${Math.round(animal.care.hunger)}%` : "", animal.care.pregnancy ? "Expecting" : ""].filter(Boolean).join(" · ") || `Fed · ${Math.round(animal.care.hunger)}%`;
         open.append(name, element("small", "livestock-roster-row__kind", `${summary.kind} ${summary.gender} · ${home?.title ?? "Needs a home"}`), element("span", `livestock-roster-row__status${ready.length && section !== "breeding" ? " is-ready" : ""}`, status));
-        item.append(open);
+        const facts = element("div", "livestock-roster-row__facts");
+        const stats = element("dl", "livestock-roster-row__stats");
+        for (const stat of summary.stats) {
+            const cell = element("div", "");
+            cell.append(element("dt", "", stat.title), element("dd", "", String(stat.value)));
+            stats.append(cell);
+        }
+        const readiness = breedingWords(animal, current);
+        const breedingStatus = element("p", "livestock-roster-row__breeding", "Breeding · " + readiness);
+        breedingStatus.classList.toggle("is-ready", readiness === "Ready to pair");
+        facts.append(stats, breedingStatus);
+        open.append(element("small", "livestock-roster-row__kind", livestockAgeDays(animal, current.clockMinutes).toFixed(1) + " farm days old · " + (summary.stage === "young" ? summary.grownPercent + "% grown" : "Adult")));
+        item.append(open, facts);
         if (section === "care" && current.canBreed) {
             const controls = element("div", "livestock-roster-row__actions");
             if (ready.length) {
@@ -484,8 +496,6 @@ export function createLivestockPanel(elements, actions, options = {}) {
             }
             item.append(controls);
         }
-        else
-            item.append(actionButton(section === "breeding" ? "Manage →" : "Details →", () => openAnimal(animal.id), "livestock-roster-row__details"));
         return item;
     }
     function housingScreen(current) {

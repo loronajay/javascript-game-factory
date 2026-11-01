@@ -219,7 +219,13 @@ export function createFishingController(deps) {
                 reeling = down;
                 return;
             }
-            if (phase === "netting" && down && fight) {
+            if (phase === "reveal" && down) {
+                fish = null;
+                reset();
+            }
+        },
+        net() {
+            if (phase === "netting" && fight) {
                 fight = pressNet(fight, fight.elapsed);
                 if (fight.phase === "landed")
                     landed(fight);
@@ -228,10 +234,6 @@ export function createFishingController(deps) {
                     deps.onEvent({ kind: "notice", text: "Missed the net — it's found its second wind!" });
                 }
                 return;
-            }
-            if (phase === "reveal" && down) {
-                fish = null;
-                reset();
             }
         },
         steer(direction) {
@@ -273,8 +275,10 @@ export function createFishingController(deps) {
                     lose("snapped");
                 else if (fight.phase === "thrown")
                     lose("thrown");
-                else if (fight.phase === "netting")
+                else if (fight.phase === "netting") {
                     phase = "netting";
+                    reeling = false;
+                }
             }
             else if (phase === "netting" && fight) {
                 fight = holdNet(fight, dt);

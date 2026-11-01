@@ -249,4 +249,4 @@ export const ZONE_MIN_LEVEL: Readonly<Record<FishZone, number>> = Object.freeze(
 
 /** Old Pike's fee to mount a fish on a plaque, and how many a player may keep mounted at once. */
 export const MOUNT_FEE = 25;
-export const MAX_MOUNTED_FISH = 30;
+export const MAX_MOUNTED_FISH = 1000;

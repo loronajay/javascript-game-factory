@@ -199,7 +199,7 @@ export async function getFarmFishing(pool: any, input: any) {
   );
   const mounted = await pool.query(
     `select fish_id, species_id, weight_g, length_mm, size_class, grade, variant, zone, state, locked, caught_at
-     from farm_fish where player_id = $1 and state = 'mounted' order by caught_at desc limit 100`,
+     from farm_fish where player_id = $1 and state = 'mounted' order by caught_at desc limit 1000`,
     [playerId],
   );
   const caughtShadows = await pool.query(

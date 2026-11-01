@@ -81,8 +81,8 @@ const dock = (id: string, kind: CoveDock["kind"], deck: Rect): CoveDock => Objec
  */
 export const COVE_DOCKS: readonly CoveDock[] = Object.freeze([
   dock("lagoon-jetty", "pier", rect(-11.2, -8.8, -2, SHORE_Z + 0.8)),
-  dock("sea-pier", "pier", rect(9.8, 12.2, -7, SHORE_Z + 0.8)),
-  dock("sea-pier-head", "head", rect(7.6, 14.4, -11, -7)),
+  dock("sea-pier", "pier", rect(11.8, 14.2, -7, SHORE_Z + 0.8)),
+  dock("sea-pier-head", "head", rect(9.6, 16.4, -11, -7)),
 ]);
 
 export function insideRect(point: Readonly<{ x: number; z: number }>, box: Rect, margin = 0): boolean {
@@ -223,8 +223,9 @@ export function coveWaterDepthAt(point: Readonly<{ x: number; z: number }>): num
 export const SHADOW_WATERS: Readonly<Record<FishZone, readonly Rect[]>> = Object.freeze({
   ...Object.fromEntries(FISHING_REGIONS.map((region) => [region.id, region.shadowWaters])) as Record<"grotto" | "volcanic" | "cedar-creek" | "estate-lake", readonly Rect[]>,
   lagoon: Object.freeze([rect(-18.5, -12.4, -18.5, 2.6), rect(-8, -3.8, -18.5, 2.6), rect(-12.4, -8, -18.5, -3.4)]),
-  reef: Object.freeze([rect(3.6, 8.6, -6.6, 3), rect(13.4, 18.5, -6.6, 3)]),
-  deep: Object.freeze([rect(3.6, 18.5, -18.5, -12.4), rect(3.6, 6.4, -12.4, -8.6), rect(15.6, 18.5, -12.4, -8.6)]),
+  reef: Object.freeze([rect(5.2, 10.6, -6.6, 3), rect(15.4, 18.5, -6.6, 3)]),
+  // Keep the bank-side pocket castable; the narrow east gap has no shadow paths.
+  deep: Object.freeze([rect(5.2, 18.5, -18.5, -12.4), rect(5.2, 8.4, -12.4, -8.6)]),
 });
 
 // ---------------------------------------------------------------- the shore
