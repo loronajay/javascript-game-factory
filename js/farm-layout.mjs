@@ -317,7 +317,9 @@ export function normalizeFarmLayout(value) {
     // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
     let decor;
     if (source.version === 1 || !Array.isArray(source.decor)) {
-        decor = [...STARTER_FARM_DECOR];
+        decor = source.lot ? [...expandFarmLot(createDefaultFarmLayout(() => 0.5), source.lot).decor] : [...STARTER_FARM_DECOR];
+        if (source.lot)
+            decor = decor.map((row) => normalizeFarmDecorRow(row, farmLotBounds(source))).filter(Boolean);
         for (const item of decor)
             seen.add(item.instanceId);
     }
@@ -396,7 +398,7 @@ export function normalizeFarmLayout(value) {
         napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
     };
     const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-    return freezeLayout({ version: 3, onboarding, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
+    return freezeLayout({ version: 3, onboarding, ...(Array.isArray(source.propertyIds) ? { propertyIds: source.propertyIds.filter((id) => id === "meadow" || FARM_LOTS.some((lot) => lot.id === id)).slice(0, FARM_LOTS.length + 1) } : {}), propertyRevision: typeof source.propertyRevision === "number" && Number.isSafeInteger(source.propertyRevision) && source.propertyRevision >= 0 ? source.propertyRevision : 0, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
 }
 export function parseFarmLayout(serialized) {
     if (!serialized)
@@ -516,6 +518,7 @@ export function farmLayoutsEqual(first, second) {
     return first.onboarding.status === second.onboarding.status
         && first.onboarding.introSeen === second.onboarding.introSeen
         && first.lot === second.lot
+        && first.propertyRevision === second.propertyRevision
         && first.ground === second.ground
         && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
         && JSON.stringify(first.trees) === JSON.stringify(second.trees)

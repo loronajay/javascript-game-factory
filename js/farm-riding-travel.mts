@@ -19,9 +19,15 @@ export function ridingHorseFrom(layout: Pick<FarmLayout, "pets">, horseId: unkno
 }
 
 /** The query string for the next page: the farm to come home to (under `farmKey`) and the horse, when riding. */
-export function horseTravelQuery(farmId: string, horseId: string, farmKey: "farm" | "id" = "farm"): string {
+export function horseTravelQuery(farmId: string, horseId: string, farmKey: "farm" | "id" = "farm", propertyId = travelPropertyId()): string {
   const parts: string[] = [];
   if (farmId) parts.push(`${farmKey}=${encodeURIComponent(farmId)}`);
   if (horseId && HORSE_ID.test(horseId)) parts.push(`horse=${encodeURIComponent(horseId)}`);
+  if (farmId && /^(?:meadow|lot\.[a-z0-9-]+)$/.test(propertyId)) parts.push(`property=${encodeURIComponent(propertyId)}`);
   return parts.join("&");
+}
+
+/** Keep a visited property's return address across the public places around it. */
+function travelPropertyId(): string {
+  return typeof location === "undefined" ? "" : new URLSearchParams(location.search).get("property") ?? "";
 }

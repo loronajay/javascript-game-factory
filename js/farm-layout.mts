@@ -96,6 +96,10 @@ export type FarmLayout = Readonly<{
   onboarding: Readonly<{ status: "needs_name" | "complete"; introSeen: boolean }>;
   ground: string;
   lot?: string;
+  /** Server selection generation; prevents an old tab overwriting a different farm. */
+  propertyRevision?: number;
+  /** Public property directory supplied by the server for visits. */
+  propertyIds?: readonly string[];
   pets: readonly FarmPet[];
   petHistory: readonly PetMemorial[];
   decor: readonly FarmDecorRow[];
@@ -411,13 +415,14 @@ export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }
 
 export function normalizeFarmLayout(value: unknown): FarmLayout {
   if (!value || typeof value !== "object") return createDefaultFarmLayout();
-  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; lot?: string; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown; horseStockRefreshedAt?: unknown };
+  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; lot?: string; propertyIds?: unknown; propertyRevision?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown; horseStockRefreshedAt?: unknown };
   if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
   const seen = new Set<string>();
   // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
   let decor: FarmDecorRow[];
   if (source.version === 1 || !Array.isArray(source.decor)) {
-    decor = [...STARTER_FARM_DECOR];
+    decor = source.lot ? [...expandFarmLot(createDefaultFarmLayout(() => 0.5), source.lot).decor] : [...STARTER_FARM_DECOR];
+    if (source.lot) decor = decor.map((row) => normalizeFarmDecorRow(row, farmLotBounds(source))!).filter(Boolean);
     for (const item of decor) seen.add(item.instanceId);
   } else {
     decor = [];
@@ -486,7 +491,7 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
   };
   const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-  return freezeLayout({ version: 3, onboarding, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
+  return freezeLayout({ version: 3, onboarding, ...(Array.isArray(source.propertyIds) ? { propertyIds: source.propertyIds.filter((id: unknown): id is string => id === "meadow" || FARM_LOTS.some((lot) => lot.id === id)).slice(0, FARM_LOTS.length + 1) } : {}), propertyRevision: typeof source.propertyRevision === "number" && Number.isSafeInteger(source.propertyRevision) && source.propertyRevision >= 0 ? source.propertyRevision : 0, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
 }
 
 export function parseFarmLayout(serialized: string | null): FarmLayout {
@@ -615,6 +620,7 @@ export function farmLayoutsEqual(first: FarmLayout, second: FarmLayout): boolean
   return first.onboarding.status === second.onboarding.status
     && first.onboarding.introSeen === second.onboarding.introSeen
     && first.lot === second.lot
+    && first.propertyRevision === second.propertyRevision
     && first.ground === second.ground
     && JSON.stringify(first.agriculture) === JSON.stringify(second.agriculture)
     && JSON.stringify(first.trees) === JSON.stringify(second.trees)

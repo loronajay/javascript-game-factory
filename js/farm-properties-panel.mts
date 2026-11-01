@@ -1,4 +1,4 @@
-import { FARM_LOTS, farmLotBounds } from "./farm-catalog/lots.mjs";
+import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 import { type FarmLayout } from "./farm-layout.mjs";
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
@@ -8,7 +8,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", 
 export function createPropertiesPanel(deps: Readonly<{
   canBuy: boolean; farm: () => FarmLayout; balance: () => number | null;
   shop: () => Promise<any>; purchase: (id: string) => Promise<any>;
-  move: (id: string) => Promise<{ ok: boolean; error?: string }>;
+  selectProperty: (id: string) => Promise<{ ok: boolean; error?: string }>;
   takeBalance: (balance: number) => void; onClose: () => void;
 }>) {
   const root = element("aside", "inventory-panel properties-panel"); root.hidden = true;
@@ -27,8 +27,11 @@ export function createPropertiesPanel(deps: Readonly<{
   function draw(): void {
     body.replaceChildren();
     const current = FARM_LOTS.find((property) => property.id === deps.farm().lot);
-    body.append(element("p", "properties-panel__intro", `Home now: ${current?.title ?? "Meadow Farm"}. A property purchase moves your existing farm into a new landscape. Your animals, buildings, crops, furniture and progress come with you.`));
+    body.append(element("p", "properties-panel__intro", `Home now: ${current?.title ?? "Meadow Farm"}. Each property has its own farm, animals, buildings, crops and inventory. Your tickets and skills are shared. Switching leaves your other farms intact.`));
     body.append(element("p", "properties-panel__balance", deps.balance() === null ? "Sign in to purchase property with tickets." : `${deps.balance()!.toLocaleString()} tickets available`));
+    const meadow = element("button", "farm-button", deps.farm().lot ? "Return to Meadow Farm · 28 × 28 m" : "Meadow Farm · Current farm");
+    meadow.type = "button"; meadow.disabled = busy || !ready || !deps.canBuy || !deps.farm().lot;
+    meadow.addEventListener("click", () => { void buy("meadow"); }); body.append(meadow);
     for (const property of FARM_LOTS) {
       const card = element("article", `property-card property-card--${property.theme}`);
       const image = element("img", "property-card__preview"); image.src = new URL(`../farm/assets/properties/${property.preview}`, import.meta.url).toString(); image.alt = `${property.title}: ${property.setting}`;
@@ -38,9 +41,8 @@ export function createPropertiesPanel(deps: Readonly<{
       const features = element("ul"); for (const feature of property.features) features.append(element("li", "", feature)); copy.append(features);
       const price = prices.get(property.id) ?? property.price;
       const home = property.id === deps.farm().lot;
-      const smaller = property.size < farmLotBounds(deps.farm()).width;
-      const button = element("button", "farm-button property-card__buy", home ? "Your current home" : smaller ? "Your farm has outgrown this property" : owned.has(property.id) ? "Move your farm here" : `Buy & move here - ${price.toLocaleString()} tickets`);
-      button.type = "button"; button.disabled = busy || !ready || !deps.canBuy || home || smaller;
+      const button = element("button", "farm-button property-card__buy", home ? "Your current farm" : owned.has(property.id) ? "Switch to this farm" : `Buy a separate farm - ${price.toLocaleString()} tickets`);
+      button.type = "button"; button.disabled = busy || !ready || !deps.canBuy || home;
       button.addEventListener("click", () => { void buy(property.id); });
       const tour = element("a", "farm-button", "Free walkthrough");
       tour.href = new URL(`../farm/tour.html?property=${encodeURIComponent(property.id)}`, import.meta.url).toString();
@@ -51,14 +53,16 @@ export function createPropertiesPanel(deps: Readonly<{
     if (busy || !deps.canBuy) return;
     busy = true; status.textContent = "Preparing your new home..."; draw();
     try {
-      if (!owned.has(id)) {
+      if (id !== "meadow" && !owned.has(id)) {
         const result = await deps.purchase(id);
         if (!result?.ok) { status.textContent = result?.error === "insufficient_tickets" ? "You need more tickets for this property." : "The purchase did not go through. Try again."; return; }
         owned.add(id);
         if (Number.isSafeInteger(result.balance)) deps.takeBalance(result.balance);
       }
-      const moved = await deps.move(id);
-      status.textContent = moved.ok ? "Your new home is ready. Take the farm road home to see it." : "You own this property. The move could not be saved; choose Move your farm here to retry without paying again.";
+      const moved = await deps.selectProperty(id);
+      if (moved.error === "trade_in_progress") { status.textContent = "Finish or cancel your current trade before switching farms."; return; }
+      if (moved.error === "farm_property_changed") { status.textContent = "Your active farm changed in another tab. Reload the market before switching."; return; }
+      status.textContent = moved.ok ? "This farm is ready. Take the farm road home to see it. Your other farms are saved." : "The farm could not be selected. Reopen the Property Office and retry; owned properties never charge twice.";
     } catch { status.textContent = "The property office could not be reached. Please try again."; }
     finally { busy = false; draw(); }
   }

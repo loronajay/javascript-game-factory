@@ -55,6 +55,8 @@ js/tests/*
 !js/tests/farm-crops.test.mjs
 !js/tests/farm-layout.test.mjs
 !js/tests/farm-property-access.test.mjs
+!js/tests/farm-properties.test.mjs
+!js/tests/farm-properties-browser.test.mjs
 !js/tests/farm-onboarding.test.mjs
 !js/tests/farm-pet-care.test.mjs
 # Catalog metadata/filtering and admin override contracts ship with the redesign.
@@ -88,6 +90,7 @@ platform-api/tests/*
 !platform-api/tests/cabinet-overrides.test.mjs
 !platform-api/tests/farm-pet-care.test.mjs
 !platform-api/tests/farm-loadout-catalog.test.mjs
+!platform-api/tests/farm-properties.test.mjs
 !platform-api/tests/ticket-routes.test.mjs
 !platform-api/tests/tickets-db.test.mjs
 !platform-api/tests/lovers-lost-ticket-rewards.test.mjs

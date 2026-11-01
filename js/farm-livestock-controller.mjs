@@ -201,7 +201,7 @@ export function createFarmLivestockController(options) {
         async refresh() {
             if (!options.api || !options.ownerId)
                 return;
-            const answer = await options.api.fetchFarmLivestock(options.ownerId).catch(() => null);
+            const answer = await options.api.fetchFarmLivestock(options.ownerId, options.layout().lot ?? "meadow").catch(() => null);
             if (Array.isArray(answer))
                 apply(normalizeLivestockHerd(answer));
         },

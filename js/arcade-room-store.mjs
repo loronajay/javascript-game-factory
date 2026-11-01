@@ -96,7 +96,7 @@ export function createLayoutStore(spec, options = {}) {
     const ownerPlayerId = visiting ? requested : selfId;
     async function loadVisit() {
         const [loadout, profile] = await Promise.all([
-            configured ? api.fetchGamePublicLoadout(spec.slug, requested).catch(() => null) : Promise.resolve(null),
+            configured ? api.fetchGamePublicLoadout(spec.slug, requested, options.propertyId).catch(() => null) : Promise.resolve(null),
             configured ? api.loadPlayerProfile(requested).catch(() => null) : Promise.resolve(null),
         ]);
         const ownerName = cleanText(profile?.profileName);

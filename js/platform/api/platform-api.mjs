@@ -144,10 +144,10 @@ export function createPlatformApiClient(options = {}) {
             const gs = encodePathSegment(gameSlug);
             return gs ? put(`/games/${gs}/garage`, { garage }, undefined, options) : Promise.resolve(null);
         },
-        fetchGamePublicLoadout(gameSlug, playerId) {
+        fetchGamePublicLoadout(gameSlug, playerId, propertyId) {
             const gs = encodePathSegment(gameSlug);
             const pid = encodePathSegment(playerId);
-            return gs && pid ? get(`/games/${gs}/loadout/${pid}`, "loadout") : Promise.resolve(null);
+            return gs && pid ? get(`/games/${gs}/loadout/${pid}${propertyId ? `?property=${encodeURIComponent(propertyId)}` : ""}`, "loadout") : Promise.resolve(null);
         },
         fetchGamePublicLoadouts(gameSlug, playerIds) {
             const gs = encodePathSegment(gameSlug);
@@ -645,8 +645,8 @@ export function createPlatformApiClient(options = {}) {
             return get(`/games/farm/fishing/fish?ids=${encodeURIComponent(ids.join(","))}`, "details");
         },
         /** A farm's herd: every head of livestock alive on it. Public. */
-        fetchFarmLivestock(playerId) {
-            return get(`/games/farm/livestock/${encodeURIComponent(playerId)}`, "herd");
+        fetchFarmLivestock(playerId, propertyId) {
+            return get(`/games/farm/livestock/${encodeURIComponent(playerId)}${propertyId ? `?property=${encodeURIComponent(propertyId)}` : ""}`, "herd");
         },
         /** Living animals by id as public cards (a trading table's other side). */
         fetchFarmLivestockCards(ids) {

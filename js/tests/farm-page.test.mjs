@@ -160,7 +160,7 @@ test("the farm links owners to the Pet Games event menu", () => {
 });
 
 test("the farm is playable signed in or out, saves locally or to a loaded account, and keeps visits read-only", () => {
-  assert.match(source, /createLayoutStore\(FARM_LAYOUT_SPEC, \{ visitPlayerId \}\)/, "signed-out farms use the store's device persistence while signed-in farms remain account-backed");
+  assert.match(source, /createLayoutStore\(FARM_LAYOUT_SPEC, \{ visitPlayerId, propertyId:/, "signed-out farms use the store's device persistence while signed-in farms remain account-backed");
   // The spec lives in the pure layout module, where the Market Square reads the same document.
   const layoutSource = readFileSync(resolve(repoRoot, "js", "farm-layout.mts"), "utf8");
   assert.match(layoutSource, /slug: "farm"/);

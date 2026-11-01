@@ -168,7 +168,7 @@ renderMusicButton();
 // signed-in player's own farm. The shared store keeps signed-out farms on this
 // device and treats the database as canonical for signed-in players.
 const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
-const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId });
+const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId, propertyId: new URLSearchParams(location.search).get("property") ?? undefined });
 const visiting = layoutStore.mode === "visitor";
 const loaded = await layoutStore.load();
 const ticketClient = createTicketWalletClient();
@@ -188,6 +188,20 @@ const canManageFarm = !visiting;
 // copy or starter layout. Signed-out owners, however, save normally on-device.
 const canPersistFarm = canManageFarm && (!layoutStore.ownerPlayerId || (layoutStore.accountBacked && loaded.source === "account"));
 let layout: FarmLayout = loaded.layout;
+if (visiting && (layout.propertyIds?.length ?? 0) > 1) {
+  const picker = document.createElement("select"); picker.className = "farm-button";
+  picker.setAttribute("aria-label", "Visit another property");
+  for (const id of layout.propertyIds ?? []) {
+    const option = document.createElement("option"); option.value = id;
+    option.textContent = FARM_LOTS.find((lot) => lot.id === id)?.title ?? "Meadow Farm";
+    option.selected = id === (layout.lot ?? "meadow"); picker.append(option);
+  }
+  picker.addEventListener("change", () => {
+    const url = new URL(location.href); url.searchParams.set("property", picker.value); url.searchParams.delete("horse");
+    location.href = url.toString();
+  });
+  farmTitle.parentElement!.append(picker);
+}
 const homeProperty = FARM_LOTS.find((property) => property.id === layout.lot);
 if (homeProperty && !visiting) { farmTitle.textContent = homeProperty.title; farmEyebrow.textContent = homeProperty.setting; document.title = `${homeProperty.title} | Farm`; }
 const showFarmIntro = canManageFarm && layout.onboarding.status === "needs_name" && !layout.onboarding.introSeen;
@@ -1174,7 +1188,8 @@ function resize(): void {
 }
 
 /** What a save result means to the player, wherever the save was asked for. */
-function describeSave(result: Readonly<{ ok: boolean; target: string }>): string {
+function describeSave(result: Readonly<{ ok: boolean; target: string; error?: string }>): string {
+  if (result.error === "farm_property_changed") return "Your active farm changed in another tab. Reload this page before making more changes.";
   if (result.ok && result.target === "account") return "Saved to your account. Friends can visit this farm.";
   if (result.ok && result.target === "device") return "Saved on this device · sign in to keep farm progression with your account.";
   if (!layoutStore.accountBacked) return "This device could not save the farm.";

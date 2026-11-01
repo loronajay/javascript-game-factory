@@ -92,7 +92,7 @@ function normalizeRotation(value) {
 }
 export function defaultFarmGarage() {
     // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-    return { version: LAYOUT_VERSION, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440, animalMinutes: 0 }, settings: { awayGrowth: 0.1, awayAnimals: 0 }, skills: emptyFarmSkillRecords() };
+    return { version: LAYOUT_VERSION, propertyRevision: 0, properties: {}, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440, animalMinutes: 0 }, settings: { awayGrowth: 0.1, awayAnimals: 0 }, skills: emptyFarmSkillRecords() };
 }
 function normalizeCropCounts(value) {
     const input = value && typeof value === "object" ? value : {};
@@ -505,7 +505,67 @@ function normalizeDecorRow(raw, limit = COORDINATE_LIMIT) {
     }
     return row;
 }
+/** Property templates are stable instance keys until multiple copies of a template are supported. */
+export const FARM_PROPERTY_IDS = Object.freeze(["meadow", ...Object.keys(FARM_LOT_SIZES)]);
+export function farmPropertyId(layout) { return layout?.lot || "meadow"; }
+function propertyRevision(value) {
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+/** Inactive farms are server-owned. A normal layout save can never replace them. */
 export function normalizeFarmGarage(value, context = {}) {
+    const saving = Object.hasOwn(context, "currentGarage");
+    const stored = context.currentGarage;
+    if (saving && stored && (farmPropertyId(value) !== farmPropertyId(stored)
+        || propertyRevision(value?.propertyRevision) !== propertyRevision(stored.propertyRevision))) {
+        throw new Error("farm_property_changed");
+    }
+    const garage = normalizeSingleFarm(value, context);
+    const source = saving ? stored : value;
+    garage.propertyRevision = propertyRevision(source?.propertyRevision);
+    const properties = {};
+    for (const id of FARM_PROPERTY_IDS) {
+        if (id === farmPropertyId(garage))
+            continue;
+        const row = source?.properties?.[id];
+        if (!row || typeof row !== "object" || farmPropertyId(row) !== id)
+            continue;
+        properties[id] = normalizeSingleFarm(row);
+    }
+    // Never nest a portfolio inside another portfolio.
+    garage.properties = properties;
+    if (saving && garage.decor) {
+        const elsewhere = new Set(Object.values(properties).flatMap((farm) => (farm.decor ?? []).map((row) => row.fishId).filter(Boolean)));
+        garage.decor = garage.decor.filter((row) => !row.fishId || !elsewhere.has(row.fishId));
+    }
+    return garage;
+}
+/** Called only inside saveGarage's locked transaction, after checking entitlements. */
+export function selectFarmProperty(stored, id, context) {
+    if (typeof id !== "string" || !FARM_PROPERTY_IDS.includes(id))
+        throw new Error("invalid_property");
+    if (id !== "meadow" && !context.ownedEntitlementIds?.has(id))
+        throw new Error("property_not_owned");
+    const current = normalizeFarmGarage(stored, { ownedEntitlementIds: context.ownedEntitlementIds });
+    if (current.onboarding?.status === "needs_name")
+        throw new Error("farm_not_initialized");
+    if (context.propertyRevision !== current.propertyRevision)
+        throw new Error("farm_property_changed");
+    if (id === farmPropertyId(current))
+        return current;
+    const { properties, propertyRevision: revision, ...snapshot } = current;
+    // Legacy clocks may predate verifiedAt. Keep their original verification window.
+    if (snapshot.clock && !snapshot.clock.verifiedAt && context.currentSavedAt)
+        snapshot.clock.verifiedAt = context.currentSavedAt;
+    const next = properties[id] ?? {
+        ...defaultFarmGarage(), ...(id === "meadow" ? {} : { lot: id }),
+        onboarding: { status: "complete", introSeen: true },
+        clock: { ...defaultFarmGarage().clock, updatedAt: context.now, verifiedAt: context.now },
+    };
+    const remaining = { ...properties, [farmPropertyId(current)]: snapshot };
+    delete remaining[id];
+    return normalizeFarmGarage({ ...next, skills: current.skills, propertyRevision: revision + 1, properties: remaining });
+}
+function normalizeSingleFarm(value, context = {}) {
     const missingDocument = !value || typeof value !== "object";
     const input = value && typeof value === "object" ? value : {};
     const current = context?.currentGarage && typeof context.currentGarage === "object"
@@ -661,7 +721,15 @@ export function normalizeFarmGarage(value, context = {}) {
 }
 /** What a visitor draws: the layout itself. */
 export function farmLoadoutFromGarage(garage, context = {}) {
-    return { layout: normalizeFarmGarage(garage, context) };
+    const portfolio = normalizeFarmGarage(garage, context);
+    const id = context.propertyId;
+    if (id && !FARM_PROPERTY_IDS.includes(id))
+        throw new Error("property_not_found");
+    const selected = id && id !== farmPropertyId(portfolio) ? portfolio.properties[id] : portfolio;
+    if (!selected)
+        throw new Error("property_not_found");
+    const { properties: _properties, ...layout } = selected;
+    return { layout: { ...layout, skills: portfolio.skills, propertyIds: [farmPropertyId(portfolio), ...Object.keys(portfolio.properties)] } };
 }
 export const FARM_LOADOUT_CATALOG = Object.freeze({
     requiresEntitlements: true,

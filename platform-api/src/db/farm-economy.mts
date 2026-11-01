@@ -89,7 +89,8 @@ export async function saveFarm(client: any, playerId: string, layout: any): Prom
 export function nextPetId(layout: any, speciesId: string): string {
   const stem = speciesId.replace(/^pet\./, "");
   let highest = 0;
-  for (const row of [...(layout.pets ?? []), ...(layout.petHistory ?? [])]) {
+  const farms: any[] = [layout, ...Object.values(layout.properties ?? {})];
+  for (const row of farms.flatMap((farm) => [...(farm.pets ?? []), ...(farm.petHistory ?? [])])) {
     const match = new RegExp(`^${stem}-(\\d+)$`).exec(String(row.instanceId ?? ""));
     if (match) highest = Math.max(highest, Number(match[1]));
   }

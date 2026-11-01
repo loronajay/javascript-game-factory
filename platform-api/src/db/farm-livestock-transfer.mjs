@@ -1,3 +1,4 @@
+import { activeFarmPropertySql } from "./farm-property-sql.mjs";
 // Livestock changing hands (planning-docs/FARM_LIVESTOCK_PLAN.md Phase 6): the
 // one place an animal's row moves from one player to another. The barter table
 // (db/farm-trades.mts) and the Exchange Board (db/farm-listings.mts) both call
@@ -45,12 +46,12 @@ export function livestockRowCard(row, clock) {
 }
 /** The ids a player could put on a table: every animal alive on their farm. */
 export async function tradeableLivestockIds(client, playerId) {
-    const result = await client.query(`select animal_id from farm_livestock where player_id = $1 and state = 'alive'`, [playerId]);
+    const result = await client.query(`select animal_id from farm_livestock where player_id = $1 and property_id = ${activeFarmPropertySql("$1")} and state = 'alive'`, [playerId]);
     return (result.rows ?? []).map((row) => String(row.animal_id));
 }
 /** A player's living herd, locked for the exchange. */
 async function lockedLivingHerd(client, playerId) {
-    const result = await client.query(`select ${COLUMNS} from farm_livestock where player_id = $1 and state = 'alive' order by created_at, animal_id for update`, [playerId]);
+    const result = await client.query(`select ${COLUMNS} from farm_livestock where player_id = $1 and property_id = ${activeFarmPropertySql("$1")} and state = 'alive' order by created_at, animal_id for update`, [playerId]);
     return result.rows ?? [];
 }
 /** The animal carried to the minute it leaves: its care at `clock`, or null if it died before then. */
@@ -117,7 +118,7 @@ export async function planLivestockTrade(client, a, b, fromA, fromB) {
 /** Write planned moves: each row changes owner, home and clock, only while it is still alive. */
 export async function applyLivestockMoves(client, moves) {
     for (const move of moves) {
-        await client.query(`update farm_livestock set player_id = $2, home_id = $3, born_minute = $4, care = $5::jsonb, updated_at = now() where animal_id = $1 and state = 'alive'`, [move.animalId, move.to, move.homeId, move.bornMinute, JSON.stringify(move.care)]);
+        await client.query(`update farm_livestock set player_id = $2, property_id = ${activeFarmPropertySql("$2")}, home_id = $3, born_minute = $4, care = $5::jsonb, updated_at = now() where animal_id = $1 and state = 'alive'`, [move.animalId, move.to, move.homeId, move.bornMinute, JSON.stringify(move.care)]);
     }
 }
 // ---------------------------------------------------------------- the Exchange Board
@@ -185,7 +186,7 @@ export async function planListedLanding(client, animalId, owner, strict) {
 }
 /** Land it: the row is alive again, on its owner's farm and clock. */
 export async function writeListedLanding(client, landing) {
-    await client.query(`update farm_livestock set state = 'alive', player_id = $2, home_id = $3, born_minute = $4, care = $5::jsonb, updated_at = now() where animal_id = $1 and state = 'listed'`, [landing.animalId, landing.owner, landing.homeId, landing.bornMinute, JSON.stringify(landing.care)]);
+    await client.query(`update farm_livestock set state = 'alive', player_id = $2, property_id = ${activeFarmPropertySql("$2")}, home_id = $3, born_minute = $4, care = $5::jsonb, updated_at = now() where animal_id = $1 and state = 'listed'`, [landing.animalId, landing.owner, landing.homeId, landing.bornMinute, JSON.stringify(landing.care)]);
 }
 /** Cards for listed animals by id (the board's rows), on clock zero. */
 export async function listedLivestockCards(client, animalIds) {
@@ -206,6 +207,6 @@ export async function getFarmLivestockCards(pool, input) {
         return { animals: [] };
     const result = await pool.query(`select l.animal_id, l.player_id, l.species_id, l.name, l.gender, l.coat_id, l.stats, l.born_minute, l.home_id, l.care, l.origin, l.state, g.garage
      from farm_livestock l left join game_loadouts g on g.player_id = l.player_id and g.game_slug = 'farm'
-     where l.animal_id = any($1::text[]) and l.state = 'alive'`, [ids]);
+     where l.animal_id = any($1::text[]) and l.state = 'alive' and l.property_id = coalesce(g.garage->>'lot', 'meadow')`, [ids]);
     return { animals: (result.rows ?? []).map((row) => livestockRowCard(row, storedFarmClock(row.garage))) };
 }

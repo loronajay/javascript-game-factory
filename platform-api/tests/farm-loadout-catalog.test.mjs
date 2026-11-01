@@ -129,6 +129,8 @@ test("the one-time onboarding transition may add exactly the free starter corgi"
 test("a missing row is the empty v3 farm with a persisted clock and agriculture document", () => {
   assert.deepEqual(normalizeFarmGarage(null), {
     version: 3,
+    propertyRevision: 0,
+    properties: {},
     onboarding: { status: "needs_name", introSeen: false },
     ground: "",
     pets: [],
@@ -217,7 +219,7 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
 
 test("a valid farm round-trips", () => {
   const garage = normalizeFarmGarage({ version: 1, ground: "ground.mud", pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck", name: "Quack" })] });
-  assert.deepEqual(garage, { version: 1, ground: "ground.mud", pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck", name: "Quack" })] });
+  assert.deepEqual(garage, { propertyRevision: 0, properties: {}, version: 1, ground: "ground.mud", pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck", name: "Quack" })] });
 });
 
 test("explicit onboarding state survives while legacy farms remain unmarked", () => {
@@ -274,9 +276,10 @@ test("decor is the field: a namespace-checked list of bounded rows, emitted only
   assert.equal("length" in garage.decor[1], false, "no length sent, none stored");
 });
 
-test("the public loadout is the whole document, like the room", () => {
+test("the public loadout exposes the selected farm and its property directory", () => {
   const garage = normalizeFarmGarage({ version: 1, ground: "ground.clover", pets: [pet()] });
-  assert.deepEqual(farmLoadoutFromGarage(garage), { layout: garage });
+  const { properties, ...layout } = garage;
+  assert.deepEqual(farmLoadoutFromGarage(garage), { layout: { ...layout, skills: garage.skills, propertyIds: ["meadow"] } });
 });
 
 test("a save cannot plant past productive capacity, but stored crops always survive", () => {

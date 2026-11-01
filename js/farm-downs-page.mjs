@@ -72,7 +72,7 @@ let farm = farmLoad.layout;
 const horse = ridingHorseFrom(farm, params.get("horse"));
 const estateTrail = params.get("via") === "estate" && farm.lot === "lot.estate";
 const backUrl = (riding) => estateTrail
-    ? `../index.html?from=downs${fromFarm ? `&id=${encodeURIComponent(fromFarm)}` : ""}${riding && horse ? `&horse=${encodeURIComponent(horse.instanceId)}` : ""}`
+    ? `../index.html?from=downs&${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "", "id")}`
     : `../market/index.html?from=downs${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "") ? `&${horseTravelQuery(fromFarm, riding && horse ? horse.instanceId : "")}` : ""}`;
 backLink.href = backUrl(true);
 if (estateTrail) {

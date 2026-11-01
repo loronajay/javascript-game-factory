@@ -58,7 +58,8 @@ export async function handleFarmLivestockRoute(context: any): Promise<boolean> {
       return true;
     }
     try {
-      writeJson(res, 200, await service({ playerId: decodeURIComponent(herd[1]!) }), requestOrigin);
+      const propertyId = new URL(req.url, "http://localhost").searchParams.get("property") ?? undefined;
+      writeJson(res, 200, await service({ playerId: decodeURIComponent(herd[1]!), propertyId }), requestOrigin);
     } catch {
       writeJson(res, 500, { status: "error", error: "farm_livestock_unavailable", timestamp }, requestOrigin);
     }

@@ -43,6 +43,7 @@ import {
 import {
   FARM_GAME_SLUG,
   FARM_LOADOUT_CATALOG,
+  selectFarmProperty,
 } from "../services/farm-loadout-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
@@ -137,6 +138,20 @@ export async function saveGarage(pool: any, { playerId, gameSlug, garage }: any 
     client = typeof pool.connect === "function" ? await pool.connect() : null;
     const db = client ?? pool;
     if (client) await client.query("begin");
+    if (slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "selectProperty")) {
+      // Serialize with trade invitations; an offer must not silently start using another farm's goods.
+      await db.query(`select pg_advisory_xact_lock(hashtext($1))`, [`farm-trade:${normalizedPlayerId}`]);
+      const trading = await db.query(
+        `select 1 from farm_trades where (initiator_id = $1 or partner_id = $1)
+         and ((status = 'invited' and created_at > now() - interval '1 minute')
+           or (status = 'open' and updated_at > now() - interval '5 minutes')) limit 1`,
+        [normalizedPlayerId],
+      );
+      if (trading.rows.length) {
+        if (client) await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "trade_in_progress" };
+      }
+    }
     const current = await db.query(
       `select garage, updated_at from game_loadouts where player_id = $1 and game_slug = $2 for update`,
       [normalizedPlayerId, slug],
@@ -149,7 +164,9 @@ export async function saveGarage(pool: any, { playerId, gameSlug, garage }: any 
       currentSavedAt: current.rows[0]?.updated_at ? new Date(current.rows[0].updated_at).getTime() : null,
       now: Date.now(),
     };
-    const normalized = catalog.normalizeGarage(garage, context);
+    const normalized = slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "selectProperty")
+      ? selectFarmProperty(context.currentGarage, garage.selectProperty, { ...context, propertyRevision: garage.propertyRevision })
+      : catalog.normalizeGarage(garage, context);
     await db.query(
       `insert into game_loadouts (player_id, game_slug, garage, updated_at)
        values ($1, $2, $3::jsonb, now())
@@ -161,6 +178,10 @@ export async function saveGarage(pool: any, { playerId, gameSlug, garage }: any 
     return { ok: true, garage: normalized };
   } catch (err) {
     if (client) await client.query("rollback").catch(() => undefined);
+    const propertyError = (err as any)?.message;
+    if (["farm_property_changed", "property_not_owned", "invalid_property", "farm_not_initialized"].includes(propertyError)) {
+      return { ok: false, statusCode: 409, error: propertyError };
+    }
     process.stderr.write(`[game-loadouts] saveGarage error: ${(err as any)?.message || err}\n`);
     return { ok: false, statusCode: 500, error: "save_failed" };
   } finally {
@@ -177,7 +198,7 @@ export async function saveGarage(pool: any, { playerId, gameSlug, garage }: any 
  * will be showing. An online race must never fail because someone left their car
  * on factory paint.
  */
-export async function getPublicLoadout(pool: any, { playerId, gameSlug }: any = {}): Promise<any> {
+export async function getPublicLoadout(pool: any, { playerId, gameSlug, propertyId }: any = {}): Promise<any> {
   const normalizedPlayerId = cleanText(playerId);
   const slug = normalizeGameSlug(gameSlug);
   const catalog = CATALOGS[slug];
@@ -192,7 +213,7 @@ export async function getPublicLoadout(pool: any, { playerId, gameSlug }: any = 
     return {
       playerId: normalizedPlayerId,
       gameSlug: slug,
-      ...catalog.loadoutFromGarage(res.rows[0]?.garage ?? null, context),
+      ...catalog.loadoutFromGarage(res.rows[0]?.garage ?? null, { ...context, propertyId }),
     };
   } catch (err) {
     process.stderr.write(`[game-loadouts] getPublicLoadout error: ${(err as any)?.message || err}\n`);

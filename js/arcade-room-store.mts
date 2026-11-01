@@ -50,6 +50,8 @@ export type RoomSaveTarget = "account" | "device";
 export type RoomStoreOptions = Readonly<{
   /** The `?id=` on the URL, or empty for "my room". */
   visitPlayerId?: string;
+  /** Optional farm property to visit, without changing the owner's active farm. */
+  propertyId?: string;
   session?: Readonly<{ authenticated: boolean; playerId: string }> | null;
   /**
    * The signed-in player's id when the session does not carry one. The stored auth
@@ -65,7 +67,7 @@ export type RoomStoreApi = Readonly<{
   isConfigured?: boolean;
   fetchGameGarage: (slug: string) => Promise<any>;
   saveGameGarage: (slug: string, garage: unknown, options?: RoomSaveOptions) => Promise<any>;
-  fetchGamePublicLoadout: (slug: string, playerId: string) => Promise<any>;
+  fetchGamePublicLoadout: (slug: string, playerId: string, propertyId?: string) => Promise<any>;
   loadPlayerProfile: (playerId: string) => Promise<any>;
   uploadRoomPoster?: (file: File | Blob) => Promise<any>;
 }>;
@@ -202,7 +204,7 @@ export function createLayoutStore<T>(spec: LayoutDocumentSpec<T>, options: RoomS
 
   async function loadVisit(): Promise<LoadResult<T>> {
     const [loadout, profile] = await Promise.all([
-      configured ? api!.fetchGamePublicLoadout(spec.slug, requested).catch(() => null) : Promise.resolve(null),
+      configured ? api!.fetchGamePublicLoadout(spec.slug, requested, options.propertyId).catch(() => null) : Promise.resolve(null),
       configured ? api!.loadPlayerProfile(requested).catch(() => null) : Promise.resolve(null),
     ]);
     const ownerName = cleanText(profile?.profileName);

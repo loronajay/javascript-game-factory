@@ -1,3 +1,4 @@
+import { activeFarmPropertySql } from "./farm-property-sql.mjs";
 // Hollis's horses on the database (planning-docs/FARM_RIDING_PLAN.md).
 //
 // A horse is a PET — a row in the farm document's `pets`, with the pets' care,
@@ -91,7 +92,7 @@ export async function buyFarmHorse(pool: any, input: any, now: number = Date.now
     const skills = normalizeFarmSkillRecords(farm.layout.skills);
     const level = farmingLevelForXp(skills.riding.xp);
     if (level < rule.minRidingLevel) return { ok: false, error: "level_too_low", minLevel: rule.minRidingLevel, level };
-    const herd = await client.query(`select home_id from farm_livestock where player_id = $1 and state = 'alive' for update`, [playerId]);
+    const herd = await client.query(`select home_id from farm_livestock where player_id = $1 and property_id = ${activeFarmPropertySql("$1")} and state = 'alive' for update`, [playerId]);
     const stall = freeFarmHorseStalls(farm.layout, (herd.rows ?? []).map((row: any) => row.home_id ?? null))[0];
     if (!stall) return { ok: false, error: "no_stall" };
     const spend = await spendTicketsInTransaction(client, {

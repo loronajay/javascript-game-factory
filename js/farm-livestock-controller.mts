@@ -43,7 +43,7 @@ import { wantsServing, type LivestockPanel } from "./farm-livestock-panel.mjs";
 type ThreeNamespace = Record<string, any>;
 
 export type LivestockApi = Readonly<{
-  fetchFarmLivestock: (playerId: string) => Promise<any>;
+  fetchFarmLivestock: (playerId: string, propertyId?: string) => Promise<any>;
   moveFarmLivestock: (input: { animalId: string; homeId: string | null }) => Promise<any>;
   renameFarmLivestock: (input: { animalId: string; name: string }) => Promise<any>;
   careFarmLivestock: (input: { layout: unknown; action: "checkup" | "feed" | "collect" | "breed"; animalId?: string; itemId?: string; mateId?: string }) => Promise<any>;
@@ -262,7 +262,7 @@ export function createFarmLivestockController(options: Readonly<{
   return Object.freeze({
     async refresh() {
       if (!options.api || !options.ownerId) return;
-      const answer = await options.api.fetchFarmLivestock(options.ownerId).catch(() => null);
+      const answer = await options.api.fetchFarmLivestock(options.ownerId, options.layout().lot ?? "meadow").catch(() => null);
       if (Array.isArray(answer)) apply(normalizeLivestockHerd(answer));
     },
     sync() {

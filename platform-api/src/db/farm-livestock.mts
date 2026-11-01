@@ -1,3 +1,4 @@
+import { activeFarmPropertySql } from "./farm-property-sql.mjs";
 // Livestock on the database (migration 057). Every animal is decided here: the
 // Livestock Dealer rolls a young one's sex, coat and stats, stamps its birth at
 // the farm's clock and finds it a home, and only then is it a row. The page
@@ -49,6 +50,7 @@ import { randomUUID } from "node:crypto";
 import { spendTicketsInTransaction } from "./tickets.mjs";
 import { lockedFarm, saveFarm, transaction, verifiedSubmittedFarm } from "./farm-economy.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
+import { FARM_PROPERTY_IDS } from "../services/farm-loadout-catalog.mjs";
 import { farmProduceKey, takeFarmProduce } from "../services/farm-quality-catalog.mjs";
 import { farmingLevelForXp, farmingSummary, normalizeFarmSkillRecords, normalizeHusbandryRecord, recordFarmBirth, recordFarmButcher, recordFarmCollection } from "../services/farm-skill-catalog.mjs";
 import { awardServerAchievementsInTransaction } from "./achievements.mjs";
@@ -124,7 +126,7 @@ const HERD_COLUMNS = `animal_id, species_id, name, gender, coat_id, stats, born_
 
 async function liveHerd(client: any, playerId: string, lock = false): Promise<any[]> {
   const result = await client.query(
-    `select ${HERD_COLUMNS} from farm_livestock where player_id = $1 and state = 'alive' order by created_at, animal_id${lock ? " for update" : ""}`,
+    `select ${HERD_COLUMNS} from farm_livestock where player_id = $1 and property_id = ${activeFarmPropertySql("$1")} and state = 'alive' order by created_at, animal_id${lock ? " for update" : ""}`,
     [playerId],
   );
   return result.rows ?? [];
@@ -133,6 +135,14 @@ async function liveHerd(client: any, playerId: string, lock = false): Promise<an
 /** Anyone's herd: a visitor sees the animals in the pens as surely as the owner. Public. */
 export async function getFarmLivestock(pool: any, input: any) {
   const playerId = required(input?.playerId, "playerId");
+  if (input?.propertyId) {
+    if (!FARM_PROPERTY_IDS.includes(input.propertyId)) return { herd: [] };
+    const result = await pool.query(
+      `select ${HERD_COLUMNS} from farm_livestock where player_id = $1 and property_id = $2 and state = 'alive' order by created_at, animal_id`,
+      [playerId, input.propertyId],
+    );
+    return { herd: (result.rows ?? []).map(presentLivestock) };
+  }
   return { herd: (await liveHerd(pool, playerId)).map(presentLivestock) };
 }
 
@@ -177,8 +187,8 @@ export async function buyFarmLivestock(pool: any, input: any, random: () => numb
       care: newLivestockCare((Math.max(0, Number(farm.layout.clock?.farmMinutes) || 0) + Math.max(0, Number(farm.layout.clock?.animalMinutes) || 0))),
     };
     await client.query(
-      `insert into farm_livestock (animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin)
-       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, 'dealer')`,
+      `insert into farm_livestock (animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, property_id)
+       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, 'dealer', ${activeFarmPropertySql("$2")})`,
       [row.animal_id, playerId, row.species_id, row.name, row.gender, row.coat_id, JSON.stringify(row.stats), row.born_minute, row.home_id, JSON.stringify(row.care)],
     );
     const animal = presentLivestock(row);
@@ -218,7 +228,7 @@ export async function renameFarmLivestock(pool: any, input: any) {
   const name = cleanLivestockName(input?.name, "");
   if (!name) return { ok: false, error: "invalid_name" };
   const result = await pool.query(
-    `update farm_livestock set name = $3, updated_at = now() where player_id = $1 and animal_id = $2 and state = 'alive'
+    `update farm_livestock set name = $3, updated_at = now() where player_id = $1 and animal_id = $2 and property_id = ${activeFarmPropertySql("$1")} and state = 'alive'
      returning ${HERD_COLUMNS}`,
     [playerId, animalId, name],
   );
@@ -341,8 +351,8 @@ async function deliverYoung(client: any, playerId: string, layout: any, living: 
       origin: "bred",
     };
     await client.query(
-      `insert into farm_livestock (animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, parents)
-       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, 'bred', $11::jsonb)`,
+      `insert into farm_livestock (animal_id, player_id, species_id, name, gender, coat_id, stats, born_minute, home_id, care, origin, parents, property_id)
+       values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, 'bred', $11::jsonb, ${activeFarmPropertySql("$2")})`,
       [row.animal_id, playerId, row.species_id, row.name, row.gender, row.coat_id, JSON.stringify(row.stats), row.born_minute, row.home_id, JSON.stringify(row.care), JSON.stringify(row.parents)],
     );
     mother.care = { ...mother.care, pregnancy: null, restUntil: bornAt + REST_DAYS * 24 * 60 };

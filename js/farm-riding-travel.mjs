@@ -15,11 +15,17 @@ export function ridingHorseFrom(layout, horseId) {
     return pet && isRidable(pet.speciesId) && pet.profile ? pet : null;
 }
 /** The query string for the next page: the farm to come home to (under `farmKey`) and the horse, when riding. */
-export function horseTravelQuery(farmId, horseId, farmKey = "farm") {
+export function horseTravelQuery(farmId, horseId, farmKey = "farm", propertyId = travelPropertyId()) {
     const parts = [];
     if (farmId)
         parts.push(`${farmKey}=${encodeURIComponent(farmId)}`);
     if (horseId && HORSE_ID.test(horseId))
         parts.push(`horse=${encodeURIComponent(horseId)}`);
+    if (farmId && /^(?:meadow|lot\.[a-z0-9-]+)$/.test(propertyId))
+        parts.push(`property=${encodeURIComponent(propertyId)}`);
     return parts.join("&");
+}
+/** Keep a visited property's return address across the public places around it. */
+function travelPropertyId() {
+    return typeof location === "undefined" ? "" : new URLSearchParams(location.search).get("property") ?? "";
 }

@@ -1,5 +1,4 @@
 import { createPropertiesPanel } from "./farm-properties-panel.mjs";
-import { expandFarmLot } from "./farm-layout.mjs";
 // The Market Square page: the shared square at the end of the farm's road.
 //
 // It is the farm's stack by import. The square's paving, walls, well, lamps and
@@ -123,9 +122,9 @@ const hud = createFarmHud({
 hud.fullscreen.bind(requiredElement("#fullscreenMarket"));
 // The road home: back to whichever farm the player walked out of.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
-const homeUrl = fromFarm ? `../index.html?id=${encodeURIComponent(fromFarm)}` : "../index.html";
+const homeUrl = `../index.html?${horseTravelQuery(fromFarm, "", "id")}`;
 // Down the north gate to the Cove, carrying the farm to come home to.
-const coveUrl = fromFarm ? `../cove/index.html?farm=${encodeURIComponent(fromFarm)}` : "../cove/index.html";
+const coveUrl = `../cove/index.html?${horseTravelQuery(fromFarm, "")}`;
 const cameFromCove = new URLSearchParams(location.search).get("from") === "cove";
 const cameFromDowns = new URLSearchParams(location.search).get("from") === "downs";
 // Out the west gate to Windrush Downs — on horseback only (FARM_RIDING_PLAN.md).
@@ -902,16 +901,17 @@ const properties = createPropertiesPanel({
     shop: () => ticketClient.getShop("farm"),
     purchase: (id) => ticketClient.purchaseShopItem("farm", id),
     takeBalance,
-    move: async (id) => {
-        // Re-read before relocation so recent market trades and purchases are preserved.
-        const latest = await farmStore.load();
-        if (latest.source !== "account")
-            return { ok: false, error: "unavailable" };
-        const next = expandFarmLot(latest.layout, id);
-        const result = await farmStore.save(next);
-        if (result.ok)
-            takeStock(next);
-        return result;
+    selectProperty: async (id) => {
+        // Select atomically on the server; do not copy the current farm's contents.
+        const result = await createPlatformApiClient().saveGameGarage("farm", { selectProperty: id, propertyRevision: farm.propertyRevision ?? 0 });
+        if (result?.ok) {
+            const url = new URL(location.href);
+            url.searchParams.delete("horse");
+            url.searchParams.delete("farm");
+            url.searchParams.delete("property");
+            location.href = url.toString(); // Refresh stock, herd, trades and return travel together.
+        }
+        return result ?? { ok: false, error: "unavailable" };
     },
     onClose: () => canvas.focus(),
 });

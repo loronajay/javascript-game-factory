@@ -23,7 +23,7 @@ import { YAM_BOWLING_GAME_SLUG, YAM_BOWLING_LOADOUT_CATALOG, } from "../services
 import { SHARK_HALL_GAME_SLUG, SHARK_HALL_LOADOUT_CATALOG, } from "../services/shark-hall-loadout-catalog.mjs";
 import { PUCK_D_UP_GAME_SLUG, PUCK_D_UP_LOADOUT_CATALOG, } from "../services/puckd-up-loadout-catalog.mjs";
 import { ARCADE_ROOM_GAME_SLUG, ARCADE_ROOM_LOADOUT_CATALOG, } from "../services/arcade-room-loadout-catalog.mjs";
-import { FARM_GAME_SLUG, FARM_LOADOUT_CATALOG, } from "../services/farm-loadout-catalog.mjs";
+import { FARM_GAME_SLUG, FARM_LOADOUT_CATALOG, selectFarmProperty, } from "../services/farm-loadout-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const CATALOGS = {
     [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
@@ -94,6 +94,18 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
         const db = client ?? pool;
         if (client)
             await client.query("begin");
+        if (slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "selectProperty")) {
+            // Serialize with trade invitations; an offer must not silently start using another farm's goods.
+            await db.query(`select pg_advisory_xact_lock(hashtext($1))`, [`farm-trade:${normalizedPlayerId}`]);
+            const trading = await db.query(`select 1 from farm_trades where (initiator_id = $1 or partner_id = $1)
+         and ((status = 'invited' and created_at > now() - interval '1 minute')
+           or (status = 'open' and updated_at > now() - interval '5 minutes')) limit 1`, [normalizedPlayerId]);
+            if (trading.rows.length) {
+                if (client)
+                    await client.query("rollback");
+                return { ok: false, statusCode: 409, error: "trade_in_progress" };
+            }
+        }
         const current = await db.query(`select garage, updated_at from game_loadouts where player_id = $1 and game_slug = $2 for update`, [normalizedPlayerId, slug]);
         const context = {
             ...await getOwnershipContext(db, normalizedPlayerId, slug, catalog),
@@ -103,7 +115,9 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
             currentSavedAt: current.rows[0]?.updated_at ? new Date(current.rows[0].updated_at).getTime() : null,
             now: Date.now(),
         };
-        const normalized = catalog.normalizeGarage(garage, context);
+        const normalized = slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "selectProperty")
+            ? selectFarmProperty(context.currentGarage, garage.selectProperty, { ...context, propertyRevision: garage.propertyRevision })
+            : catalog.normalizeGarage(garage, context);
         await db.query(`insert into game_loadouts (player_id, game_slug, garage, updated_at)
        values ($1, $2, $3::jsonb, now())
        on conflict (player_id, game_slug) do update
@@ -115,6 +129,10 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
     catch (err) {
         if (client)
             await client.query("rollback").catch(() => undefined);
+        const propertyError = err?.message;
+        if (["farm_property_changed", "property_not_owned", "invalid_property", "farm_not_initialized"].includes(propertyError)) {
+            return { ok: false, statusCode: 409, error: propertyError };
+        }
         process.stderr.write(`[game-loadouts] saveGarage error: ${err?.message || err}\n`);
         return { ok: false, statusCode: 500, error: "save_failed" };
     }
@@ -131,7 +149,7 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
  * will be showing. An online race must never fail because someone left their car
  * on factory paint.
  */
-export async function getPublicLoadout(pool, { playerId, gameSlug } = {}) {
+export async function getPublicLoadout(pool, { playerId, gameSlug, propertyId } = {}) {
     const normalizedPlayerId = cleanText(playerId);
     const slug = normalizeGameSlug(gameSlug);
     const catalog = CATALOGS[slug];
@@ -143,7 +161,7 @@ export async function getPublicLoadout(pool, { playerId, gameSlug } = {}) {
         return {
             playerId: normalizedPlayerId,
             gameSlug: slug,
-            ...catalog.loadoutFromGarage(res.rows[0]?.garage ?? null, context),
+            ...catalog.loadoutFromGarage(res.rows[0]?.garage ?? null, { ...context, propertyId }),
         };
     }
     catch (err) {

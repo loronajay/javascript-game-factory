@@ -76,6 +76,7 @@ export async function handleLoadoutRoute(context) {
         const loadout = await getPublicLoadout({
             playerId: decodeURIComponent(loadoutMatch[2]),
             gameSlug,
+            propertyId: new URL(req.url, "http://localhost").searchParams.get("property") ?? undefined,
         });
         if (!loadout) {
             writeJson(res, 500, { status: "error", error: "loadout_unavailable", timestamp }, requestOrigin);
