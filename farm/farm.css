@@ -1035,3 +1035,6 @@ kbd, .farm-button kbd {
 .livestock-map-home.is-unavailable { border-color: #a8736d; }
 .livestock-map-field { position: relative; transform: none; min-height: 105px; }
 .livestock-map-help { font-size: 12px; margin: 0; }
+.livestock-map-footprint { position: absolute; box-sizing: border-box; border: 2px dashed #c4b287; background: #a58a5426; pointer-events: none; }
+.livestock-map-home { border-color: #bda47a80; background: #253227e8; }
+.livestock-map-home > * { position: relative; }

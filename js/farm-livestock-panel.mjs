@@ -556,6 +556,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
         const icons = { chicken: "🐔", sheep: "🐑", pig: "🐖", cow: "🐄", goat: "🐐", alpaca: "🦙" };
         const target = (home) => {
             const box = element("section", "livestock-map-home");
+            box.setAttribute("aria-label", home?.title ?? "Out on the field");
             const destination = actionButton(home ? `${home.title} · ${occupancy.get(home.id) ?? 0}/${home.slots}` : "Out on the field", () => {
                 if (movingAnimal)
                     move(movingAnimal, home);
@@ -583,6 +584,7 @@ export function createLivestockPanel(elements, actions, options = {}) {
             const residents = current.herd.filter((animal) => home ? animal.homeId === home.id : !current.homes.some((entry) => entry.id === animal.homeId));
             for (const animal of residents) {
                 const tile = actionButton("", () => { movingAnimal = movingAnimal === animal.id ? null : animal.id; draw(); }, "livestock-map-animal");
+                tile.dataset.animalId = animal.id;
                 tile.disabled = !current.canManage || busy;
                 tile.draggable = current.canManage && !busy;
                 tile.setAttribute("aria-pressed", String(movingAnimal === animal.id));
@@ -610,11 +612,21 @@ export function createLivestockPanel(elements, actions, options = {}) {
         };
         for (const home of current.homes) {
             const box = target(home);
+            // Rotate only the footprint. Controls and residents stay upright and clickable.
+            const cosine = Math.abs(Math.cos(home.rotationY)), sine = Math.abs(Math.sin(home.rotationY));
             box.style.left = `${(home.x - minX) * scale}px`;
             box.style.top = `${(home.z - minZ) * scale}px`;
-            box.style.width = `${home.width * scale}px`;
-            box.style.height = `${home.depth * scale}px`;
-            box.style.transform = `translate(-50%, -50%) rotate(${-home.rotationY}rad)`;
+            box.style.width = `${(home.width * cosine + home.depth * sine) * scale}px`;
+            box.style.height = `${(home.width * sine + home.depth * cosine) * scale}px`;
+            box.style.transform = "translate(-50%, -50%)";
+            const footprint = element("div", "livestock-map-footprint");
+            footprint.setAttribute("aria-hidden", "true");
+            footprint.style.width = `${home.width * scale}px`;
+            footprint.style.height = `${home.depth * scale}px`;
+            footprint.style.transform = `translate(-50%, -50%) rotate(${-home.rotationY}rad)`;
+            footprint.style.left = box.style.left;
+            footprint.style.top = box.style.top;
+            map.append(footprint);
             map.append(box);
         }
         scroll.append(map);
@@ -712,6 +724,9 @@ export function createLivestockPanel(elements, actions, options = {}) {
     function draw() {
         if (!view)
             return;
+        const mapScroll = elements.list.querySelector(".livestock-map-scroll");
+        const mapPosition = mapScroll ? { x: mapScroll.scrollLeft, y: mapScroll.scrollTop } : null;
+        const focusedAnimal = document.activeElement?.dataset.animalId;
         const scroll = resetScroll ? 0 : elements.list.scrollTop;
         resetScroll = false;
         try {
@@ -719,7 +734,23 @@ export function createLivestockPanel(elements, actions, options = {}) {
         }
         finally {
             elements.list.scrollTop = scroll;
+            const nextMap = elements.list.querySelector(".livestock-map-scroll");
+            if (nextMap && mapPosition) {
+                nextMap.scrollLeft = mapPosition.x;
+                nextMap.scrollTop = mapPosition.y;
+            }
+            if (focusedAnimal) {
+                const tile = Array.from(elements.list.querySelectorAll("[data-animal-id]")).find((entry) => entry.dataset.animalId === focusedAnimal);
+                tile?.focus({ preventScroll: true });
+            }
         }
+    }
+    // Clock/care ticks must not replace the DOM under a pointer or reset the map.
+    // Include everything displayed by the organizer, including breeding readiness.
+    function housingKey(current) {
+        return JSON.stringify([current.homes, current.canManage, current.note,
+            current.herd.map((animal) => [animal.id, animal.homeId, animal.name, animal.speciesId,
+                animal.gender, livestockGrade(animal.stats), breedingWords(animal, current)])]);
     }
     function setOpen(next) {
         if (next === open)
@@ -742,11 +773,13 @@ export function createLivestockPanel(elements, actions, options = {}) {
         toggle: () => setOpen(!open),
         isOpen: () => open,
         render(next) {
+            const unchangedHousing = view && section === "housing" && selectedHome === null && selectedId === null
+                && housingKey(view) === housingKey(next);
             view = next;
             // Keep only an animal's editing fields stable; navigation and roster focus
             // must not prevent a fifty-animal herd from receiving live updates.
             const editing = elements.list.contains(document.activeElement) && document.activeElement?.matches("input, select, textarea");
-            if (open && !busy && !editing && !draggingAnimal)
+            if (open && !busy && !editing && !draggingAnimal && !unchangedHousing)
                 draw();
         },
         setStatus,
