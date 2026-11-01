@@ -46,12 +46,13 @@ import { createMarketStallModel } from "./farm-market-props.mjs";
 import { FISHMONGER_STALL_ID, RECORDS_BOARD_ID, TACKLE_STALL_ID, coveStallPrompt, findCoveStall, } from "./farm-cove.mjs";
 import { createCoveTerrain } from "./farm-cove-terrain.mjs";
 import { fishmongerStock, tackleStock } from "./farm-cove-props.mjs";
-import { findFishSpecies, findFishingRod, MOUNT_FEE, STARTER_ROD_ID, WORM_ID, ZONE_MIN_LEVEL, ZONE_TITLES } from "./farm-catalog/fish.mjs";
+import { findFishSpecies, findFishingRod, MOUNT_FEE, STARTER_ROD_ID, ZONE_MIN_LEVEL, ZONE_TITLES } from "./farm-catalog/fish.mjs";
 import { normalizePublicShadow, specimenTitle, formatWeight } from "./farm-fish.mjs";
 import { createShadowsView } from "./farm-fish-shadows-view.mjs";
 import { createFishingController } from "./farm-fishing-controller.mjs";
 import { createFishingView } from "./farm-fishing-view.mjs";
 import { createFishingHud } from "./farm-fishing-hud.mjs";
+import { createFishingEquipmentStore } from "./farm-fishing-equipment.mjs";
 import { createFishThumbnails } from "./farm-fish-models.mjs";
 import { PRACTICE_ANGLER, baitCount, baitTitle, bestRod, catchNews, nextBait, nextRod, normalizeAngler } from "./farm-angler.mjs";
 import { createCreelPanel, createFishmongerPanel, createRecordsPanel, createTacklePanel, normalizeRecords } from "./farm-cove-panels.mjs";
@@ -150,6 +151,8 @@ async function loadAngler() {
             rodId = bestRod(angler).id;
         if (baitCount(angler, baitId) <= 0)
             baitId = nextBait(angler, baitId);
+        fishingView.setRod(rodId);
+        saveEquipment();
     }
     repaintPanels();
 }
@@ -161,8 +164,9 @@ function takeTackle(value) {
         repaintPanels();
     }
 }
-let rodId = STARTER_ROD_ID;
-let baitId = WORM_ID;
+const equipmentStore = createFishingEquipmentStore(signedIn ? loadFactoryProfile().playerId : "practice");
+let { rodId, baitId } = equipmentStore.load();
+function saveEquipment() { equipmentStore.save({ rodId, baitId }); }
 const ticketClient = createTicketWalletClient();
 let balance = null;
 function renderTickets() {
@@ -530,6 +534,7 @@ const tacklePanel = createTacklePanel(requiredElement("#tacklePanel"), {
             if (itemId.startsWith("rod.")) {
                 rodId = itemId;
                 fishingView.setRod(rodId);
+                saveEquipment();
             }
         }
         return outcomeOf(result, itemId.startsWith("rod.") ? `The ${findFishingRod(itemId)?.title ?? "rod"} is yours — it's in your hands now.` : "In your tackle box.", {
@@ -882,11 +887,13 @@ window.addEventListener("keydown", (event) => {
     }
     else if (event.code === "KeyQ") {
         baitId = nextBait(angler, baitId);
+        saveEquipment();
         renderTackleBar();
         notice(`${baitTitle(baitId)} on the hook.`, 1.5);
     }
     else if (event.code === "KeyR") {
         rodId = nextRod(angler, rodId).id;
+        saveEquipment();
         fishingView.setRod(rodId);
         renderTackleBar();
         notice(`${findFishingRod(rodId)?.title ?? "Rod"} in hand.`, 1.5);
