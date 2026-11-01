@@ -43,6 +43,7 @@ const MOVE_ERRORS = Object.freeze({
 const GROWTH_REFRESH_SECONDS = 2;
 export function createFarmLivestockController(options) {
     let herd = [];
+    let loadState = options.api && options.ownerId ? "loading" : "ready";
     let homes = herdHomes(options.layout().decor, options.layout().pets);
     let nearby = null;
     let growthTimer = 0;
@@ -79,6 +80,7 @@ export function createFarmLivestockController(options) {
     function render() {
         options.panel.render({
             herd: current(),
+            loadState,
             homes,
             clockMinutes: options.clockMinutes(),
             husbandryLevel: skillLevelForXp(options.layout().skills.husbandry.xp),
@@ -86,7 +88,10 @@ export function createFarmLivestockController(options) {
             canBreed: options.canManage && Boolean(options.api) && Boolean(options.submit),
             supplies: options.layout().agriculture.inventory.supplies,
             feedWords,
-            note: options.api && options.ownerId ? "" : "Livestock are bought with tickets, so they live on an account farm. Sign in to keep them.",
+            note: options.api && options.ownerId
+                ? loadState === "failed" ? "Your livestock could not be loaded. This does not mean your herd is empty. Close and reopen Herd to retry."
+                    : loadState === "loading" && !herd.length ? "Loading your livestock…" : ""
+                : "Livestock are bought with tickets, so they live on an account farm. Sign in to keep them.",
         });
     }
     function apply(next) {
@@ -201,9 +206,14 @@ export function createFarmLivestockController(options) {
         async refresh() {
             if (!options.api || !options.ownerId)
                 return;
+            loadState = "loading";
+            render();
             const answer = await options.api.fetchFarmLivestock(options.ownerId, options.layout().lot ?? "meadow").catch(() => null);
+            loadState = Array.isArray(answer) ? "ready" : "failed";
             if (Array.isArray(answer))
                 apply(normalizeLivestockHerd(answer));
+            else
+                render();
         },
         sync() {
             homes = herdHomes(options.layout().decor, options.layout().pets);

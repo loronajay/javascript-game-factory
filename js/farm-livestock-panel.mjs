@@ -571,7 +571,8 @@ export function createLivestockPanel(elements, actions, options = {}) {
             return;
         const occupancy = homeOccupancy(view.homes, view.herd);
         const places = totalLivestockSlots(view.homes);
-        elements.count.textContent = `${view.herd.length} head · ${places} ${places === 1 ? "place" : "places"}`;
+        const count = view.loadState === "failed" ? "Unavailable" : view.loadState === "loading" && !view.herd.length ? "Loading…" : `${view.herd.length} head`;
+        elements.count.textContent = `${count} · ${places} ${places === 1 ? "place" : "places"}`;
         elements.list.replaceChildren();
         for (const [id, button] of tabButtons) {
             button.setAttribute("aria-selected", String(section === id));

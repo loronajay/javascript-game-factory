@@ -58,6 +58,28 @@ test('property office permits smaller farms and retries selection without chargi
     assert.deepEqual(result.purchases, ['lot.smallholding']);
     assert.deepEqual(result.selections, ['lot.smallholding', 'lot.smallholding', 'meadow']);
     assert.equal(result.defaultProperty, 'meadow');
+    const herdRead = await page.evaluate(async () => {
+      const THREE = await import('/js/vendor/three.module.js');
+      const { createFarmLivestockController } = await import('/js/farm-livestock-controller.mjs');
+      const { createDefaultFarmLayout } = await import('/js/farm-layout.mjs');
+      let answer = null;
+      const views = [];
+      const controller = createFarmLivestockController({ THREE, scene: new THREE.Scene(),
+        api: { fetchFarmLivestock: async () => answer }, ownerId: 'owner', canManage: true,
+        layout: () => createDefaultFarmLayout(() => 0.5), clockMinutes: () => 0,
+        obstacles: () => [], keepOut: () => [], water: () => [],
+        panel: { render: view => views.push(view) }, submit: null, setStatus() {} });
+      const initial = views.at(-1).loadState;
+      await controller.refresh();
+      const failed = { state: views.at(-1).loadState, note: views.at(-1).note };
+      answer = []; await controller.refresh();
+      return { initial, failed, recovered: views.at(-1).loadState, note: views.at(-1).note };
+    });
+    assert.equal(herdRead.initial, 'loading');
+    assert.equal(herdRead.failed.state, 'failed');
+    assert.match(herdRead.failed.note, /could not be loaded/);
+    assert.equal(herdRead.recovered, 'ready');
+    assert.equal(herdRead.note, '');
   } finally {
     await browser?.close();
     await new Promise(done => server.close(done));

@@ -59,6 +59,7 @@ export const MIGRATION_FILES = Object.freeze([
     "057-farm-livestock.sql",
     "058-farm-livestock-care.sql",
     "059-farm-races.sql",
+    "060-farm-properties.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

@@ -4,6 +4,14 @@ import { normalizeFarmGarage, selectFarmProperty, setDefaultFarmProperty, farmLo
 import { saveGarage } from '../src/db/game-loadouts.mjs';
 import { getFarmLivestock } from '../src/db/farm-livestock.mjs';
 import { nextPetId } from '../src/db/farm-economy.mjs';
+import { readdirSync } from 'node:fs';
+import { MIGRATION_FILES } from '../src/db/migrations.mjs';
+
+test('every numbered SQL migration is registered for production startup', () => {
+  const files = readdirSync(new URL('../src/db/migrations/', import.meta.url)).filter(name => /^\d+-.*\.sql$/.test(name)).sort();
+  assert.deepEqual([...MIGRATION_FILES].sort(), files);
+  assert.ok(MIGRATION_FILES.indexOf('060-farm-properties.sql') > MIGRATION_FILES.indexOf('059-farm-races.sql'));
+});
 
 const owned = new Set(['lot.smallholding', 'lot.estate']);
 const now = 1_800_000_000_000;

@@ -1529,7 +1529,7 @@ workshopSync = () => workshop.sync();
 const ownerHotkey = (): boolean => canManageFarm && farmEntered && !farmEditor.isEditing();
 hud.sheet("inventory", { root: requiredElement<HTMLElement>("#inventoryPanel"), open: () => inventoryPanel.open(), close: () => inventoryPanel.close(), key: "KeyI", enabled: ownerHotkey });
 hud.sheet("pets", { root: petsPanelRoot, open: () => petsPanel.open(), close: () => petsPanel.close(), key: "KeyP", enabled: ownerHotkey });
-hud.sheet("livestock", { root: requiredElement<HTMLElement>("#livestockPanel"), open: () => livestockPanel.open(), close: () => livestockPanel.close(), key: "KeyL", enabled: () => farmEntered && !farmEditor.isEditing() });
+hud.sheet("livestock", { root: requiredElement<HTMLElement>("#livestockPanel"), open: () => { livestockPanel.open(); void livestock.refresh(); }, close: () => livestockPanel.close(), key: "KeyL", enabled: () => farmEntered && !farmEditor.isEditing() });
 hud.sheet("stats", { root: requiredElement<HTMLElement>("#statsPanel"), open: () => statsPanel.open(), close: () => statsPanel.close(), key: "KeyK", enabled: ownerHotkey });
 hud.sheet("kitchen", { root: requiredElement<HTMLElement>("#kitchenPanel"), close: () => kitchenPanel.close() });
 hud.sheet("workshop", { root: requiredElement<HTMLElement>("#workshopPanel"), close: () => workshop.closePanels() });
