@@ -35,10 +35,11 @@ test("the player stats view includes every farm skill and its lifetime records",
     bartering: { xp: 750, deals: 8, bought: 200, sold: 500, saved: 14, bonus: 26 },
     husbandry: { xp: 400, collections: 6, orders: 1, goods: { "milk-sheep": 5, wool: 3 }, butchered: 2, meat: { pork: 9 } },
     riding: { xp: 0, runs: 0, races: 0, wins: 0, horses: 0, today: { day: 0, runs: {} } },
-  }, { fishing: { xp: 250, catches: 4, dex: { "fish.koi": { caught: 3, bestG: 4000 }, "fish.tetra": { caught: 1, bestG: 40 } } } });
+  }, { trades: { completed: 7 }, fishing: { xp: 250, catches: 4, dex: { "fish.koi": { caught: 3, bestG: 4000 }, "fish.tetra": { caught: 1, bestG: 40 } } } });
 
   assert.deepEqual(view.skills.map((skill) => skill.title), ["Farming", "Woodcutting", "Cooking", "Carpentry", "Fishing", "Husbandry", "Riding", "Bartering"]);
   assert.equal(view.totalXp, 4_900);
+  assert.deepEqual(view.skills[7].breakdown, [{ label: "NPC deals", value: 8 }, { label: "Completed friend trades", value: 7 }]);
   assert.equal(view.totalLevel, view.skills.reduce((total, skill) => total + skill.level, 0));
   assert.deepEqual(view.skills[0].stats, [
     { label: "Crop harvests", value: 12 },
@@ -241,7 +242,7 @@ test("pets are a pure sim the page ticks on the fixed timestep, drawn by bodies,
   assert.match(source, /keepOut: \(\) => keepOutBoxes\(layout\)/, "pets stay out of every building and pond");
   assert.match(source, /water: \(\) => waterRegions\(layout\)/, "swimmers live in the ponds");
   assert.match(source, /if \(visiting\) openPetsButton\.hidden = true/, "only visited farms hide owner controls");
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| hud\.anyOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a sheet, at the stove or bench, or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| hud\.anyOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| memorialDialog\.open \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under a sheet, at the stove or bench, or while napping");
   assert.match(source, /return kitchen\.cooking\(\) \|\| workshop\.crafting\(\);/, "a dish on the stove and a piece on the bench both hold the player");
   for (const id of ["kitchenPanel", "workshopPanel", "millPanel"]) {
     assert.match(source, new RegExp(String.raw`hud\.sheet\("\w+", \{ root: requiredElement<HTMLElement>\("#${id}"\)`), `the station counter #${id} is a sheet like the rest`);
@@ -331,9 +332,9 @@ test("build mode is the shared editor frame over the farm's own rules: owner-onl
   assert.match(editorSource, /relocating/, "pond relocation is a click-to-place editor gesture");
   assert.match(editorSource, /Aquatic pets stay adopted/, "the relocation instruction makes pet ownership safety explicit");
   // A visitor never builds; the page routes every editor change through applyLayout and hands the walker the editor's obstacles.
-  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !hud\.anyOpen\(\) && !stationBusy\(\) && !napDialog\.open && napRemainingMinutes <= 0/);
+  assert.match(source, /canEnter: \(\) => canManageFarm && farmEntered && !hud\.anyOpen\(\) && !stationBusy\(\) && !napDialog\.open && !memorialDialog\.open && napRemainingMinutes <= 0/);
   assert.match(source, /onLayoutChange: \(next\) => applyLayout\(next\)/);
-  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| hud\.anyOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
+  assert.match(source, /if \(!farmEntered \|\| leavingForMarket \|\| trees\.chopping\(\) \|\| stationBusy\(\) \|\| hud\.anyOpen\(\) \|\| farmEditor\.isEditing\(\) \|\| memorialDialog\.open \|\| napDialog\.open \|\| napRemainingMinutes > 0\) return;/, "no walking under build mode or while napping");
   assert.match(source, /if \(!farmEditor\.isEditing\(\)\) applyCamera\(\)/, "the editor owns the camera while building");
   assert.match(css, /\.is-visiting #editFarm \{ display: none; \}/);
   assert.match(css, /\.is-editing \.farm-header/);

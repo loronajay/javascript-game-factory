@@ -146,6 +146,7 @@ const statsPanel = createFarmStatsPanel({
   summary: requiredElement<HTMLElement>("#statsSummary"),
   grid: requiredElement<HTMLElement>("#statsGrid"),
 }, {
+  loadTrades: () => api.fetchCurrentFarmTrade(true),
   onClose: () => canvas.focus(),
 });
 

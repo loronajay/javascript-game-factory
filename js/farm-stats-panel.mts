@@ -12,7 +12,7 @@ type Elements = Readonly<{
   grid: HTMLElement;
 }>;
 
-type Options = Readonly<{ beforeOpen?: () => void; onClose?: () => void }>;
+type Options = Readonly<{ loadTrades?: () => Promise<any>; beforeOpen?: () => void; onClose?: () => void }>;
 
 export type FarmStatsPanel = Readonly<{
   open: () => void;
@@ -78,6 +78,10 @@ function statCard(row: FarmSkillStats): HTMLElement {
 }
 
 export function createFarmStatsPanel(elements: Elements, options: Options = {}): FarmStatsPanel {
+  let latestSkills: FarmSkills | null = null;
+  let latestFishing: FishingStats | null | undefined;
+  let trades: { completed: number } | null = null;
+  let request = 0;
   function isOpen(): boolean { return !elements.root.hidden; }
   function close(): void {
     elements.root.hidden = true;
@@ -89,10 +93,18 @@ export function createFarmStatsPanel(elements: Elements, options: Options = {}):
     elements.root.hidden = false;
     elements.openButton.setAttribute("aria-pressed", "true");
     document.exitPointerLock?.();
+    const current = ++request;
+    void options.loadTrades?.().then((result) => {
+      if (current !== request || !Number.isSafeInteger(result?.stats?.completed) || result.stats.completed < 0) return;
+      trades = result.stats;
+      if (latestSkills) render(latestSkills, latestFishing);
+    }).catch(() => {});
   }
   function toggle(): void { isOpen() ? close() : open(); }
   function render(skills: FarmSkills, fishing?: FishingStats | null): void {
-    const view = buildFarmStats(skills, { fishing });
+    latestSkills = skills;
+    latestFishing = fishing;
+    const view = buildFarmStats(skills, { fishing, trades });
     elements.summary.textContent = `Total level ${view.totalLevel} · ${view.totalXp.toLocaleString()} lifetime XP`;
     elements.grid.replaceChildren(...view.skills.map(statCard));
   }

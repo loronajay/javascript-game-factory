@@ -79,7 +79,10 @@ export function buildFarmStats(skills, extras = {}) {
         { label: "Tickets earned", value: skills.bartering.sold },
         { label: "Tickets saved", value: skills.bartering.saved },
         { label: "Bonus earned", value: skills.bartering.bonus },
-    ], "Trade record", []));
+    ], "Trade record", [
+        { label: "NPC deals", value: skills.bartering.deals },
+        ...(extras.trades ? [{ label: "Completed friend trades", value: extras.trades.completed }] : []),
+    ]));
     return Object.freeze({
         totalLevel: rows.reduce((total, row) => total + row.level, 0),
         totalXp: rows.reduce((total, row) => total + row.xp, 0),

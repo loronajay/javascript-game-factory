@@ -133,6 +133,7 @@ const statsPanel = createFarmStatsPanel({
     summary: requiredElement("#statsSummary"),
     grid: requiredElement("#statsGrid"),
 }, {
+    loadTrades: () => api.fetchCurrentFarmTrade(true),
     onClose: () => canvas.focus(),
 });
 // ---------------------------------------------------------------- the angler

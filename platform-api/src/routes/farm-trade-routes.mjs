@@ -43,7 +43,7 @@ export async function handleFarmTradeRoute(context) {
     const playerId = authClaims.playerId;
     try {
         if (readingCurrent) {
-            writeJson(res, 200, await service({ playerId }), requestOrigin);
+            writeJson(res, 200, await service({ playerId, includeStats: new URL(req.url, "http://localhost").searchParams.get("stats") === "1" }), requestOrigin);
             return true;
         }
         if (readMatch) {

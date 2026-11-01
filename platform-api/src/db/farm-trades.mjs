@@ -115,7 +115,11 @@ export async function getCurrentFarmTrade(pool, input, now = Date.now()) {
     const playerId = required(input?.playerId, "playerId");
     const live = (await activeTradesOf(pool, playerId, now)).filter(({ state }) => isActiveTrade(state));
     live.sort((left, right) => right.state.createdAt - left.state.createdAt);
-    return { trade: live[0] ? farmTradeView(live[0].state, playerId) : null };
+    // Count the existing ledger, including trades completed before Stats supported them.
+    const record = input?.includeStats ? await pool.query(`select count(*)::int as completed from farm_trades
+     where status = 'completed' and (initiator_id = $1 or partner_id = $1)`, [playerId]) : null;
+    return { trade: live[0] ? farmTradeView(live[0].state, playerId) : null,
+        ...(record ? { stats: { completed: Number(record.rows?.[0]?.completed) || 0 } } : {}) };
 }
 /** GET /games/farm/trades/:id — one trade followed to its end; a completed one brings this player's farm as it now stands. */
 export async function getFarmTrade(pool, input, now = Date.now()) {

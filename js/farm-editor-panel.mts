@@ -1,3 +1,4 @@
+import { memorialDetails } from "./farm-memorial.mjs";
 // The farm's build-mode panel: the ground swatches, the catalog for the open
 // category, the placed list, and the inspector for whatever is selected.
 //
@@ -410,7 +411,7 @@ export function createFarmEditorPanel(elements: FarmPanelElements, actions: Farm
     }
     const memorial = row.memorialId ? state.layout.petHistory.find((entry) => entry.id === row.memorialId) : undefined;
     if (memorial) {
-      nodes.push(element("div", "inspector__memorial", `${memorial.name} · ${memorial.lifespanDays.toFixed(1)} days · ${memorial.traits.length ? memorial.traits.join(", ") : "No recorded traits"}`));
+      for (const line of memorialDetails(memorial)) nodes.push(element("div", "inspector__memorial", line));
     }
     const hint = element("small", "inspector__hint", definition.doors
       ? `Walk up to the ${definition.title.toLowerCase()} and press E to open the door${definition.shell?.door?.leaves === 2 ? "s" : ""}, then step inside. Animals stay out.`

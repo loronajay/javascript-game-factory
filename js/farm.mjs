@@ -1,3 +1,4 @@
+import { findMemorialInReach, memorialDetails } from "./farm-memorial.mjs";
 import { propertyWalkBounds, propertyObstacles, propertyPlatforms, propertyRoutes, PROPERTY_GATE_ID } from "./farm-property-scene.mjs";
 import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // The farm page: the composition root for `/farm/`.
@@ -130,7 +131,7 @@ const ticketChip = requiredElement("#farmTickets");
 // owns the mouse, Escape, one-sheet-at-a-time and the feedback toast.
 const hud = createFarmHud({
     canvas,
-    canRelock: () => farmEntered && !farmEditor.isEditing() && !leavingForMarket && !napDialog.open,
+    canRelock: () => farmEntered && !farmEditor.isEditing() && !leavingForMarket && !napDialog.open && !memorialDialog.open,
     controls: requiredElement("#controlHint"),
 });
 /** Feedback the player should see now: the toast over the field (and the gate's line, for whoever is still at it). */
@@ -500,9 +501,37 @@ for (const button of napDialog.querySelectorAll("[data-nap-hours]")) {
     button.addEventListener("click", () => startNap(Number(button.dataset.napHours)));
 }
 renderFarmClock();
+const memorialDialog = document.createElement("dialog");
+memorialDialog.className = "nap-dialog";
+memorialDialog.setAttribute("aria-label", "Pet memorial");
+document.body.append(memorialDialog);
+let memorialInReach = null;
+function openMemorial() {
+    if (!memorialInReach)
+        return;
+    const entry = layout.petHistory.find((row) => row.id === memorialInReach.memorialId);
+    const form = document.createElement("form");
+    form.method = "dialog";
+    const heading = document.createElement("h2");
+    heading.textContent = entry ? "In memory of " + entry.name : "Pet memorial";
+    form.append(heading);
+    for (const line of entry ? memorialDetails(entry) : ["This stone has no surviving pet record."]) {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = line;
+        form.append(paragraph);
+    }
+    const close = document.createElement("button");
+    close.className = "nap-dialog__cancel";
+    close.textContent = "Close";
+    form.append(close);
+    memorialDialog.replaceChildren(form);
+    keys.clear();
+    document.exitPointerLock?.();
+    memorialDialog.showModal();
+}
 function updateInteraction() {
     const pose = { x: player.x, z: player.z, y: body.y, yaw: player.yaw, forward: forwardVector() };
-    const walking = farmEntered && !farmEditor.isEditing() && !napDialog.open && napRemainingMinutes <= 0 && body.mode === "walking";
+    const walking = farmEntered && !farmEditor.isEditing() && !napDialog.open && !memorialDialog.open && napRemainingMinutes <= 0 && body.mode === "walking";
     // A released pet leaves the arms with the layout.
     if (carrying && !petSim.find(carrying))
         carrying = "";
@@ -521,7 +550,7 @@ function updateInteraction() {
         kitchen.update(pose, false);
         workshop.update(pose, false);
         livestock.update(pose, false);
-        if (hud.anyOpen() || farmEditor.isEditing() || !farmEntered) {
+        if (memorialDialog.open || hud.anyOpen() || farmEditor.isEditing() || !farmEntered) {
             setPrompt("");
             return;
         }
@@ -543,6 +572,7 @@ function updateInteraction() {
     trees.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach());
     kitchen.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach() && !trees.inReach());
     workshop.update(pose, handsFree && canManageFarm && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach() && !trees.inReach() && !kitchen.inReach());
+    memorialInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !crops.inReach() && !trees.inReach() && !kitchen.inReach() && !workshop.inReach() ? findMemorialInReach(layout, pose) : null;
     const producing = crops.inReach() || trees.inReach() || kitchen.inReach() || workshop.inReach();
     seatInReach = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing ? findSeatInReach(seats, pose) : null;
     nearbyPet = handsFree && !doorInReach && !ladderInReach && !bedInReach && !producing && !seatInReach ? findPetInReach(petBodies.views().filter((view) => view.instanceId !== carrying), pose) : null;
@@ -567,7 +597,7 @@ function updateInteraction() {
     // With a pet in hand, a door that already stands open yields to setting the pet down through it; a shut one is still opened first.
     if (held && putDownFits && doorInReach && openDoors.has(doorInReach.doorId))
         doorInReach = null;
-    if (hud.anyOpen() || farmEditor.isEditing() || !farmEntered) {
+    if (memorialDialog.open || hud.anyOpen() || farmEditor.isEditing() || !farmEntered) {
         setPrompt("");
         return;
     }
@@ -618,6 +648,11 @@ function updateInteraction() {
     }
     if (workshop.inReach()) {
         setPrompt(workshop.prompt());
+        return;
+    }
+    if (memorialInReach) {
+        const memory = layout.petHistory.find((entry) => entry.id === memorialInReach.memorialId);
+        setPrompt("Press E to remember " + (memory?.name ?? "this pet"));
         return;
     }
     if (seatInReach) {
@@ -691,6 +726,10 @@ function interact() {
         return kitchen.interact();
     if (workshop.inReach())
         return workshop.interact();
+    if (memorialInReach) {
+        openMemorial();
+        return true;
+    }
     if (seatInReach) {
         applyBodyStep(sitOn(player, body, seatInReach.seat, seatInReach.point));
         keys.clear();
@@ -925,7 +964,7 @@ function renderFieldCapacity() {
 }
 hud.fullscreen.bind(fullscreenButton);
 window.addEventListener("keydown", (event) => {
-    if (napDialog.open || napRemainingMinutes > 0) {
+    if (memorialDialog.open || napDialog.open || napRemainingMinutes > 0) {
         keys.clear();
         return;
     }
@@ -1112,7 +1151,7 @@ document.addEventListener("mousemove", (event) => {
     player.pitch = looked.pitch;
 });
 function updatePlayer(dt) {
-    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || hud.anyOpen() || farmEditor.isEditing() || napDialog.open || napRemainingMinutes > 0)
+    if (!farmEntered || leavingForMarket || trees.chopping() || stationBusy() || hud.anyOpen() || farmEditor.isEditing() || memorialDialog.open || napDialog.open || napRemainingMinutes > 0)
         return;
     if (riding.mounted()) {
         riding.step(dt, keys);
@@ -1373,6 +1412,8 @@ const statsPanel = createFarmStatsPanel({
     closeButton: requiredElement("#closeStats"),
     summary: requiredElement("#statsSummary"),
     grid: requiredElement("#statsGrid"),
+}, {
+    loadTrades: () => createPlatformApiClient().fetchCurrentFarmTrade(true),
 });
 statsPanel.render(layout.skills, anglerLink.stats());
 // The owner's away-growth rate lives beside their stats: 0 is a farm that waits for them.
@@ -1583,7 +1624,7 @@ const farmEditor = createFarmEditor({
         inspector: requiredElement("#farmInspector"),
     },
     // A visitor can never build, and the pets panel and the start gate own the screen while they are up.
-    canEnter: () => canManageFarm && farmEntered && !hud.anyOpen() && !stationBusy() && !napDialog.open && napRemainingMinutes <= 0,
+    canEnter: () => canManageFarm && farmEntered && !hud.anyOpen() && !stationBusy() && !napDialog.open && !memorialDialog.open && napRemainingMinutes <= 0,
     onEditingChange: (editing) => {
         keys.clear();
         draggingLook = false;

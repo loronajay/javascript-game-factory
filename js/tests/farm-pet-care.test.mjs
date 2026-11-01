@@ -425,15 +425,16 @@ test("Phase-5 warnings escalate and only a trusted, happy pet answers a call", (
 
 test("starvation atomically creates a movable memorial and durable final history", () => {
   let layout = addPet(createDefaultFarmLayout(), "pet.corgi", "Biscuit", () => 0.5).layout;
-  layout = { ...layout, pets: layout.pets.map((pet) => ({ ...pet, profile: { ...pet.profile, hunger: 0, starvingMinutes: 1440, ageDays: 22.5, traits: ["held.loves"] } })) };
+  layout = { ...layout, pets: layout.pets.map((pet) => ({ ...pet, profile: { ...pet.profile, hunger: 0, starvingMinutes: 1440, ageDays: 22.5, traits: ["held.loves"], milestones: ["dwelling:decor.pet.doghouse"] } })) };
   const resolved = resolvePetOutcomes(layout, layout.clock.farmMinutes, layout.clock.farmMinutes, () => 0.99);
   assert.equal(resolved.pets.length, 0);
   assert.equal(resolved.petHistory[0].outcome, "starvation");
   assert.equal(resolved.petHistory[0].lifespanDays, 22.5);
   assert.deepEqual(resolved.petHistory[0].traits, ["held.loves"]);
-  assert.deepEqual(resolved.petHistory[0].accomplishments, []);
+
   const stone = resolved.decor.find((row) => row.itemId === "decor.prop.pet-tombstone");
   assert.equal(stone.memorialId, resolved.petHistory[0].id);
+  assert.deepEqual(resolved.petHistory[0].accomplishments, ["dwelling:decor.pet.doghouse"]);
   const moved = normalizeFarmLayout({ ...resolved, decor: resolved.decor.map((row) => row.instanceId === stone.instanceId ? { ...row, x: 3, z: 4, rotationY: 1 } : row) });
   assert.equal(moved.decor.find((row) => row.instanceId === stone.instanceId).x, 3);
   const removed = removeFarmDecor(moved, stone.instanceId).layout;

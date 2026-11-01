@@ -48,6 +48,10 @@ function statCard(row) {
     return card;
 }
 export function createFarmStatsPanel(elements, options = {}) {
+    let latestSkills = null;
+    let latestFishing;
+    let trades = null;
+    let request = 0;
     function isOpen() { return !elements.root.hidden; }
     function close() {
         elements.root.hidden = true;
@@ -59,10 +63,20 @@ export function createFarmStatsPanel(elements, options = {}) {
         elements.root.hidden = false;
         elements.openButton.setAttribute("aria-pressed", "true");
         document.exitPointerLock?.();
+        const current = ++request;
+        void options.loadTrades?.().then((result) => {
+            if (current !== request || !Number.isSafeInteger(result?.stats?.completed) || result.stats.completed < 0)
+                return;
+            trades = result.stats;
+            if (latestSkills)
+                render(latestSkills, latestFishing);
+        }).catch(() => { });
     }
     function toggle() { isOpen() ? close() : open(); }
     function render(skills, fishing) {
-        const view = buildFarmStats(skills, { fishing });
+        latestSkills = skills;
+        latestFishing = fishing;
+        const view = buildFarmStats(skills, { fishing, trades });
         elements.summary.textContent = `Total level ${view.totalLevel} · ${view.totalXp.toLocaleString()} lifetime XP`;
         elements.grid.replaceChildren(...view.skills.map(statCard));
     }

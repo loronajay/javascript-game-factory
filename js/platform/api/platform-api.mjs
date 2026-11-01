@@ -714,8 +714,8 @@ export function createPlatformApiClient(options = {}) {
             return post("/games/farm/trades", { partnerId }, "result", {}, true);
         },
         /** The table this player is at, an invitation to them included: `{ trade }` with `trade` null when there is none. */
-        fetchCurrentFarmTrade() {
-            return get("/games/farm/trades/current");
+        fetchCurrentFarmTrade(includeStats = false) {
+            return get(`/games/farm/trades/current${includeStats ? "?stats=1" : ""}`);
         },
         /** One table followed to its end; a completed one brings this player's farm as it now stands. */
         fetchFarmTrade(tradeId) {

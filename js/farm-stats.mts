@@ -76,7 +76,7 @@ function skill(
   });
 }
 
-export function buildFarmStats(skills: FarmSkills, extras: Readonly<{ fishing?: FishingStats | null }> = {}): FarmStatsView {
+export function buildFarmStats(skills: FarmSkills, extras: Readonly<{ fishing?: FishingStats | null; trades?: { completed: number } | null }> = {}): FarmStatsView {
   const rows: FarmSkillStats[] = [
     skill(
       "farming", "Farming", "Grow crops, pick orchard fruit and fill produce orders.", skills.farming.xp,
@@ -160,7 +160,10 @@ export function buildFarmStats(skills: FarmSkills, extras: Readonly<{ fishing?: 
       { label: "Tickets saved", value: skills.bartering.saved },
       { label: "Bonus earned", value: skills.bartering.bonus },
     ],
-    "Trade record", [],
+    "Trade record", [
+      { label: "NPC deals", value: skills.bartering.deals },
+      ...(extras.trades ? [{ label: "Completed friend trades", value: extras.trades.completed }] : []),
+    ],
   ));
   return Object.freeze({
     totalLevel: rows.reduce((total, row) => total + row.level, 0),

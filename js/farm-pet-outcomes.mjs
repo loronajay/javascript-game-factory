@@ -59,7 +59,7 @@ function remember(layout, pet, outcome, farmMinute) {
         id, instanceId: pet.instanceId, speciesId: pet.speciesId, name: pet.name, outcome,
         departedAtFarmMinute: farmMinute, lifespanDays: profile.ageDays,
         finalStats: Object.freeze({ gender: profile.gender, ageDays: profile.ageDays, size: profile.size.current, hunger: profile.hunger, happiness: profile.happiness, speed: profile.stats.speed, strength: profile.stats.strength }),
-        traits: Object.freeze([...profile.traits]), accomplishments: Object.freeze([]),
+        traits: Object.freeze([...profile.traits]), accomplishments: Object.freeze([...profile.milestones]),
     });
     let next = withPetHistory(withFarmPets(layout, layout.pets.filter((row) => row.instanceId !== pet.instanceId)), [...layout.petHistory, entry]);
     if (outcome === "runaway")
