@@ -147,6 +147,8 @@ export function farmPlankValue(speciesId: string): number {
  */
 export const PIECE_PREMIUM: Readonly<Record<DishStars, number>> = Object.freeze({ 1: 2, 2: 2.5, 3: 3.2 });
 /** A fine piece's tickets come half back when it is sold, so buying one to sell never mints. */
+/** Crafting work is paid by recipe level and finish. */
+export const PIECE_LABOR_FINISH = Object.freeze({ 1: 1, 2: 1.25, 3: 1.6 });
 export const PIECE_TICKET_RESALE = 0.5;
 
 export function farmPieceRawValue(itemId: string): number {
@@ -155,10 +157,11 @@ export function farmPieceRawValue(itemId: string): number {
   return Object.entries(rule.planks).reduce((sum, [speciesId, count]) => sum + farmPlankValue(speciesId) * count, 0);
 }
 
+/** Wood premium plus skilled crafting pay, with half the ticket cost returned. */
 export function farmPiecePrice(itemId: string, stars: DishStars): number {
   const rule = farmPieceRule(itemId);
   if (!rule) return 0;
-  return Math.ceil(farmPieceRawValue(itemId) * PIECE_PREMIUM[stars] + rule.tickets * PIECE_TICKET_RESALE);
+  return Math.ceil(farmPieceRawValue(itemId) * PIECE_PREMIUM[stars] + (20 + rule.minLevel * 4) * PIECE_LABOR_FINISH[stars] + rule.tickets * PIECE_TICKET_RESALE);
 }
 
 export const FARM_PIECE_PRICES: Readonly<Record<string, number>> = Object.freeze(Object.fromEntries(

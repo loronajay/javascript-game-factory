@@ -915,11 +915,12 @@ export function createLogPile(THREE: ThreeNamespace): any {
   const rows = [5, 4, 3, 2];
   rows.forEach((count, row) => {
     for (let index = 0; index < count; index += 1) {
-      const z = -(count - 1) * 0.16 + index * 0.32;
-      const y = 0.14 + row * 0.26;
+      // Touching cylinders: each upper log rests in the gap between two below.
+      const spacing = 0.28;
+      const z = -(count - 1) * spacing / 2 + index * spacing;
+      const y = 0.14 + row * spacing * Math.sqrt(3) / 2;
       const log = tcylinder(THREE, group, 0.14, 0.14, 1.4, [0, y, z], bark, 9);
       log.rotation.z = Math.PI / 2;
-      log.rotation.y = (row + index) * 0.4;
       for (const x of [-0.7, 0.7]) {
         const end = tcylinder(THREE, group, 0.13, 0.13, 0.02, [x, y, z], cut, 12, false);
         end.rotation.z = Math.PI / 2;
@@ -927,11 +928,14 @@ export function createLogPile(THREE: ThreeNamespace): any {
       }
     }
   });
-  for (const z of [-0.42, 0.42]) tbox(THREE, group, [0.07, 1.15, 0.07], [-0.55, 0.575, z], timber(THREE, WOOD_DARK), false);
+  for (const z of [-0.735, 0.735]) tbox(THREE, group, [0.07, 1.15, 0.07], [-0.55, 0.575, z], timber(THREE, WOOD_DARK), false);
   // An axe leaning on the pile.
-  const handle = cylinder(THREE, group, 0.02, 0.025, 0.8, [0.75, 0.4, 0.5], timber(THREE, "#c9b99c"), 6);
-  handle.rotation.z = -0.45;
-  box(THREE, group, [0.18, 0.12, 0.03], [0.55, 0.7, 0.5], standard(THREE, "#5a6068", 0.4, 0.7));
+  const axe = new THREE.Group();
+  axe.position.set(0.78, 0.37, 0.5);
+  axe.rotation.z = 0.45;
+  group.add(axe);
+  cylinder(THREE, axe, 0.02, 0.025, 0.8, [0, 0, 0], timber(THREE, "#c9b99c"), 6);
+  box(THREE, axe, [0.18, 0.12, 0.03], [0, 0.32, 0], standard(THREE, "#5a6068", 0.4, 0.7));
   return group;
 }
 

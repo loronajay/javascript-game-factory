@@ -81,11 +81,14 @@ export const SELLABLE_DISHES = Object.freeze(RECIPE_CATALOG.flatMap((recipe) => 
 // ---------------------------------------------------------------- furniture
 /**
  * What the Sawmill pays for a piece: its planks' worth times a premium by
- * stars, and half back of any tickets a fine piece asked for. A log is worth a
+ * stars, skilled crafting pay by level and finish, and half back of any tickets
+ * a fine piece asked for. A log is worth a
  * timber tree's regrowth days at the market's margin over the logs a felling
  * yields; a plank is a third of a log (platform-api's farm-carpentry-catalog pays).
  */
 export const PIECE_PREMIUM = Object.freeze({ 1: 2, 2: 2.5, 3: 3.2 });
+/** Crafting work is paid by recipe level and finish. */
+export const PIECE_LABOR_FINISH = Object.freeze({ 1: 1, 2: 1.25, 3: 1.6 });
 export const PIECE_TICKET_RESALE = 0.5;
 export function plankValue(speciesId) {
     const species = TIMBER_TREES.find((entry) => entry.id === speciesId);
@@ -97,7 +100,7 @@ export function pieceRawValue(itemId) {
 }
 export function piecePrice(itemId, stars) {
     const pattern = PATTERN_CATALOG.find((entry) => entry.id === itemId);
-    return pattern ? Math.ceil(pieceRawValue(itemId) * PIECE_PREMIUM[stars] + pattern.tickets * PIECE_TICKET_RESALE) : 0;
+    return pattern ? Math.ceil(pieceRawValue(itemId) * PIECE_PREMIUM[stars] + (20 + pattern.minLevel * 4) * PIECE_LABOR_FINISH[stars] + pattern.tickets * PIECE_TICKET_RESALE) : 0;
 }
 export const PIECE_PRICES = Object.freeze(Object.fromEntries(PATTERN_CATALOG.flatMap((pattern) => PIECE_STARS.map((stars) => [pieceKey(pattern.id, stars), piecePrice(pattern.id, stars)]))));
 /** Everything the Sawmill buys: every piece, finest first within a pattern. */

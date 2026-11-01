@@ -80,8 +80,9 @@ export function destinationSign(THREE, root, text, x, z, rotationY = 0) {
 }
 /** Visible trailheads at the Cove's western and eastern shore entrances. */
 export function createCoveTrailheads(THREE, scene) {
-    destinationSign(THREE, scene, "← FERNFALL GROTTO", -20, 11.4, 0.2);
-    destinationSign(THREE, scene, "EMBERGLASS LAGOON →", 20, 11.4, -0.2);
+    // Beyond the wall and records board, beside the trail rather than behind the board.
+    destinationSign(THREE, scene, "← FERNFALL GROTTO", -23, 11.4, 0.2);
+    destinationSign(THREE, scene, "EMBERGLASS LAGOON →", 23, 11.4, -0.2);
     for (const side of [-1, 1])
         bankTrail(THREE, scene, side * 24, 9.5, 16, () => 0);
 }
