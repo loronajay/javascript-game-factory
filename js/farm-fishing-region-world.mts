@@ -1,3 +1,4 @@
+import { createFernfallScenery } from "./farm-fernfall-scenery.mjs";
 import { createSurfaceMaterial } from "./arcade-room-surfaces.mjs";
 import { normalizeFarmLayout, type FarmDecorRow } from "./farm-layout.mjs";
 import type { FarmObstacle } from "./farm-body.mjs";
@@ -82,26 +83,46 @@ export function createFishingRegionWorld(THREE: Three, scene: any, region: Fishi
   const root = new THREE.Group(); root.name = `fishing-region-${region.id}`; scene.add(root);
   if (scene.fog) { scene.fog.near = 65; scene.fog.far = 190; }
   const volcanic = region.id === "volcanic";
+  const grotto = region.id === "grotto";
+  if (grotto && scene.fog) { scene.fog.near = 38; scene.fog.far = 115; }
   const ground = new THREE.PlaneGeometry(400, 400, 400, 400); ground.rotateX(-Math.PI / 2);
   const positions = ground.attributes.position;
   for (let index = 0; index < positions.count; index += 1) {
-    positions.setY(index, regionGroundAt(region, { x: positions.getX(index), z: positions.getZ(index) }));
+    const x = positions.getX(index), z = positions.getZ(index);
+    const outside = Math.max(0, Math.max(Math.abs(x), Math.abs(z)) - 39);
+    const hills = grotto ? (1 - Math.exp(-outside / 16)) * (7 + Math.sin(x * .045 + z * .033) * 3) : 0;
+    positions.setY(index, regionGroundAt(region, { x, z }) + hills);
   }
   ground.computeVertexNormals();
-  const floor = new THREE.Mesh(ground, createSurfaceMaterial(THREE, { pattern: !volcanic ? "grass" : "dirt", colors: !volcanic ? ["#487044", "#3c6139", "#75925b", "#5f573c"] : ["#4a4850", "#383942", "#69616b", "#827079"], repeat: 7, roughness: 1, metalness: 0 }, { u: 400, v: 400 }));
+  const floor = new THREE.Mesh(ground, createSurfaceMaterial(THREE, { pattern: !volcanic ? "grass" : "dirt", colors: !volcanic ? (grotto ? ["#456348", "#405d43", "#647859", "#535b43"] : ["#487044", "#3c6139", "#75925b", "#5f573c"]) : ["#4a4850", "#383942", "#69616b", "#827079"], repeat: 7, roughness: 1, metalness: 0 }, { u: 400, v: 400 }));
+  if (grotto) {
+    const colors: number[] = [], color = new THREE.Color();
+    const earth = new THREE.Color("#a7a18a"), green = new THREE.Color("#d6dfc5");
+    for (let index = 0; index < positions.count; index++) {
+      const x = positions.getX(index), z = positions.getZ(index);
+      const patch = Math.sin(x * .28 + Math.sin(z * .17)) * Math.cos(z * .31 - x * .12);
+      color.copy(earth).lerp(green, .5 + patch * .5);
+      colors.push(color.r, color.g, color.b);
+    }
+    ground.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3)); floor.material.vertexColors = true;
+  }
   floor.receiveShadow = true; root.add(floor);
   const waterTime = { value: 0 };
   const waterMaterial = new THREE.ShaderMaterial({
-    uniforms: { time: waterTime, tint: { value: new THREE.Color(region.water) } },
+    uniforms: { daylight: { value: Math.min(1, scene.children.find((object: any) => object.isHemisphereLight)?.intensity ?? 1) }, grotto: { value: grotto ? 1 : 0 }, time: waterTime, tint: { value: new THREE.Color(grotto ? "#399b89" : region.water) } },
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
     vertexShader: `varying vec2 uvWater; void main(){ uvWater=(modelMatrix*vec4(position,1.)).xz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader: `uniform float time; uniform vec3 tint; varying vec2 uvWater;
+    fragmentShader: `uniform float time; uniform float grotto; uniform float daylight; uniform vec3 tint; varying vec2 uvWater;
       void main(){ float ripple=(sin(uvWater.x*2.4+uvWater.y*.8+time*.7)+sin(uvWater.y*3.1-uvWater.x*.6-time*.9)+sin(uvWater.x*1.2-uvWater.y*1.7+time*.4))/3.;
-      float sparkle=pow(max(0.,ripple),18.); gl_FragColor=vec4(tint+vec3(ripple*.025+sparkle*.12),.82); }`,
+      float sparkle=pow(max(0.,ripple),18.); vec3 color=tint+vec3(ripple*.025+sparkle*.12);
+      if(grotto>.5){ float reflection=sin(uvWater.x*.19+sin(uvWater.y*.24)+ripple*.15)*.5+.5;
+        color=(mix(tint*.72,vec3(.24,.48,.40),reflection*.5)+vec3(sparkle*.14))*daylight; }
+      gl_FragColor=vec4(color,grotto>.5?.9:.82); }`,
   });
   for (const pool of region.pools) {
     const surface = new THREE.Mesh(new THREE.CircleGeometry(1, 96), waterMaterial);
     surface.rotation.x = -Math.PI / 2; surface.scale.set(pool.rx, pool.rz, 1); surface.position.set(pool.x, -0.3, pool.z); root.add(surface);
+    if (grotto) continue;
     const shorePositions: number[] = [];
     for (let step = 0; step < 160; step += 1) {
       const angle = (step + 0.5) / 160 * Math.PI * 2;
@@ -121,14 +142,14 @@ export function createFishingRegionWorld(THREE: Three, scene: any, region: Fishi
     mesh.position.set(x, y, z); mesh.scale.set(sx, sy, sz); mesh.rotation.y = x * 0.31; mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh); return mesh;
   }
   // An enclosing skyline beyond the walkable boundary; pools remain fully accessible.
-  for (let index = 0; index < 19; index += 1) {
+  for (let index = 0; index < (grotto ? 0 : 19); index += 1) {
     const x = -43 + index * 4.8; const height = volcanic ? 7 + (index % 5) * 2.3 : 9 + Math.sin(index * 1.7) * 3;
     rock(x, height / 2 - 1, -39 - (index % 3) * 1.4, 5, height, 5.5);
     if (!volcanic && index % 2 === 0) {
       const tree = createTree(THREE, index + 61); tree.position.set(x, height + 1, -40); tree.scale.setScalar(1.1); root.add(tree);
     }
   }
-  for (let index = 0; index < 60; index += 1) {
+  for (let index = 0; index < (grotto ? 0 : 60); index += 1) {
     const pool = region.pools[index % region.pools.length]!;
     const angle = index * 2.399;
     const x = pool.x + Math.cos(angle) * pool.rx * 0.985, z = pool.z + Math.sin(angle) * pool.rz * 0.985;
@@ -137,7 +158,7 @@ export function createFishingRegionWorld(THREE: Three, scene: any, region: Fishi
     rock(x, -0.05, z, size * 1.3, size * 0.7, size);
   }
   // Dense vegetation outside the playable boundary frames the pools without blocking routes.
-  for (let index = 0; index < 36; index += 1) {
+  for (let index = 0; index < (grotto ? 0 : 36); index += 1) {
     const angle = index / 36 * Math.PI * 2;
     const x = Math.cos(angle) * 45, z = Math.sin(angle) * 43;
     if (z < -30 || (Math.abs(z - 20) < 5)) continue;
@@ -145,26 +166,7 @@ export function createFishingRegionWorld(THREE: Three, scene: any, region: Fishi
   }
   const animated: Array<(seconds: number) => void> = [];
   if (region.id === "grotto") {
-    // Water descends from the north cliff directly into the main pool.
-    const cascade = new THREE.ShaderMaterial({
-      uniforms: { time: waterTime }, transparent: true, side: THREE.DoubleSide,
-      vertexShader: `varying vec2 flowUv; void main(){flowUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-      fragmentShader: `varying vec2 flowUv; uniform float time; void main(){float streak=sin(flowUv.x*90.+sin(flowUv.x*23.+flowUv.y*4.-time*3.))*.035;
-        float drops=sin(flowUv.y*120.+time*14.+sin(flowUv.x*49.))*.025; gl_FragColor=vec4(vec3(.66,.91,.9)+streak+drops,.82);}`,
-    });
-    rock(-16, 5, -32, 5, 9, 5); rock(-2, 6, -33, 5, 10, 5);
-    const ledge = new THREE.Mesh(new THREE.BoxGeometry(9, 2.5, 8), rockMaterial); ledge.position.set(-9, 15.5, -31); ledge.castShadow = true; root.add(ledge);
-    const fall = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 16, 12, 24), cascade);
-    fall.position.set(-9, 7.7, -26.9); root.add(fall);
-    const foamMaterial = new THREE.MeshBasicMaterial({ color: "#def9eb", transparent: true, opacity: 0.65, depthWrite: false });
-    for (let index = 0; index < 12; index += 1) {
-      const foam = new THREE.Mesh(new THREE.TorusGeometry(0.8 + index * 0.12, 0.06, 5, 28), foamMaterial);
-      foam.rotation.x = -Math.PI / 2; foam.position.set(-9 + Math.sin(index * 2.4) * 2, -0.26, -28 + (index % 3) * 1.2); root.add(foam);
-      animated.push((seconds) => foam.scale.setScalar(0.7 + ((seconds * 0.25 + index / 12) % 1) * 1.5));
-    }
-    for (const {x, z} of regionShoreTrees(region)) {
-      const tree = createWillow(THREE, Math.abs(x * 7 + z)); tree.position.set(x, 0, z); tree.scale.setScalar(1.3); root.add(tree);
-    }
+    animated.push(createFernfallScenery(THREE, root, region, waterTime));
   } else if (volcanic) {
     // Palms are bank landmarks and have matching solid trunks in the scene data.
     const palmWood = new THREE.MeshStandardMaterial({ color: "#80664f", roughness: 0.95 });
@@ -208,7 +210,7 @@ export function createFishingRegionWorld(THREE: Three, scene: any, region: Fishi
     }
   }
   // Low ferns / crystal clusters dress the shore without blocking casting routes.
-  for (let index = 0; index < 80; index += 1) {
+  for (let index = 0; index < (grotto ? 0 : 80); index += 1) {
     const angle = index * 2.399; const radius = 24 + (index % 9) * 1.1;
     const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
     if (regionWaterDistance(region, { x, z }) > -1.4 || Math.abs(z - 20) < 4) continue;
@@ -240,7 +242,7 @@ function bankTrail(THREE: Three, root: any, centerX: number, centerZ: number, le
   const at = (step: number, side: number): number[] => {
     const t = step / steps;
     const x = centerX + (t - 0.5) * length;
-    const width = Math.pow(Math.sin(Math.PI * t), 0.35) * (1.15 + Math.sin(step * 2.1 + side) * 0.12);
+    const width = Math.pow(Math.sin(Math.PI * t), 0.35) * (1.15 + Math.sin(t * 13 + side) * 0.09 + Math.sin(t * 27) * 0.035);
     const z = centerZ + Math.sin(t * Math.PI * 2) * 0.3 + side * width;
     return [x, heightAt({ x, z }) + 0.018, z];
   };

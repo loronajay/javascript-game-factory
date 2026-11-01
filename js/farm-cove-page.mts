@@ -227,7 +227,7 @@ const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 260);
 camera.rotation.order = "YXZ";
 scene.add(camera);
 const layout = coveLayout();
-const world = createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => coveWaterDistance({ x, z }) > -4 });
+const world = createFarmWorld(THREE, scene, { groundCover: false, field: false, keepClear: (x, z) => region?.id === "grotto" || coveWaterDistance({ x, z }) > -4 });
 world.sync(layout);
 // Like the farm and square, the Cove uses this client's paused farm clock;
 // people fishing together can therefore see different skies. `?time=` is QA.
