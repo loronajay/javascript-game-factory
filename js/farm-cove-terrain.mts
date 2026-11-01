@@ -148,10 +148,28 @@ function placeDock(THREE: ThreeNamespace, root: any, loader: any, dock: CoveDock
     // The wide dock turned across the pier's end: its length runs east-west.
     loader.load(assetUrl("dock-wide.glb"), (gltf: any) => {
       const model = gltf.scene;
-      // The head is entered from the side: its rope rail crosses the walkway.
-      // Keep the timber deck/posts, but leave the fishing platform visibly open.
+      // The head is entered from local -X after turning it across the pier.
+      // Both the rope and the middle piling on that side cross the walkway.
       model.traverse((node: any) => {
-        if (node.isMesh && node.material?.name === "String") node.visible = false;
+        if (!node.isMesh) return;
+        if (node.material?.name === "String") {
+          node.visible = false;
+          return;
+        }
+        // The pack merges the pilings and planks into material meshes. Remove
+        // only faces wholly inside the entrance piling's footprint, including
+        // its LightWood end caps; keep the deck and the other five pilings.
+        const geometry = node.geometry.clone();
+        const position = geometry.attributes.position;
+        const index = geometry.index;
+        const kept: number[] = [];
+        const inPiling = (vertex: number): boolean => position.getX(vertex) < -6.25 && Math.abs(position.getZ(vertex)) < 0.7;
+        for (let offset = 0; offset < (index?.count ?? position.count); offset += 3) {
+          const face = [0, 1, 2].map((corner) => index ? index.getX(offset + corner) : offset + corner);
+          if (!face.every(inPiling)) kept.push(...face);
+        }
+        geometry.setIndex(kept);
+        node.geometry = geometry;
       });
       const along = width / HEAD_MODEL.length;
       const across = (depth + 0.3) / HEAD_MODEL.width;
@@ -277,8 +295,12 @@ export function createCoveTerrain(THREE: ThreeNamespace, scene: any): CoveTerrai
     boat = gltf.scene;
     const scale = 3.2 / 9.01;
     boat.scale.setScalar(scale);
-    boat.position.set(13.7, COVE_WATER_LEVEL - 0.22, -1.5);
     boat.rotation.y = 0.08;
+    // Moor off the pier's east edge, allowing for the rotated hull's full
+    // width and the dock's projecting pilings, even when the pier moves.
+    const pier = COVE_DOCKS.find((dock) => dock.id === "sea-pier")!;
+    const hull = new THREE.Box3().setFromObject(boat);
+    boat.position.set(pier.deck.maxX + 0.45 - hull.min.x, COVE_WATER_LEVEL - 0.22, (pier.deck.minZ + pier.deck.maxZ) / 2);
     shade(boat);
     root.add(boat);
   }, undefined, () => undefined);
