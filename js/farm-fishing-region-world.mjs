@@ -1,11 +1,18 @@
-import { createFernfallScenery } from "./farm-fernfall-scenery.mjs";
+import { createFernfallScenery, fernfallRockFace } from "./farm-fernfall-scenery.mjs";
 import { createSurfaceMaterial } from "./arcade-room-surfaces.mjs";
 import { normalizeFarmLayout } from "./farm-layout.mjs";
 import { createTree, createWillow, createPine } from "./farm-props-plants.mjs";
 import { REGION_BOUNDS, regionShoreTrees, regionGroundAt, regionWaterDistance, regionZoneAt } from "./farm-fishing-regions.mjs";
-/** Water blockers use thin strips of the same ellipse as the visible bank. */
+/** Water blockers follow the visible banks; Fernfall's north cliff is solid too. */
 export function regionWaterObstacles(region) {
     const out = [];
+    if (region.id === "grotto") {
+        for (let x = -37; x < 37; x++) {
+            const front = Math.max(...[x, x + .5, x + 1].map(at => fernfallRockFace(at, 0)[2]));
+            out.push({ instanceId: `grotto-cliff-${x}`, x: x + .5, z: (-38 + front) / 2,
+                rotationY: 0, footprint: { width: 1, depth: front + 38 }, bottom: -Infinity, top: Infinity });
+        }
+    }
     for (const [poolIndex, pool] of region.pools.entries()) {
         const steps = Math.ceil(pool.rx * 4);
         const width = pool.rx * 2 / steps;
@@ -23,7 +30,7 @@ export function fishingRegionScene(region) {
     const side = region.id === "grotto" ? 1 : -1;
     const decor = [
         { instanceId: rail, itemId: "decor.prop.hitching-rail", x: side * 31, z: 29, rotationY: 0, length: 0 },
-        { instanceId: `${region.id}-bench`, itemId: "decor.prop.bench", x: side * 10, z: 23, rotationY: 0, length: 0 },
+        { instanceId: `${region.id}-bench`, itemId: "decor.prop.bench", x: side * 10, z: 23, rotationY: region.id === "grotto" ? Math.atan2(-19, -51) : 0, length: 0 },
         { instanceId: `${region.id}-lamp`, itemId: "decor.prop.lamp-post", x: side * 13, z: 24, rotationY: 0, length: 0 },
         { instanceId: `${region.id}-camp`, itemId: "decor.prop.campfire", x: side * 18, z: 24, rotationY: 0, length: 0 },
     ];
@@ -47,7 +54,7 @@ export function fishingRegionScene(region) {
         },
     };
 }
-export function destinationSign(THREE, root, text, x, z, rotationY = 0) {
+export function destinationSign(THREE, root, text, x, z, rotationY = 0, twoSided = false) {
     const canvas = document.createElement("canvas");
     canvas.width = 768;
     canvas.height = 192;
@@ -74,8 +81,14 @@ export function destinationSign(THREE, root, text, x, z, rotationY = 0) {
     const face = new THREE.Mesh(new THREE.PlaneGeometry(2.54, 0.61), new THREE.MeshStandardMaterial({ map: texture, roughness: 1 }));
     face.position.set(0, 1.7, 0.081);
     group.add(face);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 1.65, 7), new THREE.MeshStandardMaterial({ color: "#614c39" }));
-    post.position.set(0, 0.825, -0.12);
+    if (twoSided) {
+        const reverse = face.clone();
+        reverse.rotation.y = Math.PI;
+        reverse.position.z = -0.081;
+        group.add(reverse);
+    }
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 1.4, 7), new THREE.MeshStandardMaterial({ color: "#614c39" }));
+    post.position.set(0, 0.7, -0.12);
     group.add(post);
     root.add(group);
 }
@@ -287,9 +300,9 @@ export function createFishingRegionWorld(THREE, scene, region) {
     }
     // A broad dry path follows the southern bank to the Cove exit.
     bankTrail(THREE, root, region.exit.x > 0 ? 23 : -23, 20, 28, (point) => regionGroundAt(region, point));
-    destinationSign(THREE, root, region.requiredProperty ? "YOUR FARM  /  RETURN PATH" : "THE COVE  / RETURN PATH", region.exit.x > 0 ? 32 : -32, 16, region.exit.x > 0 ? -0.2 : 0.2);
+    destinationSign(THREE, root, region.requiredProperty ? "YOUR FARM  /  RETURN PATH" : "THE COVE  / RETURN PATH", region.exit.x > 0 ? 32 : -32, 16, grotto ? -Math.PI / 2 : region.exit.x > 0 ? -0.2 : 0.2, grotto);
     // Arrival marker looks back toward the destination, away from the narrow exit.
-    destinationSign(THREE, root, region.title.toUpperCase(), region.spawn.x * 0.72, 25);
+    destinationSign(THREE, root, region.title.toUpperCase(), region.spawn.x * 0.72, 25, grotto ? Math.PI / 2 : 0, grotto);
     return {
         update(_dt, seconds) { waterTime.value = seconds; for (const animate of animated)
             animate(seconds); },
