@@ -9,6 +9,7 @@ export function createPropertiesPanel(deps: Readonly<{
   canBuy: boolean; farm: () => FarmLayout; balance: () => number | null;
   shop: () => Promise<any>; purchase: (id: string) => Promise<any>;
   selectProperty: (id: string) => Promise<{ ok: boolean; error?: string }>;
+  setDefaultProperty: (id: string) => Promise<{ ok: boolean; error?: string }>;
   takeBalance: (balance: number) => void; onClose: () => void;
 }>) {
   const root = element("aside", "inventory-panel properties-panel"); root.hidden = true;
@@ -24,6 +25,22 @@ export function createPropertiesPanel(deps: Readonly<{
   let busy = false; let ready = false;
   const close = () => { root.hidden = true; deps.onClose(); };
   closeButton.addEventListener("click", close);
+  function defaultButton(id: string): HTMLButtonElement {
+    const selected = id === (deps.farm().defaultProperty ?? deps.farm().lot ?? "meadow");
+    const button = element("button", "farm-button", selected ? "Default from platform" : "Set as default farm");
+    button.type = "button"; button.disabled = selected || busy || !ready || !deps.canBuy || (id !== "meadow" && !owned.has(id));
+    button.addEventListener("click", () => { void setDefault(id); });
+    return button;
+  }
+  async function setDefault(id: string): Promise<void> {
+    if (busy) return;
+    busy = true; draw();
+    try {
+      const result = await deps.setDefaultProperty(id);
+      status.textContent = result.ok ? "Your default farm is saved. The platform Farm link will open it." : "The default could not be saved. Reload the market and try again.";
+    } catch { status.textContent = "The property office could not be reached. Please try again."; }
+    finally { busy = false; draw(); }
+  }
   function draw(): void {
     body.replaceChildren();
     const current = FARM_LOTS.find((property) => property.id === deps.farm().lot);
@@ -31,7 +48,7 @@ export function createPropertiesPanel(deps: Readonly<{
     body.append(element("p", "properties-panel__balance", deps.balance() === null ? "Sign in to purchase property with tickets." : `${deps.balance()!.toLocaleString()} tickets available`));
     const meadow = element("button", "farm-button", deps.farm().lot ? "Return to Meadow Farm · 28 × 28 m" : "Meadow Farm · Current farm");
     meadow.type = "button"; meadow.disabled = busy || !ready || !deps.canBuy || !deps.farm().lot;
-    meadow.addEventListener("click", () => { void buy("meadow"); }); body.append(meadow);
+    meadow.addEventListener("click", () => { void buy("meadow"); }); body.append(meadow, defaultButton("meadow"));
     for (const property of FARM_LOTS) {
       const card = element("article", `property-card property-card--${property.theme}`);
       const image = element("img", "property-card__preview"); image.src = new URL(`../farm/assets/properties/${property.preview}`, import.meta.url).toString(); image.alt = `${property.title}: ${property.setting}`;
@@ -46,7 +63,7 @@ export function createPropertiesPanel(deps: Readonly<{
       button.addEventListener("click", () => { void buy(property.id); });
       const tour = element("a", "farm-button", "Free walkthrough");
       tour.href = new URL(`../farm/tour.html?property=${encodeURIComponent(property.id)}`, import.meta.url).toString();
-      copy.append(tour, button); card.append(image, copy); body.append(card);
+      copy.append(tour, button, defaultButton(property.id)); card.append(image, copy); body.append(card);
     }
   }
   async function buy(id: string): Promise<void> {

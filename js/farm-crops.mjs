@@ -1,6 +1,7 @@
 // Persistent crop rules. This is deliberately independent of THREE and the DOM:
 // the page, server normalizer and headless tests all use the same farming contract.
 import { PET_CARE } from "./farm-pet-care.mjs";
+import { cropCanGrowInRegion } from "./farm-regions.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
 import { LIVESTOCK_BASKET_ITEMS, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
@@ -31,9 +32,9 @@ export const MAX_CARE_PENALTY = 0.6;
  * already closer than that when they left gets no worse while they are gone.
  */
 export const OFFLINE_RESCUE_MINUTES = FARM_DAY_MINUTES;
-const crop = (id, title, seedPrice, days, yieldCount, models) => Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) });
+const crop = (id, title, seedPrice, days, yieldCount, models, regions) => Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]), ...(regions ? { regions: Object.freeze([...regions]) } : {}) });
 /** Crops drawn by farm/crop-lab/generator (same palette atlas as the Grimnir pack): three stages and a ripe plant. */
-const generated = (id, title, seedPrice, days, yieldCount) => crop(id, title, seedPrice, days, yieldCount, [`Crop_${title}_STAGE_1_01.glb`, `Crop_${title}_STAGE_2_01.glb`, `Crop_${title}_STAGE_3_01.glb`, `Crop_${title}_RIPE_01.glb`]);
+const generated = (id, title, seedPrice, days, yieldCount, regions) => crop(id, title, seedPrice, days, yieldCount, [`Crop_${title}_STAGE_1_01.glb`, `Crop_${title}_STAGE_2_01.glb`, `Crop_${title}_STAGE_3_01.glb`, `Crop_${title}_RIPE_01.glb`], regions);
 export const CROP_CATALOG = Object.freeze([
     crop("bean", "Bean", 10, 3, 4, ["Crop_Bean_STAGE_1_01.glb", "Crop_Bean_STAGE_2_01.glb", "Crop_Bean_STAGE_3_01.glb", "Crop_Bean_STAGE_4_01.glb"]),
     crop("beetroot", "Beetroot", 7, 2, 3, ["Crop_Beetroot_STAGE_1_01.glb", "Crop_Beetroot_STAGE_2_01.glb", "Crop_Beetroot_STAGE_3_01.glb", "Crop_Beetroot_01.glb"]),
@@ -329,11 +330,13 @@ function result(agriculture, ok, reason = "") {
     return Object.freeze({ ok, reason, agriculture });
 }
 /** `capacity` is how many crops may be in the ground at once (farm-capacity.mts); planting past it is refused. */
-export function plantFarmCrop(value, plotId, cellId, cropId, now, capacity = Infinity) {
+export function plantFarmCrop(value, plotId, cellId, cropId, now, capacity = Infinity, regionId = "mainland") {
     const agriculture = advanceAgriculture(value, now);
     const definition = findCrop(cropId);
     if (!definition)
         return result(agriculture, false, "unknown_crop");
+    if (!cropCanGrowInRegion(definition, regionId))
+        return result(agriculture, false, "wrong_region");
     if (!SOIL_CELL_IDS.has(cellId))
         return result(agriculture, false, "unknown_cell");
     if (agriculture.crops.some((row) => row.plotId === plotId && row.cellId === cellId))

@@ -14,6 +14,7 @@
 import { canFertilizeCrop, clearDeadFarmCrop, clearFarmCrop, cropStatus, fertilizeFarmCrop, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop } from "./farm-crops.mjs";
 import { QUALITY_TITLES, gradedTitle } from "./farm-quality.mjs";
 import { cropCapacity, cropCapacityUse } from "./farm-capacity.mjs";
+import { cropCanGrowInRegion, farmRegionForProperty, findFarmRegion } from "./farm-regions.mjs";
 import { withFarmAgriculture, withFarmClock } from "./farm-layout.mjs";
 export function createFarmCropsController(deps) {
     let target = null;
@@ -28,6 +29,8 @@ export function createFarmCropsController(deps) {
         const planted = plantedAt(layout);
         if (!planted) {
             const selected = findCrop(deps.selectedCropId());
+            if (!cropCanGrowInRegion(selected, farmRegionForProperty(layout.lot)))
+                return `${selected.title} needs a different climate · grows in ${selected.regions?.map((id) => findFarmRegion(id)?.title ?? id).join(", ")}`;
             const seeds = layout.agriculture.inventory.seeds[selected.id] ?? 0;
             const fields = cropCapacityUse(layout.agriculture, layout.decor, deps.farmingLevel());
             if (fields.full)
@@ -100,7 +103,7 @@ export function createFarmCropsController(deps) {
         const planted = plantedAt(layout);
         let action;
         if (!planted)
-            action = plantFarmCrop(layout.agriculture, plotId, cellId, deps.selectedCropId(), now, cropCapacityUse(layout.agriculture, layout.decor, deps.farmingLevel()).capacity);
+            action = plantFarmCrop(layout.agriculture, plotId, cellId, deps.selectedCropId(), now, cropCapacityUse(layout.agriculture, layout.decor, deps.farmingLevel()).capacity, farmRegionForProperty(layout.lot));
         else {
             const state = cropStatus(planted, now);
             if (state.dead)

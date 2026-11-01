@@ -57,6 +57,9 @@ js/tests/*
 !js/tests/farm-property-access.test.mjs
 !js/tests/farm-properties.test.mjs
 !js/tests/farm-properties-browser.test.mjs
+!js/tests/farm-boating.test.mjs
+!js/tests/farm-harbor-browser.test.mjs
+!js/tests/farm-regions.test.mjs
 !js/tests/farm-onboarding.test.mjs
 !js/tests/farm-pet-care.test.mjs
 # Catalog metadata/filtering and admin override contracts ship with the redesign.

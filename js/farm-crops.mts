@@ -2,6 +2,7 @@
 // the page, server normalizer and headless tests all use the same farming contract.
 
 import { PET_CARE } from "./farm-pet-care.mjs";
+import { cropCanGrowInRegion, type FarmRegionId } from "./farm-regions.mjs";
 import { FRUIT_IDS, TIMBER_TREES, TREE_CATALOG } from "./farm-catalog/trees.mjs";
 import { LIVESTOCK_BASKET_ITEMS, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { DISH_KEYS } from "./farm-catalog/recipes.mjs";
@@ -42,14 +43,16 @@ export type CropDefinition = Readonly<{
   growMinutes: number;
   yield: number;
   models: readonly [string, string, string, string];
+  /** Absent for general-purpose crops; island specialties name their growing regions. */
+  regions?: readonly string[];
 }>;
 
-const crop = (id: string, title: string, seedPrice: number, days: number, yieldCount: number, models: readonly [string, string, string, string]): CropDefinition =>
-  Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) as unknown as readonly [string, string, string, string] });
+const crop = (id: string, title: string, seedPrice: number, days: number, yieldCount: number, models: readonly [string, string, string, string], regions?: readonly FarmRegionId[]): CropDefinition =>
+  Object.freeze({ id, title, seedPrice, growMinutes: days * FARM_DAY_MINUTES, yield: yieldCount, models: Object.freeze([...models]) as unknown as readonly [string, string, string, string], ...(regions ? { regions: Object.freeze([...regions]) } : {}) });
 
 /** Crops drawn by farm/crop-lab/generator (same palette atlas as the Grimnir pack): three stages and a ripe plant. */
-const generated = (id: string, title: string, seedPrice: number, days: number, yieldCount: number): CropDefinition =>
-  crop(id, title, seedPrice, days, yieldCount, [`Crop_${title}_STAGE_1_01.glb`, `Crop_${title}_STAGE_2_01.glb`, `Crop_${title}_STAGE_3_01.glb`, `Crop_${title}_RIPE_01.glb`]);
+const generated = (id: string, title: string, seedPrice: number, days: number, yieldCount: number, regions?: readonly FarmRegionId[]): CropDefinition =>
+  crop(id, title, seedPrice, days, yieldCount, [`Crop_${title}_STAGE_1_01.glb`, `Crop_${title}_STAGE_2_01.glb`, `Crop_${title}_STAGE_3_01.glb`, `Crop_${title}_RIPE_01.glb`], regions);
 
 export const CROP_CATALOG: readonly CropDefinition[] = Object.freeze([
   crop("bean", "Bean", 10, 3, 4, ["Crop_Bean_STAGE_1_01.glb", "Crop_Bean_STAGE_2_01.glb", "Crop_Bean_STAGE_3_01.glb", "Crop_Bean_STAGE_4_01.glb"]),
@@ -437,10 +440,11 @@ function result(agriculture: FarmAgriculture, ok: boolean, reason = ""): CropAct
 }
 
 /** `capacity` is how many crops may be in the ground at once (farm-capacity.mts); planting past it is refused. */
-export function plantFarmCrop(value: FarmAgriculture, plotId: string, cellId: SoilCellId, cropId: string, now: number, capacity = Infinity): CropActionResult {
+export function plantFarmCrop(value: FarmAgriculture, plotId: string, cellId: SoilCellId, cropId: string, now: number, capacity = Infinity, regionId: FarmRegionId = "mainland"): CropActionResult {
   const agriculture = advanceAgriculture(value, now);
   const definition = findCrop(cropId);
   if (!definition) return result(agriculture, false, "unknown_crop");
+  if (!cropCanGrowInRegion(definition, regionId)) return result(agriculture, false, "wrong_region");
   if (!SOIL_CELL_IDS.has(cellId)) return result(agriculture, false, "unknown_cell");
   if (agriculture.crops.some((row) => row.plotId === plotId && row.cellId === cellId)) return result(agriculture, false, "occupied");
   if ((agriculture.inventory.seeds[cropId] ?? 0) <= 0) return result(agriculture, false, "no_seeds");

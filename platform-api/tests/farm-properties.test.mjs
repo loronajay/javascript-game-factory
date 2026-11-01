@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeFarmGarage, selectFarmProperty, farmLoadoutFromGarage } from '../src/services/farm-loadout-catalog.mjs';
+import { normalizeFarmGarage, selectFarmProperty, setDefaultFarmProperty, farmLoadoutFromGarage } from '../src/services/farm-loadout-catalog.mjs';
 import { saveGarage } from '../src/db/game-loadouts.mjs';
 import { getFarmLivestock } from '../src/db/farm-livestock.mjs';
 import { nextPetId } from '../src/db/farm-economy.mjs';
@@ -120,4 +120,29 @@ test('public herd reads are scoped to a named property', async () => {
   assert.match(calls[0].sql, /property_id = \$2/);
   await getFarmLivestock(pool, { playerId: 'p1' });
   assert.match(calls[1].sql, /property_id = coalesce/);
+});
+
+test('default property persists independently of selection and ordinary saves', async () => {
+  const meadow = base();
+  const preferred = setDefaultFarmProperty(meadow, 'lot.estate', context(meadow));
+  assert.equal(preferred.lot, undefined);
+  assert.equal(preferred.defaultProperty, 'lot.estate');
+  const cedar = selectFarmProperty(preferred, 'lot.smallholding', context(preferred));
+  assert.equal(cedar.defaultProperty, 'lot.estate');
+  const saved = normalizeFarmGarage({ ...cedar, defaultProperty: 'meadow' }, { currentGarage: cedar, ownedEntitlementIds: owned });
+  assert.equal(saved.defaultProperty, 'lot.estate', 'a stale ordinary save cannot undo the preference');
+  assert.throws(() => setDefaultFarmProperty(meadow, 'lot.estate', { ...context(meadow), ownedEntitlementIds: new Set() }), /property_not_owned/);
+  const pool = memoryPool(meadow);
+  const result = await saveGarage(pool, { playerId: 'p1', gameSlug: 'farm', garage: { setDefaultProperty: 'lot.estate', propertyRevision: 0 } });
+  assert.equal(result.ok, true);
+  assert.equal(pool.garage.defaultProperty, 'lot.estate');
+  assert.equal(pool.garage.propertyRevision, 0);
+});
+
+test('a save cannot introduce an unregistered regional crop', () => {
+  const stored = base();
+  const submitted = { ...stored, agriculture: { ...stored.agriculture, crops: [{ ...stored.agriculture.crops[0], cropId: 'unreleased-island-crop' }] } };
+  const saved = normalizeFarmGarage(submitted, { currentGarage: stored, now, ownedEntitlementIds: owned });
+  assert.deepEqual(saved.agriculture.crops, []);
+  assert.deepEqual(stored.agriculture.crops.map(crop => crop.cropId), ['carrot']);
 });

@@ -17,6 +17,7 @@ import * as THREE_VENDOR from "./vendor/three.module.js";
 import { createFarmSoundEffects } from "./farm-sound-effects.mjs";
 import { applyOfflineAnimals } from "./farm-offline-animals.mjs";
 import { createLayoutStore } from "./arcade-room-store.mjs";
+import { loadFarmEntry } from "./farm-property-entry.mjs";
 import { forwardOf, lookWalker, obstacleBlocks } from "./arcade-room-walker.mjs";
 import { createFarmWorld } from "./farm-world.mjs";
 import { gatewayAt, perimeterGates } from "./farm-gateway.mjs";
@@ -160,7 +161,7 @@ renderMusicButton();
 const visitPlayerId = new URLSearchParams(location.search).get("id") ?? "";
 const layoutStore = createLayoutStore(FARM_LAYOUT_SPEC, { visitPlayerId, propertyId: new URLSearchParams(location.search).get("property") ?? undefined });
 const visiting = layoutStore.mode === "visitor";
-const loaded = await layoutStore.load();
+const loaded = await loadFarmEntry(layoutStore, createPlatformApiClient(), new URLSearchParams(location.search));
 const ticketClient = createTicketWalletClient();
 const shop = layoutStore.accountBacked
     ? await ticketClient.getShop("farm").catch(() => null)

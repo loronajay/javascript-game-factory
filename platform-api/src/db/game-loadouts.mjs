@@ -23,7 +23,7 @@ import { YAM_BOWLING_GAME_SLUG, YAM_BOWLING_LOADOUT_CATALOG, } from "../services
 import { SHARK_HALL_GAME_SLUG, SHARK_HALL_LOADOUT_CATALOG, } from "../services/shark-hall-loadout-catalog.mjs";
 import { PUCK_D_UP_GAME_SLUG, PUCK_D_UP_LOADOUT_CATALOG, } from "../services/puckd-up-loadout-catalog.mjs";
 import { ARCADE_ROOM_GAME_SLUG, ARCADE_ROOM_LOADOUT_CATALOG, } from "../services/arcade-room-loadout-catalog.mjs";
-import { FARM_GAME_SLUG, FARM_LOADOUT_CATALOG, selectFarmProperty, } from "../services/farm-loadout-catalog.mjs";
+import { FARM_GAME_SLUG, FARM_LOADOUT_CATALOG, selectFarmProperty, setDefaultFarmProperty, } from "../services/farm-loadout-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const CATALOGS = {
     [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
@@ -117,7 +117,9 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
         };
         const normalized = slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "selectProperty")
             ? selectFarmProperty(context.currentGarage, garage.selectProperty, { ...context, propertyRevision: garage.propertyRevision })
-            : catalog.normalizeGarage(garage, context);
+            : slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "setDefaultProperty")
+                ? setDefaultFarmProperty(context.currentGarage, garage.setDefaultProperty, { ...context, propertyRevision: garage.propertyRevision })
+                : catalog.normalizeGarage(garage, context);
         await db.query(`insert into game_loadouts (player_id, game_slug, garage, updated_at)
        values ($1, $2, $3::jsonb, now())
        on conflict (player_id, game_slug) do update

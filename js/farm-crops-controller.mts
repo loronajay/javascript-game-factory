@@ -15,6 +15,7 @@
 import { canFertilizeCrop, clearDeadFarmCrop, clearFarmCrop, cropStatus, fertilizeFarmCrop, findCrop, findSoilCellInReach, harvestFarmCrop, plantFarmCrop, tendFarmCrop, waterFarmCrop, type CropPlayerPose, type SoilCellTarget } from "./farm-crops.mjs";
 import { QUALITY_TITLES, gradedTitle, type Quality } from "./farm-quality.mjs";
 import { cropCapacity, cropCapacityUse } from "./farm-capacity.mjs";
+import { cropCanGrowInRegion, farmRegionForProperty, findFarmRegion } from "./farm-regions.mjs";
 import { withFarmAgriculture, withFarmClock, type FarmDecorRow, type FarmLayout } from "./farm-layout.mjs";
 
 export type CropsControllerDeps = Readonly<{
@@ -56,6 +57,7 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     const planted = plantedAt(layout);
     if (!planted) {
       const selected = findCrop(deps.selectedCropId())!;
+      if (!cropCanGrowInRegion(selected, farmRegionForProperty(layout.lot))) return `${selected.title} needs a different climate · grows in ${selected.regions?.map((id) => findFarmRegion(id)?.title ?? id).join(", ")}`;
       const seeds = layout.agriculture.inventory.seeds[selected.id] ?? 0;
       const fields = cropCapacityUse(layout.agriculture, layout.decor, deps.farmingLevel());
       if (fields.full) return `Your fields are full · ${fields.used}/${fields.capacity} growing · harvest or clear a crop to plant here`;
@@ -114,7 +116,7 @@ export function createFarmCropsController(deps: CropsControllerDeps): FarmCropsC
     const cellId = target.cellId;
     const planted = plantedAt(layout);
     let action;
-    if (!planted) action = plantFarmCrop(layout.agriculture, plotId, cellId, deps.selectedCropId(), now, cropCapacityUse(layout.agriculture, layout.decor, deps.farmingLevel()).capacity);
+    if (!planted) action = plantFarmCrop(layout.agriculture, plotId, cellId, deps.selectedCropId(), now, cropCapacityUse(layout.agriculture, layout.decor, deps.farmingLevel()).capacity, farmRegionForProperty(layout.lot));
     else {
       const state = cropStatus(planted, now);
       if (state.dead) action = clearDeadFarmCrop(layout.agriculture, plotId, cellId, now);

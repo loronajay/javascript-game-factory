@@ -6,7 +6,10 @@ Follow-up: independent properties were implemented locally first at the user's
 request. See `FARM_PROPERTIES.md` for actual behavior and deployment requirements.
 Its local inventories differ from this proposal's account-wide carried goods;
 transport between properties remains a future design decision. Boats, islands,
-regional markets, and island crops remain proposed.
+regional markets, and island crop species remain proposed. A local borrowed-boat
+trial is now implemented at `/farm/harbor/`, linked from the Cove. See
+`harbor/README.md` for the delivered controls, region/crop foundation, and next
+slice. This trial does not provide boat ownership or inter-region travel.
 
 ## Product direction
 
@@ -25,7 +28,7 @@ and regional identity across those transitions.
 
 All names, prices, boat specifications, and unlocks below are proposals.
 
-## What exists today
+## Baseline when scoped (before implementation)
 
 - `js/farm-catalog/lots.mts`: Cedar Hollow and Sunwater Estate are farm upgrades.
   Their descriptions explicitly move existing buildings, animals, and crops.

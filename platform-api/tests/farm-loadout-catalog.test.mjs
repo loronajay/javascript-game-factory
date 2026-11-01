@@ -129,6 +129,7 @@ test("the one-time onboarding transition may add exactly the free starter corgi"
 test("a missing row is the empty v3 farm with a persisted clock and agriculture document", () => {
   assert.deepEqual(normalizeFarmGarage(null), {
     version: 3,
+    defaultProperty: "meadow",
     propertyRevision: 0,
     properties: {},
     onboarding: { status: "needs_name", introSeen: false },
@@ -219,7 +220,7 @@ test("v3 agriculture and clock survive the server trust boundary", () => {
 
 test("a valid farm round-trips", () => {
   const garage = normalizeFarmGarage({ version: 1, ground: "ground.mud", pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck", name: "Quack" })] });
-  assert.deepEqual(garage, { propertyRevision: 0, properties: {}, version: 1, ground: "ground.mud", pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck", name: "Quack" })] });
+  assert.deepEqual(garage, { defaultProperty: "meadow", propertyRevision: 0, properties: {}, version: 1, ground: "ground.mud", pets: [pet(), pet({ instanceId: "duck-1", speciesId: "pet.duck", name: "Quack" })] });
 });
 
 test("explicit onboarding state survives while legacy farms remain unmarked", () => {

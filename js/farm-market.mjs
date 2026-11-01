@@ -122,7 +122,7 @@ const hud = createFarmHud({
 hud.fullscreen.bind(requiredElement("#fullscreenMarket"));
 // The road home: back to whichever farm the player walked out of.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
-const homeUrl = `../index.html?${horseTravelQuery(fromFarm, "", "id")}`;
+const homeUrl = `../index.html?from=market&${horseTravelQuery(fromFarm, "", "id")}`;
 // Down the north gate to the Cove, carrying the farm to come home to.
 const coveUrl = `../cove/index.html?${horseTravelQuery(fromFarm, "")}`;
 const cameFromCove = new URLSearchParams(location.search).get("from") === "cove";
@@ -901,6 +901,12 @@ const properties = createPropertiesPanel({
     shop: () => ticketClient.getShop("farm"),
     purchase: (id) => ticketClient.purchaseShopItem("farm", id),
     takeBalance,
+    setDefaultProperty: async (id) => {
+        const result = await createPlatformApiClient().saveGameGarage("farm", { setDefaultProperty: id, propertyRevision: farm.propertyRevision ?? 0 });
+        if (result?.ok)
+            takeStock(normalizeFarmLayout(result.garage));
+        return result ?? { ok: false, error: "unavailable" };
+    },
     selectProperty: async (id) => {
         // Select atomically on the server; do not copy the current farm's contents.
         const result = await createPlatformApiClient().saveGameGarage("farm", { selectProperty: id, propertyRevision: farm.propertyRevision ?? 0 });
@@ -1146,7 +1152,7 @@ function checkGateway() {
     setPrompt(words);
     status.textContent = words;
     presence.disconnect();
-    location.href = toDowns ? downsUrl(horse) : toCove ? `../cove/index.html?${horseTravelQuery(fromFarm, horse)}` : `../index.html?${horseTravelQuery(fromFarm, horse, "id")}`;
+    location.href = toDowns ? downsUrl(horse) : toCove ? `../cove/index.html?${horseTravelQuery(fromFarm, horse)}` : `../index.html?from=market&${horseTravelQuery(fromFarm, horse, "id")}`;
 }
 window.addEventListener("keydown", (event) => {
     // I and K toggle (and switch) their sheets, Escape closes the top one, ? the controls card (farm-hud.mts).

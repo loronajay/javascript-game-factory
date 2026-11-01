@@ -10,6 +10,12 @@ Cedar Hollow (40 × 40 m), and Sunwater Estate (56 × 56 m). Buying a property
 unlocks a separate farm and selects it. Returning to an owned property is free,
 including switching from a larger property to a smaller one.
 
+Each property also has a **Set as default farm** button. This account preference
+controls fresh entries from the platform Farm link; switching properties does
+not change it. Returns marked `from=market`, `from=downs`, or a fishing area
+retain the current farm. Visits and mounted travel also retain their explicit
+context. Existing players initially default to their current farm.
+
 Each farm retains its buildings, decor, pets/horses, livestock, crops, trees,
 inventory, settings, memorials, and farm/offline clocks. Tickets, permanent shop
 unlocks, skills and fishing records/equipment/creel remain account-wide.

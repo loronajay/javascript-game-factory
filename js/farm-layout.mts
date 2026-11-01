@@ -98,6 +98,7 @@ export type FarmLayout = Readonly<{
   lot?: string;
   /** Server selection generation; prevents an old tab overwriting a different farm. */
   propertyRevision?: number;
+  defaultProperty?: string;
   /** Public property directory supplied by the server for visits. */
   propertyIds?: readonly string[];
   pets: readonly FarmPet[];
@@ -415,7 +416,7 @@ export function farmHabitats(layout: Readonly<{ decor: readonly FarmDecorRow[] }
 
 export function normalizeFarmLayout(value: unknown): FarmLayout {
   if (!value || typeof value !== "object") return createDefaultFarmLayout();
-  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; lot?: string; propertyIds?: unknown; propertyRevision?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown; horseStockRefreshedAt?: unknown };
+  const source = value as { version?: unknown; onboarding?: unknown; ground?: unknown; lot?: string; defaultProperty?: unknown; propertyIds?: unknown; propertyRevision?: unknown; pets?: unknown; petHistory?: unknown; decor?: unknown; agriculture?: unknown; trees?: unknown; clock?: unknown; skills?: unknown; settings?: unknown; horseStockRefreshedAt?: unknown };
   if (source.version !== 1 && source.version !== 2 && source.version !== FARM_LAYOUT_VERSION) return createDefaultFarmLayout();
   const seen = new Set<string>();
   // A v1 document never had decor; a v2 one without the key was stored before the field was editable.
@@ -491,7 +492,7 @@ export function normalizeFarmLayout(value: unknown): FarmLayout {
     napBank: finiteNumber(rawClock.napBank) ? Math.min(NAP_BANK_CAPACITY_MINUTES, Math.max(0, rawClock.napBank)) : NAP_BANK_CAPACITY_MINUTES,
   };
   const trees = normalizeFarmTrees(source.trees, treePlotIds(decor));
-  return freezeLayout({ version: 3, onboarding, ...(Array.isArray(source.propertyIds) ? { propertyIds: source.propertyIds.filter((id: unknown): id is string => id === "meadow" || FARM_LOTS.some((lot) => lot.id === id)).slice(0, FARM_LOTS.length + 1) } : {}), propertyRevision: typeof source.propertyRevision === "number" && Number.isSafeInteger(source.propertyRevision) && source.propertyRevision >= 0 ? source.propertyRevision : 0, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
+  return freezeLayout({ version: 3, onboarding, defaultProperty: typeof source.defaultProperty === "string" && (source.defaultProperty === "meadow" || FARM_LOTS.some((lot) => lot.id === source.defaultProperty)) ? source.defaultProperty : source.lot ?? "meadow", ...(Array.isArray(source.propertyIds) ? { propertyIds: source.propertyIds.filter((id: unknown): id is string => id === "meadow" || FARM_LOTS.some((lot) => lot.id === id)).slice(0, FARM_LOTS.length + 1) } : {}), propertyRevision: typeof source.propertyRevision === "number" && Number.isSafeInteger(source.propertyRevision) && source.propertyRevision >= 0 ? source.propertyRevision : 0, ...(FARM_LOTS.some((lot) => lot.id === source.lot) ? { lot: source.lot } : {}), ground: normalizeGroundId(source.ground), pets, petHistory, decor, agriculture, trees, clock, skills: normalizeFarmSkills(source.skills), settings: normalizeFarmSettings(source.settings), ...(finiteNumber(source.horseStockRefreshedAt) ? { horseStockRefreshedAt: Math.max(0, source.horseStockRefreshedAt) } : {}) });
 }
 
 export function parseFarmLayout(serialized: string | null): FarmLayout {

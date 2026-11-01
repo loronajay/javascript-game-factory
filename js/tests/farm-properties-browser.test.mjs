@@ -28,10 +28,12 @@ test('property office permits smaller farms and retries selection without chargi
       document.body.innerHTML = '<div class="farm-shell"></div>';
       const purchases = [], selections = [];
       let refuse = true;
-      const panel = createPropertiesPanel({ canBuy: true, farm: () => ({ lot: 'lot.estate' }), balance: () => 100000,
+      let defaultProperty = 'lot.estate';
+      const panel = createPropertiesPanel({ canBuy: true, farm: () => ({ lot: 'lot.estate', defaultProperty }), balance: () => 100000,
         shop: async () => ({ ownedIds: ['lot.estate'], items: [] }),
         purchase: async id => { purchases.push(id); return { ok: true, balance: 75000 }; },
         selectProperty: async id => { selections.push(id); return { ok: !refuse }; },
+        setDefaultProperty: async id => { defaultProperty = id; return { ok: true }; },
         takeBalance() {}, onClose() {} });
       await panel.open();
       const find = text => [...panel.root.querySelectorAll('button')].find(button => button.textContent.includes(text));
@@ -46,13 +48,16 @@ test('property office permits smaller farms and retries selection without chargi
       await new Promise(done => setTimeout(done, 0));
       find('Return to Meadow').click();
       await new Promise(done => setTimeout(done, 0));
-      return { meadowEnabled, smallerEnabled, retryEnabled, purchases, selections };
+      find('Set as default farm').click();
+      await new Promise(done => setTimeout(done, 0));
+      return { meadowEnabled, smallerEnabled, retryEnabled, purchases, selections, defaultProperty };
     });
     assert.equal(result.meadowEnabled, true);
     assert.equal(result.smallerEnabled, true);
     assert.equal(result.retryEnabled, true);
     assert.deepEqual(result.purchases, ['lot.smallholding']);
     assert.deepEqual(result.selections, ['lot.smallholding', 'lot.smallholding', 'meadow']);
+    assert.equal(result.defaultProperty, 'meadow');
   } finally {
     await browser?.close();
     await new Promise(done => server.close(done));

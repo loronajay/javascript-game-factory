@@ -5,6 +5,7 @@ import { normalizeFarmGarage, selectFarmProperty } from '../../platform-api/src/
 import { createLayoutStore } from '../arcade-room-store.mjs';
 import { FARM_LAYOUT_SPEC } from '../farm-layout.mjs';
 import { horseTravelQuery } from '../farm-riding-travel.mjs';
+import { loadFarmEntry } from '../farm-property-entry.mjs';
 
 test('fresh independent properties have expanded boundaries, entrances and empty paid inventory', () => {
   const original = normalizeFarmGarage({ version: 3, onboarding: { status: 'complete' }, pets: [{ instanceId: 'corgi-1', speciesId: 'pet.corgi', name: 'Original' }] });
@@ -41,4 +42,17 @@ test('travel preserves a visited property without granting it to the acting play
   assert.equal(query.get('id'), 'friend');
   assert.equal(query.get('property'), 'lot.estate');
   assert.equal(horseTravelQuery('', '', 'id', 'lot.estate'), '', 'own-property switching stays server controlled');
+});
+
+test('platform entry selects the preferred farm; trip returns, visitors and offline entry do not', async () => {
+  for (const [query, mode, accountBacked, expected] of [
+    ['', 'owner', true, 1], ['from=market', 'owner', true, 0], ['from=estate-lake', 'owner', true, 0],
+    ['horse=horse-1', 'owner', true, 0], ['id=friend', 'visitor', true, 0], ['', 'owner', false, 0],
+  ]) {
+    let selected = false, calls = 0;
+    const store = { mode, accountBacked, load: async () => ({ layout: { version: 3, defaultProperty: 'lot.estate', propertyRevision: 2, ...(selected ? { lot: 'lot.estate' } : {}) }, source: 'account' }) };
+    const result = await loadFarmEntry(store, { saveGameGarage: async (_slug, command) => { calls++; assert.equal(command.selectProperty, 'lot.estate'); selected = true; return { ok: true }; } }, new URLSearchParams(query));
+    assert.equal(calls, expected, query || mode);
+    assert.equal(result.layout.lot, expected ? 'lot.estate' : undefined);
+  }
 });

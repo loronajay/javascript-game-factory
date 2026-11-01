@@ -27,6 +27,31 @@ export function createPropertiesPanel(deps) {
     let ready = false;
     const close = () => { root.hidden = true; deps.onClose(); };
     closeButton.addEventListener("click", close);
+    function defaultButton(id) {
+        const selected = id === (deps.farm().defaultProperty ?? deps.farm().lot ?? "meadow");
+        const button = element("button", "farm-button", selected ? "Default from platform" : "Set as default farm");
+        button.type = "button";
+        button.disabled = selected || busy || !ready || !deps.canBuy || (id !== "meadow" && !owned.has(id));
+        button.addEventListener("click", () => { void setDefault(id); });
+        return button;
+    }
+    async function setDefault(id) {
+        if (busy)
+            return;
+        busy = true;
+        draw();
+        try {
+            const result = await deps.setDefaultProperty(id);
+            status.textContent = result.ok ? "Your default farm is saved. The platform Farm link will open it." : "The default could not be saved. Reload the market and try again.";
+        }
+        catch {
+            status.textContent = "The property office could not be reached. Please try again.";
+        }
+        finally {
+            busy = false;
+            draw();
+        }
+    }
     function draw() {
         body.replaceChildren();
         const current = FARM_LOTS.find((property) => property.id === deps.farm().lot);
@@ -36,7 +61,7 @@ export function createPropertiesPanel(deps) {
         meadow.type = "button";
         meadow.disabled = busy || !ready || !deps.canBuy || !deps.farm().lot;
         meadow.addEventListener("click", () => { void buy("meadow"); });
-        body.append(meadow);
+        body.append(meadow, defaultButton("meadow"));
         for (const property of FARM_LOTS) {
             const card = element("article", `property-card property-card--${property.theme}`);
             const image = element("img", "property-card__preview");
@@ -57,7 +82,7 @@ export function createPropertiesPanel(deps) {
             button.addEventListener("click", () => { void buy(property.id); });
             const tour = element("a", "farm-button", "Free walkthrough");
             tour.href = new URL(`../farm/tour.html?property=${encodeURIComponent(property.id)}`, import.meta.url).toString();
-            copy.append(tour, button);
+            copy.append(tour, button, defaultButton(property.id));
             card.append(image, copy);
             body.append(card);
         }

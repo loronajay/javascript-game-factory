@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mainland Harbor · Farm</title>
+  <link rel="stylesheet" href="harbor.css">
+</head>
+<body>
+  <main class="harbor-shell">
+    <canvas id="harborCanvas" tabindex="0" aria-label="Boat trials at Mainland Harbor"></canvas>
+    <header class="harbor-header">
+      <a id="backToCove" href="../cove/index.html">← The Cove</a>
+      <div><span class="eyebrow">THE MAINLAND</span><h1>Mainland Harbor</h1></div>
+      <span class="trial-tag">Boat trials</span>
+    </header>
+    <aside class="voyage-card" aria-label="Coastal chart">
+      <span class="eyebrow">YOUR NEXT HORIZON</span>
+      <h2>A little farther<br>from shore.</h2>
+      <p>A borrowed rowboat, two quiet islands, and room to find your sea legs.</p>
+      <svg id="harborChart" viewBox="-75 -100 150 135" role="img" aria-label="Chart of the trial waters"><g id="chartLand"></g><path id="chartBoat" d="M0 -3 L2 2 L0 1 L-2 2 Z" /></svg>
+      <div class="chart-key"><span>● Mainland</span><span>● Gull Landing</span></div>
+      <p class="trial-note">Local boat trial. Island homes, sea routes, and fishing from boats are coming later.</p>
+    </aside>
+    <section class="helm" aria-label="Boat controls">
+      <div class="helm-reading"><span id="boatMode">At the dock</span><strong><span id="boatSpeed">0.0</span><small> m/s</small></strong><span id="boatHeading">N</span></div>
+      <p id="boatPrompt" aria-live="polite">Board your borrowed boat to explore the coast.</p>
+      <div class="helm-actions"><button id="useDock" type="button">Board boat <kbd>E</kbd></button><button id="toggleAnchor" type="button" disabled>Drop anchor <kbd>R</kbd></button><button id="returnHarbor" type="button">Return to harbor</button></div>
+      <small>W / S · Row &amp; reverse &nbsp; A / D · Steer &nbsp; Space · Brake &nbsp; Drag · Look around</small>
+      <div class="touch-helm" aria-label="Touch steering"><button type="button" data-control="KeyA" aria-label="Steer left">←</button><button type="button" data-control="KeyW" aria-label="Row forward">↑</button><button type="button" data-control="Space" aria-label="Brake">■</button><button type="button" data-control="KeyS" aria-label="Reverse">↓</button><button type="button" data-control="KeyD" aria-label="Steer right">→</button></div>
+    </section>
+    <div id="harborStatus" class="harbor-status" role="status"></div>
+  </main>
+  <script type="module" src="../../js/farm-harbor-page.mjs"></script>
+</body>
+</html>

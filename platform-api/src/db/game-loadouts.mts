@@ -44,6 +44,7 @@ import {
   FARM_GAME_SLUG,
   FARM_LOADOUT_CATALOG,
   selectFarmProperty,
+  setDefaultFarmProperty,
 } from "../services/farm-loadout-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
@@ -166,6 +167,8 @@ export async function saveGarage(pool: any, { playerId, gameSlug, garage }: any 
     };
     const normalized = slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "selectProperty")
       ? selectFarmProperty(context.currentGarage, garage.selectProperty, { ...context, propertyRevision: garage.propertyRevision })
+      : slug === FARM_GAME_SLUG && Object.hasOwn(garage ?? {}, "setDefaultProperty")
+      ? setDefaultFarmProperty(context.currentGarage, garage.setDefaultProperty, { ...context, propertyRevision: garage.propertyRevision })
       : catalog.normalizeGarage(garage, context);
     await db.query(
       `insert into game_loadouts (player_id, game_slug, garage, updated_at)

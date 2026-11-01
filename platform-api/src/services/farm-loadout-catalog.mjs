@@ -37,6 +37,7 @@ import { normalizeFarmPetGrowthShape, pinFarmPetGrowth } from "./farm-pet-growth
 import { normalizeFarmPetLineage } from "./farm-pet-breeding-policy.mjs";
 import { normalizeFarmHorseRiding, pinFarmHorseRiding } from "./farm-horse-catalog.mjs";
 import { farmCropRule } from "./farm-crop-catalog.mjs";
+import { cropCanGrowInRegion, farmRegionForProperty } from "./farm-region-catalog.mjs";
 import { farmLivestockGood } from "./farm-livestock-catalog.mjs";
 import { parseFarmProduceKey } from "./farm-quality-catalog.mjs";
 import { NAP_BANK_CAPACITY_MINUTES, boundAnimalMinutes, boundCropGrowth, clampOfflineRate, offlineRateForSave, verifyFarmClock } from "./farm-time-policy.mjs";
@@ -92,7 +93,7 @@ function normalizeRotation(value) {
 }
 export function defaultFarmGarage() {
     // "" for the ground means "the client's starter meadow"; no `decor` key means its starter field.
-    return { version: LAYOUT_VERSION, propertyRevision: 0, properties: {}, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440, animalMinutes: 0 }, settings: { awayGrowth: 0.1, awayAnimals: 0 }, skills: emptyFarmSkillRecords() };
+    return { version: LAYOUT_VERSION, defaultProperty: "meadow", propertyRevision: 0, properties: {}, onboarding: { status: "needs_name", introSeen: false }, ground: "", pets: [], agriculture: { inventory: { seeds: {}, produce: {}, raised: {}, supplies: {}, saplings: {}, logs: {}, dishes: {}, planks: {}, furniture: {}, compost: 0 }, crops: [] }, trees: [], clock: { farmMinutes: 480, updatedAt: 0, checkpointAt: 0, napBank: 1440, animalMinutes: 0 }, settings: { awayGrowth: 0.1, awayAnimals: 0 }, skills: emptyFarmSkillRecords() };
 }
 function normalizeCropCounts(value) {
     const input = value && typeof value === "object" ? value : {};
@@ -246,12 +247,14 @@ function normalizeAgriculture(value, decorIds) {
 // bonus however many greenhouses stand. Enforced on client SAVES only — crops
 // already stored always survive (a farm over the cap is grandfathered), and a
 // new row is accepted only while the farm is under capacity. Reads never trim.
-function capNewCrops(crops, storedCrops, capacity) {
+function capNewCrops(crops, storedCrops, capacity, regionId) {
     const key = (row) => `${row.plotId}:${row.cellId}:${row.cropId}`;
     const stored = new Set(storedCrops.map(key));
     const kept = crops.filter((row) => stored.has(key(row)));
     for (const row of crops) {
         if (stored.has(key(row)))
+            continue;
+        if (!cropCanGrowInRegion(farmCropRule(row.cropId), regionId))
             continue;
         if (kept.length >= capacity)
             break;
@@ -322,7 +325,7 @@ function guardFarmSave(garage, current, context) {
     const offlineRate = offlineRateForSave(current ? current.settings ?? {} : null, garage.settings);
     const bounded = boundCropGrowth(garage.agriculture.crops, storedCrops, storedClockMinutes, verified, (cropId) => farmCropRule(cropId)?.growMinutes ?? 0, offlineRate);
     const level = farmingLevelForXp(garage.skills.farming.xp);
-    garage.agriculture.crops = capNewCrops(bounded, storedCrops, farmCropCapacity(garage.decor ?? [], level));
+    garage.agriculture.crops = capNewCrops(bounded, storedCrops, farmCropCapacity(garage.decor ?? [], level), farmRegionForProperty(garage.lot));
     const storedTrees = Array.isArray(current?.trees) ? current.trees : [];
     guardCompost(garage.agriculture, current ? storedInventory.compost ?? 0 : 0, storedCrops, deadTreesDugOut(garage.trees, storedTrees));
     garage.trees = admitNewTrees(boundTreeGrowth(garage.trees, storedTrees, storedClockMinutes, verified, offlineRate), storedTrees, {
@@ -522,6 +525,7 @@ export function normalizeFarmGarage(value, context = {}) {
     const garage = normalizeSingleFarm(value, context);
     const source = saving ? stored : value;
     garage.propertyRevision = propertyRevision(source?.propertyRevision);
+    garage.defaultProperty = FARM_PROPERTY_IDS.includes(source?.defaultProperty) ? source.defaultProperty : farmPropertyId(garage);
     const properties = {};
     for (const id of FARM_PROPERTY_IDS) {
         if (id === farmPropertyId(garage))
@@ -552,7 +556,7 @@ export function selectFarmProperty(stored, id, context) {
         throw new Error("farm_property_changed");
     if (id === farmPropertyId(current))
         return current;
-    const { properties, propertyRevision: revision, ...snapshot } = current;
+    const { properties, defaultProperty, propertyRevision: revision, ...snapshot } = current;
     // Legacy clocks may predate verifiedAt. Keep their original verification window.
     if (snapshot.clock && !snapshot.clock.verifiedAt && context.currentSavedAt)
         snapshot.clock.verifiedAt = context.currentSavedAt;
@@ -563,7 +567,20 @@ export function selectFarmProperty(stored, id, context) {
     };
     const remaining = { ...properties, [farmPropertyId(current)]: snapshot };
     delete remaining[id];
-    return normalizeFarmGarage({ ...next, skills: current.skills, propertyRevision: revision + 1, properties: remaining });
+    return normalizeFarmGarage({ ...next, skills: current.skills, defaultProperty, propertyRevision: revision + 1, properties: remaining });
+}
+/** The preferred platform entry point is independent of the currently visited farm. */
+export function setDefaultFarmProperty(stored, id, context) {
+    if (typeof id !== "string" || !FARM_PROPERTY_IDS.includes(id))
+        throw new Error("invalid_property");
+    if (id !== "meadow" && !context.ownedEntitlementIds?.has(id))
+        throw new Error("property_not_owned");
+    const current = normalizeFarmGarage(stored, { ownedEntitlementIds: context.ownedEntitlementIds });
+    if (context.propertyRevision !== current.propertyRevision)
+        throw new Error("farm_property_changed");
+    if (current.clock && !current.clock.verifiedAt && context.currentSavedAt)
+        current.clock.verifiedAt = context.currentSavedAt;
+    return normalizeFarmGarage({ ...current, defaultProperty: id });
 }
 function normalizeSingleFarm(value, context = {}) {
     const missingDocument = !value || typeof value !== "object";

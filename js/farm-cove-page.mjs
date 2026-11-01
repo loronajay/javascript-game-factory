@@ -105,6 +105,9 @@ const farmHud = createFarmHud({
 farmHud.fullscreen.bind(requiredElement("#fullscreenCove"));
 // Back up the path: to the Market Square's north gate, carrying the farm to come home to.
 const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
+const harborLink = requiredElement("#visitHarbor");
+harborLink.hidden = Boolean(region) || preview;
+harborLink.href = `../harbor/index.html?${horseTravelQuery(fromFarm, destinationQuery.get("horse") ?? "")}`;
 const marketUrl = `../market/index.html?from=cove&${horseTravelQuery(fromFarm, "")}`;
 backLink.href = region?.requiredProperty ? `../index.html?from=${region.id}&${horseTravelQuery(fromFarm, "", "id")}` : region ? `index.html?from=${region.id}&${horseTravelQuery(fromFarm, "")}` : marketUrl;
 if (region) {
