@@ -1,4 +1,4 @@
-# Mainland Harbor
+# Mainland and Orchard Harbors
 
 The harbor uses the same walking, fishing, tackle, creel and social page stack as
 the Cove. Walk through the signed opening in the Cove's southeast wall, beyond
@@ -6,7 +6,7 @@ the shops, to take the coast path. The return path is behind the mainland pier.
 
 - Arrive on foot. Walk down the pier, approach the boat, and press E to board.
 - W/S row forward/reverse; A/D steer; hold Shift to brake.
-- At a slow approach to Mainland Harbor or Gull Landing, press E to disembark.
+- At a slow approach to either region's harbor, press E to disembark.
   You stand on the actual pier and can walk onto land. The boat stays moored.
 - F drops or raises the anchor. While anchored, look toward water and use Space
   to cast, strike, reel and net through the normal fishing minigame.
@@ -15,7 +15,7 @@ the shops, to take the coast path. The return path is behind the mainland pier.
   Signed-out fishing remains practice. R changes rods; Q changes bait; C opens
   the creel. F opens Fishdex while on foot; its toolbar button is always available.
 - The recovery button returns you to the mainland pier on foot. Reloads start
-  on the mainland. Boat ownership and persistent voyage positions are not yet
+  safely in the current harbor. Boat ownership and persistent voyage positions are not yet
   implemented; each session currently uses a local loan boat.
 
 The GLB's pointed bow faces +z. Rendering rotates it by PI so the bow matches
@@ -26,13 +26,12 @@ The API validates harbor water, piers, island shorelines, and reef/deep zones
 against its matching catalog. This uses existing fish species and progression.
 Harbor fishing does not introduce another reward or inventory system.
 
-Regional crop foundations remain in js/farm-regions.mts and the API region
-catalog. Existing properties and crops remain on the mainland; new island homes,
-regional crop species, routes, boat ownership, passengers and synchronized boat
-presence are separate follow-up work.
+Orchard Isle is now a real connected destination. Take the free ferry beside the
+pier or sail north to the marked sea route and press E. Arrive at Orchard Harbor,
+walk to its market or homestead entrance, and use the resident board to visit
+island farms. The cosmetic trial islands have been removed. See
+[FARM_ISLANDS.md](../FARM_ISLANDS.md) for property, crop, market and travel details.
 
-Validation includes an actual browser walk from the Cove to the harbor, boarding,
-disembarking and walking away, rowing bow-first, anchoring and casting, recovery,
-and walking back to the Cove with property context preserved. Pure tests cover
-walkable approaches at both landings, the real bow orientation, hull collision,
-and matching browser/API fishing geometry.
+Validation covers the actual walking, boarding, disembarking and fishing loop,
+and a browser journey from the ferry through the island market, property
+purchase, homestead entrance and resident board. Geometry and API rules agree.

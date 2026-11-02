@@ -18,6 +18,11 @@ export function propertyObstacles(_layout: { lot?: string }): FarmObstacle[] { r
 export function propertyRoutes(layout: { lot?: string }): PropertyRoute[] {
   const edge = farmLotBounds(layout).width / 2 - 0.37;
   if (!layout.lot) return [];
+  if (layout.lot === "lot.orchard") return [{
+    target: "orchard-harbor", title: "Orchard Harbor", gateId: PROPERTY_GATE_ID, x: edge, z: 7, horse: false,
+    returnPoint: { x: edge - 2.5, z: 7, yaw: Math.PI / 2 },
+    sign: { x: edge + 1, z: 10, yaw: -Math.PI / 2 },
+  }];
   const fishing: PropertyRoute = {
     target: layout.lot === "lot.smallholding" ? "cedar-creek" : "estate-lake",
     title: layout.lot === "lot.smallholding" ? "Cedar Creek" : "Sunwater Private Lake",
@@ -43,6 +48,11 @@ export function propertyTrees(layout: { lot?: string }): Array<{ x: number; z: n
       const x = Math.cos(angle) * distance, z = Math.sin(angle) * distance;
       if (Math.max(Math.abs(x), Math.abs(z)) < half + 8 || (z > half && Math.abs(x) < 6) || (x > half && Math.abs(z - 7) < 5)) continue;
       out.push({ x, z, seed: index + 13, scale: 1.5 + index % 3 * .2, kind: index % 5 === 0 ? "birch" : "pine" });
+    }
+  } else if (layout.lot === "lot.orchard") {
+    for (let index = 0; index < 36; index++) {
+      const side = index % 2 ? -1 : 1;
+      out.push({ x: side * (half + 8 + index % 3 * 5), z: -33 + Math.floor(index / 6) * 13, seed: index + 200, scale: 1.3, kind: index % 4 === 0 ? "willow" : "apple" });
     }
   } else if (layout.lot === "lot.estate") {
     for (let index = 0; index < 20; index++) out.push({ x: -half - 9 - index % 4 * 7, z: -24 + Math.floor(index / 4) * 12, seed: index + 80, scale: 1.3, kind: "apple" });

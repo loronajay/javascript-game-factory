@@ -530,7 +530,7 @@ export const TROPHY_MOUNT_ITEM_ID = "decor.prop.trophy-mount";
 
 /** Missing areaId preserves legacy Cove clients; unknown destinations admit no casts. */
 export function farmFishingZoneAt(point: Readonly<{ x: number; z: number }>, areaId: unknown = "cove"): FishZone | null {
-  if (areaId === "harbor") return harborFishingZoneAt(point);
+  if (areaId === "harbor" || areaId === "orchard-harbor") return harborFishingZoneAt(point);
   if (areaId === "cove" || areaId === undefined) return farmCoveZoneAt(point);
   const region = findFishingRegion(areaId);
   return region ? regionZoneAt(region, point) : null;

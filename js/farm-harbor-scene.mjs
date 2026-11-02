@@ -1,12 +1,16 @@
 import { normalizeFarmLayout } from "./farm-layout.mjs";
 import { stepWalker } from "./arcade-room-walker.mjs";
 import { HARBOR_DOCKS, harborFishingZoneAt, harborWalkHeight } from "./farm-harbor-geometry.mjs";
+import { ISLAND_ORCHARD_TREES } from "./farm-island.mjs";
 export const HARBOR_SPAWN = Object.freeze({ x: 0, z: 34, yaw: 0 });
 export const HARBOR_COVE_EXIT = Object.freeze({ x: 0, z: 40 });
 const buildings = [-17, 15].map((x, index) => ({ instanceId: `harbor-building-${index}`, x, z: 30, rotationY: 0, footprint: { width: 7, depth: 5 }, bottom: 0, top: Infinity }));
+const islandSolids = [...buildings,
+    { instanceId: "orchard-market-hall", x: 0, z: 53, rotationY: 0, footprint: { width: 13, depth: 6 }, bottom: 0, top: Infinity },
+    ...ISLAND_ORCHARD_TREES.map((point, i) => ({ ...point, instanceId: `orchard-tree-${i}`, rotationY: 0, footprint: { width: 0.9, depth: 0.9 }, bottom: 0, top: Infinity }))];
 /** Use the farm's existing walker, with the harbor's actual land and dock surfaces. */
-export function stepHarborWalker(pose, keys, dt) {
-    const next = stepWalker(pose, keys, dt, { halfWidth: 70, halfDepth: 100, margin: 1 }, buildings);
+export function stepHarborWalker(pose, keys, dt, island = false) {
+    const next = stepWalker(pose, keys, dt, { halfWidth: 70, halfDepth: 100, margin: 1 }, island ? islandSolids : buildings);
     const point = next.pose;
     const safe = [[0, 0], [-0.18, 0], [0.18, 0], [0, -0.18], [0, 0.18]].every(([x, z]) => harborWalkHeight({ x: point.x + x, z: point.z + z }) !== null);
     return safe ? next : { pose, moved: false };

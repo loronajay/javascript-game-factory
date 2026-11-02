@@ -147,7 +147,7 @@ test("species paint preserves details, clones materials and applies body proport
   assert.equal(model.scale.x, look.width); assert.equal(model.scale.y, look.height);
 });
 test("farm properties name distinct settings and keep every existing possession during a move", () => {
-  assert.deepEqual(FARM_LOTS.map((property) => property.theme), ["woodland", "lakeside"]);
+  assert.deepEqual(FARM_LOTS.map((property) => property.theme), ["woodland", "lakeside", "orchard"]);
   const farm = createDefaultFarmLayout();
   const wooded = expandFarmLot(farm, "lot.smallholding");
   const estate = expandFarmLot(wooded, "lot.estate");
@@ -223,7 +223,7 @@ test("fishing arrivals and return-path approaches do not start inside a fixture"
 import { findMarketStall, PROPERTY_OFFICE_ID, MARKET_DECOR, MARKET_COVE_GATE, MARKET_DOWNS_GATE, marketSquareLayout, stallLocalToWorld, MARKET_STALLS, stallObstacles } from "../farm-market-square.mjs";
 import { findFarmTicketItem } from "../../platform-api/src/services/farm-ticket-catalog.mjs";
 test("property prices match the server and the office has a clear approach away from trees and gates", () => {
-  assert.deepEqual(FARM_LOTS.map((lot) => lot.price), [25000, 100000]);
+  assert.deepEqual(FARM_LOTS.map((lot) => lot.price), [25000, 100000, 35000]);
   for (const lot of FARM_LOTS) assert.equal(findFarmTicketItem(lot.id).price, lot.price);
   const office = findMarketStall(PROPERTY_OFFICE_ID);
   for (const item of MARKET_DECOR.filter((item) => /decor.plant.(oak|birch|pine|willow)$/.test(item.itemId))) assert.ok(Math.hypot(office.x-item.x,office.z-item.z)>4.5, item.instanceId);

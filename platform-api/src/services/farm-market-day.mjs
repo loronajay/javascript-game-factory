@@ -11,6 +11,7 @@
 // is likelier than the ends. The point is a decision — sell today, or hold the
 // basket for a better day — never a speculative market. Orders, dishes and
 // furniture keep their fixed prices: only raw produce at the merchant moves.
+import { cropCanGrowInRegion } from "./farm-region-catalog.mjs";
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { farmProducePrice } from "./farm-market-catalog.mjs";
@@ -55,9 +56,9 @@ export function farmMarketTrend(itemId, day) {
     return today > yesterday ? 1 : today < yesterday ? -1 : 0;
 }
 /** The seeds on special on day `day`: SEED_SPECIAL_COUNT different crops. */
-export function farmSeedSpecials(day) {
-    const random = farmSeededRandom(farmSeedFor(`farm-seed-specials:v1:${day}`));
-    const open = Object.keys(FARM_CROP_RULES);
+export function farmSeedSpecials(day, region = "mainland") {
+    const random = farmSeededRandom(farmSeedFor(region === "mainland" ? `farm-seed-specials:v1:${day}` : `farm-seed-specials:v1:${day}:${region}`));
+    const open = Object.keys(FARM_CROP_RULES).filter(id => cropCanGrowInRegion(FARM_CROP_RULES[id], region));
     const picked = [];
     while (picked.length < Math.min(SEED_SPECIAL_COUNT, open.length)) {
         picked.push(open.splice(Math.floor(random() * open.length), 1)[0]);
@@ -70,19 +71,19 @@ export function farmSeedSpecials(day) {
  * seed shop always charges the standing price — the special is the reason to
  * walk down the road.
  */
-export function farmMarketSeedPrice(cropId, day) {
+export function farmMarketSeedPrice(cropId, day, region = "mainland") {
     const supply = findFarmSupply(`seed.${cropId}`);
     if (!supply)
         return 0;
-    return farmSeedSpecials(day).includes(cropId) ? Math.max(1, Math.ceil(supply.price * (1 - SEED_SPECIAL_DISCOUNT))) : supply.price;
+    return farmSeedSpecials(day, region).includes(cropId) ? Math.max(1, Math.ceil(supply.price * (1 - SEED_SPECIAL_DISCOUNT))) : supply.price;
 }
-export function farmMarketBoard(day) {
+export function farmMarketBoard(day, region = "mainland") {
     const itemIds = [...new Set(FARM_PRODUCE_KEYS.map((key) => parseFarmProduceKey(key).itemId))];
     return Object.freeze({
         day,
         endsAt: (day + 1) * FARM_MARKET_DAY_MS,
         prices: Object.freeze(Object.fromEntries(FARM_PRODUCE_KEYS.map((key) => [key, farmMarketProducePrice(key, day)]))),
         trends: Object.freeze(Object.fromEntries(itemIds.map((itemId) => [itemId, farmMarketTrend(itemId, day)]))),
-        seedSpecials: Object.freeze(Object.fromEntries(farmSeedSpecials(day).map((cropId) => [cropId, farmMarketSeedPrice(cropId, day)]))),
+        seedSpecials: Object.freeze(Object.fromEntries(farmSeedSpecials(day, region).map((cropId) => [cropId, farmMarketSeedPrice(cropId, day, region)]))),
     });
 }

@@ -1,3 +1,4 @@
+import { farmRegionForProperty } from "./farm-regions.mjs";
 import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 function element(tag, className = "", text = "") {
     const node = document.createElement(tag);
@@ -61,13 +62,16 @@ export function createPropertiesPanel(deps) {
         meadow.type = "button";
         meadow.disabled = busy || !ready || !deps.canBuy || !deps.farm().lot;
         meadow.addEventListener("click", () => { void buy("meadow"); });
-        body.append(meadow, defaultButton("meadow"));
-        for (const property of FARM_LOTS) {
+        if (!deps.regionId || deps.regionId === "mainland")
+            body.append(meadow, defaultButton("meadow"));
+        for (const property of FARM_LOTS.filter(lot => !deps.regionId || farmRegionForProperty(lot.id) === deps.regionId)) {
             const card = element("article", `property-card property-card--${property.theme}`);
             const image = element("img", "property-card__preview");
-            image.src = new URL(`../farm/assets/properties/${property.preview}`, import.meta.url).toString();
+            if (property.preview)
+                image.src = new URL(`../farm/assets/properties/${property.preview}`, import.meta.url).toString();
             image.alt = `${property.title}: ${property.setting}`;
             image.loading = "lazy";
+            image.hidden = !property.preview;
             const copy = element("div", "property-card__copy");
             copy.append(element("span", "eyebrow", property.setting), element("h2", "", property.title), element("p", "", property.description));
             const features = element("ul");

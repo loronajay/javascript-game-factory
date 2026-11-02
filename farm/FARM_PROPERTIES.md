@@ -6,7 +6,9 @@ API startup applies migration `060-farm-properties.sql` before serving requests.
 ## Player behavior
 
 The Property Office in the Market switches between Meadow Farm (28 × 28 m),
-Cedar Hollow (40 × 40 m), and Sunwater Estate (56 × 56 m). Buying a property
+Cedar Hollow (40 × 40 m), Sunwater Estate (56 × 56 m), and Orchard Isle Homestead (40 × 40 m).
+The island Property Office sells island homes; the mainland office sells
+mainland homes. See [FARM_ISLANDS.md](FARM_ISLANDS.md). Buying a property
 unlocks a separate farm and selects it. Returning to an owned property is free,
 including switching from a larger property to a smaller one.
 
@@ -37,7 +39,7 @@ does not change the owner's active farm. Legacy links show the active farm.
 The existing `game_loadouts` farm row remains the canonical document. Its top
 level is the active farm, keeping existing economy services on their established
 interface. `properties` contains bounded, non-nested inactive farm snapshots,
-keyed by `meadow`, `lot.smallholding`, or `lot.estate`. These are one-per-template
+keyed by `meadow`, `lot.smallholding`, `lot.estate`, or `lot.orchard`. These are one-per-template
 properties; multiple instances of the same template are not supported yet.
 
 An authenticated `PUT /games/farm/garage` with

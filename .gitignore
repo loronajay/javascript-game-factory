@@ -166,3 +166,6 @@ farm/assets/yield-animals/Blends/
 farm/assets/yield-animals/FBX/
 farm/assets/yield-animals/OBJ/
 !js/tests/farm-expansion.test.mjs
+
+!js/tests/farm-island.test.mjs
+!js/tests/farm-island-browser.test.mjs

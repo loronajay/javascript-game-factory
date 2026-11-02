@@ -68,6 +68,7 @@ const supplyPrices: Readonly<Record<string, number>> = Object.freeze({
   "food.hay": 8, "food.pig-feed": 8, "food.chicken-feed": 6,
 });
 const seedPrices: Readonly<Record<string, number>> = Object.freeze({
+  pepper: 14, lavender: 12,
   bean: 10, beetroot: 7, cabbage: 12, carrot: 8,
   cauliflower: 14, garlic: 7, potato: 11, radish: 6,
   // Generated crops (farm/crop-lab); must match js/farm-crops.mts.

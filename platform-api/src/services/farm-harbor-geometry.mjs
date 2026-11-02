@@ -1,11 +1,10 @@
 export const HARBOR_BOUNDS = Object.freeze({ minX: -70, maxX: 70, minZ: -95, maxZ: 22 });
 export const HARBOR_ISLANDS = Object.freeze([
-    Object.freeze({ x: -28, z: -36, radius: 12, title: "Gull Island" }),
-    Object.freeze({ x: 29, z: -56, radius: 15, title: "The Pines" }),
+// Offshore land is a separately loaded settlement, reached through the sea route.
+// Keep this typed roster for coastal collision, without decorative destination islands.
 ]);
 export const HARBOR_DOCKS = Object.freeze([
     Object.freeze({ id: "mainland-harbor", title: "Mainland Harbor", x: 8, z: 12, yaw: 0, minX: -4, maxX: 4, minZ: 8, maxZ: 22 }),
-    Object.freeze({ id: "gull-landing", title: "Gull Landing", x: -22, z: -18, yaw: Math.PI, minX: -31, maxX: -25, minZ: -26, maxZ: -16 }),
 ]);
 export function harborWalkHeight(point) {
     if (point.x < -69 || point.x > 69 || point.z > 65 || point.z < -94)

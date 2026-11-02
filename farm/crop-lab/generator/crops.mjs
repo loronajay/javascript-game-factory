@@ -654,7 +654,33 @@ export const DEAD_PLANT = { id: "dead", title: "Dead", sizes: 3, draw: deadPlant
  * shipped eight (6-14 tickets, 2-4 days, 2-5 produce); they only matter once
  * a crop is promoted into js/farm-crops.mts.
  */
+function pepper(b, r, stage) {
+  if (stage === 0) { seedling(b, r, { trueLeaves: 2 }); return; }
+  const height = [0, 0.11, 0.23, 0.28][stage];
+  stemAlong(b, [[0, 0, 0], [0, height, 0]], 0.005, 0.003, P.stem);
+  for (let i = 0; i < 7; i++) {
+    const yaw = i * 2.4, y = height * (0.3 + i * 0.08);
+    const tip = stemAlong(b, [[0, y, 0], [Math.sin(yaw) * 0.065, y + 0.018, Math.cos(yaw) * 0.065]], 0.0025, 0.001, P.stem);
+    at(b, aim(tip, heading(yaw, 0)), leaf({ length: 0.08, width: 0.028, lift: 0.3, droop: 0.3, steps: 5 }), P.leaf);
+    if (stage >= 2 && i % 2 === 0) b.with(translate(tip[0], tip[1] - 0.035, tip[2]), () => {
+      b.addPart(lathe([[0.008, 0], [0.023, 0.009], [0.026, 0.043], [0.016, 0.055], [0, 0.055]], { segments: 12, radial: theta => 1 + 0.12 * Math.cos(theta * 4) }), stage === 3 ? (i % 4 ? P.yellow : P.tomato) : P.leafDark);
+    });
+  }
+}
+function lavenderCrop(b, r, stage) {
+  if (stage === 0) { seedling(b, r, { size: 0.025, leafMat: P.sage }); return; }
+  const count = stage === 1 ? 5 : 13;
+  for (let i = 0; i < count; i++) {
+    const yaw = i * 2.4, h = (stage === 1 ? 0.08 : 0.2) + r() * 0.05;
+    const tip = [Math.sin(yaw) * 0.055, h, Math.cos(yaw) * 0.055];
+    stemAlong(b, [[0, 0, 0], tip], 0.002, 0.001, P.sage);
+    for (const side of [-1, 1]) at(b, aim([tip[0] * 0.5, h * 0.5, tip[2] * 0.5], heading(yaw + side, 0.5)), leaf({ length: 0.045, width: 0.006, steps: 4 }), P.sage);
+    if (stage > 1) for (let j = 0; j < 5; j++) at(b, translate(tip[0], h + j * 0.008, tip[2]), gem((5 - j) * 0.0015 + 0.002, 1.5), stage === 3 ? P.lavender : P.plum);
+  }
+}
 export const GENERATED_CROPS = [
+  { id: "pepper", title: "Pepper", draw: pepper, proposal: { seedPrice: 14, days: 3, yield: 4 } },
+  { id: "lavender", title: "Lavender", draw: lavenderCrop, proposal: { seedPrice: 12, days: 3, yield: 3 } },
   { id: "strawberry", title: "Strawberry", draw: strawberry, proposal: { seedPrice: 9, days: 2.5, yield: 5 } },
   { id: "tomato", title: "Tomato", draw: tomato, proposal: { seedPrice: 10, days: 3, yield: 4 } },
   { id: "corn", title: "Corn", draw: corn, proposal: { seedPrice: 11, days: 3.5, yield: 2 } },

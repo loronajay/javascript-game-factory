@@ -2,8 +2,10 @@ import { GLTFLoader } from "./vendor/loaders/GLTFLoader.js";
 import { BOAT_MODEL_YAW_OFFSET, HARBOR_BOUNDS, HARBOR_DOCKS, HARBOR_ISLANDS } from "./farm-boating.mjs";
 import { destinationSign } from "./farm-fishing-region-world.mjs";
 import { harborWalkHeight } from "./farm-harbor-geometry.mjs";
+import { createAppleTree, createWillow, createLavender, createBush } from "./farm-props-plants.mjs";
+import { ISLAND_ORCHARD_TREES } from "./farm-island.mjs";
 /** A coastal handling scene, independent of farm saves and paid travel. */
-export function createHarborWorld(THREE, scene, onModel) {
+export function createHarborWorld(THREE, scene, onModel, island = false) {
     scene.background = new THREE.Color("#c6e1e4");
     scene.fog = new THREE.Fog("#c6e1e4", 110, 250);
     scene.add(new THREE.HemisphereLight("#e5f4ff", "#567445", 2.1));
@@ -11,12 +13,18 @@ export function createHarborWorld(THREE, scene, onModel) {
     sun.position.set(-35, 65, 25);
     scene.add(sun);
     const material = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true });
-    const sand = material("#d6c9a0"), grass = material("#7b9a58"), wood = material("#9b7650"), darkWood = material("#574633"), stone = material("#92958a");
+    const sand = material(island ? "#e8d4ac" : "#d6c9a0"), grass = material(island ? "#9aa966" : "#7b9a58"), wood = material("#9b7650"), darkWood = material("#574633"), stone = material("#92958a");
     function mesh(geometry, surface, x, y, z, parent = scene) {
         const object = new THREE.Mesh(geometry, surface);
         object.position.set(x, y, z);
         parent.add(object);
         return object;
+    }
+    function sign(text, x, z, yaw = 0) {
+        const raised = new THREE.Group();
+        raised.position.y = harborWalkHeight({ x, z }) ?? 0;
+        scene.add(raised);
+        destinationSign(THREE, raised, text, x, z, yaw, true);
     }
     const waterTime = { value: 0 };
     const waterMaterial = new THREE.MeshPhongMaterial({ color: "#319ba8", specular: "#9bd2d5", shininess: 85 });
@@ -40,15 +48,63 @@ export function createHarborWorld(THREE, scene, onModel) {
     }
     groundStrip(175, 3.5, 23.75, sand, 0);
     groundStrip(4, 24, 34, material("#bba57b"), 0.015);
-    destinationSign(THREE, scene, "THE COVE / COAST PATH", -3, 37, Math.PI, true);
-    destinationSign(THREE, scene, "HARBOR / BOAT PIER", -3, 25, 0, true);
+    sign(island ? "ORCHARD MARKET / WALK AHEAD" : "THE COVE / COAST PATH", -3, 37, Math.PI);
+    sign("HARBOR / BOAT PIER", -3, 25, 0);
     function pine(x, z, height, base = 1) {
         mesh(new THREE.CylinderGeometry(0.2, 0.3, height * 0.55, 6), darkWood, x, base + height * 0.25, z);
         for (let level = 0; level < 3; level++)
             mesh(new THREE.ConeGeometry(height * (0.32 - level * 0.06), height * 0.58, 7), material(level % 2 ? "#477459" : "#365e4b"), x, base + height * (0.47 + level * 0.19), z);
     }
-    for (let i = 0; i < 24; i++)
-        pine(-73 + i * 6.3, 37 + (i % 4) * 5, 5 + i % 5);
+    if (!island)
+        for (let i = 0; i < 24; i++)
+            pine(-73 + i * 6.3, 37 + (i % 4) * 5, 5 + i % 5);
+    if (island) {
+        for (const [i, point] of ISLAND_ORCHARD_TREES.entries()) {
+            const tree = createAppleTree(THREE, i + 90);
+            tree.position.set(point.x, 1.4, point.z);
+            tree.scale.setScalar(2);
+            scene.add(tree);
+        }
+        for (let i = 0; i < 12; i++) {
+            const bush = i % 2 ? createLavender(THREE, i + 22) : createBush(THREE, i + 22);
+            bush.position.set(i < 6 ? -5 : 5, 1.4, 28 + i % 6 * 2);
+            bush.scale.setScalar(1.4);
+            scene.add(bush);
+        }
+        // The market road leads through a visible village gateway, with a roofline behind it.
+        for (const x of [-3, 3]) {
+            mesh(new THREE.BoxGeometry(0.65, 3.8, 0.8), material("#eee3c8"), x, 3.3, 42);
+            mesh(new THREE.BoxGeometry(1, 0.25, 1.1), material("#b77756"), x, 5.3, 42);
+        }
+        mesh(new THREE.BoxGeometry(6.7, 0.55, 1), material("#b77756"), 0, 5.1, 42);
+        mesh(new THREE.BoxGeometry(13, 5, 6), material("#eeddbd"), 0, 3.9, 53);
+        const hallRoof = mesh(new THREE.ConeGeometry(9.8, 3, 4), material("#b77756"), 0, 7.8, 53);
+        hallRoof.rotation.y = Math.PI / 4;
+        mesh(new THREE.BoxGeometry(2.5, 3.4, 0.15), darkWood, 0, 3.1, 49.9);
+        for (const x of [-4.5, 4.5])
+            mesh(new THREE.BoxGeometry(1.6, 1.6, 0.15), material("#779fa2"), x, 4.7, 49.9);
+        // Low orchard ridges close the horizon above the settlement.
+        for (let i = 0; i < 7; i++) {
+            const ridge = mesh(new THREE.SphereGeometry(1, 16, 10), material(i % 2 ? "#8eaa71" : "#a1b77a"), -90 + i * 30, -2, 89 + i % 2 * 10);
+            ridge.scale.set(33, 15 + i % 3 * 3, 25);
+        }
+        // Productive orchards and shaded coastal walks frame a village, rather than a toy islet.
+        for (let i = 0; i < 16; i++) {
+            const tree = i % 7 ? createAppleTree(THREE, i + 200) : createWillow(THREE, i + 200);
+            tree.position.set((i % 2 ? -1 : 1) * (34 + i % 5 * 6), 1.4, 29 + Math.floor(i / 4) * 9);
+            tree.scale.setScalar(1.3);
+            scene.add(tree);
+        }
+        const path = mesh(new THREE.PlaneGeometry(25, 3), material("#d4ba92"), 13, 1.42, 38);
+        path.rotation.x = -Math.PI / 2;
+        sign("ORCHARD HOMESTEADS / E", 24, 39, Math.PI);
+        sign("RESIDENTS / VISIT FARMS / E", 9, 31, Math.PI);
+        for (const x of [22, 26])
+            mesh(new THREE.BoxGeometry(0.35, 2, 0.35), material("#eee1c5"), x, 2.4, 41);
+        mesh(new THREE.BoxGeometry(4.4, 0.35, 0.4), darkWood, 24, 3.4, 41);
+    }
+    sign(island ? "FERRY / MAINLAND / E" : "FERRY / ORCHARD ISLE / E", -6, 25, Math.PI);
+    sign(island ? "SEA ROUTE / MAINLAND" : "SEA ROUTE / ORCHARD ISLE", -7, -73, Math.PI);
     for (const [i, island] of HARBOR_ISLANDS.entries()) {
         mesh(new THREE.CylinderGeometry(island.radius + 1.8, island.radius + 2.7, 0.6, 48), sand, island.x, -0.15, island.z);
         mesh(new THREE.CylinderGeometry(island.radius, island.radius + 1, 2, 32), grass, island.x, 0.8, island.z);
@@ -71,10 +127,16 @@ export function createHarborWorld(THREE, scene, onModel) {
     }
     // Small harbor buildings keep the mainland legible from the water.
     for (const x of [-17, 15]) {
-        mesh(new THREE.BoxGeometry(7, 4, 5), material(x < 0 ? "#e1d4b5" : "#ab6654"), x, 3.1, 30);
-        const roof = mesh(new THREE.ConeGeometry(5.3, 2.2, 4), material("#4e6466"), x, 6.1, 30);
+        mesh(new THREE.BoxGeometry(7, 4, 5), material(island ? "#f3e4c8" : x < 0 ? "#e1d4b5" : "#ab6654"), x, 3.1, 30);
+        const roof = mesh(new THREE.ConeGeometry(5.3, 2.2, 4), material(island ? "#ad604c" : "#4e6466"), x, 6.1, 30);
         roof.rotation.y = Math.PI / 4;
         mesh(new THREE.BoxGeometry(1.5, 2.7, 0.1), darkWood, x, 2.6, 27.45);
+        for (const dx of [-2, 2]) {
+            mesh(new THREE.BoxGeometry(1, 1.1, 0.12), material("#8dbac0"), x + dx, 3.6, 27.4);
+            if (island)
+                for (const side of [-1, 1])
+                    mesh(new THREE.BoxGeometry(0.3, 1.2, 0.15), material("#6f8b6a"), x + dx + side * 0.65, 3.6, 27.35);
+        }
     }
     // Navigation buoys mark the trial's boundary instead of an invisible open-ocean exit.
     for (let x = -60; x <= 60; x += 15) {

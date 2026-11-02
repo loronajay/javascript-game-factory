@@ -1,12 +1,14 @@
 # Boating, islands, and regional homesteads
 
-Status: proposed scope, 2026-11-01. No implementation is implied by this document.
+Original proposal: 2026-11-01. Orchard Isle implementation: 2026-11-02.
+See [FARM_ISLANDS.md](FARM_ISLANDS.md) for shipped travel, homesteads,
+regional crops, market and resident-directory behavior. The remaining sections
+retain the broader plan, including work beyond this first inhabited island.
 
 Follow-up: independent properties were implemented locally first at the user's
 request. See `FARM_PROPERTIES.md` for actual behavior and deployment requirements.
 Its local inventories differ from this proposal's account-wide carried goods;
-transport between properties remains a future design decision. Island travel,
-regional markets, and island crop species remain proposed. Mainland Harbor is
+transport between properties remains a future design decision. Orchard Isle travel, a regional market and two island crop species are implemented. Mainland Harbor is
 implemented at `/farm/harbor/`, reached by walking the
 southeast coast path from the Cove. It now uses the Cove walking/fishing stack:
 board at a pier, row, anchor to fish into the existing creel, disembark to walk

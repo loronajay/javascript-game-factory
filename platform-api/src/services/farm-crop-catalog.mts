@@ -7,6 +7,8 @@ const DAY = 24 * 60;
 
 export type FarmCropRule = Readonly<{ growMinutes: number; yield: number; regions?: readonly string[] }>;
 export const FARM_CROP_RULES: Readonly<Record<string, FarmCropRule>> = Object.freeze({
+  pepper: Object.freeze({ growMinutes: 3 * DAY, yield: 4, regions: ["orchard-isle"] }),
+  lavender: Object.freeze({ growMinutes: 3 * DAY, yield: 3, regions: ["orchard-isle"] }),
   bean: Object.freeze({ growMinutes: 3 * DAY, yield: 4 }),
   beetroot: Object.freeze({ growMinutes: 2 * DAY, yield: 3 }),
   blueberry: Object.freeze({ growMinutes: 4 * DAY, yield: 6 }),

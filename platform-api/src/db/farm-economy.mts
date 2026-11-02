@@ -1,5 +1,7 @@
+import { farmCropRule } from "../services/farm-crop-catalog.mjs";
 import { awardTicketsInTransaction, spendTicketsInTransaction } from "./tickets.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
+import { cropCanGrowInRegion, farmRegionForProperty } from "../services/farm-region-catalog.mjs";
 import { FARM_ADOPTION_PRICE, createFarmPetProfile, findFarmSpecies, findFarmSupply, isAdoptableFarmSpecies } from "../services/farm-economy-catalog.mjs";
 import { farmHarvestYield } from "../services/farm-crop-catalog.mjs";
 import { farmSalePrice, normalizeSaleLines } from "../services/farm-market-catalog.mjs";
@@ -158,7 +160,6 @@ export async function purchaseFarmSupply(pool: any, input: any, now: number = Da
   if (supply.kind === "recipe" && quantity !== 1) return { ok: false, error: "invalid_quantity" };
   const day = farmMarketDay(now);
   if (atMarket && Number(input?.day) !== day) return { ok: false, error: "prices_changed", day };
-  const unitPrice = atMarket && supply.kind === "seed" ? farmMarketSeedPrice(supply.cropId!, day) : supply.price;
   const transactionKey = `farm:supply:${purchaseId}`;
   return transaction(pool, async (client) => {
     const farm = await lockedFarm(client, playerId);
@@ -167,6 +168,8 @@ export async function purchaseFarmSupply(pool: any, input: any, now: number = Da
       const wallet = await client.query(`select balance from ticket_wallets where player_id = $1`, [playerId]);
       return { ok: true, duplicate: true, price: 0, quantity, balance: Number(wallet.rows[0]?.balance) || 0, layout: farm.layout };
     }
+    if (supply.kind === "seed" && !cropCanGrowInRegion(farmCropRule(supply.cropId), farmRegionForProperty(farm.layout.lot))) return { ok: false, error: "wrong_crop_region", layout: farm.layout };
+    const unitPrice = atMarket && supply.kind === "seed" ? farmMarketSeedPrice(supply.cropId!, day, farmRegionForProperty(farm.layout.lot)) : supply.price;
     const agriculture = farm.layout.agriculture;
     const skills = normalizeFarmSkillRecords(farm.layout.skills);
     // A sapling is sold only to a farmer whose skill has reached its species (Farming for fruit, Woodcutting for timber).

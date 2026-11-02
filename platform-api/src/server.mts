@@ -36,6 +36,7 @@ import { cookFarmDish } from "./db/farm-kitchen.mjs";
 import { craftFarmPiece, millFarmLogs } from "./db/farm-workshop.mjs";
 import { breedFarmPets } from "./db/farm-pet-breeding.mjs";
 import { actOnFarmTrade, getCurrentFarmTrade, getFarmTrade, inviteFarmTrade } from "./db/farm-trades.mjs";
+import { getFarmResidents } from "./db/farm-residents.mjs";
 import { buyFarmListing, createFarmListing, getFarmListings, withdrawFarmListing } from "./db/farm-listings.mjs";
 import { butcherFarmLivestock, buyFarmLivestock, careFarmLivestock, getFarmLivestock, moveFarmLivestock, renameFarmLivestock } from "./db/farm-livestock.mjs";
 import { buyFarmHorse, refreshFarmHorses } from "./db/farm-horses.mjs";
@@ -453,6 +454,7 @@ async function bootstrap(): Promise<void> {
     getFarmOrderBoard: (params: any) => getFarmOrderBoard(pool, params),
     fillFarmOrder: (params: any) => fillFarmOrder(pool, params),
     inviteFarmTrade: (params: any) => inviteFarmTrade(pool, params),
+    getFarmResidents: (params: any) => getFarmResidents(pool, params),
     getFarmListings: (params: any) => getFarmListings(pool, params),
     createFarmListing: (params: any) => createFarmListing(pool, params),
     buyFarmListing: (params: any) => buyFarmListing(pool, params),

@@ -1,10 +1,25 @@
+import { findFarmRegion } from "../services/farm-region-catalog.mjs";
 import { readJsonBody, writeJson } from "../http-utils.mjs";
 import { farmMarketBoard, farmMarketDay } from "../services/farm-market-day.mjs";
 export async function handleFarmEconomyRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
+    if (pathname === "/games/farm/residents" && method === "GET") {
+        const query = new URL(req.url, "http://localhost").searchParams;
+        if (typeof services?.getFarmResidents !== "function") {
+            writeJson(res, 503, { error: "unavailable" }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { directory: await services.getFarmResidents({ region: query.get("region"), after: query.get("after") }) }, requestOrigin);
+        return true;
+    }
     // Today's Market prices are the same for everyone and nobody's business: a public read.
     if (pathname === "/games/farm/market/prices" && method === "GET") {
-        writeJson(res, 200, { market: farmMarketBoard(farmMarketDay(Date.now())) }, requestOrigin);
+        const region = findFarmRegion(new URL(req.url, "http://localhost").searchParams.get("region") ?? "mainland");
+        if (!region?.available) {
+            writeJson(res, 400, { error: "invalid_region" }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { market: farmMarketBoard(farmMarketDay(Date.now()), region.id) }, requestOrigin);
         return true;
     }
     const adopting = pathname === "/games/farm/adoptions" && method === "POST";

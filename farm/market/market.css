@@ -155,3 +155,5 @@
   .exchange-row { grid-template-columns: 44px minmax(0, 1fr); }
   .exchange-row .sale-row__stepper, .exchange-row > .farm-button { grid-column: 2; justify-self: start; }
 }
+
+.property-card--orchard .property-card__copy { grid-column: 1 / -1; }

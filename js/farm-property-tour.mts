@@ -20,13 +20,13 @@ const routes = propertyRoutes(layout);
 for (const route of routes) {
   if (!route.horse) {
     const link = document.createElement("a");
-    link.href = `cove/index.html?area=${route.target}&preview=1`;
-    link.textContent = `Fish at ${route.title}`;
+    link.href = route.target === "orchard-harbor" ? "harbor/index.html?region=orchard-isle" : `cove/index.html?area=${route.target}&preview=1`;
+    link.textContent = route.target === "orchard-harbor" ? "Explore Orchard Harbor" : `Fish at ${route.title}`;
     document.querySelector('[aria-label="Viewpoints"]')!.append(link);
   }
   const button = document.createElement("button"); button.type = "button";
   button.dataset.view = route.target;
-  button.textContent = route.horse ? "Show Downs gate" : "Show fishing gate";
+  button.textContent = route.horse ? "Show Downs gate" : route.target === "orchard-harbor" ? "Show harbor path" : "Show fishing gate";
   document.querySelector('[aria-label="Viewpoints"]')!.append(button);
 }
 document.title = `${property.title} · Free walkthrough`;
@@ -139,7 +139,7 @@ try {
         const destination = gate ? routes.find(route => route.gateId === gate.instanceId) : null;
         if (destination && !destination.horse && !leaving) {
           leaving = true;
-          location.href = `cove/index.html?area=${destination.target}&preview=1`;
+          location.href = destination.target === "orchard-harbor" ? "harbor/index.html?region=orchard-isle" : `cove/index.html?area=${destination.target}&preview=1`;
         }
       }
       camera.position.set(pose.x, eyeHeight(body, EYE_HEIGHT), pose.z);

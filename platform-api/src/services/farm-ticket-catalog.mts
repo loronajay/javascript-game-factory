@@ -18,9 +18,10 @@ export const FARM_STARTER_IDS: ReadonlySet<string> = new Set([
   "decor.prop.workbench",
 ]);
 
-export const FARM_LOT_SIZES: Readonly<Record<string, number>> = Object.freeze({ "lot.smallholding": 40, "lot.estate": 56 });
+export const FARM_LOT_SIZES: Readonly<Record<string, number>> = Object.freeze({ "lot.smallholding": 40, "lot.estate": 56, "lot.orchard": 40 });
 const prices: Readonly<Record<string, number>> = Object.freeze({
   "lot.smallholding": 25000, "lot.estate": 100000,
+  "lot.orchard": 35000,
   "ground.clover": 150, "ground.dry": 150, "ground.mud": 200, "ground.gravel": 250,
   "decor.fence.split-rail": 100, "decor.fence.wire": 125, "decor.fence.picket": 150,
   "decor.fence.hedge": 200, "decor.fence.stone-wall": 250,

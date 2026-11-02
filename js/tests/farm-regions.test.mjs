@@ -18,8 +18,9 @@ test('world identities and crop restrictions agree across the browser and API', 
   assert.equal(server.cropCanGrowInRegion({}, 'unknown'), false);
   assert.equal(server.cropCanGrowInRegion(null, 'mainland'), false);
 });
-test('existing farms and crops stay on the mainland; a planned island is not an unlock', () => {
+test('existing farms stay on the mainland and the island has its own property and crops', () => {
   for (const property of [undefined, 'meadow', 'lot.smallholding', 'lot.estate', 'untrusted']) assert.equal(client.farmRegionForProperty(property), 'mainland');
-  assert.equal(client.findFarmRegion('orchard-isle').available, false);
-  for (const crop of CROP_CATALOG) assert.equal(client.cropCanGrowInRegion(crop, 'mainland'), true);
+  assert.equal(client.findFarmRegion('orchard-isle').available, true);
+  assert.equal(client.farmRegionForProperty('lot.orchard'), 'orchard-isle');
+  for (const crop of CROP_CATALOG) assert.equal(client.cropCanGrowInRegion(crop, 'mainland'), !['pepper', 'lavender'].includes(crop.id));
 });

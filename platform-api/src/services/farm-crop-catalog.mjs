@@ -4,6 +4,8 @@
 // server decides whether it is ripe and how much it pays.
 const DAY = 24 * 60;
 export const FARM_CROP_RULES = Object.freeze({
+    pepper: Object.freeze({ growMinutes: 3 * DAY, yield: 4, regions: ["orchard-isle"] }),
+    lavender: Object.freeze({ growMinutes: 3 * DAY, yield: 3, regions: ["orchard-isle"] }),
     bean: Object.freeze({ growMinutes: 3 * DAY, yield: 4 }),
     beetroot: Object.freeze({ growMinutes: 2 * DAY, yield: 3 }),
     blueberry: Object.freeze({ growMinutes: 4 * DAY, yield: 6 }),

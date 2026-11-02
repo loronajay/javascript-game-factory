@@ -593,8 +593,11 @@ export function createPlatformApiClient(options = {}) {
             return post("/games/farm/market/sales", { items, saleId, ...(Number.isSafeInteger(day) ? { day } : {}) }, "sale", {}, true);
         },
         /** The Exchange Board: everyone else's open listings, this player's own, and what today's caps leave them. */
-        fetchFarmListings() {
-            return get("/games/farm/market/listings", "board");
+        fetchFarmResidents(region, after = "") {
+            return get(`/games/farm/residents?region=${encodeURIComponent(region)}&after=${encodeURIComponent(after)}`, "directory");
+        },
+        fetchFarmListings(region = "mainland") {
+            return get(`/games/farm/market/listings?region=${encodeURIComponent(region)}`, "board");
         },
         /** Put goods up on the Exchange Board: they leave the farm into escrow. The server checks the price band. */
         createFarmListing({ listingId, stack, itemId, quantity, unitPrice }) {
@@ -698,8 +701,8 @@ export function createPlatformApiClient(options = {}) {
             return post("/games/farm/fishing/mounts", { fishId, mounted, purchaseId }, "result", {}, true);
         },
         /** Today's Market prices (every produce grade), which way each moved, and the Seed Merchant's specials. Public. */
-        fetchFarmMarketPrices() {
-            return get("/games/farm/market/prices", "market");
+        fetchFarmMarketPrices(region = "mainland") {
+            return get(`/games/farm/market/prices?region=${encodeURIComponent(region)}`, "market");
         },
         /** Today's Order Board with this player's ticks, Farming level and basket (self only). */
         fetchFarmOrders() {

@@ -12,6 +12,7 @@
 // basket for a better day — never a speculative market. Orders, dishes and
 // furniture keep their fixed prices: only raw produce at the merchant moves.
 
+import { cropCanGrowInRegion } from "./farm-region-catalog.mjs";
 import { FARM_CROP_RULES } from "./farm-crop-catalog.mjs";
 import { findFarmSupply } from "./farm-economy-catalog.mjs";
 import { farmProducePrice } from "./farm-market-catalog.mjs";
@@ -60,9 +61,9 @@ export function farmMarketTrend(itemId: string, day: number): -1 | 0 | 1 {
 }
 
 /** The seeds on special on day `day`: SEED_SPECIAL_COUNT different crops. */
-export function farmSeedSpecials(day: number): readonly string[] {
-  const random = farmSeededRandom(farmSeedFor(`farm-seed-specials:v1:${day}`));
-  const open = Object.keys(FARM_CROP_RULES);
+export function farmSeedSpecials(day: number, region = "mainland"): readonly string[] {
+  const random = farmSeededRandom(farmSeedFor(region === "mainland" ? `farm-seed-specials:v1:${day}` : `farm-seed-specials:v1:${day}:${region}`));
+  const open = Object.keys(FARM_CROP_RULES).filter(id => cropCanGrowInRegion(FARM_CROP_RULES[id], region));
   const picked: string[] = [];
   while (picked.length < Math.min(SEED_SPECIAL_COUNT, open.length)) {
     picked.push(open.splice(Math.floor(random() * open.length), 1)[0]!);
@@ -76,10 +77,10 @@ export function farmSeedSpecials(day: number): readonly string[] {
  * seed shop always charges the standing price — the special is the reason to
  * walk down the road.
  */
-export function farmMarketSeedPrice(cropId: string, day: number): number {
+export function farmMarketSeedPrice(cropId: string, day: number, region = "mainland"): number {
   const supply = findFarmSupply(`seed.${cropId}`);
   if (!supply) return 0;
-  return farmSeedSpecials(day).includes(cropId) ? Math.max(1, Math.ceil(supply.price * (1 - SEED_SPECIAL_DISCOUNT))) : supply.price;
+  return farmSeedSpecials(day, region).includes(cropId) ? Math.max(1, Math.ceil(supply.price * (1 - SEED_SPECIAL_DISCOUNT))) : supply.price;
 }
 
 export type FarmMarketBoard = Readonly<{
@@ -93,13 +94,13 @@ export type FarmMarketBoard = Readonly<{
   seedSpecials: Readonly<Record<string, number>>;
 }>;
 
-export function farmMarketBoard(day: number): FarmMarketBoard {
+export function farmMarketBoard(day: number, region = "mainland"): FarmMarketBoard {
   const itemIds = [...new Set(FARM_PRODUCE_KEYS.map((key) => parseFarmProduceKey(key)!.itemId))];
   return Object.freeze({
     day,
     endsAt: (day + 1) * FARM_MARKET_DAY_MS,
     prices: Object.freeze(Object.fromEntries(FARM_PRODUCE_KEYS.map((key) => [key, farmMarketProducePrice(key, day)]))),
     trends: Object.freeze(Object.fromEntries(itemIds.map((itemId) => [itemId, farmMarketTrend(itemId, day)]))),
-    seedSpecials: Object.freeze(Object.fromEntries(farmSeedSpecials(day).map((cropId) => [cropId, farmMarketSeedPrice(cropId, day)]))),
+    seedSpecials: Object.freeze(Object.fromEntries(farmSeedSpecials(day, region).map((cropId) => [cropId, farmMarketSeedPrice(cropId, day, region)]))),
   });
 }

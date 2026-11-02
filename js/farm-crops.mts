@@ -71,6 +71,8 @@ export const CROP_CATALOG: readonly CropDefinition[] = Object.freeze([
   generated("sunflower", "Sunflower", 12, 4, 1),
   generated("tomato", "Tomato", 10, 3, 4),
   generated("watermelon", "Watermelon", 18, 4, 1),
+  generated("pepper", "Pepper", 14, 3, 4, ["orchard-isle"]),
+  generated("lavender", "Lavender", 12, 3, 3, ["orchard-isle"]),
 ]);
 
 /**
@@ -276,7 +278,7 @@ function freezeAgriculture(value: { inventory: FarmInventory; crops: readonly Fa
 }
 
 export function createStarterAgriculture(random: () => number = Math.random): FarmAgriculture {
-  const available = CROP_CATALOG.map((entry) => entry.id);
+  const available = CROP_CATALOG.filter(entry => cropCanGrowInRegion(entry, "mainland")).map((entry) => entry.id);
   const selected = new Set<string>();
   const targetCount = Math.min(6, available.length);
   while (selected.size < targetCount) {

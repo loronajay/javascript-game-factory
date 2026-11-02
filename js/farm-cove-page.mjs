@@ -1,4 +1,6 @@
 import * as cove from "./farm-cove.mjs";
+import { travelRegion, publicRegionUrl, islandPlaceInReach, ISLAND_PROPERTY, ISLAND_PLACES } from "./farm-island.mjs";
+import { createIslandResidents } from "./farm-island-residents.mjs";
 import { harborScene, HARBOR_COVE_EXIT, stepHarborWalker } from "./farm-harbor-scene.mjs";
 import { HARBOR_DOCKS, harborDockFoot, harborFishingZoneAt, harborWalkHeight } from "./farm-harbor-geometry.mjs";
 import { BOAT_HANDLING, dockedBoat, nearbyBoatDock, stepBoat, toggleBoatAnchor, useBoatDock } from "./farm-boating.mjs";
@@ -74,14 +76,15 @@ import { createFarmHud } from "./farm-hud.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
 const destinationQuery = new URLSearchParams(location.search);
 const harbor = /\/harbor\/(?:index\.html)?$/.test(location.pathname);
+const island = harbor && travelRegion(destinationQuery) === "orchard-isle";
 let boatState = dockedBoat();
 let aboard = false;
 const region = findFishingRegion(destinationQuery.get("area"));
 // A public practice visit never loads or modifies the farmer's actual account.
 const preview = destinationQuery.get("preview") === "1" && Boolean(region?.requiredProperty);
-const areaId = harbor ? "harbor" : region?.id ?? "cove";
-const areaTitle = harbor ? "Mainland Harbor" : region?.title ?? "The Cove";
-const areaScene = harbor ? harborScene : region ? fishingRegionScene(region) : cove;
+const areaId = harbor ? island ? "orchard-harbor" : "harbor" : region?.id ?? "cove";
+const areaTitle = harbor ? island ? "Orchard Harbor" : "Mainland Harbor" : region?.title ?? "The Cove";
+const areaScene = harbor ? { ...harborScene, COVE_PRESENCE_ROOM: island ? "farm:orchard-harbor" : harborScene.COVE_PRESENCE_ROOM } : region ? fishingRegionScene(region) : cove;
 const { COVE_BOUNDS, COVE_MARKET_GATE, COVE_PRESENCE_ROOM, COVE_SPAWN, COVE_RAIL_ID, COVE_STALLS, coveGroundAt, coveWaterDepthAt, castOrigin, coveLayout, coveObstacles, covePlatforms, coveWaterDistance } = areaScene;
 const THREE = THREE_VENDOR;
 function requiredElement(selector) {
@@ -120,7 +123,7 @@ if (harbor) {
     requiredElement(".hud-place__name h1").textContent = "Mainland Harbor";
     requiredElement(".hud-place__name .eyebrow").textContent = "THE MAINLAND / COAST PATH";
     requiredElement(".start-card h2").textContent = "Down to the harbor.";
-    requiredElement(".start-card p").textContent = "Walk down to the pier and press E by the boat to board. Row out, drop anchor with F, and fish with Space. Return to either landing and press E to step onto the pier and explore on foot.";
+    requiredElement(".start-card p").textContent = "Walk down to the pier and press E by the boat to board. Row out, drop anchor with F, and fish with Space. Sail to the marked sea route for Orchard Isle, or take the free ferry beside the pier. Return slowly and press E to disembark.";
     enterButton.textContent = "Walk into the harbor";
     requiredElement(".start-card__tag").textContent = "MAINLAND HARBOR";
     visitorsChipLabel.textContent = "AT THE HARBOR";
@@ -133,6 +136,18 @@ if (region) {
     requiredElement(".start-card h2").textContent = region.title;
     requiredElement(".start-card p").textContent = `${region.description} Fishing level ${region.minLevel} to keep catches here. Return to the Cove for bait, sales and records.`;
     enterButton.textContent = "Explore the pools";
+}
+if (island) {
+    document.title = "Orchard Harbor · Farm";
+    backLink.href = publicRegionUrl("market", "orchard-isle", new URLSearchParams("from=harbor"));
+    backLink.querySelector(".back-link__words").textContent = "Orchard Market";
+    requiredElement(".hud-place__name h1").textContent = areaTitle;
+    requiredElement(".hud-place__name .eyebrow").textContent = "ORCHARD ISLE / HARBOR VILLAGE";
+    requiredElement(".start-card h2").textContent = "Welcome to Orchard Isle.";
+    requiredElement(".start-card p").textContent = "Step off the pier into the village. Follow the road to Orchard Market, or the east path to the homesteads. Read the resident board to visit neighbors. Fish from the dock or anchor offshore. The ferry returns to the mainland.";
+    requiredElement(".start-card__tag").textContent = "ORCHARD ISLE";
+    enterButton.textContent = "Step ashore";
+    visitorsChipLabel.textContent = "ON ORCHARD ISLE";
 }
 const inventoryFarm = preview ? { layout: createDefaultFarmLayout(() => .5) } : await createLayoutStore(FARM_LAYOUT_SPEC).load();
 if (preview) {
@@ -166,6 +181,8 @@ const statsPanel = createFarmStatsPanel({
 });
 // ---------------------------------------------------------------- the angler
 const api = createPlatformApiClient();
+const residents = createIslandResidents((after) => api.fetchFarmResidents("orchard-isle", after), () => canvas.focus());
+farmHud.sheet("island-residents", { root: residents.root, close: residents.close });
 const signedIn = !preview && readFactoryAccountSession().authenticated && api.isConfigured !== false;
 let angler = PRACTICE_ANGLER;
 let accountLoaded = false;
@@ -251,7 +268,7 @@ world.sync(layout);
 // people fishing together can therefore see different skies. `?time=` is QA.
 world.setTime(resolveFarmSceneTime(inventoryFarm.layout.clock.farmMinutes, new URLSearchParams(location.search).get("time")));
 const harborWorld = harbor ? createHarborWorld(THREE, scene, (ok) => { if (!ok)
-    status.textContent = "The boat model could not load. Reload before boarding."; }) : null;
+    status.textContent = "The boat model could not load. Reload before boarding."; }, island) : null;
 const terrain = harborWorld ? { update: (_dt, seconds) => harborWorld.update(boatState, seconds) }
     : region ? createFishingRegionWorld(THREE, scene, region) : createCoveTerrain(THREE, scene);
 if (!region && !harbor)
@@ -323,6 +340,15 @@ if (qaSpot && !region && !harbor)
     Object.assign(player, qaSpot);
 if (harbor && destinationQuery.get("at") === "dock")
     Object.assign(player, harborDockFoot(HARBOR_DOCKS[0]));
+if (island) {
+    Object.assign(player, destinationQuery.get("from") === "market" ? { x: 0, z: 36, yaw: 0 }
+        : destinationQuery.get("from") === "farm" ? { x: 22, z: 38, yaw: Math.PI / 2 }
+            : { x: 0, z: 17, yaw: Math.PI });
+    if (destinationQuery.get("at") === "residents")
+        Object.assign(player, { x: 9, z: 33, yaw: 0 });
+}
+if (harbor && destinationQuery.get("at") === "ferry")
+    Object.assign(player, { x: -6, z: 27, yaw: 0 });
 if (!region && !harbor && destinationQuery.get("from") === "harbor")
     Object.assign(player, { x: 17, z: 17.2, yaw: Math.PI / 2 });
 if (!region && destinationQuery.get("from") === "grotto")
@@ -737,7 +763,7 @@ if (harbor) {
         keys.clear();
         Object.assign(player, harborDockFoot(HARBOR_DOCKS[0]));
         body = { ...createFarmBody(), y: 0.87 };
-        notice("Back on the mainland pier. Follow the coast path to walk back to the Cove.");
+        notice(island ? "Back on Orchard Harbor pier. Walk ashore to the market and homesteads." : "Back on the mainland pier. Follow the coast path to walk back to the Cove.");
     });
 }
 function updateInteraction() {
@@ -753,9 +779,20 @@ function updateInteraction() {
             setPrompt("");
             return;
         }
+        if (boatState.z < -73)
+            return setPrompt(`Sea route to ${island ? "the Mainland" : "Orchard Isle"} · Press E to sail across`);
         if (nearbyBoatDock(boatState) && Math.abs(boatState.speed) <= BOAT_HANDLING.dockingSpeed)
             return setPrompt("Press E to disembark onto the pier · F to anchor and fish here");
         return setPrompt(boatState.mode === "anchored" ? "At anchor · Hold Space to cast · F to raise anchor" : "W/S to row · A/D to steer · Shift to brake · F to anchor and fish");
+    }
+    if (free && harbor && !aboard) {
+        if (island) {
+            const place = islandPlaceInReach(player);
+            if (place)
+                return setPrompt(`Press E · ${ISLAND_PLACES[place].title}`);
+        }
+        else if (Math.hypot(player.x + 6, player.z - 25) < 2.8)
+            return setPrompt("Press E · Free ferry to Orchard Isle — market, homesteads and island farming");
     }
     if (free && boatWithinReach()) {
         atWater = false;
@@ -835,7 +872,82 @@ function updateInteraction() {
     }
     setPrompt("");
 }
+function voyage(method) {
+    const params = new URLSearchParams({ from: method, at: "dock" });
+    // A sea crossing ends a visit to a particular farm; destination residents have their own entrances.
+    leaving = true;
+    keys.clear();
+    document.exitPointerLock?.();
+    presence.disconnect();
+    location.href = publicRegionUrl("harbor", island ? "mainland" : "orchard-isle", params);
+}
+async function enterIslandFarm() {
+    if (leaving)
+        return;
+    // A resident's return entrance retains the public visit instead of selecting the visitor's farm.
+    if (fromFarm && destinationQuery.get("property") === ISLAND_PROPERTY) {
+        location.href = `../index.html?id=${encodeURIComponent(fromFarm)}&property=${ISLAND_PROPERTY}&from=orchard-harbor`;
+        return;
+    }
+    if (!signedIn) {
+        notice("Sign in and visit the Property Office in Orchard Market to buy an island homestead.", 5);
+        return;
+    }
+    leaving = true;
+    keys.clear();
+    try {
+        const latest = await createLayoutStore(FARM_LAYOUT_SPEC).load();
+        if (latest.source !== "account")
+            throw Error("unavailable");
+        const result = latest.layout.lot === ISLAND_PROPERTY ? { ok: true }
+            : await api.saveGameGarage("farm", { selectProperty: ISLAND_PROPERTY, propertyRevision: latest.layout.propertyRevision ?? 0 });
+        if (!result?.ok) {
+            notice(result?.error === "trade_in_progress" ? "Finish your trade before entering another farm." : "Visit the Property Office in Orchard Market to buy or select your island homestead.", 5);
+            leaving = false;
+            return;
+        }
+        document.exitPointerLock?.();
+        presence.disconnect();
+        location.href = "../index.html?from=orchard-harbor";
+    }
+    catch {
+        leaving = false;
+        notice("Your farm records could not be reached. Try the entrance again.", 4);
+    }
+}
+function useHarborPlace() {
+    if (!harbor || !entered || leaving || fishing.busy() || panelOpen())
+        return false;
+    if (aboard) {
+        if (boatState.z < -73) {
+            voyage("boat");
+            return true;
+        }
+        return false;
+    }
+    if (!island) {
+        if (Math.hypot(player.x + 6, player.z - 25) < 2.8) {
+            voyage("ferry");
+            return true;
+        }
+        return false;
+    }
+    const place = islandPlaceInReach(player);
+    if (place === "ferry")
+        voyage("ferry");
+    else if (place === "market")
+        followTrail("orchard-market");
+    else if (place === "farm")
+        void enterIslandFarm();
+    else if (place === "residents") {
+        keys.clear();
+        residents.open();
+    }
+    return Boolean(place);
+}
 function interact() {
+    if (useHarborPlace())
+        return;
     if (boardOrDisembark())
         return;
     if (!doorInReach && (away.mounted() || away.action(player)?.kind === "mount")) {
@@ -898,7 +1010,7 @@ function updatePlayer(dt) {
                 player.yaw = boatState.yaw;
         }
         else {
-            Object.assign(player, stepHarborWalker(player, keys, dt).pose);
+            Object.assign(player, stepHarborWalker(player, keys, dt, island).pose);
             body = { ...body, y: harborWalkHeight(player) ?? body.y };
         }
         return;
@@ -921,7 +1033,7 @@ function updatePlayer(dt) {
 }
 function trailDestination() {
     if (harbor)
-        return !aboard && Math.abs(player.x - HARBOR_COVE_EXIT.x) < 2.3 && player.z > HARBOR_COVE_EXIT.z - 1 ? "cove" : null;
+        return !aboard && Math.abs(player.x - HARBOR_COVE_EXIT.x) < 2.3 && player.z > HARBOR_COVE_EXIT.z - 1 ? island ? "orchard-market" : "cove" : null;
     if (region)
         return Math.abs(player.x - region.exit.x) < 2.2 && Math.abs(player.z - region.exit.z) < 2.6 ? region.requiredProperty ? "farm" : "cove" : null;
     if (player.x > 18.6 && player.z > 16 && player.z < 18.5)
@@ -941,6 +1053,11 @@ function followTrail(destination) {
     presence.disconnect();
     const horse = harbor ? destinationQuery.get("horse") ?? "" : away.mounted() ? away.horseId() : "";
     const params = new URLSearchParams(horseTravelQuery(fromFarm, horse));
+    if (destination === "orchard-market") {
+        params.set("from", "harbor");
+        location.href = publicRegionUrl("market", "orchard-isle", params);
+        return;
+    }
     if (destination === "harbor") {
         params.set("from", "cove");
         location.href = `../harbor/index.html?${params}`;

@@ -21,10 +21,21 @@ export function createPropertyScenery(THREE, scene, propertyId) {
         }
         approach(half - .1, 7, 5, 2.2);
         approach(0, half + 7, 2.2, 19);
+        if (propertyId === "lot.orchard") {
+            const sea = new THREE.Mesh(new THREE.PlaneGeometry(100, 220), new THREE.MeshStandardMaterial({ color: "#489eae", roughness: 0.25, metalness: 0.15 }));
+            sea.rotation.x = -Math.PI / 2;
+            sea.position.set(half + 96, 0.04, 0);
+            root.add(sea);
+            const beach = new THREE.Mesh(new THREE.PlaneGeometry(12, 220), new THREE.MeshStandardMaterial({ color: "#e0cc9f", roughness: 1 }));
+            beach.rotation.x = -Math.PI / 2;
+            beach.position.set(half + 42, 0.02, 0);
+            root.add(beach);
+            destinationSign(THREE, root, "ORCHARD MARKET / VILLAGE ROAD", 3.2, half + 3, Math.PI);
+        }
         for (const route of propertyRoutes({ lot: propertyId })) {
             if (route.horse)
                 approach(0, -half + .1, 2.2, 5);
-            destinationSign(THREE, root, route.horse ? "WINDRUSH DOWNS" : route.title.toUpperCase() + " / FISHING", route.sign.x, route.sign.z, route.sign.yaw);
+            destinationSign(THREE, root, route.horse ? "WINDRUSH DOWNS" : route.title.toUpperCase() + (propertyId === "lot.orchard" ? " / MARKET & DOCKS" : " / FISHING"), route.sign.x, route.sign.z, route.sign.yaw);
         }
         for (const entry of propertyTrees({ lot: propertyId })) {
             const tree = entry.kind === "pine" ? createPine(THREE, entry.seed) : entry.kind === "birch" ? createBirch(THREE, entry.seed) : entry.kind === "apple" ? createAppleTree(THREE, entry.seed) : createWillow(THREE, entry.seed);

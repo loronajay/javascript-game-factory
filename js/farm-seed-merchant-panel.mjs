@@ -80,7 +80,7 @@ export function createSeedMerchantPanel(elements, options) {
     }
     function render() {
         const market = options.market();
-        elements.list.replaceChildren(...seedShelf(market, seeds).map(row));
+        elements.list.replaceChildren(...seedShelf(market, seeds).filter(line => options.cropAvailable?.(line.cropId) ?? true).map(row));
         elements.turnover.textContent = market ? `${turnoverNote(market, Date.now())} · specials change with them` : "Reading today's specials…";
     }
     function open(next) {

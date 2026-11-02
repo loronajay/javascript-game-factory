@@ -23,6 +23,7 @@
 // UPDATE, then the farm.
 
 import { randomUUID } from "node:crypto";
+import { farmRegionForProperty, findFarmRegion } from "../services/farm-region-catalog.mjs";
 import { normalizeFarmGarage } from "../services/farm-loadout-catalog.mjs";
 import { unplacedFarmPieces } from "../services/farm-carpentry-catalog.mjs";
 import {
@@ -61,9 +62,10 @@ async function lockPlayers(client: any, playerIds: readonly string[]): Promise<v
   for (const id of [...new Set(playerIds)].sort()) await client.query(`select pg_advisory_xact_lock(hashtext($1))`, [`farm-listing:${id}`]);
 }
 
-async function lockedListing(client: any, listingId: string, now: number): Promise<FarmListing | null> {
+async function lockedListing(client: any, listingId: string, now: number): Promise<(FarmListing & { regionId: string }) | null> {
   const result = await client.query(`select * from farm_market_listings where listing_id = $1 for update`, [listingId]);
-  return normalizeListingRow(result.rows?.[0], now);
+  const listing = normalizeListingRow(result.rows?.[0], now);
+  return listing ? { ...listing, regionId: result.rows?.[0]?.region_id ?? "mainland" } : null;
 }
 
 async function writeListing(client: any, listing: FarmListing, now: number): Promise<void> {
@@ -120,13 +122,15 @@ async function sellerName(client: any, playerId: string): Promise<string> {
  */
 export async function getFarmListings(pool: any, input: any, now: number = Date.now()) {
   const playerId = required(input?.playerId, "playerId");
+  const region = findFarmRegion(input?.region ?? "mainland");
+  if (!region?.available) throw new TypeError("invalid_region");
   const open = await pool.query(
-    `select * from farm_market_listings where status = 'open' and expires_at > $1 and seller_id <> $2 order by created_at desc limit $3`,
-    [new Date(now), playerId, BOARD_PAGE],
+    `select * from farm_market_listings where status = 'open' and expires_at > $1 and seller_id <> $2 and region_id = $4 order by created_at desc limit $3`,
+    [new Date(now), playerId, BOARD_PAGE, region.id],
   );
   const own = await pool.query(
-    `select * from farm_market_listings where seller_id = $1 and status = 'open' order by created_at desc`,
-    [playerId],
+    `select * from farm_market_listings where seller_id = $1 and status = 'open' and region_id = $2 order by created_at desc`,
+    [playerId, region.id],
   );
   const parse = (rows: any[]) => rows.map((row) => normalizeListingRow(row, now)).filter((row): row is FarmListing => Boolean(row));
   const listings = parse(open.rows ?? []);
@@ -189,9 +193,9 @@ export async function createFarmListing(pool: any, input: any, now: number = Dat
     }
     const name = await sellerName(client, playerId);
     await client.query(
-      `insert into farm_market_listings (listing_id, seller_id, seller_name, stack, item_id, quantity, listed_quantity, unit_price, status, created_at, expires_at)
-       values ($1, $2, $3, $4, $5, $6, $6, $7, 'open', $8, $9)`,
-      [listingId, playerId, name, request.stack, request.itemId, request.quantity, request.unitPrice, new Date(now), new Date(now + LISTING_TTL_MS)],
+      `insert into farm_market_listings (listing_id, seller_id, seller_name, stack, item_id, quantity, listed_quantity, unit_price, status, created_at, expires_at, region_id)
+       values ($1, $2, $3, $4, $5, $6, $6, $7, 'open', $8, $9, $10)`,
+      [listingId, playerId, name, request.stack, request.itemId, request.quantity, request.unitPrice, new Date(now), new Date(now + LISTING_TTL_MS), farmRegionForProperty(farm.layout.lot)],
     );
     const listing = normalizeListingRow({
       listing_id: listingId, seller_id: playerId, seller_name: name, stack: request.stack, item_id: request.itemId,
@@ -233,6 +237,7 @@ export async function buyFarmListing(pool: any, input: any, now: number = Date.n
     if (!check.ok) return { ok: false, error: check.error, listing: view };
     const farm = await lockedFarm(client, playerId);
     if (!farm || farm.layout.onboarding?.status !== "complete") return { ok: false, error: "farm_not_initialized", listing: view };
+    if (farmRegionForProperty(farm.layout.lot) !== listing.regionId) return { ok: false, error: "wrong_market_region" };
     // An animal must be able to live on the buyer's farm before a ticket moves; goods must fit a stack.
     const landing = listing.stack === "livestock" ? await planListedLanding(client, listing.itemId, { playerId, layout: farm.layout }, true) : null;
     if (landing && !landing.ok) return { ok: false, error: landing.error === "not_found" ? "listing_closed" : landing.error, listing: view };
@@ -283,6 +288,7 @@ export async function withdrawFarmListing(pool: any, input: any, now: number = D
     if ((listing.status !== "open" && listing.status !== "expired") || listing.quantity <= 0) return { ok: false, error: "listing_closed", listing: listingView(listing, playerId) };
     const farm = await lockedFarm(client, playerId);
     if (!farm) return { ok: false, error: "farm_not_initialized" };
+    if (farmRegionForProperty(farm.layout.lot) !== listing.regionId) return { ok: false, error: "wrong_market_region" };
     let layout = farm.layout;
     if (listing.stack === "livestock") {
       // Home is never refused: to the first place with room, else onto the field to wait for one.

@@ -21,6 +21,7 @@ export type SeedPurchaseOutcome = Readonly<{ ok: boolean; message: string; seeds
 type Options = Readonly<{
   buy: (cropId: string, quantity: number) => Promise<SeedPurchaseOutcome>;
   market: () => MarketDay | null;
+  cropAvailable?: (cropId: string) => boolean;
   price?: (basePrice: number) => number;
   /** A crop's portrait (farm-crop-thumbnails.mts): the plant it grows into. */
   thumbnail?: (cropId: string, onReady: (url: string) => void) => string | null;
@@ -111,7 +112,7 @@ export function createSeedMerchantPanel(elements: Elements, options: Options): S
 
   function render(): void {
     const market = options.market();
-    elements.list.replaceChildren(...seedShelf(market, seeds).map(row));
+    elements.list.replaceChildren(...seedShelf(market, seeds).filter(line => options.cropAvailable?.(line.cropId) ?? true).map(row));
     elements.turnover.textContent = market ? `${turnoverNote(market, Date.now())} · specials change with them` : "Reading today's specials…";
   }
 

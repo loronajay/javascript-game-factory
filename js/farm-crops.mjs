@@ -52,6 +52,8 @@ export const CROP_CATALOG = Object.freeze([
     generated("sunflower", "Sunflower", 12, 4, 1),
     generated("tomato", "Tomato", 10, 3, 4),
     generated("watermelon", "Watermelon", 18, 4, 1),
+    generated("pepper", "Pepper", 14, 3, 4, ["orchard-isle"]),
+    generated("lavender", "Lavender", 12, 3, 3, ["orchard-isle"]),
 ]);
 /**
  * The withered plant a dead crop shows instead of its own model, in three sizes
@@ -169,7 +171,7 @@ function freezeAgriculture(value) {
     return Object.freeze({ inventory: value.inventory, crops: Object.freeze(value.crops.map((entry) => Object.freeze({ ...entry }))) });
 }
 export function createStarterAgriculture(random = Math.random) {
-    const available = CROP_CATALOG.map((entry) => entry.id);
+    const available = CROP_CATALOG.filter(entry => cropCanGrowInRegion(entry, "mainland")).map((entry) => entry.id);
     const selected = new Set();
     const targetCount = Math.min(6, available.length);
     while (selected.size < targetCount) {

@@ -452,7 +452,7 @@ export const MOUNT_FEE = 25;
 export const TROPHY_MOUNT_ITEM_ID = "decor.prop.trophy-mount";
 /** Missing areaId preserves legacy Cove clients; unknown destinations admit no casts. */
 export function farmFishingZoneAt(point, areaId = "cove") {
-    if (areaId === "harbor")
+    if (areaId === "harbor" || areaId === "orchard-harbor")
         return harborFishingZoneAt(point);
     if (areaId === "cove" || areaId === undefined)
         return farmCoveZoneAt(point);

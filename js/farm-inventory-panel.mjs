@@ -5,6 +5,7 @@
 // furniture the Workbench has made in its finish, saplings in burlap and
 // sacks of feed.
 import { CROP_CATALOG } from "./farm-crops.mjs";
+import { cropCanGrowInRegion } from "./farm-regions.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { LIVESTOCK_BASKET_ITEMS, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies } from "./farm-catalog/trees.mjs";
@@ -122,7 +123,7 @@ export function createFarmInventoryPanel(elements, options = {}) {
         if ((agriculture.inventory.seeds[selectedCropId] ?? 0) <= 0) {
             selectedCropId = CROP_CATALOG.find((entry) => (agriculture.inventory.seeds[entry.id] ?? 0) > 0)?.id ?? selectedCropId;
         }
-        elements.seedGrid.replaceChildren(...CROP_CATALOG.map((crop) => {
+        elements.seedGrid.replaceChildren(...CROP_CATALOG.filter(crop => cropCanGrowInRegion(crop, options.regionId?.() ?? "mainland")).map((crop) => {
             const button = document.createElement("button");
             button.type = "button";
             button.className = "seed-card";

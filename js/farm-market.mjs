@@ -1,3 +1,6 @@
+import { regionalMarketStalls, regionalMarketLayout } from "./farm-regional-market.mjs";
+import { cropCanGrowInRegion, farmRegionForProperty } from "./farm-regions.mjs";
+import { travelRegion, publicRegionUrl, ISLAND_PROPERTY } from "./farm-island.mjs";
 import { createPropertiesPanel } from "./farm-properties-panel.mjs";
 // The Market Square page: the shared square at the end of the farm's road.
 //
@@ -44,7 +47,7 @@ import { createFarmBody, eyeHeight, isMoveKey, sitOn, standUp, stepFarmBody } fr
 import { SEATED_PROMPT, SEAT_PROMPT, canWorkDoor, findSeatInReach, getDoorPrompt } from "./farm-interaction.mjs";
 import { FARM_LAYOUT_SPEC, normalizeFarmLayout } from "./farm-layout.mjs";
 import { gatewayAt } from "./farm-gateway.mjs";
-import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, MARKET_STALLS, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, PROPERTY_OFFICE_ID, findMarketStall, findStallInReach, keeperPose, stallLocalToWorld, marketSquareLayout, stallObstacles, stallPrompt, MARKET_DOWNS_GATE, MARKET_DOWNS_SPAWN, MARKET_RAIL_IDS, } from "./farm-market-square.mjs";
+import { MARKET_BOUNDS, MARKET_HOME_GATE, MARKET_COVE_GATE, MARKET_COVE_SPAWN, MARKET_PAVING as MAINLAND_PAVING, MARKET_PRESENCE_ROOM, MARKET_SPAWN, KITCHEN_STALL_ID, ORDER_BOARD_ID, PRODUCE_STALL_ID, SAWMILL_STALL_ID, SEED_STALL_ID, LIVESTOCK_STALL_ID, BUTCHER_STALL_ID, EXCHANGE_BOARD_ID, PROPERTY_OFFICE_ID, findStallInReach, keeperPose, stallLocalToWorld, stallObstacles, stallPrompt, MARKET_DOWNS_GATE, MARKET_DOWNS_SPAWN, MARKET_RAIL_IDS, } from "./farm-market-square.mjs";
 import { createMarketStallModel } from "./farm-market-props.mjs";
 import { createMarketSalePanel } from "./farm-market-panel.mjs";
 import { createSeedMerchantPanel } from "./farm-seed-merchant-panel.mjs";
@@ -96,6 +99,11 @@ import { createFarmHud, wireSheetTabs } from "./farm-hud.mjs";
 import { normalizeAngler } from "./farm-angler.mjs";
 import { resolveFarmSceneTime } from "./farm-time.mjs";
 const THREE = THREE_VENDOR;
+const marketRegion = travelRegion(new URLSearchParams(location.search));
+const island = marketRegion === "orchard-isle";
+const MARKET_STALLS = regionalMarketStalls(island);
+const MARKET_PAVING = island ? { ...MAINLAND_PAVING, colors: ["#d3bd99", "#c1aa85", "#9f8b6b"] } : MAINLAND_PAVING;
+const findMarketStall = (id) => MARKET_STALLS.find(stall => stall.id === id);
 function requiredElement(selector) {
     const element = document.querySelector(selector);
     if (!element)
@@ -125,11 +133,11 @@ const fromFarm = new URLSearchParams(location.search).get("farm") ?? "";
 const homeUrl = `../index.html?from=market&${horseTravelQuery(fromFarm, "", "id")}`;
 // Down the north gate to the Cove, carrying the farm to come home to.
 const coveUrl = `../cove/index.html?${horseTravelQuery(fromFarm, "")}`;
-const cameFromCove = new URLSearchParams(location.search).get("from") === "cove";
+const cameFromCove = ["cove", "harbor"].includes(new URLSearchParams(location.search).get("from") ?? "");
 const cameFromDowns = new URLSearchParams(location.search).get("from") === "downs";
 // Out the west gate to Windrush Downs — on horseback only (FARM_RIDING_PLAN.md).
 const downsUrl = (horseId) => `../downs/index.html?${horseTravelQuery(fromFarm, horseId)}`;
-homeLink.href = homeUrl;
+homeLink.href = island ? publicRegionUrl("harbor", "orchard-isle", new URLSearchParams("from=market")) : homeUrl;
 if (fromFarm)
     homeLink.querySelector(".back-link__words").textContent = "Their farm";
 // What the player has to sell is on THEIR farm document (visiting someone else's
@@ -143,6 +151,26 @@ let dishes = farmLoad.layout.agriculture.inventory.dishes;
 let seeds = farmLoad.layout.agriculture.inventory.seeds;
 /** The whole farm as the server last answered: the Sawmill reads its logs, planks and furniture shelf from it. */
 let farm = farmLoad.layout;
+if (island) {
+    document.title = "Orchard Market · Farm";
+    requiredElement(".hud-place__name h1").textContent = "Orchard Market";
+    requiredElement(".hud-place__name .eyebrow").textContent = "ORCHARD ISLE / VILLAGE SQUARE";
+    requiredElement(".start-card h2").textContent = "Welcome to Orchard Market.";
+    requiredElement(".start-card p").textContent = "Meet the island's keepers, buy local seeds, exchange goods with island neighbors and purchase your own homestead at the Property Office. The north gate returns to the harbor.";
+    homeLink.querySelector(".back-link__words").textContent = "Orchard Harbor";
+    canvas.setAttribute("aria-label", "Orchard Market, in 3D");
+    const names = { Marigold: "Saffron", Juniper: "Lina", Basil: "Clement", Bram: "Rowan", Hollis: "Mira", Otto: "Silas" };
+    const textNodes = document.createTreeWalker(document.querySelector(".farm-shell"), NodeFilter.SHOW_TEXT);
+    while (textNodes.nextNode()) {
+        const node = textNodes.currentNode;
+        if (node.parentElement?.closest("script,style"))
+            continue;
+        node.textContent = (node.textContent ?? "").replace(/Marigold|Juniper|Basil|Bram|Hollis|Otto/g, name => names[name]);
+    }
+    const horseNote = document.querySelector('[data-sheet-pane="horses"] .sale-note');
+    if (horseNote)
+        horseNote.textContent = "Island horses live in your homestead's stable. Mainland riding trails are reached from the mainland market.";
+}
 let farmFishing = null;
 const inventorySummary = createFarmInventorySummary({
     root: requiredElement("#inventoryPanel"),
@@ -202,7 +230,7 @@ const ticketClient = createTicketWalletClient();
 /** Today's prices and specials, as the server last said. Until they arrive the counters show standing prices. */
 let market = null;
 async function loadMarketDay() {
-    const next = normalizeMarketDay(await ticketClient.getFarmMarketPrices().catch(() => null));
+    const next = normalizeMarketDay(await ticketClient.getFarmMarketPrices(marketRegion).catch(() => null));
     if (next)
         market = next;
     salePanel.repaint();
@@ -253,7 +281,7 @@ renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(65, 1, 0.05, 200);
 camera.rotation.order = "YXZ";
-const layout = marketSquareLayout();
+const layout = regionalMarketLayout(island);
 const world = createFarmWorld(THREE, scene, { groundCover: false });
 world.applyGroundStyle(MARKET_PAVING);
 world.sync(layout);
@@ -343,7 +371,7 @@ const visitors = createRoomVisitors(THREE, scene, { mountSeat: (mount) => away.s
 const factoryProfile = loadFactoryProfile();
 const presenceName = factoryProfile.profileName || "Player";
 const presence = createRoomPresence({
-    roomId: MARKET_PRESENCE_ROOM,
+    roomId: island ? "farm:orchard-market" : MARKET_PRESENCE_ROOM,
     identity: { playerId: factoryProfile.playerId, displayName: presenceName, avatarId: "" },
 });
 // The body the player wears here is the one they wear in their arcade.
@@ -502,6 +530,7 @@ const seedPanel = createSeedMerchantPanel({
 }, {
     buy: buySeeds,
     market: () => market,
+    cropAvailable: (id) => cropCanGrowInRegion(findCrop(id), marketRegion),
     price: (base) => barterPurchasePrice(base, barteringLevel()),
     thumbnail: cropThumbnails.get,
     onClose: () => canvas.focus(),
@@ -829,7 +858,7 @@ const exchangePanel = createExchangePanel({
     limits: requiredElement("#exchangeLimits"),
     status: requiredElement("#exchangeStatus"),
 }, {
-    load: async () => normalizeListingBoard(await listingApi.fetchFarmListings()),
+    load: async () => normalizeListingBoard(await listingApi.fetchFarmListings(marketRegion)),
     buy: async (listing, quantity) => {
         const result = await listingApi.buyFarmListing({ listingId: listing.id, quantity, purchaseId: newId("buy") });
         const landed = listing.stack === "livestock" ? `${listing.animal?.name ?? "It"} is on its way to your farm — press L there to see it.`
@@ -897,6 +926,7 @@ for (const id of ["#salePanel", "#kitchenPanel", "#dealerPanel", "#butcherPanel"
     wireSheetTabs(requiredElement(id));
 /** A counter, the board or a trading table has the player's attention: no walking, no looking round. */
 const properties = createPropertiesPanel({
+    regionId: marketRegion,
     canBuy: canSell, farm: () => farm, balance: () => balance,
     shop: () => ticketClient.getShop("farm"),
     purchase: (id) => ticketClient.purchaseShopItem("farm", id),
@@ -915,6 +945,7 @@ const properties = createPropertiesPanel({
             url.searchParams.delete("horse");
             url.searchParams.delete("farm");
             url.searchParams.delete("property");
+            url.searchParams.set("region", farmRegionForProperty(id));
             location.href = url.toString(); // Refresh stock, herd, trades and return travel together.
         }
         return result ?? { ok: false, error: "unavailable" };
@@ -953,6 +984,10 @@ function workStall(stall) {
                                     : stall.id === BUTCHER_STALL_ID
                                         ? "Sign in to send livestock to the Butcher — only an account farm's herd can go."
                                         : "Sign in to sell your produce — only an account farm's harvest can be traded for tickets.");
+        return;
+    }
+    if (farmRegionForProperty(farm.lot) !== marketRegion) {
+        notice("Your active basket belongs to another region. Select a local farm at the Property Office to trade here.", 5);
         return;
     }
     keys.clear();
@@ -1026,7 +1061,7 @@ function updateInteraction() {
         return setPrompt(tie ? tie.prompt : getRidingPrompt(away.horseName(), "away"));
     }
     const untie = walking ? away.action(pose) : null;
-    stallInReach = walking && !doorInReach && !untie ? findStallInReach(pose) : null;
+    stallInReach = walking && !doorInReach && !untie ? findStallInReach(pose, MARKET_STALLS) : null;
     seatInReach = walking && !doorInReach && !stallInReach ? findSeatInReach(seats, pose) : null;
     nearbyVisitor = walking && !doorInReach && !stallInReach && !seatInReach ? visitors.nearest(pose) : null;
     // A keeper calls out once as someone steps up to an open counter.
@@ -1044,7 +1079,7 @@ function updateInteraction() {
         const home = doorInReach.doorId === MARKET_HOME_GATE;
         const cove = doorInReach.doorId === MARKET_COVE_GATE;
         const downs = doorInReach.doorId === MARKET_DOWNS_GATE;
-        return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? " · the road back to the farm" : cove ? " · down to the Cove" : downs ? " · Windrush Downs, for riders only" : ""));
+        return setPrompt(getDoorPrompt(openDoors.has(doorInReach.doorId), doorInReach) + (home ? (island ? " · island homestead road" : " · the road back to the farm") : cove ? (island ? " · down to Orchard Harbor" : " · down to the Cove") : downs ? " · Windrush Downs, for riders only" : ""));
     }
     if (untie)
         return setPrompt(untie.prompt);
@@ -1129,6 +1164,36 @@ function updatePlayer(dt) {
     player.z = step.pose.z;
     body = step.body;
 }
+async function enterRegionalHome() {
+    if (leaving)
+        return;
+    leaving = true;
+    keys.clear();
+    const preferred = farm.defaultProperty;
+    const target = preferred && farmRegionForProperty(preferred) === marketRegion ? preferred : island ? ISLAND_PROPERTY : "meadow";
+    try {
+        const result = await farmPanelsApi.saveGameGarage("farm", { selectProperty: target, propertyRevision: farm.propertyRevision ?? 0 });
+        if (!result?.ok) {
+            leaving = false;
+            notice("Select or purchase a local farm at the Property Office before taking the homestead road.", 5);
+            player.z -= 1;
+            return;
+        }
+        presence.disconnect();
+        location.href = "../index.html?from=market";
+    }
+    catch {
+        leaving = false;
+        player.z -= 1;
+        notice("Your farm records could not be reached. Try again.", 4);
+    }
+}
+homeLink.addEventListener("click", (event) => {
+    if (!island && !fromFarm && farmRegionForProperty(farm.lot) !== marketRegion) {
+        event.preventDefault();
+        void enterRegionalHome();
+    }
+});
 // Out through the open south gate is the road home; out through the north gate, the path down to the Cove.
 function checkGateway() {
     if (!entered || leaving || body.mode !== "walking")
@@ -1138,6 +1203,10 @@ function checkGateway() {
         return;
     const toCove = gate.instanceId === MARKET_COVE_GATE;
     const toDowns = gate.instanceId === MARKET_DOWNS_GATE;
+    if (!toCove && !toDowns && !fromFarm && farmRegionForProperty(farm.lot) !== marketRegion) {
+        void enterRegionalHome();
+        return;
+    }
     // Windrush Downs is for riders: on foot, the gate stays a view of the gallops.
     if (toDowns && !away.mounted()) {
         notice(away.hasHorse() ? `Windrush Downs is for riders — ride ${away.horseName()} out through this gate.` : "Windrush Downs is for riders — come back on your horse (Hollis sells them).", 3);
@@ -1152,6 +1221,12 @@ function checkGateway() {
     setPrompt(words);
     status.textContent = words;
     presence.disconnect();
+    if (island) {
+        location.href = toCove ? publicRegionUrl("harbor", marketRegion, new URLSearchParams("from=market"))
+            : farm.lot === ISLAND_PROPERTY ? "../index.html?from=market&" + horseTravelQuery(fromFarm, horse, "id", ISLAND_PROPERTY)
+                : publicRegionUrl("harbor", marketRegion, new URLSearchParams("from=market"));
+        return;
+    }
     location.href = toDowns ? downsUrl(horse) : toCove ? `../cove/index.html?${horseTravelQuery(fromFarm, horse)}` : `../index.html?from=market&${horseTravelQuery(fromFarm, horse, "id")}`;
 }
 window.addEventListener("keydown", (event) => {

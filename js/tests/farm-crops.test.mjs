@@ -86,7 +86,7 @@ test("every piece of tackle in the inventory has a model to portray it", () => {
 test("the farming catalog exposes every growth-cycle crop and the inventory includes pet-food supplies", () => {
   assert.deepEqual(CROP_CATALOG.map((crop) => crop.id), [
     "bean", "beetroot", "blueberry", "cabbage", "carrot", "cauliflower", "corn", "eggplant",
-    "garlic", "potato", "pumpkin", "radish", "strawberry", "sunflower", "tomato", "watermelon",
+    "garlic", "potato", "pumpkin", "radish", "strawberry", "sunflower", "tomato", "watermelon", "pepper", "lavender",
   ]);
   assert.ok(carrot);
   const agriculture = createStarterAgriculture(() => 0);

@@ -1,5 +1,6 @@
 import { findMemorialInReach, memorialDetails } from "./farm-memorial.mjs";
 import { propertyWalkBounds, propertyObstacles, propertyPlatforms, propertyGroundHeight, propertyRoutes, PROPERTY_GATE_ID } from "./farm-property-scene.mjs";
+import { farmRegionForProperty } from "./farm-regions.mjs";
 import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 // The farm page: the composition root for `/farm/`.
 //
@@ -1421,6 +1422,7 @@ const inventoryPanel = createFarmInventoryPanel({
     tackleGrid: requiredElement("#tackleGrid"),
     selected: requiredElement("#selectedSeed"),
 }, {
+    regionId: () => farmRegionForProperty(layout.lot),
     thumbnail: cropThumbnails.get,
     itemThumbnail: portraits,
     purchaseSupply: layoutStore.accountBacked ? buyFarmSupply : null,
@@ -1717,6 +1719,11 @@ function checkGateway() {
                 query.set("via", "estate");
                 location.href = `downs/index.html?${query}`;
             }
+            else if (route.target === "orchard-harbor") {
+                query.set("region", "orchard-isle");
+                query.set("from", "farm");
+                location.href = `harbor/index.html?${query}`;
+            }
             else {
                 query.set("area", route.target);
                 location.href = `cove/index.html?${query}`;
@@ -1742,9 +1749,16 @@ function checkGateway() {
     status.textContent = "Off down the road to the Market Square…";
     setPrompt("Off down the road to the Market Square…");
     const departure = canPersistFarm ? layoutStore.save(stampPresence(progressedLayout())) : Promise.resolve(null);
-    void departure.catch(() => null).then(() => {
-        const query = horseTravelQuery(visiting ? layoutStore.ownerPlayerId : "", ridingOut);
-        location.href = `market/index.html${query ? `?${query}` : ""}`;
+    void departure.catch(() => null).then((result) => {
+        if (canPersistFarm && !result?.ok) {
+            leavingForMarket = false;
+            document.body.classList.remove("is-leaving");
+            setPrompt("Your farm could not be saved. Step back and try again.");
+            return;
+        }
+        const query = new URLSearchParams(horseTravelQuery(visiting ? layoutStore.ownerPlayerId : "", ridingOut));
+        query.set("region", farmRegionForProperty(layout.lot));
+        location.href = `market/index.html?${query}`;
     });
 }
 const TICK_SECONDS = 1 / 60;

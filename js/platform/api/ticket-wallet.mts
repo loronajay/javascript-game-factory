@@ -58,8 +58,8 @@ export function createTicketWalletClient(options: any = {}) {
     sellFarmProduce(items: Record<string, number>, saleId: string, day?: number) {
       return api.sellFarmProduce({ items, saleId, day });
     },
-    getFarmMarketPrices() {
-      return api.fetchFarmMarketPrices();
+    getFarmMarketPrices(region = "mainland") {
+      return api.fetchFarmMarketPrices(region);
     },
     getFarmOrders() {
       return api.fetchFarmOrders();

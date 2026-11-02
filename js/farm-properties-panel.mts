@@ -1,3 +1,4 @@
+import { farmRegionForProperty } from "./farm-regions.mjs";
 import { FARM_LOTS } from "./farm-catalog/lots.mjs";
 import { type FarmLayout } from "./farm-layout.mjs";
 
@@ -6,6 +7,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", 
 }
 
 export function createPropertiesPanel(deps: Readonly<{
+  regionId?: string;
   canBuy: boolean; farm: () => FarmLayout; balance: () => number | null;
   shop: () => Promise<any>; purchase: (id: string) => Promise<any>;
   selectProperty: (id: string) => Promise<{ ok: boolean; error?: string }>;
@@ -48,11 +50,12 @@ export function createPropertiesPanel(deps: Readonly<{
     body.append(element("p", "properties-panel__balance", deps.balance() === null ? "Sign in to purchase property with tickets." : `${deps.balance()!.toLocaleString()} tickets available`));
     const meadow = element("button", "farm-button", deps.farm().lot ? "Return to Meadow Farm · 28 × 28 m" : "Meadow Farm · Current farm");
     meadow.type = "button"; meadow.disabled = busy || !ready || !deps.canBuy || !deps.farm().lot;
-    meadow.addEventListener("click", () => { void buy("meadow"); }); body.append(meadow, defaultButton("meadow"));
-    for (const property of FARM_LOTS) {
+    meadow.addEventListener("click", () => { void buy("meadow"); }); if (!deps.regionId || deps.regionId === "mainland") body.append(meadow, defaultButton("meadow"));
+    for (const property of FARM_LOTS.filter(lot => !deps.regionId || farmRegionForProperty(lot.id) === deps.regionId)) {
       const card = element("article", `property-card property-card--${property.theme}`);
-      const image = element("img", "property-card__preview"); image.src = new URL(`../farm/assets/properties/${property.preview}`, import.meta.url).toString(); image.alt = `${property.title}: ${property.setting}`;
+      const image = element("img", "property-card__preview"); if (property.preview) image.src = new URL(`../farm/assets/properties/${property.preview}`, import.meta.url).toString(); image.alt = `${property.title}: ${property.setting}`;
       image.loading = "lazy";
+      image.hidden = !property.preview;
       const copy = element("div", "property-card__copy");
       copy.append(element("span", "eyebrow", property.setting), element("h2", "", property.title), element("p", "", property.description));
       const features = element("ul"); for (const feature of property.features) features.append(element("li", "", feature)); copy.append(features);

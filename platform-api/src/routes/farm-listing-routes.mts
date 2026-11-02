@@ -15,7 +15,7 @@ const WITHDRAW_PATH = /^\/games\/farm\/market\/listings\/([^/]+)\/withdrawal$/;
 
 // A refusal about the state of the world rather than a malformed request.
 const CONFLICTS = new Set([
-  "too_many_listings", "daily_listing_limit", "farm_not_initialized", "not_enough", "price_out_of_band",
+  "wrong_market_region", "too_many_listings", "daily_listing_limit", "farm_not_initialized", "not_enough", "price_out_of_band",
   "listing_expired", "listing_closed", "own_listing", "not_enough_listed", "daily_purchase_limit",
   "daily_spend_limit", "seller_daily_limit", "inventory_full", "insufficient_tickets",
   // A live animal or a fish: gone from the farm, or the buyer cannot keep it.
@@ -44,7 +44,7 @@ export async function handleFarmListingRoute(context: any): Promise<boolean> {
   const playerId = authClaims.playerId;
   try {
     if (reading) {
-      writeJson(res, 200, { board: await service({ playerId }) }, requestOrigin);
+      writeJson(res, 200, { board: await service({ playerId, region: new URL(req.url, "http://localhost").searchParams.get("region") ?? "mainland" }) }, requestOrigin);
       return true;
     }
     const body = await readJsonBody(req);

@@ -6,6 +6,7 @@
 // sacks of feed.
 
 import { CROP_CATALOG, type FarmAgriculture } from "./farm-crops.mjs";
+import { cropCanGrowInRegion } from "./farm-regions.mjs";
 import { PET_CARE } from "./farm-pet-care.mjs";
 import { LIVESTOCK_BASKET_ITEMS, LIVESTOCK_FEEDS } from "./farm-catalog/livestock.mjs";
 import { FRUIT_TREES, TIMBER_TREES, TREE_CATALOG, findTreeSpecies, type TreeSpecies } from "./farm-catalog/trees.mjs";
@@ -39,6 +40,7 @@ export type InventoryLevels = Readonly<{ farming: number; woodcutting: number }>
 type Thumbnail = (key: string, onReady: (url: string) => void) => string | null;
 
 type Options = Readonly<{
+  regionId?: () => string;
   /** A seed card's portrait: the crop grown (its GLB). */
   thumbnail?: Thumbnail;
   /** Every other stack's portrait, by item key (farm-item-thumbnails.mts). */
@@ -172,7 +174,7 @@ export function createFarmInventoryPanel(elements: Elements, options: Options = 
     if ((agriculture.inventory.seeds[selectedCropId] ?? 0) <= 0) {
       selectedCropId = CROP_CATALOG.find((entry) => (agriculture.inventory.seeds[entry.id] ?? 0) > 0)?.id ?? selectedCropId;
     }
-    elements.seedGrid.replaceChildren(...CROP_CATALOG.map((crop) => {
+    elements.seedGrid.replaceChildren(...CROP_CATALOG.filter(crop => cropCanGrowInRegion(crop, options.regionId?.() ?? "mainland")).map((crop) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "seed-card";
