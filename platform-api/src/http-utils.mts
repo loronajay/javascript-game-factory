@@ -10,6 +10,8 @@ import busboy from "busboy";
 // the live ticket wallet or profile database.
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://factory.jayarcade.com",
+  // Dedicated packaged-app origin. Do not trust arbitrary localhost pages in production.
+  "https://yam-bowling.native.jayarcade.com",
   // The GitHub Pages origin the site was served from before the custom domain.
   // Pages redirects it, but keep it allow-listed for old links and bookmarks.
   "https://loronajay.github.io",

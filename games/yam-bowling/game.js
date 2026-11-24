@@ -4,6 +4,7 @@ import { createYamOnlineIdentity } from "./online-identity.mjs";
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
 import { getStoredAuthToken } from "../../js/platform/api/auth-token.mjs";
 import { createYamAccountAccess } from "./account-access.mjs";
+import { createYamAccountDialog } from "./ui/account-dialog.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
 import { createTournamentClient } from "./tournament-client.mjs";
 import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
@@ -46,6 +47,7 @@ import { bindEvents, createHeldKeys } from "./input/bindings.mjs";
 import { createBowlingMode } from "./bowl3d/controller.mjs";
 
 initMobileLandscapeGate();
+createYamAccountDialog();
 
 // Composition root. This file wires the cabinet together and runs the frame
 // loop; it owns no game logic, no rendering and no screen markup of its own.
@@ -80,6 +82,10 @@ initMobileLandscapeGate();
 
   const classicRenderer = new window.YamBowlingRenderer($("game-canvas"));
   const audio = AudioCore.createAudioDirector();
+  document.addEventListener('yam-app-active', ({ detail }) => {
+    if (detail?.isActive) { if (audio.enabled) { audio.context?.resume?.().catch(() => {}); audio.resumeMusic(); } }
+    else { audio.pauseMusic(); audio.context?.suspend?.().catch(() => {}); }
+  });
   const factoryProfile = loadFactoryProfile();
   const platformApi = createPlatformApiClient();
   // Resolved per read, never captured: a sign-in or a profile edit can fill in

@@ -11,7 +11,7 @@ test("signed-out players cannot enter entitlement or online modes", () => {
   let redirects = 0;
   const access = createYamAccountAccess({
     readAccount: () => ({ authenticated: false, token: "" }),
-    redirectToSignIn: () => { redirects += 1; },
+    openSignIn: () => { redirects += 1; },
   });
 
   assert.equal(access.isEligible(), false);
@@ -23,7 +23,7 @@ test("a real Factory auth token opens account-backed modes without redirecting",
   let redirects = 0;
   const access = createYamAccountAccess({
     readAccount: () => ({ authenticated: true, token: "factory-token" }),
-    redirectToSignIn: () => { redirects += 1; },
+    openSignIn: () => { redirects += 1; },
   });
 
   assert.equal(access.isEligible(), true);

@@ -1,7 +1,6 @@
 import {
   getOnlineAccountGate,
   readFactoryAccountSession,
-  redirectToFactoryAccountSignIn,
 } from "../../js/platform/api/factory-account-gate.mjs";
 import { syncOnlineAccountFeatureControls } from "../../js/platform/ui/online-account-feature-gate.mjs";
 import { AUTH_SESSION_EXPIRED_EVENT } from "../../js/platform/api/auth-token.mjs";
@@ -11,7 +10,7 @@ export const FACTORY_ACCOUNT_FEATURE_MESSAGE = "Sign in to your Factory profile 
 
 export function createYamAccountAccess({
   readAccount = readFactoryAccountSession,
-  redirectToSignIn = redirectToFactoryAccountSignIn,
+  openSignIn = () => globalThis.dispatchEvent(new CustomEvent('yam-open-account')),
 } = {}) {
   function gate() {
     return getOnlineAccountGate(readAccount());
@@ -23,7 +22,7 @@ export function createYamAccountAccess({
 
   function requireFactoryAccount() {
     if (isEligible()) return true;
-    redirectToSignIn();
+    openSignIn();
     return false;
   }
 

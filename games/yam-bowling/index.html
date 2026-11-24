@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="styles/match.css" />
     <link rel="stylesheet" href="styles/bowl3d.css" />
     <link rel="stylesheet" href="styles/tutorial.css" />
+    <link rel="stylesheet" href="styles/account.css" />
     <link rel="stylesheet" href="styles/results.css" />
     <link rel="stylesheet" href="styles/dialogs.css" />
     <link rel="stylesheet" href="styles/inspector.css" />
@@ -35,7 +36,10 @@
         <span class="audio-toggle__label">Sound on</span>
       </button>
       <section class="screen title-screen is-active" id="title-screen" aria-labelledby="game-title">
-        <a class="arcade-link" href="../../grid.html">&#8592; Return to Arcade</a>
+        <div class="title-account-controls">
+          <a class="arcade-link" href="../../grid.html">&#8592; Return to Arcade</a>
+          <button class="account-button" id="native-account-button" type="button" aria-haspopup="dialog">Sign in</button>
+        </div>
         <img class="title-art" id="menu-splash-art" src="assets/menu-splashes/daisy-monroe.webp" alt="Daisy Monroe featured on the Yam Bowling title screen" decoding="async" fetchpriority="high" />
         <div class="title-vignette"></div>
         <div class="title-content">

@@ -1,0 +1,17 @@
+.menu-splash-dialog.native-account-dialog { width: min(560px, 94vw); max-height: 90dvh; overflow: auto; padding: 24px; color: #f8f4ef; background: #17151c; }
+.native-account-dialog label { display: grid; gap: 4px; margin: 10px 0; }
+.native-account-dialog label[hidden], .native-account-dialog [hidden] { display: none; }
+.native-account-dialog input { width: 100%; box-sizing: border-box; min-height: 42px; font-size: 16px; padding: 8px; color: #fff; background: #08090d; border: 1px solid #666; border-radius: 6px; }
+.native-account-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.native-account-dialog a { color: #ffe19a; }
+.title-account-controls { position: fixed; top: max(1rem, env(safe-area-inset-top)); left: max(1rem, env(safe-area-inset-left)); z-index: 70; display: flex; gap: 8px; align-items: center; }
+.title-account-controls .arcade-link, .title-account-controls .account-button { position: static; }
+.account-button { min-height: 42px; padding: .65rem .85rem; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; color: #fff; background: rgba(9,10,14,.88); font: inherit; font-size: .68rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.account-button:hover { border-color: #f32e3f; color: var(--gold); }
+.account-button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+@media (orientation: landscape) and (max-height: 600px) {
+  .title-account-controls { top: max(5px, env(safe-area-inset-top)); left: max(7px, env(safe-area-inset-left)); }
+  .title-account-controls .account-button { min-height: 34px; padding: .45rem .65rem; font-size: .58rem; }
+  .native-account-dialog { max-height: 92dvh; padding: 14px 20px; }
+  .native-account-dialog h2 { margin: 0 40px 8px 0; }
+}
